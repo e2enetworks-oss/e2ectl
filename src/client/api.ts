@@ -31,6 +31,15 @@ export interface ApiClientOptions {
   timeoutMs?: number;
 }
 
+export interface ApiClientCredentials {
+  alias?: string;
+  api_key: string;
+  auth_token: string;
+  location?: string;
+  project_id?: string;
+  source: ResolvedCredentials['source'];
+}
+
 export interface MyAccountClient {
   createNode(body: NodeCreateRequest): Promise<ApiEnvelope<NodeCreateResult>>;
   delete<TData>(
@@ -58,12 +67,12 @@ export interface MyAccountClient {
 
 export class MyAccountApiClient implements MyAccountClient {
   private readonly baseUrl: string;
-  private readonly credentials: ResolvedCredentials;
+  private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
   private readonly timeoutMs: number;
 
   constructor(
-    credentials: ResolvedCredentials,
+    credentials: ApiClientCredentials,
     options: ApiClientOptions = {}
   ) {
     this.credentials = credentials;
@@ -250,6 +259,21 @@ export class MyAccountApiClient implements MyAccountClient {
     url.searchParams.set('apikey', this.credentials.api_key);
 
     if (options.includeProjectContext ?? true) {
+      if (
+        this.credentials.project_id === undefined ||
+        this.credentials.location === undefined
+      ) {
+        throw new CliError(
+          'MyAccount project context is required for this request.',
+          {
+            code: 'MISSING_REQUEST_CONTEXT',
+            details: [`Path: ${options.path}`],
+            exitCode: EXIT_CODES.config,
+            suggestion:
+              'Pass --project-id and --location, set E2E_PROJECT_ID and E2E_LOCATION, or save default project/location values on the selected profile.'
+          }
+        );
+      }
       url.searchParams.set('project_id', this.credentials.project_id);
       url.searchParams.set('location', this.credentials.location);
     }

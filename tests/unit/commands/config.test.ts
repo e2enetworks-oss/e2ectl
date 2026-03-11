@@ -79,7 +79,7 @@ describe('config commands', () => {
     return filePath;
   }
 
-  it('adds a profile after validation and prints masked json output', async () => {
+  it('adds a profile with optional default context and prints masked json output', async () => {
     const { runtime, stdout, validator } = createRuntimeFixture();
     const program = createProgram(runtime);
 
@@ -95,28 +95,37 @@ describe('config commands', () => {
       'api-123456',
       '--auth-token',
       'auth-654321',
-      '--project-id',
+      '--default-project-id',
       '12345',
-      '--location',
+      '--default-location',
       'Delhi'
     ]);
 
-    expect(validator.calls).toHaveLength(1);
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-123456',
+        auth_token: 'auth-654321',
+        default_project_id: '12345',
+        default_location: 'Delhi'
+      }
+    ]);
     expect(stdout.buffer).toContain('"action": "saved"');
     expect(stdout.buffer).toContain('"alias": "prod"');
     expect(stdout.buffer).toContain('"api_key": "****3456"');
     expect(stdout.buffer).toContain('"auth_token": "****4321"');
+    expect(stdout.buffer).toContain('"default_project_id": "12345"');
+    expect(stdout.buffer).toContain('"default_location": "Delhi"');
   });
 
-  it('lists profiles with masked table output', async () => {
+  it('lists profiles with masked table output and default context columns', async () => {
     const { runtime, stdout, store } = createRuntimeFixture();
     const program = createProgram(runtime);
 
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      project_id: '12345',
-      location: 'Delhi'
+      default_project_id: '12345',
+      default_location: 'Delhi'
     });
 
     await program.parseAsync(['node', 'e2ectl', 'config', 'list']);
@@ -124,6 +133,8 @@ describe('config commands', () => {
     expect(stdout.buffer).toContain('prod');
     expect(stdout.buffer).toContain('****3456');
     expect(stdout.buffer).toContain('****4321');
+    expect(stdout.buffer).toContain('12345');
+    expect(stdout.buffer).toContain('Delhi');
   });
 
   it('sets the default alias', async () => {
@@ -133,14 +144,14 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      project_id: '12345',
-      location: 'Delhi'
+      default_project_id: '12345',
+      default_location: 'Delhi'
     });
     await store.upsertProfile('staging', {
       api_key: 'api-999999',
       auth_token: 'auth-888888',
-      project_id: '67890',
-      location: 'Chennai'
+      default_project_id: '67890',
+      default_location: 'Chennai'
     });
 
     await program.parseAsync([
@@ -156,6 +167,34 @@ describe('config commands', () => {
     expect(stdout.buffer).toContain('"default": "staging"');
   });
 
+  it('updates the default context for a saved alias', async () => {
+    const { runtime, stdout, store } = createRuntimeFixture();
+    const program = createProgram(runtime);
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-123456',
+      auth_token: 'auth-654321'
+    });
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'config',
+      'set-context',
+      '--alias',
+      'prod',
+      '--default-project-id',
+      '46429',
+      '--default-location',
+      'Delhi'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "set-context"');
+    expect(stdout.buffer).toContain('"default_project_id": "46429"');
+    expect(stdout.buffer).toContain('"default_location": "Delhi"');
+  });
+
   it('removes a saved profile', async () => {
     const { runtime, stdout, store } = createRuntimeFixture();
     const program = createProgram(runtime);
@@ -163,8 +202,8 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      project_id: '12345',
-      location: 'Delhi'
+      default_project_id: '12345',
+      default_location: 'Delhi'
     });
 
     await program.parseAsync([
@@ -180,7 +219,7 @@ describe('config commands', () => {
     expect(stdout.buffer).toContain('"profiles": []');
   });
 
-  it('rejects unsupported locations before validation', async () => {
+  it('rejects unsupported default locations before validation', async () => {
     const { runtime, validator } = createRuntimeFixture();
     const program = createProgram(runtime);
 
@@ -196,17 +235,15 @@ describe('config commands', () => {
         'api-123456',
         '--auth-token',
         'auth-654321',
-        '--project-id',
-        '12345',
-        '--location',
+        '--default-location',
         'Noida'
       ])
-    ).rejects.toThrow(/Unsupported location/i);
+    ).rejects.toThrow(/Unsupported default location/i);
     expect(validator.calls).toHaveLength(0);
   });
 
-  it('imports aliases, prompts for shared metadata, and offers a default alias', async () => {
-    const { confirm, prompt, runtime, stdout, validator } =
+  it('imports aliases, prompts for shared default context, and offers a default alias', async () => {
+    const { confirm, prompt, runtime, stdout, store, validator } =
       createRuntimeFixture();
     const program = createProgram(runtime);
     const filePath = await createImportFile({
@@ -238,24 +275,38 @@ describe('config commands', () => {
     expect(validator.calls).toEqual([
       {
         api_key: 'api-prod',
-        auth_token: 'auth-prod',
-        project_id: '46429',
-        location: 'Delhi'
+        auth_token: 'auth-prod'
       },
       {
         api_key: 'api-staging',
-        auth_token: 'auth-staging',
-        project_id: '46429',
-        location: 'Delhi'
+        auth_token: 'auth-staging'
       }
     ]);
+
+    const config = await store.read();
+    expect(config.default).toBe('prod');
+    expect(config.profiles.prod).toMatchObject({
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
+    expect(config.profiles.staging).toMatchObject({
+      api_key: 'api-staging',
+      auth_token: 'auth-staging',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
     expect(stdout.buffer).toContain('Imported 2 profiles');
     expect(stdout.buffer).toContain('Saved aliases: prod, staging.');
+    expect(stdout.buffer).toContain('Saved default project ID "46429"');
+    expect(stdout.buffer).toContain('Saved default location "Delhi"');
     expect(stdout.buffer).toContain('Set "prod" as the default profile.');
   });
 
-  it('sets the requested default alias during import without prompting', async () => {
-    const { confirm, prompt, runtime, stdout } = createRuntimeFixture();
+  it('supports a fully non-interactive import with explicit defaults', async () => {
+    const { confirm, prompt, runtime, stdout, store, validator } =
+      createRuntimeFixture();
     const program = createProgram(runtime);
     const filePath = await createImportFile({
       prod: {
@@ -272,9 +323,9 @@ describe('config commands', () => {
       'import',
       '--file',
       filePath,
-      '--project-id',
+      '--default-project-id',
       '46429',
-      '--location',
+      '--default-location',
       'Delhi',
       '--default',
       'prod',
@@ -283,49 +334,28 @@ describe('config commands', () => {
 
     expect(confirm).not.toHaveBeenCalled();
     expect(prompt).not.toHaveBeenCalled();
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-prod',
+        auth_token: 'auth-prod'
+      }
+    ]);
+
+    const config = await store.read();
+    expect(config.default).toBe('prod');
+    expect(config.profiles.prod).toMatchObject({
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
     expect(stdout.buffer).toContain('"action": "imported"');
     expect(stdout.buffer).toContain('"default": "prod"');
     expect(stdout.buffer).toContain('"imported_count": 1');
   });
 
-  it('skips the default prompt when a default profile already exists', async () => {
+  it('allows non-interactive imports without default project or location', async () => {
     const { confirm, prompt, runtime, stdout, store } = createRuntimeFixture();
-    const program = createProgram(runtime);
-    const filePath = await createImportFile({
-      prod: {
-        api_auth_token: 'auth-prod',
-        api_key: 'api-prod'
-      }
-    });
-
-    await store.upsertProfile('existing', {
-      api_key: 'api-existing',
-      auth_token: 'auth-existing',
-      project_id: '12345',
-      location: 'Delhi'
-    });
-
-    await program.parseAsync([
-      'node',
-      'e2ectl',
-      'config',
-      'import',
-      '--file',
-      filePath,
-      '--project-id',
-      '46429',
-      '--location',
-      'Delhi',
-      '--no-input'
-    ]);
-
-    expect(confirm).not.toHaveBeenCalled();
-    expect(prompt).not.toHaveBeenCalled();
-    expect(stdout.buffer).toContain('Default profile remains "existing".');
-  });
-
-  it('fails in non-interactive mode when project metadata is missing', async () => {
-    const { runtime } = createRuntimeFixture();
     const program = createProgram({
       ...runtime,
       isInteractive: false
@@ -337,16 +367,26 @@ describe('config commands', () => {
       }
     });
 
-    await expect(
-      program.parseAsync([
-        'node',
-        'e2ectl',
-        'config',
-        'import',
-        '--file',
-        filePath,
-        '--no-input'
-      ])
-    ).rejects.toThrow(/Project ID is required/i);
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      'config',
+      'import',
+      '--file',
+      filePath,
+      '--no-input'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(prompt).not.toHaveBeenCalled();
+
+    const config = await store.read();
+    expect(config.default).toBeUndefined();
+    expect(config.profiles.prod).toEqual({
+      api_key: 'api-prod',
+      auth_token: 'auth-prod'
+    });
+    expect(stdout.buffer).toContain('Imported 1 profile');
+    expect(stdout.buffer).toContain('No default profile was set.');
   });
 });

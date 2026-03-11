@@ -45,11 +45,12 @@ Update these when behavior changes:
 - [README.md](../README.md) for operator-facing usage
 - [docs/DEMO.md](./DEMO.md) for live walkthrough commands
 - [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
-- [docs/ROADMAP.md](./ROADMAP.md) for milestone state
-- [docs/spec/v1](./spec/v1/) for milestone-level implementation notes
+- [docs/ROADMAP.md](./ROADMAP.md) for future roadmap and scope direction
+- [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
 
 ## Release Notes
 
 - Keep [CHANGELOG.md](../CHANGELOG.md) current for user-visible changes.
 - Do not bump the package version unless a release is being prepared.
 - Prefer Conventional Commits for history clarity.
+- Keep the doc set small: avoid reintroducing milestone-by-milestone implementation history once it is absorbed into the maintained docs above.

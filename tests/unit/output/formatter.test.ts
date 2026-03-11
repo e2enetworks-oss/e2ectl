@@ -21,14 +21,14 @@ describe('formatter helpers', () => {
     expect(json).toBe('{\n  "apple": 1,\n  "zebra": 2\n}\n');
   });
 
-  it('masks secrets in profile summaries and table output', () => {
+  it('masks secrets in profile summaries and shows alias defaults', () => {
     const config: ConfigFile = {
       profiles: {
         prod: {
           api_key: '12345678',
           auth_token: 'abcdefgh',
-          project_id: '42',
-          location: 'Delhi'
+          default_project_id: '42',
+          default_location: 'Delhi'
         }
       },
       default: 'prod'
@@ -39,10 +39,14 @@ describe('formatter helpers', () => {
 
     expect(summary[0]).toMatchObject({
       api_key: '****5678',
-      auth_token: '****efgh'
+      auth_token: '****efgh',
+      default_project_id: '42',
+      default_location: 'Delhi'
     });
     expect(table).toContain('****5678');
-    expect(table).toContain('prod');
+    expect(table).toContain('Default Project ID');
+    expect(table).toContain('Default Location');
+    expect(table).toContain('Delhi');
   });
 
   it('keeps masked profile secrets compact even for very long tokens', () => {
@@ -51,8 +55,8 @@ describe('formatter helpers', () => {
         prod: {
           api_key: '1234567890abcdef',
           auth_token: 'x'.repeat(2048) + 'hUpk',
-          project_id: '46429',
-          location: 'Delhi'
+          default_project_id: '46429',
+          default_location: 'Delhi'
         }
       },
       default: 'prod'

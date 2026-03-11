@@ -1,8 +1,8 @@
 export interface ProfileConfig {
   api_key: string;
   auth_token: string;
-  project_id: string;
-  location: string;
+  default_project_id?: string;
+  default_location?: string;
 }
 
 export const VALID_LOCATIONS = ['Delhi', 'Chennai'] as const;
@@ -12,7 +12,11 @@ export interface ConfigFile {
   default?: string;
 }
 
-export interface ResolvedCredentials extends ProfileConfig {
+export interface ResolvedCredentials {
+  api_key: string;
+  auth_token: string;
+  project_id: string;
+  location: string;
   alias?: string;
   source: 'env' | 'profile' | 'mixed';
 }
@@ -22,22 +26,23 @@ export interface ProfileSummary {
   isDefault: boolean;
   api_key: string;
   auth_token: string;
-  project_id: string;
-  location: string;
+  default_project_id: string;
+  default_location: string;
 }
 
-export const REQUIRED_CREDENTIAL_FIELDS = [
-  'api_key',
-  'auth_token',
-  'project_id',
-  'location'
-] as const;
+export const REQUIRED_AUTH_FIELDS = ['api_key', 'auth_token'] as const;
 
-export type CredentialField = (typeof REQUIRED_CREDENTIAL_FIELDS)[number];
+export const REQUIRED_CONTEXT_FIELDS = ['project_id', 'location'] as const;
 
-export const ENV_VAR_BY_FIELD: Record<CredentialField, string> = {
+export type AuthField = (typeof REQUIRED_AUTH_FIELDS)[number];
+export type ContextField = (typeof REQUIRED_CONTEXT_FIELDS)[number];
+
+export const AUTH_ENV_VAR_BY_FIELD: Record<AuthField, string> = {
   api_key: 'E2E_API_KEY',
-  auth_token: 'E2E_AUTH_TOKEN',
+  auth_token: 'E2E_AUTH_TOKEN'
+};
+
+export const CONTEXT_ENV_VAR_BY_FIELD: Record<ContextField, string> = {
   project_id: 'E2E_PROJECT_ID',
   location: 'E2E_LOCATION'
 };

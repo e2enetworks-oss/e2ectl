@@ -117,11 +117,6 @@ function requireAuthToken(
     return apiAuthToken.trim();
   }
 
-  const authToken = profile.auth_token;
-  if (typeof authToken === 'string' && authToken.trim().length > 0) {
-    return authToken.trim();
-  }
-
   throw new CliError(
     `Alias "${alias}" is missing api_auth_token in the import file.`,
     {

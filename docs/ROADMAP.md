@@ -1,104 +1,45 @@
-# e2ectl Prototype Roadmap
+# e2ectl Roadmap
 
-## M0 — Scaffold
+## Current v1 Baseline
 
-**Status:** DONE
+The current CLI baseline is production-oriented for the shipped surface area:
 
-Acceptance criteria:
+- alias-based auth profiles where each alias stores one API key and bearer-token pair
+- optional per-alias defaults for `project_id` and `location`
+- command-level context overrides with deterministic `--json` output
+- config management, node catalog discovery, node list/get/create/delete
+- unit-test coverage plus an explicit manual live-check lane
+- CI gates for format, lint, typecheck, tests, and build
 
-- Repository layout, TypeScript toolchain, CI, Make targets, and starter docs exist
-- `e2ectl --help` works from the development entrypoint
-- `make lint`, `make test`, and `make build` pass locally
+## Near-Term Priorities
 
-## M1 — Config/Auth/Types
+### 1. Release Readiness
 
-**Status:** DONE
+- finalize npm publishing metadata and release workflow
+- tighten changelog/versioning discipline for `1.x`
+- document the supported compatibility contract for JSON output
 
-Acceptance criteria:
+### 2. Broader Node Ergonomics
 
-- Config file types and filesystem store support `~/.e2e/config.json`
-- Auth resolution supports env overrides plus profile/default fallback
-- Secrets can be masked for display
-- Deterministic JSON formatting exists for agent-safe output
-- Errors are actionable and mapped to stable exit codes
+- improve node create UX beyond raw `plan` and `image` flags
+- add more guided discovery around valid create inputs
+- expand safe defaults only where the backend contract is well understood
 
-## M2 — API Client
+### 3. Integration Verification
 
-**Status:** DONE
+- add a stronger manual integration runbook for write paths
+- decide whether a gated non-production integration suite should exist outside CI
+- keep CI itself deterministic and free of live-account dependencies
 
-Acceptance criteria:
+### 4. Service Expansion
 
-- Internal client injects bearer auth and required query params
-- API envelope parsing checks `code`, `message`, `errors`, and `data`
-- Network, auth, and API failures map to actionable CLI errors
+- extend coverage beyond config and node commands
+- preserve the same internal client and output contracts as new services are added
+- keep human-readable defaults and machine-readable JSON aligned across commands
 
-## M3 — Config Commands
+## Change Management Rules
 
-**Status:** DONE
-
-Acceptance criteria:
-
-- `config add`, `list`, `set-default`, and `remove` are implemented
-- Credentials are validated before save
-- List output masks secrets in human mode and is deterministic in JSON mode
-
-## M4 — Node Read Commands
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- `node list` and `node get` are implemented
-- Human output uses stable table columns
-- `--json` output is deterministic and script-friendly
-
-## M5 — Node Write Commands
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- `node create` and `node delete` are implemented
-- Create uses sensible defaults for non-required fields
-- Delete confirms unless `--force`
-
-## M6 — Test Suite
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- Unit tests cover config CRUD, auth resolution, formatter behavior, and command wiring
-- Manual read-only e2e tests exist and are skipped in CI
-- Test setup avoids touching the real home directory
-
-## M7 — CI/Docs/Polish
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- README and CONTRIBUTING fully describe install, config, and command usage
-- CI covers the intended Node.js matrix and repository gates
-- Release and maintenance docs are sufficient for external contributors
-
-## M8 — Node Catalog Discovery
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- `node catalog os` lists command-ready OS rows for prototype node creation
-- `node catalog plans` lists valid plan and image pairs for a selected OS row
-- `e2ectl help`, `e2ectl node help`, and `e2ectl node catalog --help` expose the discovery-first create flow
-- The manual read-only suite covers the catalog endpoints against a real MyAccount project
-
-## M9 — Config Import UX
-
-**Status:** DONE
-
-Acceptance criteria:
-
-- `config import --file ...` imports aliases and secrets from the downloaded credential JSON format
-- Missing shared metadata prompts once for `project_id` and `location` in interactive mode
-- Successful imports print a summary and can immediately set a default alias
+- update [README.md](../README.md) when the command surface or operator flow changes
+- update [docs/DEMO.md](./DEMO.md) when demo or manual verification commands change
+- update [CONTRIBUTING.md](../CONTRIBUTING.md) and [docs/MAINTAINING.md](./MAINTAINING.md) when contributor or release workflow changes
+- keep [CHANGELOG.md](../CHANGELOG.md) current for user-visible behavior changes

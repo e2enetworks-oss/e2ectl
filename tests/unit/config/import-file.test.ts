@@ -19,24 +19,6 @@ describe('import-file parser', () => {
     });
   });
 
-  it('accepts auth_token for compatibility with stored config shapes', () => {
-    const parsed = parseImportedProfiles(
-      JSON.stringify({
-        prod: {
-          api_key: 'api-key',
-          auth_token: 'auth-token'
-        }
-      })
-    );
-
-    expect(parsed).toEqual({
-      prod: {
-        api_key: 'api-key',
-        auth_token: 'auth-token'
-      }
-    });
-  });
-
   it('rejects malformed top-level values', () => {
     expect(() => parseImportedProfiles(JSON.stringify(['prod']))).toThrow(
       /JSON object keyed by alias/i
@@ -49,6 +31,19 @@ describe('import-file parser', () => {
         JSON.stringify({
           prod: {
             api_key: 'api-key'
+          }
+        })
+      )
+    ).toThrow(/missing api_auth_token/i);
+  });
+
+  it('rejects auth_token-only shapes because import requires downloaded credential JSON', () => {
+    expect(() =>
+      parseImportedProfiles(
+        JSON.stringify({
+          prod: {
+            api_key: 'api-key',
+            auth_token: 'auth-token'
           }
         })
       )

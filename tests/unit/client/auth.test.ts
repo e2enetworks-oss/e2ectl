@@ -7,14 +7,14 @@ describe('resolveCredentials', () => {
       prod: {
         api_key: 'api-prod',
         auth_token: 'auth-prod',
-        project_id: '123',
-        location: 'Delhi'
+        default_project_id: '123',
+        default_location: 'Delhi'
       }
     },
     default: 'prod'
   };
 
-  it('returns the default profile when environment overrides are not set', () => {
+  it('returns auth and default context from the saved default profile', () => {
     const result = resolveCredentials({
       config,
       configPath: '/tmp/config.json',
@@ -31,21 +31,23 @@ describe('resolveCredentials', () => {
     });
   });
 
-  it('overrides profile values with environment variables', () => {
+  it('applies flag and env context overrides on top of saved auth', () => {
     const result = resolveCredentials({
       alias: 'prod',
       config,
       env: {
-        E2E_PROJECT_ID: '456'
-      }
+        E2E_LOCATION: 'Chennai'
+      },
+      projectId: '456'
     });
 
     expect(result.project_id).toBe('456');
+    expect(result.location).toBe('Chennai');
     expect(result.api_key).toBe('api-prod');
-    expect(result.source).toBe('mixed');
+    expect(result.source).toBe('profile');
   });
 
-  it('uses environment credentials without a saved profile', () => {
+  it('uses environment auth and context without a saved profile', () => {
     const result = resolveCredentials({
       config: { profiles: {} },
       env: {
@@ -66,7 +68,7 @@ describe('resolveCredentials', () => {
     expect(result.alias).toBeUndefined();
   });
 
-  it('throws an actionable error when credentials are incomplete', () => {
+  it('throws an actionable error when auth is incomplete', () => {
     expect(() =>
       resolveCredentials({
         config: { profiles: {} },
@@ -75,7 +77,25 @@ describe('resolveCredentials', () => {
           E2E_API_KEY: 'api-env'
         }
       })
-    ).toThrowError(/Unable to resolve MyAccount credentials/);
+    ).toThrowError(/Unable to resolve MyAccount authentication/);
+  });
+
+  it('throws an actionable error when context is missing', () => {
+    expect(() =>
+      resolveCredentials({
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod'
+            }
+          },
+          default: 'prod'
+        },
+        configPath: '/tmp/config.json',
+        env: {}
+      })
+    ).toThrowError(/Unable to resolve MyAccount project context/);
   });
 
   it('throws when the requested alias does not exist', () => {
@@ -89,7 +109,7 @@ describe('resolveCredentials', () => {
     ).toThrowError(/Profile "missing" was not found/);
   });
 
-  it('prefers environment credentials over the saved default profile', () => {
+  it('prefers environment auth over the saved default profile auth', () => {
     const result = resolveCredentials({
       config,
       env: {

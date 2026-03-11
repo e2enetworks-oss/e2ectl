@@ -72,15 +72,39 @@ describe('MyAccountApiClient', () => {
       });
     });
 
-    const client = new MyAccountApiClient(credentials, {
-      baseUrl: 'https://example.test/',
-      fetchFn
-    });
+    const client = new MyAccountApiClient(
+      {
+        api_key: 'api-key',
+        auth_token: 'auth-token',
+        source: 'profile'
+      },
+      {
+        baseUrl: 'https://example.test/',
+        fetchFn
+      }
+    );
 
     await client.validateCredentials();
 
     expect(seenInput).toBe(
       'https://example.test/iam/multi-crn/?apikey=api-key'
+    );
+  });
+
+  it('fails early when a project-scoped request has no resolved context', async () => {
+    const client = new MyAccountApiClient(
+      {
+        api_key: 'api-key',
+        auth_token: 'auth-token',
+        source: 'profile'
+      },
+      {
+        fetchFn: vi.fn()
+      }
+    );
+
+    await expect(client.listNodes()).rejects.toThrow(
+      /project context is required/i
     );
   });
 

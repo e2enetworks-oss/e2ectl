@@ -24,8 +24,8 @@ export function summarizeProfiles(config: ConfigFile): ProfileSummary[] {
       isDefault: config.default === alias,
       api_key: maskSecret(profile.api_key),
       auth_token: maskSecret(profile.auth_token),
-      project_id: profile.project_id,
-      location: profile.location
+      default_project_id: profile.default_project_id ?? '',
+      default_location: profile.default_location ?? ''
     }));
 }
 
@@ -36,8 +36,8 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       'Default',
       'API Key',
       'Auth Token',
-      'Project ID',
-      'Location'
+      'Default Project ID',
+      'Default Location'
     ]
   });
 
@@ -47,8 +47,8 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       profile.isDefault ? 'yes' : '',
       profile.api_key,
       profile.auth_token,
-      profile.project_id,
-      profile.location
+      profile.default_project_id,
+      profile.default_location
     ]);
   }
 

@@ -93,6 +93,26 @@ export class ConfigStore {
     return normalizeConfig(nextConfig);
   }
 
+  async updateProfile(
+    alias: string,
+    patch: Partial<ProfileConfig>
+  ): Promise<ConfigFile> {
+    const config = await this.read();
+    const currentProfile = config.profiles[alias];
+    const nextConfig: ConfigFile = {
+      ...config,
+      profiles: {
+        ...config.profiles,
+        [alias]: normalizeProfile({
+          ...currentProfile,
+          ...patch
+        } as ProfileConfig)
+      }
+    };
+    await this.write(nextConfig);
+    return normalizeConfig(nextConfig);
+  }
+
   async hasProfile(alias: string): Promise<boolean> {
     const config = await this.read();
     return config.profiles[alias] !== undefined;
@@ -107,9 +127,9 @@ export function createEmptyConfig(): ConfigFile {
 
 export function normalizeConfig(config: ConfigFile): ConfigFile {
   const sortedProfiles = Object.fromEntries(
-    Object.entries(config.profiles).sort(([leftAlias], [rightAlias]) =>
-      leftAlias.localeCompare(rightAlias)
-    )
+    Object.entries(config.profiles)
+      .map(([alias, profile]) => [alias, normalizeProfile(profile)] as const)
+      .sort(([leftAlias], [rightAlias]) => leftAlias.localeCompare(rightAlias))
   );
 
   return config.default === undefined
@@ -122,6 +142,23 @@ export function normalizeConfig(config: ConfigFile): ConfigFile {
       };
 }
 
+function normalizeProfile(profile: ProfileConfig): ProfileConfig {
+  const normalizedProfile: ProfileConfig = {
+    api_key: profile.api_key.trim(),
+    auth_token: profile.auth_token.trim()
+  };
+
+  if (isNonEmptyString(profile.default_project_id)) {
+    normalizedProfile.default_project_id = profile.default_project_id.trim();
+  }
+
+  if (isNonEmptyString(profile.default_location)) {
+    normalizedProfile.default_location = profile.default_location.trim();
+  }
+
+  return normalizedProfile;
+}
+
 function firstProfileAlias(
   profiles: Record<string, ProfileConfig>
 ): string | undefined {
@@ -130,4 +167,8 @@ function firstProfileAlias(
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+function isNonEmptyString(value: string | undefined): value is string {
+  return value !== undefined && value.trim().length > 0;
 }

@@ -23,9 +23,7 @@ describe('ApiCredentialValidator', () => {
     await expect(
       validator.validate({
         api_key: 'api-key',
-        auth_token: 'auth-token',
-        project_id: '123',
-        location: 'Delhi'
+        auth_token: 'auth-token'
       })
     ).resolves.toEqual({
       valid: true,

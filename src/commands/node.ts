@@ -23,6 +23,8 @@ interface GlobalOptions {
 
 interface NodeAliasOptions {
   alias?: string;
+  location?: string;
+  projectId?: string;
 }
 
 interface NodeCreateCommandOptions extends NodeAliasOptions {
@@ -42,8 +44,8 @@ interface NodeCatalogPlansCommandOptions extends NodeAliasOptions {
   osVersion: string;
 }
 
-// Keep the prototype create payload aligned with the public-node serializer:
-// send only the explicit prototype choices here and let the backend apply
+// Keep the create payload aligned with the public-node serializer:
+// send only the explicit CLI choices here and let the backend apply
 // defaults for SG, VPC, reserve IP, encryption, and volume fields.
 const DEFAULT_NODE_CREATE_REQUEST = {
   backups: false,
@@ -71,8 +73,13 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       'List nodes for the selected profile or environment credentials.'
     )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .action(async (options: NodeAliasOptions, commandInstance: Command) => {
-      const client = await createNodeClient(runtime, options.alias);
+      const client = await createNodeClient(runtime, options);
       const response = await client.listNodes();
 
       if (commandInstance.optsWithGlobals<GlobalOptions>().json ?? false) {
@@ -97,15 +104,20 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   command
     .command('create')
     .description(
-      'Create a new node with the prototype defaults. Discover valid plan and image pairs with `e2ectl node catalog` first.'
+      'Create a new node with the documented default fields. Discover valid plan and image pairs with `e2ectl node catalog` first.'
     )
     .requiredOption('--name <name>', 'Node name.')
     .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
     .requiredOption('--image <image>', 'MyAccount image identifier.')
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .action(
       async (options: NodeCreateCommandOptions, commandInstance: Command) => {
-        const client = await createNodeClient(runtime, options.alias);
+        const client = await createNodeClient(runtime, options);
         const request = buildNodeCreateRequest(options);
         const response = await client.createNode(request);
 
@@ -129,6 +141,11 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     .command('get <nodeId>')
     .description('Get details for a node.')
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .action(
       async (
         nodeId: string,
@@ -136,7 +153,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         commandInstance: Command
       ) => {
         assertNodeId(nodeId);
-        const client = await createNodeClient(runtime, options.alias);
+        const client = await createNodeClient(runtime, options);
         const response = await client.getNode(nodeId);
 
         if (commandInstance.optsWithGlobals<GlobalOptions>().json ?? false) {
@@ -157,6 +174,11 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     .command('delete <nodeId>')
     .description('Delete a node.')
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .option('--force', 'Skip the interactive confirmation prompt.')
     .action(
       async (
@@ -179,7 +201,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
           }
         }
 
-        const client = await createNodeClient(runtime, options.alias);
+        const client = await createNodeClient(runtime, options);
         const response = await client.deleteNode(nodeId);
 
         if (globalOptions.json ?? false) {
@@ -218,8 +240,13 @@ function buildNodeCatalogCommand(runtime: CliRuntime): Command {
       'List OS rows that can be used to query valid plan/image pairs.'
     )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .action(async (options: NodeAliasOptions, commandInstance: Command) => {
-      const client = await createNodeClient(runtime, options.alias);
+      const client = await createNodeClient(runtime, options);
       const response = await client.listNodeCatalogOs();
       const entries = summarizeNodeCatalogOs(response.data);
 
@@ -261,12 +288,17 @@ function buildNodeCatalogCommand(runtime: CliRuntime): Command {
     )
     .requiredOption('--os-version <osVersion>', 'Operating system version.')
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .option(
+      '--project-id <projectId>',
+      'Override the project id for this command.'
+    )
+    .option('--location <location>', 'Override the location for this command.')
     .action(
       async (
         options: NodeCatalogPlansCommandOptions,
         commandInstance: Command
       ) => {
-        const client = await createNodeClient(runtime, options.alias);
+        const client = await createNodeClient(runtime, options);
         const query = buildNodeCatalogQuery(options);
         const response = await client.listNodeCatalogPlans(query);
         const plans = sortNodeCatalogPlans(response.data);
@@ -301,12 +333,25 @@ function buildNodeCatalogCommand(runtime: CliRuntime): Command {
   return command;
 }
 
-async function createNodeClient(runtime: CliRuntime, alias?: string) {
+async function createNodeClient(
+  runtime: CliRuntime,
+  options: NodeAliasOptions
+) {
   const config = await runtime.store.read();
   const credentials = resolveCredentials({
-    ...(alias === undefined ? {} : { alias }),
+    ...(options.alias === undefined ? {} : { alias: options.alias }),
     config,
-    configPath: runtime.store.configPath
+    configPath: runtime.store.configPath,
+    ...(options.projectId === undefined
+      ? {}
+      : {
+          projectId: options.projectId
+        }),
+    ...(options.location === undefined
+      ? {}
+      : {
+          location: options.location
+        })
   });
 
   return runtime.createApiClient(credentials);

@@ -1,6 +1,6 @@
 # Demo Runbook
 
-This runbook is the operator-facing script for demonstrating the current `e2ectl` prototype against a real MyAccount project.
+This runbook is the operator-facing script for demonstrating the current `e2ectl` CLI against a real MyAccount project.
 
 It assumes:
 
@@ -47,8 +47,8 @@ npm run --silent dev -- config import --file "/path/to/downloaded-config.json"
 What happens:
 
 - `e2ectl` reads every alias, API key, and auth token from the file
-- prompts for `Project ID` once
-- prompts for `Location` once
+- optionally prompts for a default `Project ID`
+- optionally prompts for a default `Location`
 - validates each alias before saving
 - prints a success summary
 - prompts to set a default alias when the config does not already have one
@@ -64,8 +64,8 @@ If you prefer a fully non-interactive run:
 ```bash
 npm run --silent dev -- config import \
   --file '/Users/hiteshsadhwani/Downloads/config (4).json' \
-  --project-id 46429 \
-  --location Delhi \
+  --default-project-id 46429 \
+  --default-location Delhi \
   --default prod \
   --no-input
 ```
@@ -77,8 +77,8 @@ npm run --silent dev -- config add \
   --alias prod \
   --api-key <api-key> \
   --auth-token <auth-token> \
-  --project-id 46429 \
-  --location Delhi
+  --default-project-id 46429 \
+  --default-location Delhi
 ```
 
 Confirm the saved aliases:
@@ -121,7 +121,7 @@ npm run --silent dev -- node catalog os
 
 For standard distro rows like Ubuntu, Debian, AlmaLinux, and CentOS, the human table usually omits the `Software Version` column because the backend sends that field as blank. If the API returns real software-version values for application-style images, the column appears automatically.
 
-For the current prototype demo, use:
+For the current demo, use:
 
 - `display category`: `Linux Virtual Node`
 - `category`: `Ubuntu`
@@ -170,7 +170,7 @@ npm run --silent dev -- node create \
   --image Ubuntu-24.04-Distro
 ```
 
-Current prototype defaults applied by the CLI:
+Current default fields applied by the CLI:
 
 - `backups=false`
 - `disable_password=true`
@@ -239,9 +239,10 @@ e2ectl node list
 
 - `config import --file ...` is the recommended first-time setup path
 - a default alias set during import means later commands do not need `--alias prod`
+- `--project-id` and `--location` can override alias defaults on any node command
 - environment variables still override saved profile values
 - CI does not run live API integration tests; live verification is manual
-- the current prototype has been manually verified for:
+- the current CLI has been manually verified for:
   - config profile flow
   - help output
   - OS catalog discovery

@@ -1,8 +1,8 @@
 # e2ectl
 
-`e2ectl` is an OSS prototype CLI for managing E2E Networks MyAccount resources from the terminal.
+`e2ectl` is an OSS CLI for managing E2E Networks MyAccount resources from the terminal.
 
-Current prototype scope:
+Current v1 scope:
 
 - local profile and auth management
 - node read commands
@@ -51,13 +51,15 @@ Profiles are stored in `~/.e2e/config.json`:
     "prod": {
       "api_key": "xxxx",
       "auth_token": "yyyy",
-      "project_id": "12345",
-      "location": "Delhi"
+      "default_project_id": "12345",
+      "default_location": "Delhi"
     }
   },
   "default": "prod"
 }
 ```
+
+If you already have an older local config that saved `project_id` and `location` directly on the profile, re-import it or run `e2ectl config set-context` so the alias has `default_project_id` and `default_location` in the clean v1 schema.
 
 Supported environment overrides:
 
@@ -68,9 +70,10 @@ Supported environment overrides:
 
 Resolution order is:
 
-1. environment variables
-2. selected profile via `--alias`
-3. default saved profile
+1. command flags such as `--project-id` and `--location`
+2. environment variables
+3. selected profile via `--alias`
+4. default saved profile
 
 Add a profile:
 
@@ -79,11 +82,11 @@ e2ectl config add \
   --alias prod \
   --api-key <api-key> \
   --auth-token <bearer-token> \
-  --project-id <project-id> \
-  --location Delhi
+  --default-project-id <project-id> \
+  --default-location Delhi
 ```
 
-Credentials are validated before the profile is saved.
+The API key and bearer token are validated before the profile is saved. The default project and location are optional per-alias defaults, not part of the auth identity.
 
 Import one or more aliases from a downloaded credential file:
 
@@ -91,7 +94,7 @@ Import one or more aliases from a downloaded credential file:
 e2ectl config import --file ~/Downloads/config.json
 ```
 
-`e2ectl` reads aliases, API keys, and bearer tokens from the file, prompts once for `project_id` and `location` when needed, validates every imported alias, prints a success summary, and then offers to set a default alias if the config does not already have one.
+`e2ectl` reads aliases, API keys, and bearer tokens from the file, can optionally prompt for a default project id and default location to apply to the imported aliases, validates every imported alias, prints a success summary, and then offers to set a default alias if the config does not already have one.
 
 Set a saved profile as the default alias:
 
@@ -100,16 +103,24 @@ e2ectl config set-default --alias prod
 e2ectl config list
 ```
 
-After that, `node` commands can omit `--alias`.
+After that, `node` commands can omit `--alias`. You can also update alias defaults later:
+
+```bash
+e2ectl config set-context \
+  --alias prod \
+  --default-project-id 46429 \
+  --default-location Delhi
+```
 
 ## Command Surface
 
 Config commands:
 
 ```bash
-e2ectl config add --alias <name> --api-key <key> --auth-token <token> --project-id <id> --location <Delhi|Chennai>
-e2ectl config import --file <path> [--project-id <id>] [--location <Delhi|Chennai>] [--default <alias>] [--force] [--no-input] [--json]
+e2ectl config add --alias <name> --api-key <key> --auth-token <token> [--default-project-id <id>] [--default-location <Delhi|Chennai>] [--json]
+e2ectl config import --file <path> [--default-project-id <id>] [--default-location <Delhi|Chennai>] [--default <alias>] [--force] [--no-input] [--json]
 e2ectl config list [--json]
+e2ectl config set-context --alias <name> [--default-project-id <id>] [--default-location <Delhi|Chennai>] [--json]
 e2ectl config set-default --alias <name> [--json]
 e2ectl config remove --alias <name> [--json]
 ```
@@ -117,15 +128,15 @@ e2ectl config remove --alias <name> [--json]
 Node commands:
 
 ```bash
-e2ectl node list [--alias <profile>] [--json]
-e2ectl node get <node-id> [--alias <profile>] [--json]
-e2ectl node catalog os [--alias <profile>] [--json]
-e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value> [--alias <profile>] [--json]
-e2ectl node create --name <name> --plan <plan> --image <image> [--alias <profile>] [--json]
-e2ectl node delete <node-id> [--alias <profile>] [--force] [--json]
+e2ectl node list [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--json]
+e2ectl node get <node-id> [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--json]
+e2ectl node catalog os [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--json]
+e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value> [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--json]
+e2ectl node create --name <name> --plan <plan> --image <image> [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--json]
+e2ectl node delete <node-id> [--alias <profile>] [--project-id <id>] [--location <Delhi|Chennai>] [--force] [--json]
 ```
 
-Prototype defaults for `node create`:
+Default fields for `node create`:
 
 - `backups=false`
 - `disable_password=true`
@@ -134,7 +145,7 @@ Prototype defaults for `node create`:
 - `label=default`
 - empty `ssh_keys` and `start_scripts`
 
-Recommended prototype flow:
+Recommended flow:
 
 ```bash
 e2ectl node catalog os --alias prod

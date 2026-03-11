@@ -2,6 +2,7 @@ import { createProgram } from '../../../src/cli.js';
 import type { MyAccountClient } from '../../../src/client/api.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { CliRuntime } from '../../../src/runtime.js';
+import type { ResolvedCredentials } from '../../../src/types/config.js';
 import type { NodeCreateRequest } from '../../../src/types/node.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -165,6 +166,7 @@ describe('node commands', () => {
   }): {
     confirm: ReturnType<typeof vi.fn>;
     prompt: ReturnType<typeof vi.fn>;
+    receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
     stdout: MemoryWriter;
     stub: ReturnType<typeof createNodeClientStub>;
@@ -177,10 +179,14 @@ describe('node commands', () => {
       Promise.resolve(options?.confirmResult ?? true)
     );
     const prompt = vi.fn(() => Promise.resolve(''));
+    let credentials: ResolvedCredentials | undefined;
 
     const runtime: CliRuntime = {
       confirm,
-      createApiClient: () => stub.stub,
+      createApiClient: (resolvedCredentials) => {
+        credentials = resolvedCredentials;
+        return stub.stub;
+      },
       credentialValidator: {
         validate: vi.fn()
       },
@@ -194,6 +200,7 @@ describe('node commands', () => {
     return {
       confirm,
       prompt,
+      receivedCredentials: () => credentials,
       runtime,
       stdout,
       stub
@@ -204,13 +211,13 @@ describe('node commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      project_id: '12345',
-      location: 'Delhi'
+      default_project_id: '12345',
+      default_location: 'Delhi'
     });
   }
 
-  it('lists nodes in deterministic json mode', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
+  it('lists nodes in deterministic json mode using alias defaults', async () => {
+    const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
@@ -224,8 +231,38 @@ describe('node commands', () => {
       'prod'
     ]);
 
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      project_id: '12345',
+      location: 'Delhi'
+    });
     expect(stdout.buffer).toContain('"action": "list"');
     expect(stdout.buffer).toContain('"name": "node-a"');
+  });
+
+  it('applies per-command project and location overrides', async () => {
+    const { receivedCredentials, runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      'node',
+      'list',
+      '--alias',
+      'prod',
+      '--project-id',
+      '46429',
+      '--location',
+      'Chennai'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      project_id: '46429',
+      location: 'Chennai'
+    });
   });
 
   it('gets a node in human-readable mode', async () => {
