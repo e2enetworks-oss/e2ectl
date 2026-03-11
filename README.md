@@ -10,8 +10,6 @@ Current v1 scope:
 - node create, delete, and selected action commands
 - deterministic `--json` output for automation
 
-Milestone status is tracked in [docs/ROADMAP.md](./docs/ROADMAP.md).
-
 ## Requirements
 
 - Node.js 18+
@@ -28,7 +26,7 @@ For a production build:
 
 ```bash
 make build
-node dist/index.js --help
+node dist/app/index.js --help
 ```
 
 To install the CLI command locally:
@@ -39,7 +37,8 @@ npm link
 e2ectl --help
 ```
 
-For a copy-paste demo walkthrough, use [docs/DEMO.md](./docs/DEMO.md).
+For architecture and contribution rules, use [CONTRIBUTING.md](./CONTRIBUTING.md).
+For CI and maintenance expectations, use [docs/MAINTAINING.md](./docs/MAINTAINING.md).
 
 ## Configuration And Auth
 
@@ -58,8 +57,6 @@ Profiles are stored in `~/.e2e/config.json`:
   "default": "prod"
 }
 ```
-
-If you already have an older local config that saved `project_id` and `location` directly on the profile, re-import it or run `e2ectl config set-context` so the alias has `default_project_id` and `default_location` in the clean v1 schema.
 
 Supported environment overrides:
 
@@ -170,8 +167,6 @@ e2ectl node action lock-vm <node-id> --alias prod
 e2ectl node action save-image <node-id> --name demo-node-image --alias prod
 ```
 
-For a reviewer-ready, step-by-step version including setup and verification, see [docs/DEMO.md](./docs/DEMO.md).
-
 For `node catalog os`, the human table hides the `Software Version` column when the API only returns blank values for standard distro rows. The field is still preserved in `--json` output and appears in human output when populated.
 
 ## Output And Safety
@@ -198,6 +193,25 @@ Useful local commands:
 make dev
 npm run test:manual
 ```
+
+## Source Layout
+
+The v1 source tree is organized by domain:
+
+```text
+src/
+  app/
+  core/
+  myaccount/
+  config/
+  node/
+```
+
+- `app/` wires the program and runtime only.
+- `core/` holds shared error, JSON, and masking primitives.
+- `myaccount/` contains the transport client and credential validation.
+- `config/` owns aliases, imports, defaults, and auth/context resolution.
+- `node/` owns node workflows, defaults, and rendering.
 
 ## Testing
 

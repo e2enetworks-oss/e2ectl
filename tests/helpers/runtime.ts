@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import type { OutputWriter } from '../../src/runtime.js';
+import type { OutputWriter } from '../../src/app/runtime.js';
 
 export class MemoryWriter implements OutputWriter {
   buffer = '';

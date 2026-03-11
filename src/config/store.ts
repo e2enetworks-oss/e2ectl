@@ -2,8 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { ConfigFile, ProfileConfig } from '../types/config.js';
-import { stableStringify, type JsonValue } from '../utils/json.js';
+import { stableStringify, type JsonValue } from '../core/json.js';
+import type { ConfigFile, ProfileConfig } from './types.js';
 
 const DEFAULT_DIRECTORY_NAME = '.e2e';
 const DEFAULT_CONFIG_FILE_NAME = 'config.json';

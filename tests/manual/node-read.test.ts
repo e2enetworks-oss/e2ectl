@@ -1,4 +1,4 @@
-import { MyAccountApiClient } from '../../src/client/api.js';
+import { MyAccountApiClient } from '../../src/myaccount/client.js';
 
 const runManualSuite = process.env.E2ECTL_RUN_MANUAL_E2E === '1';
 const describeManual = runManualSuite ? describe : describe.skip;
