@@ -1,6 +1,9 @@
 import type { ApiEnvelope, ApiRequestOptions } from '../types/api.js';
 import type { ResolvedCredentials } from '../types/config.js';
 import type {
+  NodeCatalogOsData,
+  NodeCatalogPlan,
+  NodeCatalogQuery,
   NodeCreateRequest,
   NodeCreateResult,
   NodeDeleteResult,
@@ -39,6 +42,10 @@ export interface MyAccountClient {
     path: string,
     options?: Omit<ApiRequestOptions, 'method' | 'path'>
   ): Promise<ApiEnvelope<TData>>;
+  listNodeCatalogOs(): Promise<ApiEnvelope<NodeCatalogOsData>>;
+  listNodeCatalogPlans(
+    query: NodeCatalogQuery
+  ): Promise<ApiEnvelope<NodeCatalogPlan[]>>;
   getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>>;
   listNodes(): Promise<NodeListEnvelope>;
   post<TData>(
@@ -113,6 +120,18 @@ export class MyAccountApiClient implements MyAccountClient {
   async validateCredentials(): Promise<ApiEnvelope<unknown>> {
     return this.get('/iam/multi-crn/', {
       includeProjectContext: false
+    });
+  }
+
+  async listNodeCatalogOs(): Promise<ApiEnvelope<NodeCatalogOsData>> {
+    return this.get<NodeCatalogOsData>('/images/os-category/');
+  }
+
+  async listNodeCatalogPlans(
+    query: NodeCatalogQuery
+  ): Promise<ApiEnvelope<NodeCatalogPlan[]>> {
+    return this.get<NodeCatalogPlan[]>('/images/', {
+      query
     });
   }
 

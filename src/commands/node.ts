@@ -2,12 +2,19 @@ import { Command } from 'commander';
 import { resolveCredentials } from '../client/auth.js';
 import {
   formatJson,
+  formatNodeCatalogOsTable,
+  formatNodeCatalogPlansTable,
   formatNodeCreateResult,
   formatNodeDetails,
-  formatNodesTable
+  formatNodesTable,
+  summarizeNodeCatalogOs
 } from '../output/formatter.js';
 import type { CliRuntime } from '../runtime.js';
-import type { NodeCreateRequest } from '../types/node.js';
+import type {
+  NodeCatalogPlan,
+  NodeCatalogQuery,
+  NodeCreateRequest
+} from '../types/node.js';
 import { CliError, EXIT_CODES } from '../utils/errors.js';
 
 interface GlobalOptions {
@@ -28,6 +35,16 @@ interface NodeDeleteCommandOptions extends NodeAliasOptions {
   force?: boolean;
 }
 
+interface NodeCatalogPlansCommandOptions extends NodeAliasOptions {
+  category: string;
+  displayCategory: string;
+  os: string;
+  osVersion: string;
+}
+
+// Keep the prototype create payload aligned with the public-node serializer:
+// send only the explicit prototype choices here and let the backend apply
+// defaults for SG, VPC, reserve IP, encryption, and volume fields.
 const DEFAULT_NODE_CREATE_REQUEST = {
   backups: false,
   default_public_ip: false,
@@ -43,6 +60,10 @@ const DEFAULT_NODE_CREATE_REQUEST = {
 
 export function buildNodeCommand(runtime: CliRuntime): Command {
   const command = new Command('node').description('Manage MyAccount nodes.');
+  const catalogCommand = buildNodeCatalogCommand(runtime);
+
+  command.helpCommand('help [command]', 'Show help for a node command');
+  command.addCommand(catalogCommand);
 
   command
     .command('list')
@@ -75,7 +96,9 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
 
   command
     .command('create')
-    .description('Create a new node with the prototype defaults.')
+    .description(
+      'Create a new node with the prototype defaults. Discover valid plan and image pairs with `e2ectl node catalog` first.'
+    )
     .requiredOption('--name <name>', 'Node name.')
     .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
     .requiredOption('--image <image>', 'MyAccount image identifier.')
@@ -182,6 +205,102 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   return command;
 }
 
+function buildNodeCatalogCommand(runtime: CliRuntime): Command {
+  const command = new Command('catalog').description(
+    'Discover valid OS, plan, and image combinations for node creation.'
+  );
+
+  command.helpCommand('help [command]', 'Show help for a node catalog command');
+
+  command
+    .command('os')
+    .description(
+      'List OS rows that can be used to query valid plan/image pairs.'
+    )
+    .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .action(async (options: NodeAliasOptions, commandInstance: Command) => {
+      const client = await createNodeClient(runtime, options.alias);
+      const response = await client.listNodeCatalogOs();
+      const entries = summarizeNodeCatalogOs(response.data);
+
+      if (commandInstance.optsWithGlobals<GlobalOptions>().json ?? false) {
+        runtime.stdout.write(
+          formatJson({
+            action: 'catalog-os',
+            entries
+          })
+        );
+        return;
+      }
+
+      if (entries.length === 0) {
+        runtime.stdout.write('No OS catalog rows found.\n');
+        return;
+      }
+
+      runtime.stdout.write(
+        `${formatNodeCatalogOsTable(entries)}\n\nUse one row with:\n` +
+          'e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>\n'
+      );
+    });
+
+  command
+    .command('plans')
+    .description('List valid plan and image pairs for a selected OS row.')
+    .requiredOption(
+      '--display-category <displayCategory>',
+      'Node display category, for example "Linux Virtual Node".'
+    )
+    .requiredOption(
+      '--category <category>',
+      'OS category, for example "Ubuntu".'
+    )
+    .requiredOption(
+      '--os <os>',
+      'Operating system family, for example "Ubuntu".'
+    )
+    .requiredOption('--os-version <osVersion>', 'Operating system version.')
+    .option('--alias <alias>', 'Saved profile alias to use for this command.')
+    .action(
+      async (
+        options: NodeCatalogPlansCommandOptions,
+        commandInstance: Command
+      ) => {
+        const client = await createNodeClient(runtime, options.alias);
+        const query = buildNodeCatalogQuery(options);
+        const response = await client.listNodeCatalogPlans(query);
+        const plans = sortNodeCatalogPlans(response.data);
+
+        if (commandInstance.optsWithGlobals<GlobalOptions>().json ?? false) {
+          runtime.stdout.write(
+            formatJson({
+              action: 'catalog-plans',
+              plans,
+              query
+            })
+          );
+          return;
+        }
+
+        if (plans.length === 0) {
+          runtime.stdout.write('No plans found for the selected OS row.\n');
+          return;
+        }
+
+        runtime.stdout.write(
+          `${formatNodeCatalogPlansTable(plans)}\n\nUse the exact plan and image values from a row with:\n` +
+            'e2ectl node create --name <name> --plan <plan> --image <image>\n'
+        );
+      }
+    );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
 async function createNodeClient(runtime: CliRuntime, alias?: string) {
   const config = await runtime.store.read();
   const credentials = resolveCredentials({
@@ -229,6 +348,29 @@ function buildNodeCreateRequest(
   };
 }
 
+function buildNodeCatalogQuery(
+  options: NodeCatalogPlansCommandOptions
+): NodeCatalogQuery {
+  return {
+    category: normalizeRequiredString(
+      options.category,
+      'Category',
+      '--category'
+    ),
+    display_category: normalizeRequiredString(
+      options.displayCategory,
+      'Display category',
+      '--display-category'
+    ),
+    os: normalizeRequiredString(options.os, 'OS', '--os'),
+    osversion: normalizeRequiredString(
+      options.osVersion,
+      'OS version',
+      '--os-version'
+    )
+  };
+}
+
 function normalizeRequiredString(
   value: string,
   label: string,
@@ -263,4 +405,25 @@ function writeDeleteCancelled(
   }
 
   runtime.stdout.write('Deletion cancelled.\n');
+}
+
+function sortNodeCatalogPlans(plans: NodeCatalogPlan[]): NodeCatalogPlan[] {
+  return [...plans].sort((left, right) => {
+    const leftKey = [
+      left.name,
+      left.plan,
+      left.image,
+      left.location ?? '',
+      left.specs?.series ?? ''
+    ].join('\u0000');
+    const rightKey = [
+      right.name,
+      right.plan,
+      right.image,
+      right.location ?? '',
+      right.specs?.series ?? ''
+    ].join('\u0000');
+
+    return leftKey.localeCompare(rightKey);
+  });
 }

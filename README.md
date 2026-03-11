@@ -6,6 +6,7 @@ Current prototype scope:
 
 - local profile and auth management
 - node read commands
+- node catalog discovery for valid plan/image pairs
 - node create and delete commands
 - deterministic `--json` output for automation
 
@@ -90,6 +91,8 @@ Node commands:
 ```bash
 e2ectl node list [--alias <profile>] [--json]
 e2ectl node get <node-id> [--alias <profile>] [--json]
+e2ectl node catalog os [--alias <profile>] [--json]
+e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value> [--alias <profile>] [--json]
 e2ectl node create --name <name> --plan <plan> --image <image> [--alias <profile>] [--json]
 e2ectl node delete <node-id> [--alias <profile>] [--force] [--json]
 ```
@@ -102,6 +105,23 @@ Prototype defaults for `node create`:
 - `default_public_ip=false`
 - `label=default`
 - empty `ssh_keys` and `start_scripts`
+
+Recommended prototype flow:
+
+```bash
+e2ectl node catalog os --alias prod
+e2ectl node catalog plans \
+  --alias prod \
+  --display-category "Linux Virtual Node" \
+  --category Ubuntu \
+  --os Ubuntu \
+  --os-version 24.04
+e2ectl node create \
+  --alias prod \
+  --name demo-node \
+  --plan <exact-plan-from-catalog> \
+  --image <exact-image-from-catalog>
+```
 
 ## Output And Safety
 
@@ -133,6 +153,7 @@ npm run test:manual
 - `make test` runs unit tests only.
 - `make build` verifies the distributable compile.
 - `npm run test:manual` runs read-only live API checks and stays skipped unless `E2ECTL_RUN_MANUAL_E2E=1`.
+- The manual suite covers OS catalog discovery, plan/image catalog discovery, and node list by default.
 
 Manual test inputs:
 

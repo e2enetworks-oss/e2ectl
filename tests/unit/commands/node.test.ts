@@ -77,6 +77,61 @@ function createNodeClientStub() {
       message: 'Success'
     })
   );
+  const listNodeCatalogOs = vi.fn(() =>
+    Promise.resolve({
+      code: 200,
+      data: {
+        category_list: [
+          {
+            OS: 'Ubuntu',
+            category: ['Linux Virtual Node'],
+            version: [
+              {
+                number_of_domains: null,
+                os: 'Ubuntu',
+                software_version: '',
+                sub_category: 'Ubuntu',
+                version: '24.04'
+              }
+            ]
+          }
+        ]
+      },
+      errors: {},
+      message: 'Success'
+    })
+  );
+  const listNodeCatalogPlans = vi.fn(() =>
+    Promise.resolve({
+      code: 200,
+      data: [
+        {
+          available_inventory_status: true,
+          currency: 'INR',
+          image: 'Ubuntu-24.04-Distro',
+          location: 'Delhi',
+          name: 'C3.8GB',
+          os: {
+            category: 'Ubuntu',
+            image: 'Ubuntu-24.04-Distro',
+            name: 'Ubuntu',
+            version: '24.04'
+          },
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+          specs: {
+            cpu: 4,
+            disk_space: 100,
+            price_per_month: 2263,
+            ram: '8.00',
+            series: 'C3',
+            sku_name: 'C3.8GB'
+          }
+        }
+      ],
+      errors: {},
+      message: 'Success'
+    })
+  );
 
   const stub: MyAccountClient = {
     createNode,
@@ -84,6 +139,8 @@ function createNodeClientStub() {
     deleteNode,
     get: vi.fn(),
     getNode,
+    listNodeCatalogOs,
+    listNodeCatalogPlans,
     listNodes,
     post: vi.fn(),
     request: vi.fn(),
@@ -94,6 +151,8 @@ function createNodeClientStub() {
     createNode,
     deleteNode,
     getNode,
+    listNodeCatalogOs,
+    listNodeCatalogPlans,
     listNodes,
     stub
   };
@@ -185,7 +244,7 @@ describe('node commands', () => {
     expect(stdout.buffer).toContain('Status: Running');
   });
 
-  it('creates a node with the prototype defaults', async () => {
+  it('creates a public-node request that stays compatible with backend serializer defaults', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -206,7 +265,9 @@ describe('node commands', () => {
       'prod'
     ]);
 
-    expect(stub.createNode).toHaveBeenCalledWith({
+    const request = stub.createNode.mock.calls[0]?.[0];
+
+    expect(request).toMatchObject({
       backups: false,
       default_public_ip: false,
       disable_password: true,
@@ -221,8 +282,76 @@ describe('node commands', () => {
       ssh_keys: [],
       start_scripts: []
     });
+    expect(request).not.toHaveProperty('security_group_id');
+    expect(request).not.toHaveProperty('vpc_id');
+    expect(request).not.toHaveProperty('subnet_id');
+    expect(request).not.toHaveProperty('reserve_ip');
+    expect(request).not.toHaveProperty('reserve_ip_pool');
+    expect(request).not.toHaveProperty('image_id');
+    expect(request).not.toHaveProperty('disk');
+    expect(request).not.toHaveProperty('is_encryption_required');
+    expect(request).not.toHaveProperty('isEncryptionEnabled');
+    expect(request).not.toHaveProperty('saved_image_template_id');
     expect(stdout.buffer).toContain('"action": "create"');
     expect(stdout.buffer).toContain('"created": 1');
+  });
+
+  it('lists OS catalog rows in deterministic json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'catalog',
+      'os',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "catalog-os"');
+    expect(stdout.buffer).toContain('"display_category": "Linux Virtual Node"');
+    expect(stdout.buffer).toContain('"os_version": "24.04"');
+  });
+
+  it('lists valid plan and image pairs for a selected catalog row', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'catalog',
+      'plans',
+      '--display-category',
+      'Linux Virtual Node',
+      '--category',
+      'Ubuntu',
+      '--os',
+      'Ubuntu',
+      '--os-version',
+      '24.04',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stub.listNodeCatalogPlans).toHaveBeenCalledWith({
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(stdout.buffer).toContain('"action": "catalog-plans"');
+    expect(stdout.buffer).toContain('"image": "Ubuntu-24.04-Distro"');
+    expect(stdout.buffer).toContain(
+      '"plan": "C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi"'
+    );
   });
 
   it('cancels deletion when the confirmation is declined', async () => {
@@ -312,5 +441,17 @@ describe('node commands', () => {
         'prod'
       ])
     ).rejects.toThrow(/Node ID must be numeric/i);
+  });
+
+  it('shows node help with the catalog namespace', () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    const nodeCommand = program.commands.find(
+      (command) => command.name() === 'node'
+    );
+
+    expect(nodeCommand).toBeDefined();
+    expect(nodeCommand?.helpInformation()).toContain('catalog');
+    expect(nodeCommand?.helpInformation()).toContain('create');
   });
 });

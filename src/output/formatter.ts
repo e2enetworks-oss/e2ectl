@@ -2,6 +2,9 @@ import Table from 'cli-table3';
 
 import type { ConfigFile, ProfileSummary } from '../types/config.js';
 import type {
+  NodeCatalogOsData,
+  NodeCatalogOsEntry,
+  NodeCatalogPlan,
   NodeCreateResult,
   NodeDetails,
   NodeSummary
@@ -71,6 +74,119 @@ export function formatNodesTable(nodes: NodeSummary[]): string {
   return table.toString();
 }
 
+export function summarizeNodeCatalogOs(
+  data: NodeCatalogOsData
+): NodeCatalogOsEntry[] {
+  return data.category_list
+    .flatMap((group) =>
+      group.version.flatMap((version) =>
+        group.category.map((displayCategory) => ({
+          category: version.sub_category,
+          display_category: displayCategory,
+          number_of_domains: version.number_of_domains ?? null,
+          os: version.os,
+          os_version: version.version,
+          software_version: version.software_version ?? ''
+        }))
+      )
+    )
+    .sort((left, right) => {
+      const leftKey = [
+        left.display_category,
+        left.category,
+        left.os,
+        left.os_version,
+        left.software_version
+      ].join('\u0000');
+      const rightKey = [
+        right.display_category,
+        right.category,
+        right.os,
+        right.os_version,
+        right.software_version
+      ].join('\u0000');
+
+      return leftKey.localeCompare(rightKey);
+    });
+}
+
+export function formatNodeCatalogOsTable(
+  entries: NodeCatalogOsEntry[]
+): string {
+  const table = new Table({
+    head: [
+      'Display Category',
+      'Category',
+      'OS',
+      'OS Version',
+      'Software Version'
+    ]
+  });
+
+  for (const entry of entries) {
+    table.push([
+      entry.display_category,
+      entry.category,
+      entry.os,
+      entry.os_version,
+      entry.software_version
+    ]);
+  }
+
+  return table.toString();
+}
+
+export function formatNodeCatalogPlansTable(plans: NodeCatalogPlan[]): string {
+  const table = new Table({
+    head: [
+      '#',
+      'SKU',
+      'Plan',
+      'Image',
+      'vCPU',
+      'RAM',
+      'Disk',
+      'Price/Month',
+      'Available'
+    ]
+  });
+
+  const sortedPlans = [...plans].sort((left, right) => {
+    const leftKey = [
+      left.name,
+      left.plan,
+      left.image,
+      left.location ?? '',
+      left.specs?.series ?? ''
+    ].join('\u0000');
+    const rightKey = [
+      right.name,
+      right.plan,
+      right.image,
+      right.location ?? '',
+      right.specs?.series ?? ''
+    ].join('\u0000');
+
+    return leftKey.localeCompare(rightKey);
+  });
+
+  sortedPlans.forEach((plan, index) => {
+    table.push([
+      String(index + 1),
+      plan.name,
+      plan.plan,
+      plan.image,
+      formatCell(plan.specs?.cpu),
+      formatCell(plan.specs?.ram),
+      formatCell(plan.specs?.disk_space),
+      formatPrice(plan.specs?.price_per_month, plan.currency),
+      plan.available_inventory_status === false ? 'no' : 'yes'
+    ]);
+  });
+
+  return table.toString();
+}
+
 export function formatNodeDetails(node: NodeDetails): string {
   const rows: Array<[string, string]> = [
     ['ID', String(node.id)],
@@ -100,4 +216,19 @@ export function formatNodeCreateResult(result: NodeCreateResult): string {
   }
 
   return lines.join('\n');
+}
+
+function formatCell(value: number | string | undefined): string {
+  return value === undefined ? '' : String(value);
+}
+
+function formatPrice(
+  value: number | undefined,
+  currency: string | undefined
+): string {
+  if (value === undefined) {
+    return '';
+  }
+
+  return currency === undefined ? String(value) : `${value} ${currency}`;
 }

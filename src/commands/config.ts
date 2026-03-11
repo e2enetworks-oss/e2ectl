@@ -34,6 +34,8 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
     'Manage local e2ectl profiles and authentication settings.'
   );
 
+  command.helpCommand('help [command]', 'Show help for a config command');
+
   command
     .command('add')
     .description(

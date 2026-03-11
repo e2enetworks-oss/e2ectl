@@ -84,7 +84,7 @@ describe('MyAccountApiClient', () => {
     );
   });
 
-  it('serializes node create requests with json body defaults', async () => {
+  it('serializes a public-node create request that matches backend serializer expectations', async () => {
     let seenInput = '';
     let seenInit: RequestInit | undefined;
 
@@ -139,22 +139,107 @@ describe('MyAccountApiClient', () => {
       Authorization: 'Bearer auth-token',
       'Content-Type': 'application/json'
     });
-    expect(seenInit?.body).toBe(
-      JSON.stringify({
-        backups: false,
-        default_public_ip: false,
-        disable_password: true,
-        enable_bitninja: false,
-        image: 'Ubuntu-24.04-Distro',
-        is_ipv6_availed: false,
-        is_saved_image: false,
-        label: 'default',
-        name: 'node-a',
-        number_of_instances: 1,
-        plan: 'plan-123',
-        ssh_keys: [],
-        start_scripts: []
-      })
+    expect(typeof seenInit?.body).toBe('string');
+    const body = JSON.parse(seenInit?.body as string) as Record<
+      string,
+      unknown
+    >;
+
+    expect(body).toMatchObject({
+      backups: false,
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'node-a',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [],
+      start_scripts: []
+    });
+    expect(body).not.toHaveProperty('security_group_id');
+    expect(body).not.toHaveProperty('vpc_id');
+    expect(body).not.toHaveProperty('subnet_id');
+    expect(body).not.toHaveProperty('reserve_ip');
+    expect(body).not.toHaveProperty('reserve_ip_pool');
+    expect(body).not.toHaveProperty('image_id');
+    expect(body).not.toHaveProperty('disk');
+    expect(body).not.toHaveProperty('is_encryption_required');
+    expect(body).not.toHaveProperty('isEncryptionEnabled');
+    expect(body).not.toHaveProperty('saved_image_template_id');
+  });
+
+  it('requests the OS catalog from the docs-backed discovery path', async () => {
+    let seenInput = '';
+
+    const fetchFn = vi.fn((input: string) => {
+      seenInput = input;
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () =>
+          Promise.resolve({
+            code: 200,
+            data: {
+              category_list: []
+            },
+            errors: {},
+            message: 'Success'
+          })
+      });
+    });
+
+    const client = new MyAccountApiClient(credentials, {
+      baseUrl: 'https://example.test/',
+      fetchFn
+    });
+
+    await client.listNodeCatalogOs();
+
+    expect(seenInput).toBe(
+      'https://example.test/images/os-category/?apikey=api-key&project_id=123&location=Delhi'
+    );
+  });
+
+  it('serializes catalog plan queries with the required filters', async () => {
+    let seenInput = '';
+
+    const fetchFn = vi.fn((input: string) => {
+      seenInput = input;
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () =>
+          Promise.resolve({
+            code: 200,
+            data: [],
+            errors: {},
+            message: 'Success'
+          })
+      });
+    });
+
+    const client = new MyAccountApiClient(credentials, {
+      baseUrl: 'https://example.test/',
+      fetchFn
+    });
+
+    await client.listNodeCatalogPlans({
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+
+    expect(seenInput).toBe(
+      'https://example.test/images/?apikey=api-key&project_id=123&location=Delhi&category=Ubuntu&display_category=Linux+Virtual+Node&os=Ubuntu&osversion=24.04'
     );
   });
 

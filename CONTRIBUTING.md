@@ -54,6 +54,12 @@ Optional:
 
 - `E2ECTL_MANUAL_NODE_ID` to exercise the live `node get` path
 
+The default manual suite verifies:
+
+- OS catalog discovery
+- plan and image catalog discovery
+- node list
+
 ## CI Triggers
 
 GitHub Actions runs for:

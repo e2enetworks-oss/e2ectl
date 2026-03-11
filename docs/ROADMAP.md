@@ -81,3 +81,14 @@ Acceptance criteria:
 - README and CONTRIBUTING fully describe install, config, and command usage
 - CI covers the intended Node.js matrix and repository gates
 - Release and maintenance docs are sufficient for external contributors
+
+## M8 — Node Catalog Discovery
+
+**Status:** DONE
+
+Acceptance criteria:
+
+- `node catalog os` lists command-ready OS rows for prototype node creation
+- `node catalog plans` lists valid plan and image pairs for a selected OS row
+- `e2ectl help`, `e2ectl node help`, and `e2ectl node catalog --help` expose the discovery-first create flow
+- The manual read-only suite covers the catalog endpoints against a real MyAccount project

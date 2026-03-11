@@ -13,6 +13,37 @@ interface ManualCredentials {
 }
 
 describeManual('manual MyAccount read-only API checks', () => {
+  it('lists OS catalog rows using the configured production credentials', async () => {
+    const client = new MyAccountApiClient(readManualCredentials());
+    const response = await client.listNodeCatalogOs();
+
+    expect(response.code).toBe(200);
+    expect(Array.isArray(response.data.category_list)).toBe(true);
+    expect(response.data.category_list.length).toBeGreaterThan(0);
+  });
+
+  it('lists plan and image pairs for the first available OS catalog row', async () => {
+    const client = new MyAccountApiClient(readManualCredentials());
+    const osCatalog = await client.listNodeCatalogOs();
+    const group = osCatalog.data.category_list[0];
+    const version = group?.version[0];
+    const displayCategory = group?.category[0];
+
+    expect(group).toBeDefined();
+    expect(version).toBeDefined();
+    expect(displayCategory).toBeDefined();
+
+    const response = await client.listNodeCatalogPlans({
+      category: version!.sub_category,
+      display_category: displayCategory!,
+      os: version!.os,
+      osversion: version!.version
+    });
+
+    expect(response.code).toBe(200);
+    expect(Array.isArray(response.data)).toBe(true);
+  });
+
   it('lists nodes using the configured production credentials', async () => {
     const client = new MyAccountApiClient(readManualCredentials());
     const response = await client.listNodes();
