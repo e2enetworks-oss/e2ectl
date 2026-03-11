@@ -4,7 +4,7 @@
   "description": "CLI prototype for E2E Networks MyAccount.",
   "type": "module",
   "bin": {
-    "e2ectl": "dist/index.js"
+    "e2ectl": "dist/app/index.js"
   },
   "files": [
     "dist"
@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "clean": "node ./scripts/clean.mjs",
-    "dev": "node --import tsx ./src/index.ts",
+    "dev": "node --import tsx ./src/app/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src tests vitest.config.ts vitest.manual.config.ts",

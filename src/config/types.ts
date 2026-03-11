@@ -15,9 +15,9 @@ export interface ConfigFile {
 export interface ResolvedCredentials {
   api_key: string;
   auth_token: string;
-  project_id: string;
-  location: string;
   alias?: string;
+  location: string;
+  project_id: string;
   source: 'env' | 'profile' | 'mixed';
 }
 

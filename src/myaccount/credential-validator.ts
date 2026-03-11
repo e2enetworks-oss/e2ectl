@@ -1,5 +1,5 @@
-import type { ProfileConfig } from '../types/config.js';
-import { MyAccountApiClient, type FetchLike } from './api.js';
+import type { ProfileConfig } from '../config/index.js';
+import { MyAccountApiClient, type FetchLike } from './client.js';
 
 export interface CredentialValidationResult {
   message?: string;

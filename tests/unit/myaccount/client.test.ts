@@ -1,5 +1,5 @@
-import { MyAccountApiClient } from '../../../src/client/api.js';
-import { CliError } from '../../../src/utils/errors.js';
+import { CliError } from '../../../src/core/errors.js';
+import { MyAccountApiClient } from '../../../src/myaccount/client.js';
 
 describe('MyAccountApiClient', () => {
   const credentials = {

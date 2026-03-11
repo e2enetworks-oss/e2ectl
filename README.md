@@ -28,7 +28,7 @@ For a production build:
 
 ```bash
 make build
-node dist/index.js --help
+node dist/app/index.js --help
 ```
 
 To install the CLI command locally:
@@ -40,6 +40,7 @@ e2ectl --help
 ```
 
 For a copy-paste demo walkthrough, use [docs/DEMO.md](./docs/DEMO.md).
+For architecture and contribution rules, use [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Configuration And Auth
 
@@ -58,8 +59,6 @@ Profiles are stored in `~/.e2e/config.json`:
   "default": "prod"
 }
 ```
-
-If you already have an older local config that saved `project_id` and `location` directly on the profile, re-import it or run `e2ectl config set-context` so the alias has `default_project_id` and `default_location` in the clean v1 schema.
 
 Supported environment overrides:
 
@@ -189,6 +188,25 @@ Useful local commands:
 make dev
 npm run test:manual
 ```
+
+## Source Layout
+
+The v1 source tree is organized by domain:
+
+```text
+src/
+  app/
+  core/
+  myaccount/
+  config/
+  node/
+```
+
+- `app/` wires the program and runtime only.
+- `core/` holds shared error, JSON, and masking primitives.
+- `myaccount/` contains the transport client and credential validation.
+- `config/` owns aliases, imports, defaults, and auth/context resolution.
+- `node/` owns node workflows, defaults, and rendering.
 
 ## Testing
 

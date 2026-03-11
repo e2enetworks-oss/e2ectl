@@ -1,4 +1,4 @@
-import { ApiCredentialValidator } from '../../../src/client/credential-validator.js';
+import { ApiCredentialValidator } from '../../../src/myaccount/credential-validator.js';
 
 describe('ApiCredentialValidator', () => {
   it('accepts valid credentials when /iam/multi-crn/ succeeds', async () => {

@@ -1,8 +1,4 @@
-import {
-  CliError,
-  EXIT_CODES,
-  formatError
-} from '../../../src/utils/errors.js';
+import { CliError, EXIT_CODES, formatError } from '../../../src/core/errors.js';
 
 describe('formatError', () => {
   it('renders actionable CLI errors', () => {

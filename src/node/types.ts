@@ -1,5 +1,3 @@
-import type { ApiEnvelope } from './api.js';
-
 export interface NodeSummary {
   id: number;
   is_locked?: boolean;
@@ -29,7 +27,11 @@ export interface NodeDetails extends NodeSummary {
   vcpus?: string;
 }
 
-export interface NodeListEnvelope extends ApiEnvelope<NodeSummary[]> {
+export interface NodeListResponse {
+  code: number;
+  data: NodeSummary[];
+  errors: Record<string, unknown>;
+  message: string;
   total_count?: number;
   total_page_number?: number;
 }

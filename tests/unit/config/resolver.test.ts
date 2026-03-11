@@ -1,5 +1,5 @@
-import { resolveCredentials } from '../../../src/client/auth.js';
-import type { ConfigFile } from '../../../src/types/config.js';
+import { resolveCredentials } from '../../../src/config/resolver.js';
+import type { ConfigFile } from '../../../src/config/index.js';
 
 describe('resolveCredentials', () => {
   const config: ConfigFile = {

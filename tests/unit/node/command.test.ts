@@ -1,9 +1,9 @@
-import { createProgram } from '../../../src/cli.js';
-import type { MyAccountClient } from '../../../src/client/api.js';
+import { createProgram } from '../../../src/app/program.js';
+import type { CliRuntime } from '../../../src/app/runtime.js';
+import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
-import type { CliRuntime } from '../../../src/runtime.js';
-import type { ResolvedCredentials } from '../../../src/types/config.js';
-import type { NodeCreateRequest } from '../../../src/types/node.js';
+import type { MyAccountClient } from '../../../src/myaccount/index.js';
+import type { NodeCreateRequest } from '../../../src/node/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createNodeClientStub() {

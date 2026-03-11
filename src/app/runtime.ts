@@ -1,12 +1,12 @@
 import { createInterface } from 'node:readline/promises';
 
-import { MyAccountApiClient, type MyAccountClient } from './client/api.js';
 import {
   ApiCredentialValidator,
-  type CredentialValidator
-} from './client/credential-validator.js';
-import { ConfigStore } from './config/store.js';
-import type { ResolvedCredentials } from './types/config.js';
+  type CredentialValidator,
+  MyAccountApiClient,
+  type MyAccountClient
+} from '../myaccount/index.js';
+import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;

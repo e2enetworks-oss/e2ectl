@@ -1,6 +1,6 @@
 import Table from 'cli-table3';
 
-import type { ConfigFile, ProfileSummary } from '../types/config.js';
+import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   NodeCatalogOsData,
   NodeCatalogOsEntry,
@@ -8,51 +8,14 @@ import type {
   NodeCreateResult,
   NodeDetails,
   NodeSummary
-} from '../types/node.js';
-import { stableStringify, type JsonValue } from '../utils/json.js';
-import { maskSecret } from '../utils/mask.js';
+} from './types.js';
+import type { NodeCommandResult } from './service.js';
 
-export function formatJson(value: unknown): string {
-  return `${stableStringify(value as JsonValue)}\n`;
-}
-
-export function summarizeProfiles(config: ConfigFile): ProfileSummary[] {
-  return Object.entries(config.profiles)
-    .sort(([leftAlias], [rightAlias]) => leftAlias.localeCompare(rightAlias))
-    .map(([alias, profile]) => ({
-      alias,
-      isDefault: config.default === alias,
-      api_key: maskSecret(profile.api_key),
-      auth_token: maskSecret(profile.auth_token),
-      default_project_id: profile.default_project_id ?? '',
-      default_location: profile.default_location ?? ''
-    }));
-}
-
-export function formatProfilesTable(profiles: ProfileSummary[]): string {
-  const table = new Table({
-    head: [
-      'Alias',
-      'Default',
-      'API Key',
-      'Auth Token',
-      'Default Project ID',
-      'Default Location'
-    ]
-  });
-
-  for (const profile of profiles) {
-    table.push([
-      profile.alias,
-      profile.isDefault ? 'yes' : '',
-      profile.api_key,
-      profile.auth_token,
-      profile.default_project_id,
-      profile.default_location
-    ]);
-  }
-
-  return table.toString();
+export function renderNodeResult(
+  result: NodeCommandResult,
+  json: boolean
+): string {
+  return json ? renderNodeJson(result) : renderNodeHuman(result);
 }
 
 export function formatNodesTable(nodes: NodeSummary[]): string {
@@ -154,26 +117,7 @@ export function formatNodeCatalogPlansTable(plans: NodeCatalogPlan[]): string {
     ]
   });
 
-  const sortedPlans = [...plans].sort((left, right) => {
-    const leftKey = [
-      left.name,
-      left.plan,
-      left.image,
-      left.location ?? '',
-      left.specs?.series ?? ''
-    ].join('\u0000');
-    const rightKey = [
-      right.name,
-      right.plan,
-      right.image,
-      right.location ?? '',
-      right.specs?.series ?? ''
-    ].join('\u0000');
-
-    return leftKey.localeCompare(rightKey);
-  });
-
-  sortedPlans.forEach((plan, index) => {
+  sortNodeCatalogPlans(plans).forEach((plan, index) => {
     table.push([
       String(index + 1),
       plan.name,
@@ -238,4 +182,118 @@ function formatPrice(
 
 function hasVisibleValue(value: string): boolean {
   return value.trim().length > 0;
+}
+
+function renderNodeHuman(result: NodeCommandResult): string {
+  switch (result.action) {
+    case 'catalog-os': {
+      const entries = summarizeNodeCatalogOs(result.catalog);
+      if (entries.length === 0) {
+        return 'No OS catalog rows found.\n';
+      }
+
+      return (
+        `${formatNodeCatalogOsTable(entries)}\n\nUse one row with:\n` +
+        'e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>\n'
+      );
+    }
+    case 'catalog-plans': {
+      const plans = sortNodeCatalogPlans(result.plans);
+      if (plans.length === 0) {
+        return 'No plans found for the selected OS row.\n';
+      }
+
+      return (
+        `${formatNodeCatalogPlansTable(plans)}\n\nUse the exact plan and image values from a row with:\n` +
+        'e2ectl node create --name <name> --plan <plan> --image <image>\n'
+      );
+    }
+    case 'create':
+      return `${formatNodeCreateResult(result.result)}\n`;
+    case 'delete':
+      return result.cancelled
+        ? 'Deletion cancelled.\n'
+        : `Deleted node ${result.node_id}.\n`;
+    case 'get':
+      return `${formatNodeDetails(result.node)}\n`;
+    case 'list':
+      return result.response.data.length === 0
+        ? 'No nodes found.\n'
+        : `${formatNodesTable(result.response.data)}\n`;
+  }
+}
+
+function renderNodeJson(result: NodeCommandResult): string {
+  switch (result.action) {
+    case 'catalog-os':
+      return renderJson({
+        action: 'catalog-os',
+        entries: summarizeNodeCatalogOs(result.catalog)
+      });
+    case 'catalog-plans':
+      return renderJson({
+        action: 'catalog-plans',
+        plans: sortNodeCatalogPlans(result.plans),
+        query: result.query
+      });
+    case 'create':
+      return renderJson({
+        action: 'create',
+        created: result.result.total_number_of_node_created,
+        nodes: result.result.node_create_response,
+        requested: result.result.total_number_of_node_requested
+      });
+    case 'delete':
+      return renderJson(
+        result.cancelled
+          ? {
+              action: 'delete',
+              cancelled: true,
+              node_id: result.node_id
+            }
+          : {
+              action: 'delete',
+              cancelled: false,
+              message: result.message ?? '',
+              node_id: result.node_id
+            }
+      );
+    case 'get':
+      return renderJson({
+        action: 'get',
+        node: result.node
+      });
+    case 'list':
+      return renderJson({
+        action: 'list',
+        nodes: result.response.data,
+        total_count: result.response.total_count ?? null,
+        total_page_number: result.response.total_page_number ?? null
+      });
+  }
+}
+
+function renderJson(value: unknown): string {
+  return `${stableStringify(value as JsonValue)}\n`;
+}
+
+function sortNodeCatalogPlans(plans: NodeCatalogPlan[]): NodeCatalogPlan[] {
+  return [...plans].sort((left, right) => {
+    const leftKey = [
+      left.name,
+      left.plan,
+      left.image,
+      left.location ?? '',
+      left.specs?.series ?? ''
+    ].join('\u0000');
+    const rightKey = [
+      right.name,
+      right.plan,
+      right.image,
+      right.location ?? '',
+      right.specs?.series ?? ''
+    ].join('\u0000');
+
+    return leftKey.localeCompare(rightKey);
+  });
 }

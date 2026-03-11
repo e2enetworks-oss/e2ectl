@@ -1,5 +1,3 @@
-import type { ApiEnvelope, ApiRequestOptions } from '../types/api.js';
-import type { ResolvedCredentials } from '../types/config.js';
 import type {
   NodeCatalogOsData,
   NodeCatalogPlan,
@@ -8,9 +6,10 @@ import type {
   NodeCreateResult,
   NodeDeleteResult,
   NodeDetails,
-  NodeListEnvelope
-} from '../types/node.js';
-import { CliError, EXIT_CODES } from '../utils/errors.js';
+  NodeListResponse
+} from '../node/index.js';
+import type { ResolvedCredentials } from '../config/index.js';
+import { CliError, EXIT_CODES } from '../core/errors.js';
 
 const DEFAULT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -29,6 +28,29 @@ export interface ApiClientOptions {
   baseUrl?: string;
   fetchFn?: FetchLike;
   timeoutMs?: number;
+}
+
+export interface ApiEnvelope<TData> {
+  code: number;
+  data: TData;
+  errors: Record<string, ApiErrorValue>;
+  message: string;
+}
+
+export type ApiErrorValue =
+  | null
+  | string
+  | string[]
+  | number
+  | boolean
+  | Record<string, unknown>;
+
+export interface ApiRequestOptions {
+  body?: unknown;
+  includeProjectContext?: boolean;
+  method?: 'DELETE' | 'GET' | 'POST' | 'PUT';
+  path: string;
+  query?: Record<string, string | undefined>;
 }
 
 export interface ApiClientCredentials {
@@ -56,7 +78,7 @@ export interface MyAccountClient {
     query: NodeCatalogQuery
   ): Promise<ApiEnvelope<NodeCatalogPlan[]>>;
   getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>>;
-  listNodes(): Promise<NodeListEnvelope>;
+  listNodes(): Promise<NodeListResponse>;
   post<TData>(
     path: string,
     options?: Omit<ApiRequestOptions, 'method' | 'path'>
@@ -144,10 +166,10 @@ export class MyAccountApiClient implements MyAccountClient {
     });
   }
 
-  async listNodes(): Promise<NodeListEnvelope> {
-    return this.get<NodeListEnvelope['data']>(
+  async listNodes(): Promise<NodeListResponse> {
+    return this.get<NodeListResponse['data']>(
       '/nodes/'
-    ) as Promise<NodeListEnvelope>;
+    ) as Promise<NodeListResponse>;
   }
 
   async getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>> {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { createProgram } from './cli.js';
+import { formatError, isCliError } from '../core/errors.js';
+import { createProgram } from './program.js';
 import { createRuntime } from './runtime.js';
-import { formatError, isCliError } from './utils/errors.js';
 
 async function main(): Promise<void> {
   const program = createProgram(createRuntime());

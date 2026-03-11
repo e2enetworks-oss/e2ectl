@@ -2,8 +2,8 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { ConfigFile } from '../../../src/config/index.js';
 import { ConfigStore, createEmptyConfig } from '../../../src/config/store.js';
-import type { ConfigFile } from '../../../src/types/config.js';
 
 describe('ConfigStore', () => {
   it('returns an empty config when the file does not exist', async () => {

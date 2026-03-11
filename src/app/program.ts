@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { createRequire } from 'node:module';
 
-import { buildConfigCommand } from './commands/config.js';
-import { buildNodeCommand } from './commands/node.js';
+import { buildConfigCommand } from '../config/index.js';
+import { buildNodeCommand } from '../node/index.js';
 import { createRuntime, type CliRuntime } from './runtime.js';
 
 interface PackageMetadata {
@@ -10,7 +10,7 @@ interface PackageMetadata {
 }
 
 const require = createRequire(import.meta.url);
-const packageMetadata = require('../package.json') as PackageMetadata;
+const packageMetadata = require('../../package.json') as PackageMetadata;
 
 export function createProgram(runtime: CliRuntime = createRuntime()): Command {
   const program = new Command();

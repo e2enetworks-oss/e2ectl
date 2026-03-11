@@ -1,18 +1,18 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { createProgram } from '../../../src/cli.js';
-import { MyAccountApiClient } from '../../../src/client/api.js';
-import {
-  ApiCredentialValidator,
-  type CredentialValidationResult
-} from '../../../src/client/credential-validator.js';
-import { ConfigStore } from '../../../src/config/store.js';
-import type { CliRuntime } from '../../../src/runtime.js';
+import { createProgram } from '../../../src/app/program.js';
+import type { CliRuntime } from '../../../src/app/runtime.js';
 import type {
   ProfileConfig,
   ResolvedCredentials
-} from '../../../src/types/config.js';
+} from '../../../src/config/index.js';
+import {
+  ApiCredentialValidator,
+  type CredentialValidationResult
+} from '../../../src/myaccount/credential-validator.js';
+import { MyAccountApiClient } from '../../../src/myaccount/client.js';
+import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 class StubCredentialValidator extends ApiCredentialValidator {

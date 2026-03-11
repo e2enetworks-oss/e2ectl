@@ -16,6 +16,21 @@ Optional live verification:
 npm run test:manual
 ```
 
+## Source Layout
+
+The maintained v1 tree is:
+
+```text
+src/
+  app/
+  core/
+  myaccount/
+  config/
+  node/
+```
+
+Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
+
 ## CI Contract
 
 GitHub Actions verifies:
@@ -47,6 +62,8 @@ Update these when behavior changes:
 - [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
 - [docs/ROADMAP.md](./ROADMAP.md) for future roadmap and scope direction
 - [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
+
+Any user-visible behavior change must also update unit tests, docs, and the deterministic `--json` output review. The manual live API suite remains opt-in and is never part of normal CI.
 
 ## Release Notes
 

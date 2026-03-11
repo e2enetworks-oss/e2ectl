@@ -1,78 +1,13 @@
 import {
-  formatJson,
   formatNodeCatalogOsTable,
   formatNodeCatalogPlansTable,
   formatNodeCreateResult,
   formatNodeDetails,
   formatNodesTable,
-  formatProfilesTable,
-  summarizeNodeCatalogOs,
-  summarizeProfiles
-} from '../../../src/output/formatter.js';
-import type { ConfigFile } from '../../../src/types/config.js';
+  summarizeNodeCatalogOs
+} from '../../../src/node/formatter.js';
 
-describe('formatter helpers', () => {
-  it('formats JSON deterministically', () => {
-    const json = formatJson({
-      zebra: 2,
-      apple: 1
-    });
-
-    expect(json).toBe('{\n  "apple": 1,\n  "zebra": 2\n}\n');
-  });
-
-  it('masks secrets in profile summaries and shows alias defaults', () => {
-    const config: ConfigFile = {
-      profiles: {
-        prod: {
-          api_key: '12345678',
-          auth_token: 'abcdefgh',
-          default_project_id: '42',
-          default_location: 'Delhi'
-        }
-      },
-      default: 'prod'
-    };
-
-    const summary = summarizeProfiles(config);
-    const table = formatProfilesTable(summary);
-
-    expect(summary[0]).toMatchObject({
-      api_key: '****5678',
-      auth_token: '****efgh',
-      default_project_id: '42',
-      default_location: 'Delhi'
-    });
-    expect(table).toContain('****5678');
-    expect(table).toContain('Default Project ID');
-    expect(table).toContain('Default Location');
-    expect(table).toContain('Delhi');
-  });
-
-  it('keeps masked profile secrets compact even for very long tokens', () => {
-    const config: ConfigFile = {
-      profiles: {
-        prod: {
-          api_key: '1234567890abcdef',
-          auth_token: 'x'.repeat(2048) + 'hUpk',
-          default_project_id: '46429',
-          default_location: 'Delhi'
-        }
-      },
-      default: 'prod'
-    };
-
-    const summary = summarizeProfiles(config);
-    const table = formatProfilesTable(summary);
-
-    expect(summary[0]).toMatchObject({
-      api_key: '****cdef',
-      auth_token: '****hUpk'
-    });
-    expect(table).toContain('****hUpk');
-    expect(table).not.toContain('*'.repeat(100));
-  });
-
+describe('node formatter', () => {
   it('renders stable node list and detail output', () => {
     const table = formatNodesTable([
       {

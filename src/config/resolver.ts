@@ -4,15 +4,15 @@ import type {
   ContextField,
   ProfileConfig,
   ResolvedCredentials
-} from '../types/config.js';
+} from './types.js';
 import {
   AUTH_ENV_VAR_BY_FIELD,
   CONTEXT_ENV_VAR_BY_FIELD,
   REQUIRED_AUTH_FIELDS,
   REQUIRED_CONTEXT_FIELDS,
   VALID_LOCATIONS
-} from '../types/config.js';
-import { CliError, EXIT_CODES } from '../utils/errors.js';
+} from './types.js';
+import { CliError, EXIT_CODES } from '../core/errors.js';
 
 export interface ResolveCredentialsOptions {
   alias?: string;

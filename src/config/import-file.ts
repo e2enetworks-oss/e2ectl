@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-import { CliError, EXIT_CODES } from '../utils/errors.js';
+import { CliError, EXIT_CODES } from '../core/errors.js';
 
 export interface ImportedProfileSecrets {
   api_key: string;
