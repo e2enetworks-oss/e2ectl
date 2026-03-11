@@ -24,7 +24,7 @@ Acceptance criteria:
 
 ## M2 — API Client
 
-**Status:** PENDING
+**Status:** DONE
 
 Acceptance criteria:
 

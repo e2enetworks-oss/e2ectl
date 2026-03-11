@@ -8,6 +8,7 @@ This repository currently implements:
 
 - M0 scaffold: project structure, build tooling, CI, docs, and CLI entrypoint
 - M1 foundations: typed config model, config store, env/profile auth resolution, deterministic JSON helpers, and actionable error handling
+- M2 API client: reusable MyAccount client, auth/query injection, response envelope parsing, and live credential validation
 
 Planned next milestones are tracked in [docs/ROADMAP.md](./docs/ROADMAP.md).
 

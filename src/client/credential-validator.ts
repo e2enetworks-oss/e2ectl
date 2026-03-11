@@ -1,4 +1,5 @@
 import type { ProfileConfig } from '../types/config.js';
+import { MyAccountApiClient, type FetchLike } from './api.js';
 
 export interface CredentialValidationResult {
   message?: string;
@@ -9,14 +10,33 @@ export interface CredentialValidator {
   validate(profile: ProfileConfig): Promise<CredentialValidationResult>;
 }
 
-export class DeferredCredentialValidator implements CredentialValidator {
-  validate(profile: ProfileConfig): Promise<CredentialValidationResult> {
-    void profile;
+export interface ApiCredentialValidatorOptions {
+  baseUrl?: string;
+  fetchFn?: FetchLike;
+  timeoutMs?: number;
+}
 
-    return Promise.resolve({
+export class ApiCredentialValidator implements CredentialValidator {
+  private readonly options: ApiCredentialValidatorOptions;
+
+  constructor(options: ApiCredentialValidatorOptions = {}) {
+    this.options = options;
+  }
+
+  async validate(profile: ProfileConfig): Promise<CredentialValidationResult> {
+    const client = new MyAccountApiClient(
+      {
+        ...profile,
+        source: 'profile'
+      },
+      this.options
+    );
+
+    await client.validateCredentials();
+
+    return {
       valid: true,
-      message:
-        'Live credential validation will be connected when the API client lands in M2.'
-    });
+      message: 'Credentials validated successfully against /iam/multi-crn/.'
+    };
   }
 }
