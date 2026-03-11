@@ -10,6 +10,7 @@ This repository currently implements:
 - M1 foundations: typed config model, config store, env/profile auth resolution, deterministic JSON helpers, and actionable error handling
 - M2 API client: reusable MyAccount client, auth/query injection, response envelope parsing, and live credential validation
 - M3 config commands: `config add`, `list`, `set-default`, and `remove`
+- M4 node read commands: `node list` and `node get`
 
 Planned next milestones are tracked in [docs/ROADMAP.md](./docs/ROADMAP.md).
 

@@ -1,4 +1,4 @@
-import { MyAccountApiClient } from './client/api.js';
+import { MyAccountApiClient, type MyAccountClient } from './client/api.js';
 import {
   ApiCredentialValidator,
   type CredentialValidator
@@ -11,7 +11,7 @@ export interface OutputWriter {
 }
 
 export interface CliRuntime {
-  createApiClient(credentials: ResolvedCredentials): MyAccountApiClient;
+  createApiClient(credentials: ResolvedCredentials): MyAccountClient;
   credentialValidator: CredentialValidator;
   stderr: OutputWriter;
   stdout: OutputWriter;

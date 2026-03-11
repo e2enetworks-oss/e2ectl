@@ -1,5 +1,6 @@
 import type { ApiEnvelope, ApiRequestOptions } from '../types/api.js';
 import type { ResolvedCredentials } from '../types/config.js';
+import type { NodeDetails, NodeListEnvelope } from '../types/node.js';
 import { CliError, EXIT_CODES } from '../utils/errors.js';
 
 const DEFAULT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
@@ -21,7 +22,26 @@ export interface ApiClientOptions {
   timeoutMs?: number;
 }
 
-export class MyAccountApiClient {
+export interface MyAccountClient {
+  delete<TData>(
+    path: string,
+    options?: Omit<ApiRequestOptions, 'method' | 'path'>
+  ): Promise<ApiEnvelope<TData>>;
+  get<TData>(
+    path: string,
+    options?: Omit<ApiRequestOptions, 'method' | 'path'>
+  ): Promise<ApiEnvelope<TData>>;
+  getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>>;
+  listNodes(): Promise<NodeListEnvelope>;
+  post<TData>(
+    path: string,
+    options?: Omit<ApiRequestOptions, 'method' | 'path'>
+  ): Promise<ApiEnvelope<TData>>;
+  request<TData>(options: ApiRequestOptions): Promise<ApiEnvelope<TData>>;
+  validateCredentials(): Promise<ApiEnvelope<unknown>>;
+}
+
+export class MyAccountApiClient implements MyAccountClient {
   private readonly baseUrl: string;
   private readonly credentials: ResolvedCredentials;
   private readonly fetchFn: FetchLike;
@@ -74,6 +94,16 @@ export class MyAccountApiClient {
     return this.get('/iam/multi-crn/', {
       includeProjectContext: false
     });
+  }
+
+  async listNodes(): Promise<NodeListEnvelope> {
+    return this.get<NodeListEnvelope['data']>(
+      '/nodes/'
+    ) as Promise<NodeListEnvelope>;
+  }
+
+  async getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>> {
+    return this.get<NodeDetails>(`/nodes/${nodeId}/`);
   }
 
   async request<TData>(

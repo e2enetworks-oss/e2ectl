@@ -44,7 +44,7 @@ Acceptance criteria:
 
 ## M4 — Node Read Commands
 
-**Status:** PENDING
+**Status:** DONE
 
 Acceptance criteria:
 
