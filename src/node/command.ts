@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 
-import type { CliRuntime } from '../app/runtime.js';
+import type { CliRuntime } from '../app/index.js';
 import { renderNodeResult } from './formatter.js';
 import {
   NodeService,
@@ -17,7 +17,7 @@ interface GlobalOptions {
 export function buildNodeCommand(runtime: CliRuntime): Command {
   const service = new NodeService({
     confirm: (message) => runtime.confirm(message),
-    createApiClient: (credentials) => runtime.createApiClient(credentials),
+    createNodeClient: (credentials) => runtime.createNodeClient(credentials),
     isInteractive: runtime.isInteractive,
     store: runtime.store
   });

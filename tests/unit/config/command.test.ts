@@ -11,7 +11,8 @@ import {
   ApiCredentialValidator,
   type CredentialValidationResult
 } from '../../../src/myaccount/credential-validator.js';
-import { MyAccountApiClient } from '../../../src/myaccount/client.js';
+import { MyAccountApiTransport } from '../../../src/myaccount/index.js';
+import { NodeApiClient } from '../../../src/node/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -53,8 +54,8 @@ describe('config commands', () => {
       prompt,
       runtime: {
         confirm,
-        createApiClient: (credentials: ResolvedCredentials) =>
-          new MyAccountApiClient(credentials),
+        createNodeClient: (credentials: ResolvedCredentials) =>
+          new NodeApiClient(new MyAccountApiTransport(credentials)),
         credentialValidator: validator,
         isInteractive: true,
         prompt,

@@ -217,9 +217,9 @@ function renderNodeHuman(result: NodeCommandResult): string {
     case 'get':
       return `${formatNodeDetails(result.node)}\n`;
     case 'list':
-      return result.response.data.length === 0
+      return result.nodes.length === 0
         ? 'No nodes found.\n'
-        : `${formatNodesTable(result.response.data)}\n`;
+        : `${formatNodesTable(result.nodes)}\n`;
   }
 }
 
@@ -266,9 +266,9 @@ function renderNodeJson(result: NodeCommandResult): string {
     case 'list':
       return renderJson({
         action: 'list',
-        nodes: result.response.data,
-        total_count: result.response.total_count ?? null,
-        total_page_number: result.response.total_page_number ?? null
+        nodes: result.nodes,
+        total_count: result.total_count ?? null,
+        total_page_number: result.total_page_number ?? null
       });
   }
 }

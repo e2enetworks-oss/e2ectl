@@ -1,4 +1,5 @@
 export { buildNodeCommand } from './command.js';
+export { NodeApiClient, type NodeClient } from './client.js';
 export type {
   NodeCatalogCommittedSku,
   NodeCatalogOsData,
@@ -13,7 +14,7 @@ export type {
   NodeCreateResult,
   NodeDeleteResult,
   NodeDetails,
-  NodeListResponse,
+  NodeListResult,
   NodeOsInfo,
   NodeSummary
 } from './types.js';

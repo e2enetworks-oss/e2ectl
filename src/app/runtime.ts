@@ -3,10 +3,10 @@ import { createInterface } from 'node:readline/promises';
 import {
   ApiCredentialValidator,
   type CredentialValidator,
-  MyAccountApiClient,
-  type MyAccountClient
+  MyAccountApiTransport
 } from '../myaccount/index.js';
 import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
+import { NodeApiClient, type NodeClient } from '../node/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -14,7 +14,7 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
-  createApiClient(credentials: ResolvedCredentials): MyAccountClient;
+  createNodeClient(credentials: ResolvedCredentials): NodeClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
@@ -26,7 +26,8 @@ export interface CliRuntime {
 export function createRuntime(): CliRuntime {
   return {
     confirm: promptForConfirmation,
-    createApiClient: (credentials) => new MyAccountApiClient(credentials),
+    createNodeClient: (credentials) =>
+      new NodeApiClient(new MyAccountApiTransport(credentials)),
     credentialValidator: new ApiCredentialValidator(),
     isInteractive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     prompt: promptForInput,

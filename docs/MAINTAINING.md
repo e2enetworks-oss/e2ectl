@@ -30,6 +30,7 @@ src/
 ```
 
 Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
+Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep node-specific endpoint parsing in `src/node/client.ts`. Cross-domain imports should go through each domain `index.ts`.
 
 ## CI Contract
 

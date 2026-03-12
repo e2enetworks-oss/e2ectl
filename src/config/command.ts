@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 
-import type { CliRuntime } from '../app/runtime.js';
+import type { CliRuntime } from '../app/index.js';
 import { renderConfigResult } from './formatter.js';
 import {
   ConfigService,

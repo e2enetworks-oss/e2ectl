@@ -27,11 +27,8 @@ export interface NodeDetails extends NodeSummary {
   vcpus?: string;
 }
 
-export interface NodeListResponse {
-  code: number;
-  data: NodeSummary[];
-  errors: Record<string, unknown>;
-  message: string;
+export interface NodeListResult {
+  nodes: NodeSummary[];
   total_count?: number;
   total_page_number?: number;
 }
@@ -135,4 +132,6 @@ export interface NodeCreateResult {
   total_number_of_node_requested: number;
 }
 
-export type NodeDeleteResult = Record<string, never>;
+export interface NodeDeleteResult {
+  message: string;
+}

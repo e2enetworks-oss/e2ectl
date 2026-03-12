@@ -38,8 +38,9 @@ src/
     mask.ts
 
   myaccount/
-    client.ts
+    transport.ts
     credential-validator.ts
+    types.ts
     index.ts
 
   config/
@@ -54,6 +55,7 @@ src/
 
   node/
     index.ts
+    client.ts
     command.ts
     service.ts
     formatter.ts
@@ -63,17 +65,19 @@ src/
 
 ### Domain Ownership
 
-- `app/` is bootstrap only. It wires the Commander program, runtime, stdout/stderr, prompts, store, and MyAccount client factory.
+- `app/` is bootstrap only. It wires the Commander program, runtime, stdout/stderr, prompts, store, shared transport, and domain client factories.
 - `core/` contains shared low-level primitives only: errors, deterministic JSON helpers, and secret masking.
-- `myaccount/` is transport and credential validation only. `client.ts` stays generic and reusable; do not turn it into a product SDK.
+- `myaccount/` is shared transport only: request execution, API envelope typing, credential validation, and centralized API failure handling.
 - `config/` owns alias storage, import parsing, default alias/default context behavior, and auth/context resolution.
-- `node/` owns node workflows, node create defaults, and node-specific rendering.
+- `node/` owns node workflows, node create defaults, node-specific API parsing, and node-specific rendering.
 
 ### Architectural Rules
 
 - Commands stay thin. `command.ts` files define CLI surface area and delegate business logic.
-- Services return typed data. They should not print output or manually serialize JSON.
+- Services orchestrate validation, confirmation, defaults, and auth/context resolution. They should not print output or manually serialize JSON.
+- Service clients own endpoint paths and success-shape parsing. They return typed data to services.
 - Formatters own both human-readable rendering and deterministic `--json` rendering.
+- `src/myaccount/transport.ts` owns generic HTTP execution and generic API failure handling. Do not duplicate backend error translation in `node/client.ts` or future service clients.
 - Deterministic `--json` output is a compatibility contract. Review key order, field names, null handling, and sorting before merging changes.
 - Import across domains only via that domain's `index.ts`. Do not reach into another domain's internal files.
 - Do not introduce placeholder abstractions. If a file or type does not serve the current v1 scope, do not add it.
@@ -101,12 +105,14 @@ This includes command help text, prompt/confirmation flow, error wording that op
 
 - Manual live API tests are never part of normal CI.
 - CI runs `make lint`, `make test`, and `make build`.
-- Prefer unit coverage at the domain level:
+- Prefer unit coverage at the domain level and keep the seams explicit:
   - `tests/unit/app/`
   - `tests/unit/core/`
   - `tests/unit/myaccount/`
   - `tests/unit/config/`
   - `tests/unit/node/`
+- `tests/unit/myaccount/` covers transport behavior, request construction, and centralized error handling.
+- `tests/unit/node/` covers node client endpoint parsing plus command/service behavior such as defaults, prompts, and output.
 
 ## Manual API Checks
 

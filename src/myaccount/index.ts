@@ -4,13 +4,13 @@ export {
   type CredentialValidationResult,
   type CredentialValidator
 } from './credential-validator.js';
-export {
-  MyAccountApiClient,
-  type ApiClientCredentials,
-  type ApiClientOptions,
-  type ApiEnvelope,
-  type ApiErrorValue,
-  type ApiRequestOptions,
-  type FetchLike,
-  type MyAccountClient
-} from './client.js';
+export { MyAccountApiTransport, type MyAccountTransport } from './transport.js';
+export type {
+  ApiClientCredentials,
+  ApiClientOptions,
+  ApiEnvelope,
+  ApiErrorValue,
+  ApiRequestOptions,
+  ApiResponse,
+  FetchLike
+} from './types.js';

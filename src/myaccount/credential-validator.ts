@@ -1,5 +1,6 @@
 import type { ProfileConfig } from '../config/index.js';
-import { MyAccountApiClient, type FetchLike } from './client.js';
+import { MyAccountApiTransport } from './transport.js';
+import type { ApiEnvelope, FetchLike } from './types.js';
 
 export interface CredentialValidationResult {
   message?: string;
@@ -24,7 +25,7 @@ export class ApiCredentialValidator implements CredentialValidator {
   }
 
   async validate(profile: ProfileConfig): Promise<CredentialValidationResult> {
-    const client = new MyAccountApiClient(
+    const transport = new MyAccountApiTransport(
       {
         ...profile,
         source: 'profile'
@@ -32,7 +33,9 @@ export class ApiCredentialValidator implements CredentialValidator {
       this.options
     );
 
-    await client.validateCredentials();
+    await transport.get<ApiEnvelope<unknown>>('/iam/multi-crn/', {
+      includeProjectContext: false
+    });
 
     return {
       valid: true,

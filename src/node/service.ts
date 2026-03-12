@@ -4,15 +4,15 @@ import {
   type ResolvedCredentials
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import type { NodeClient } from './client.js';
 import { buildDefaultNodeCreateRequest } from './defaults.js';
 import type {
   NodeCatalogOsData,
   NodeCatalogPlan,
   NodeCatalogQuery,
-  NodeCreateRequest,
   NodeCreateResult,
   NodeDetails,
-  NodeListResponse
+  NodeListResult
 } from './types.js';
 
 export interface NodeContextOptions {
@@ -40,7 +40,9 @@ export interface NodeCatalogPlansOptions extends NodeContextOptions {
 
 export interface NodeListCommandResult {
   action: 'list';
-  response: NodeListResponse;
+  nodes: NodeListResult['nodes'];
+  total_count?: number;
+  total_page_number?: number;
 }
 
 export interface NodeCreateCommandResult {
@@ -79,22 +81,6 @@ export type NodeCommandResult =
   | NodeGetCommandResult
   | NodeListCommandResult;
 
-interface NodeEnvelope<TData> {
-  data: TData;
-  message: string;
-}
-
-interface NodeClient {
-  createNode(body: NodeCreateRequest): Promise<NodeEnvelope<NodeCreateResult>>;
-  deleteNode(nodeId: string): Promise<NodeEnvelope<Record<string, never>>>;
-  getNode(nodeId: string): Promise<NodeEnvelope<NodeDetails>>;
-  listNodeCatalogOs(): Promise<NodeEnvelope<NodeCatalogOsData>>;
-  listNodeCatalogPlans(
-    query: NodeCatalogQuery
-  ): Promise<NodeEnvelope<NodeCatalogPlan[]>>;
-  listNodes(): Promise<NodeListResponse>;
-}
-
 interface NodeStore {
   readonly configPath: string;
   read(): Promise<ConfigFile>;
@@ -102,7 +88,7 @@ interface NodeStore {
 
 export interface NodeServiceDependencies {
   confirm(message: string): Promise<boolean>;
-  createApiClient(credentials: ResolvedCredentials): NodeClient;
+  createNodeClient(credentials: ResolvedCredentials): NodeClient;
   isInteractive: boolean;
   store: NodeStore;
 }
@@ -124,7 +110,7 @@ export class NodeService {
 
     return {
       action: 'create',
-      result: result.data
+      result
     };
   }
 
@@ -150,12 +136,12 @@ export class NodeService {
     }
 
     const client = await this.createClient(options);
-    const response = await client.deleteNode(nodeId);
+    const result = await client.deleteNode(nodeId);
 
     return {
       action: 'delete',
       cancelled: false,
-      message: response.message,
+      message: result.message,
       node_id: Number(nodeId)
     };
   }
@@ -166,11 +152,10 @@ export class NodeService {
   ): Promise<NodeGetCommandResult> {
     assertNodeId(nodeId);
     const client = await this.createClient(options);
-    const response = await client.getNode(nodeId);
 
     return {
       action: 'get',
-      node: response.data
+      node: await client.getNode(nodeId)
     };
   }
 
@@ -178,11 +163,10 @@ export class NodeService {
     options: NodeContextOptions
   ): Promise<NodeCatalogOsCommandResult> {
     const client = await this.createClient(options);
-    const response = await client.listNodeCatalogOs();
 
     return {
       action: 'catalog-os',
-      catalog: response.data
+      catalog: await client.listNodeCatalogOs()
     };
   }
 
@@ -191,21 +175,21 @@ export class NodeService {
   ): Promise<NodeCatalogPlansCommandResult> {
     const client = await this.createClient(options);
     const query = buildNodeCatalogQuery(options);
-    const response = await client.listNodeCatalogPlans(query);
 
     return {
       action: 'catalog-plans',
-      plans: response.data,
+      plans: await client.listNodeCatalogPlans(query),
       query
     };
   }
 
   async listNodes(options: NodeContextOptions): Promise<NodeListCommandResult> {
     const client = await this.createClient(options);
+    const result = await client.listNodes();
 
     return {
       action: 'list',
-      response: await client.listNodes()
+      ...result
     };
   }
 
@@ -227,7 +211,7 @@ export class NodeService {
           })
     });
 
-    return this.dependencies.createApiClient(credentials);
+    return this.dependencies.createNodeClient(credentials);
   }
 }
 

@@ -1,94 +1,35 @@
-import type {
-  NodeCatalogOsData,
-  NodeCatalogPlan,
-  NodeCatalogQuery,
-  NodeCreateRequest,
-  NodeCreateResult,
-  NodeDeleteResult,
-  NodeDetails,
-  NodeListResponse
-} from '../node/index.js';
-import type { ResolvedCredentials } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+
+import type {
+  ApiClientCredentials,
+  ApiClientOptions,
+  ApiEnvelope,
+  ApiRequestOptions,
+  FetchLike
+} from './types.js';
 
 const DEFAULT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-export type FetchLike = (
-  input: string,
-  init?: RequestInit
-) => Promise<{
-  json(): Promise<unknown>;
-  ok: boolean;
-  status: number;
-  statusText: string;
-  text?(): Promise<string>;
-}>;
-
-export interface ApiClientOptions {
-  baseUrl?: string;
-  fetchFn?: FetchLike;
-  timeoutMs?: number;
-}
-
-export interface ApiEnvelope<TData> {
-  code: number;
-  data: TData;
-  errors: Record<string, ApiErrorValue>;
-  message: string;
-}
-
-export type ApiErrorValue =
-  | null
-  | string
-  | string[]
-  | number
-  | boolean
-  | Record<string, unknown>;
-
-export interface ApiRequestOptions {
-  body?: unknown;
-  includeProjectContext?: boolean;
-  method?: 'DELETE' | 'GET' | 'POST' | 'PUT';
-  path: string;
-  query?: Record<string, string | undefined>;
-}
-
-export interface ApiClientCredentials {
-  alias?: string;
-  api_key: string;
-  auth_token: string;
-  location?: string;
-  project_id?: string;
-  source: ResolvedCredentials['source'];
-}
-
-export interface MyAccountClient {
-  createNode(body: NodeCreateRequest): Promise<ApiEnvelope<NodeCreateResult>>;
-  delete<TData>(
+export interface MyAccountTransport {
+  delete<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options?: Omit<ApiRequestOptions, 'method' | 'path'>
-  ): Promise<ApiEnvelope<TData>>;
-  deleteNode(nodeId: string): Promise<ApiEnvelope<NodeDeleteResult>>;
-  get<TData>(
+  ): Promise<TResponse>;
+  get<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options?: Omit<ApiRequestOptions, 'method' | 'path'>
-  ): Promise<ApiEnvelope<TData>>;
-  listNodeCatalogOs(): Promise<ApiEnvelope<NodeCatalogOsData>>;
-  listNodeCatalogPlans(
-    query: NodeCatalogQuery
-  ): Promise<ApiEnvelope<NodeCatalogPlan[]>>;
-  getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>>;
-  listNodes(): Promise<NodeListResponse>;
-  post<TData>(
+  ): Promise<TResponse>;
+  post<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options?: Omit<ApiRequestOptions, 'method' | 'path'>
-  ): Promise<ApiEnvelope<TData>>;
-  request<TData>(options: ApiRequestOptions): Promise<ApiEnvelope<TData>>;
-  validateCredentials(): Promise<ApiEnvelope<unknown>>;
+  ): Promise<TResponse>;
+  request<TResponse extends ApiEnvelope<unknown>>(
+    options: ApiRequestOptions
+  ): Promise<TResponse>;
 }
 
-export class MyAccountApiClient implements MyAccountClient {
+export class MyAccountApiTransport implements MyAccountTransport {
   private readonly baseUrl: string;
   private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
@@ -104,82 +45,42 @@ export class MyAccountApiClient implements MyAccountClient {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
-  async get<TData>(
+  async get<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options: Omit<ApiRequestOptions, 'method' | 'path'> = {}
-  ): Promise<ApiEnvelope<TData>> {
-    return this.request<TData>({
+  ): Promise<TResponse> {
+    return this.request<TResponse>({
       ...options,
       method: 'GET',
       path
     });
   }
 
-  async post<TData>(
+  async post<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options: Omit<ApiRequestOptions, 'method' | 'path'> = {}
-  ): Promise<ApiEnvelope<TData>> {
-    return this.request<TData>({
+  ): Promise<TResponse> {
+    return this.request<TResponse>({
       ...options,
       method: 'POST',
       path
     });
   }
 
-  async delete<TData>(
+  async delete<TResponse extends ApiEnvelope<unknown>>(
     path: string,
     options: Omit<ApiRequestOptions, 'method' | 'path'> = {}
-  ): Promise<ApiEnvelope<TData>> {
-    return this.request<TData>({
+  ): Promise<TResponse> {
+    return this.request<TResponse>({
       ...options,
       method: 'DELETE',
       path
     });
   }
 
-  async createNode(
-    body: NodeCreateRequest
-  ): Promise<ApiEnvelope<NodeCreateResult>> {
-    return this.post<NodeCreateResult>('/nodes/', {
-      body
-    });
-  }
-
-  async deleteNode(nodeId: string): Promise<ApiEnvelope<NodeDeleteResult>> {
-    return this.delete<NodeDeleteResult>(`/nodes/${nodeId}/`);
-  }
-
-  async validateCredentials(): Promise<ApiEnvelope<unknown>> {
-    return this.get('/iam/multi-crn/', {
-      includeProjectContext: false
-    });
-  }
-
-  async listNodeCatalogOs(): Promise<ApiEnvelope<NodeCatalogOsData>> {
-    return this.get<NodeCatalogOsData>('/images/os-category/');
-  }
-
-  async listNodeCatalogPlans(
-    query: NodeCatalogQuery
-  ): Promise<ApiEnvelope<NodeCatalogPlan[]>> {
-    return this.get<NodeCatalogPlan[]>('/images/', {
-      query
-    });
-  }
-
-  async listNodes(): Promise<NodeListResponse> {
-    return this.get<NodeListResponse['data']>(
-      '/nodes/'
-    ) as Promise<NodeListResponse>;
-  }
-
-  async getNode(nodeId: string): Promise<ApiEnvelope<NodeDetails>> {
-    return this.get<NodeDetails>(`/nodes/${nodeId}/`);
-  }
-
-  async request<TData>(
+  async request<TResponse extends ApiEnvelope<unknown>>(
     options: ApiRequestOptions
-  ): Promise<ApiEnvelope<TData>> {
+  ): Promise<TResponse> {
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
@@ -199,7 +100,7 @@ export class MyAccountApiClient implements MyAccountClient {
 
       const { parseError, payload, preview } =
         await parseResponseBody(response);
-      if (!isApiEnvelope<TData>(payload)) {
+      if (!isApiEnvelope(payload)) {
         const fallbackApiError = buildFallbackApiError({
           path: options.path,
           payload,
@@ -248,7 +149,7 @@ export class MyAccountApiClient implements MyAccountClient {
         });
       }
 
-      return payload;
+      return payload as TResponse;
     } catch (error: unknown) {
       if (error instanceof CliError) {
         throw error;
@@ -314,6 +215,7 @@ export class MyAccountApiClient implements MyAccountClient {
           }
         );
       }
+
       url.searchParams.set('project_id', this.credentials.project_id);
       url.searchParams.set('location', this.credentials.location);
     }
@@ -355,7 +257,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isApiEnvelope<TData>(value: unknown): value is ApiEnvelope<TData> {
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   return (
     isRecord(value) &&
     typeof value.code === 'number' &&

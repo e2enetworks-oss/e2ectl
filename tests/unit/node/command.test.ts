@@ -2,15 +2,13 @@ import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
-import type { MyAccountClient } from '../../../src/myaccount/index.js';
-import type { NodeCreateRequest } from '../../../src/node/index.js';
+import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createNodeClientStub() {
   const listNodes = vi.fn(() =>
     Promise.resolve({
-      code: 200,
-      data: [
+      nodes: [
         {
           id: 101,
           is_locked: false,
@@ -21,131 +19,101 @@ function createNodeClientStub() {
           status: 'Running'
         }
       ],
-      errors: {},
-      message: 'Success',
       total_count: 1,
       total_page_number: 1
     })
   );
   const getNode = vi.fn(() =>
     Promise.resolve({
-      code: 200,
-      data: {
-        created_at: '2026-03-11T10:00:00Z',
-        disk: '100 GB',
-        id: 101,
-        location: 'Delhi',
-        memory: '8 GB',
-        name: 'node-a',
-        plan: 'C3.8GB',
-        private_ip_address: '10.0.0.1',
-        public_ip_address: '1.1.1.1',
-        status: 'Running',
-        vcpus: '4'
-      },
-      errors: {},
-      message: 'Success'
+      created_at: '2026-03-11T10:00:00Z',
+      disk: '100 GB',
+      id: 101,
+      location: 'Delhi',
+      memory: '8 GB',
+      name: 'node-a',
+      plan: 'C3.8GB',
+      private_ip_address: '10.0.0.1',
+      public_ip_address: '1.1.1.1',
+      status: 'Running',
+      vcpus: '4'
     })
   );
   const createNode = vi.fn((body: NodeCreateRequest) =>
     Promise.resolve({
-      code: 200,
-      data: {
-        node_create_response: [
-          {
-            created_at: '2026-03-11T10:00:00Z',
-            id: 205,
-            location: 'Delhi',
-            name: body.name,
-            plan: 'C3.8GB',
-            private_ip_address: '10.0.0.2',
-            public_ip_address: '1.1.1.2',
-            status: 'Creating'
-          }
-        ],
-        total_number_of_node_created: 1,
-        total_number_of_node_requested: 1
-      },
-      errors: {},
-      message: 'Success'
+      node_create_response: [
+        {
+          created_at: '2026-03-11T10:00:00Z',
+          id: 205,
+          location: 'Delhi',
+          name: body.name,
+          plan: 'C3.8GB',
+          private_ip_address: '10.0.0.2',
+          public_ip_address: '1.1.1.2',
+          status: 'Creating'
+        }
+      ],
+      total_number_of_node_created: 1,
+      total_number_of_node_requested: 1
     })
   );
   const deleteNode = vi.fn(() =>
     Promise.resolve({
-      code: 200,
-      data: {},
-      errors: {},
       message: 'Success'
     })
   );
   const listNodeCatalogOs = vi.fn(() =>
     Promise.resolve({
-      code: 200,
-      data: {
-        category_list: [
-          {
-            OS: 'Ubuntu',
-            category: ['Linux Virtual Node'],
-            version: [
-              {
-                number_of_domains: null,
-                os: 'Ubuntu',
-                software_version: '',
-                sub_category: 'Ubuntu',
-                version: '24.04'
-              }
-            ]
-          }
-        ]
-      },
-      errors: {},
-      message: 'Success'
+      category_list: [
+        {
+          OS: 'Ubuntu',
+          category: ['Linux Virtual Node'],
+          version: [
+            {
+              number_of_domains: null,
+              os: 'Ubuntu',
+              software_version: '',
+              sub_category: 'Ubuntu',
+              version: '24.04'
+            }
+          ]
+        }
+      ]
     })
   );
   const listNodeCatalogPlans = vi.fn(() =>
-    Promise.resolve({
-      code: 200,
-      data: [
-        {
-          available_inventory_status: true,
-          currency: 'INR',
+    Promise.resolve([
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        location: 'Delhi',
+        name: 'C3.8GB',
+        os: {
+          category: 'Ubuntu',
           image: 'Ubuntu-24.04-Distro',
-          location: 'Delhi',
-          name: 'C3.8GB',
-          os: {
-            category: 'Ubuntu',
-            image: 'Ubuntu-24.04-Distro',
-            name: 'Ubuntu',
-            version: '24.04'
-          },
-          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
-          specs: {
-            cpu: 4,
-            disk_space: 100,
-            price_per_month: 2263,
-            ram: '8.00',
-            series: 'C3',
-            sku_name: 'C3.8GB'
-          }
+          name: 'Ubuntu',
+          version: '24.04'
+        },
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+        specs: {
+          cpu: 4,
+          disk_space: 100,
+          price_per_month: 2263,
+          ram: '8.00',
+          series: 'C3',
+          sku_name: 'C3.8GB'
         }
-      ],
-      errors: {},
-      message: 'Success'
-    })
+      }
+    ])
   );
 
-  const stub: MyAccountClient = {
+  const stub: NodeClient = {
     createNode,
-    delete: vi.fn(),
     deleteNode,
-    get: vi.fn(),
     getNode,
     listNodeCatalogOs,
     listNodeCatalogPlans,
-    listNodes,
-    post: vi.fn(),
-    request: vi.fn(),
-    validateCredentials: vi.fn()
+    listNodes
   };
 
   return {
@@ -183,7 +151,7 @@ describe('node commands', () => {
 
     const runtime: CliRuntime = {
       confirm,
-      createApiClient: (resolvedCredentials) => {
+      createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;
       },

@@ -201,9 +201,9 @@ src/
 
 - `app/` wires the program and runtime only.
 - `core/` holds shared error, JSON, and masking primitives.
-- `myaccount/` contains the transport client and credential validation.
+- `myaccount/` contains the shared transport, API types, and credential validation.
 - `config/` owns aliases, imports, defaults, and auth/context resolution.
-- `node/` owns node workflows, defaults, and rendering.
+- `node/` owns node API parsing, workflows, defaults, and rendering.
 
 ## Testing
 

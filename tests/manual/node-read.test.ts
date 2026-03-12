@@ -1,4 +1,5 @@
-import { MyAccountApiClient } from '../../src/myaccount/client.js';
+import { MyAccountApiTransport } from '../../src/myaccount/index.js';
+import { NodeApiClient } from '../../src/node/index.js';
 
 const runManualSuite = process.env.E2ECTL_RUN_MANUAL_E2E === '1';
 const describeManual = runManualSuite ? describe : describe.skip;
@@ -12,20 +13,19 @@ interface ManualCredentials {
   source: 'env';
 }
 
-describeManual('manual MyAccount read-only API checks', () => {
+describeManual('manual node read-only API checks', () => {
   it('lists OS catalog rows using the configured production credentials', async () => {
-    const client = new MyAccountApiClient(readManualCredentials());
+    const client = createManualNodeClient();
     const response = await client.listNodeCatalogOs();
 
-    expect(response.code).toBe(200);
-    expect(Array.isArray(response.data.category_list)).toBe(true);
-    expect(response.data.category_list.length).toBeGreaterThan(0);
+    expect(Array.isArray(response.category_list)).toBe(true);
+    expect(response.category_list.length).toBeGreaterThan(0);
   });
 
   it('lists plan and image pairs for the first available OS catalog row', async () => {
-    const client = new MyAccountApiClient(readManualCredentials());
+    const client = createManualNodeClient();
     const osCatalog = await client.listNodeCatalogOs();
-    const group = osCatalog.data.category_list[0];
+    const group = osCatalog.category_list[0];
     const version = group?.version[0];
     const displayCategory = group?.category[0];
 
@@ -40,29 +40,30 @@ describeManual('manual MyAccount read-only API checks', () => {
       osversion: version!.version
     });
 
-    expect(response.code).toBe(200);
-    expect(Array.isArray(response.data)).toBe(true);
+    expect(Array.isArray(response)).toBe(true);
   });
 
   it('lists nodes using the configured production credentials', async () => {
-    const client = new MyAccountApiClient(readManualCredentials());
+    const client = createManualNodeClient();
     const response = await client.listNodes();
 
-    expect(response.code).toBe(200);
-    expect(Array.isArray(response.data)).toBe(true);
+    expect(Array.isArray(response.nodes)).toBe(true);
   });
 
   itWithNodeId(
     'reads a specific node when E2ECTL_MANUAL_NODE_ID is provided',
     async () => {
-      const client = new MyAccountApiClient(readManualCredentials());
+      const client = createManualNodeClient();
       const response = await client.getNode(process.env.E2ECTL_MANUAL_NODE_ID!);
 
-      expect(response.code).toBe(200);
-      expect(String(response.data.id)).toBe(process.env.E2ECTL_MANUAL_NODE_ID);
+      expect(String(response.id)).toBe(process.env.E2ECTL_MANUAL_NODE_ID);
     }
   );
 });
+
+function createManualNodeClient(): NodeApiClient {
+  return new NodeApiClient(new MyAccountApiTransport(readManualCredentials()));
+}
 
 function readManualCredentials(): ManualCredentials {
   const apiKey = process.env.E2E_API_KEY;
