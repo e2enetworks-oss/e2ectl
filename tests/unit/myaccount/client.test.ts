@@ -344,6 +344,89 @@ describe('MyAccountApiClient', () => {
     );
   });
 
+  it('extracts a DRF-style detail message from failed API responses', async () => {
+    const client = new MyAccountApiClient(credentials, {
+      fetchFn: () =>
+        Promise.resolve({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          json: () =>
+            Promise.resolve({
+              detail: 'Authentication credentials were not provided.'
+            })
+        })
+    });
+
+    await expect(client.validateCredentials()).rejects.toThrow(
+      /Authentication credentials were not provided/i
+    );
+  });
+
+  it('extracts message and status_code from non-envelope API failures', async () => {
+    const client = new MyAccountApiClient(credentials, {
+      fetchFn: () =>
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          json: () =>
+            Promise.resolve({
+              status_code: 400,
+              message: 'Project not found'
+            })
+        })
+    });
+
+    await expect(client.validateCredentials()).rejects.toThrow(
+      /Project not found/i
+    );
+  });
+
+  it('treats a 200 response with errors=true as an API failure', async () => {
+    const client = new MyAccountApiClient(credentials, {
+      fetchFn: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: () =>
+            Promise.resolve({
+              errors: true,
+              message: 'Validation failed'
+            })
+        })
+    });
+
+    await expect(client.validateCredentials()).rejects.toThrow(
+      /Validation failed/i
+    );
+  });
+
+  it('uses a short response preview for non-json failed responses', async () => {
+    const client = new MyAccountApiClient(credentials, {
+      fetchFn: () =>
+        Promise.resolve({
+          ok: false,
+          status: 502,
+          statusText: 'Bad Gateway',
+          json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+          text: () =>
+            Promise.resolve('<html><body>502 Bad Gateway</body></html>')
+        })
+    });
+
+    await expect(client.validateCredentials()).rejects.toMatchObject({
+      details: expect.arrayContaining([
+        expect.stringContaining('HTTP status: 502 Bad Gateway'),
+        expect.stringContaining(
+          'Response preview: <html><body>502 Bad Gateway</body></html>'
+        )
+      ]),
+      message: expect.stringContaining('Unexpected API error')
+    });
+  });
+
   it('wraps network failures in an actionable CLI error', async () => {
     const client = new MyAccountApiClient(credentials, {
       fetchFn: () => Promise.reject(new Error('dns failure'))

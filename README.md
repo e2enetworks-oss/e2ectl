@@ -168,6 +168,7 @@ For `node catalog os`, the human table hides the `Software Version` column when 
 - `config list` masks stored secrets in compact form such as `****e39d`.
 - `node delete` prompts for confirmation unless `--force` is supplied.
 - MyAccount API requests use bearer auth plus required query parameters on every call.
+- API failures are handled centrally in the MyAccount client, with simple fallbacks for inconsistent backend error shapes such as `message`, `detail`, and non-JSON failure bodies.
 
 ## Development
 
