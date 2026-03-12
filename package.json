@@ -2,6 +2,14 @@
   "name": "e2ectl",
   "version": "0.1.0",
   "description": "OSS CLI for E2E Networks MyAccount.",
+  "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
+  "bugs": {
+    "url": "https://github.com/e2enetworks-oss/e2ectl/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/e2enetworks-oss/e2ectl.git"
+  },
   "type": "module",
   "bin": {
     "e2ectl": "dist/app/index.js"
@@ -9,16 +17,20 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "clean": "node ./scripts/clean.mjs",
     "dev": "node --import tsx ./src/app/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src tests vitest.config.ts vitest.manual.config.ts",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:manual": "vitest run --config vitest.manual.config.ts",
     "test:watch": "vitest",

@@ -18,6 +18,7 @@ npm install
 make lint
 make test
 make build
+npm pack --dry-run
 ```
 
 ## Local Workflow
@@ -35,7 +36,10 @@ Useful commands:
 make dev
 npm run test:manual
 node dist/app/index.js --help
+npm pack --dry-run
 ```
+
+For release automation and npm publish flow, read [docs/RELEASING.md](./docs/RELEASING.md).
 
 ## Architecture Contract
 
@@ -116,6 +120,7 @@ Reuse `config/resolver.ts` for credential/context resolution and keep shared MyA
 - `make lint` runs formatting checks, ESLint, and `tsc --noEmit`
 - `make test` runs unit tests only
 - `make build` verifies the production compile
+- `npm pack --dry-run` verifies the publishable package contents locally
 - `npm run test:manual` is for explicit read-only live API checks and stays skipped unless `E2ECTL_RUN_MANUAL_E2E=1`
 
 Do not merge changes without running the relevant local gate first.
@@ -130,6 +135,15 @@ Every user-visible behavior change requires:
 - verification that README examples still match the real CLI help surface when you touch commands or flags
 
 This includes command help text, prompt/confirmation flow, error wording that operators rely on, and machine-facing JSON fields.
+
+## Release Automation
+
+- `main` is expected to stay releaseable.
+- Use Conventional Commits on merged PRs so Release Please can derive the right version bump.
+- Do not hand-edit `package.json` versions outside the release PR flow.
+- The first public prerelease is forced with a commit body that contains `Release-As: 1.0.0-rc.1`.
+- The first stable release is forced with a commit body that contains `Release-As: 1.0.0`.
+- GitHub release automation and npm publish activation steps live in [docs/RELEASING.md](./docs/RELEASING.md).
 
 ## Testing Expectations
 

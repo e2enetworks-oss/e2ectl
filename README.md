@@ -15,9 +15,23 @@ Current v1 scope:
 - Node.js 18+
 - npm
 
-## Install From Source
+## Install
 
-Until public package distribution is added, install `e2ectl` from this repository:
+After the first public npm release:
+
+```bash
+npm install -g e2ectl
+e2ectl --help
+```
+
+To try release candidates once prereleases begin:
+
+```bash
+npm install -g e2ectl@next
+e2ectl --help
+```
+
+Until public package distribution is live, install `e2ectl` from this repository:
 
 ```bash
 npm install
@@ -34,6 +48,12 @@ make dev
 
 For architecture and contribution rules, use [CONTRIBUTING.md](./CONTRIBUTING.md).
 For CI and maintenance expectations, use [docs/MAINTAINING.md](./docs/MAINTAINING.md).
+For versioning, release automation, and npm publishing, use [docs/RELEASING.md](./docs/RELEASING.md).
+
+## Release Channels
+
+- `next` is reserved for prereleases such as `1.0.0-rc.1`
+- `latest` is reserved for stable releases such as `1.0.0`
 
 ## First-Time Setup
 
