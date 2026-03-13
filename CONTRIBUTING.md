@@ -48,8 +48,8 @@ For release automation and npm publish flow, read [docs/RELEASING.md](./docs/REL
 
 - `develop` is the staging branch for pre-v1 integration and hardening work.
 - `main` is the release branch.
-- Pull requests into `develop` use the fast gate.
-- Merges into `develop` run the full staging gate.
+- Pull requests into `develop` run both the fast gate and the full staging gate.
+- Merges into `develop` rerun the full staging gate on the merged branch tip.
 - Promotion from `develop` to `main` reruns the full gate before release automation on `main`.
 
 ## Architecture Contract
@@ -221,4 +221,4 @@ GitHub Actions runs for:
 - pushes to `develop` for the full staging gate
 
 The fast `ci.yml` workflow covers Node `18`, `20`, and `22`.
-The dedicated `integration.yml` workflow runs on Node `22` only.
+The dedicated `integration.yml` workflow runs on Node `22` only and is required on pull requests to both `develop` and `main`.

@@ -25,8 +25,8 @@ For release automation and npm publish activation, use [docs/RELEASING.md](./REL
 
 - `develop` is the staging branch for pre-v1 integration and hardening.
 - `main` is the release branch.
-- Pull requests into `develop` use the fast gate.
-- Pushes to `develop` run the full staging gate.
+- Pull requests into `develop` run both the fast gate and the full staging gate.
+- Pushes to `develop` rerun the full staging gate on the merged branch tip.
 - Promotion from `develop` to `main` reruns the full gate and merge queue checks before release automation on `main`.
 
 ## Source Layout

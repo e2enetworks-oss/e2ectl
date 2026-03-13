@@ -13,7 +13,7 @@ This repository is prepared for automated GitHub releases plus npm publishing, w
   - required merge queue verification for `main`
   - runs `make lint`, `make test`, and `make build`
 - `.github/workflows/integration.yml`
-  - full staging verification on pushes to `develop`
+  - full staging verification on pull requests to `develop` and on pushes to `develop`
   - full promotion verification on pull requests and merge queue runs for `main`
   - runs `make lint`, `make test`, `make build`, `npm run test:integration`, and `npm pack --dry-run`
 - `.github/workflows/release-please.yml`

@@ -323,7 +323,7 @@ Manual test inputs:
 
 GitHub Actions runs on:
 
-- pull requests to `develop`
+- pull requests to `develop` for both the fast gate and the integration gate
 - pull requests to `main`
 - pushes to `develop` for the full staging gate
 - merge queue (`merge_group`) checks for `main`
@@ -335,7 +335,7 @@ Fast PR checks in `ci.yml` use Node `18`, `20`, and `22` and run:
 3. `make test`
 4. `make build`
 
-The dedicated `integration.yml` workflow runs on Node `22` and adds:
+The dedicated `integration.yml` workflow runs on Node `22` and adds full staging and promotion verification:
 
 1. `npm run test:integration`
 2. `npm pack --dry-run`
