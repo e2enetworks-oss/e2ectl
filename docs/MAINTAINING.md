@@ -40,10 +40,12 @@ src/
   myaccount/
   config/
   node/
+  vpc/
+  ssh-key/
 ```
 
 Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
-Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep node-specific endpoint parsing in `src/node/client.ts`. Cross-domain imports should go through each domain `index.ts`.
+Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
 Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
 
 ## CI Contract
@@ -96,7 +98,7 @@ Before calling a branch production-ready, verify:
 1. clean install from source: `npm install`, `make build`, `npm link`
 2. first-time setup from a clean temp `HOME`
 3. `config import` and `config list` behavior
-4. read-only live API calls such as `node catalog os`, `node catalog plans`, and `node list`
+4. read-only live API calls such as `node catalog os`, `node catalog plans`, `node list`, `vpc list`, `vpc plans`, and `ssh-key list`
 5. local gates: `make lint`, `make test`, `make build`, `npm run test:integration`
 6. publish package preview: `npm pack --dry-run`
 
@@ -116,7 +118,8 @@ Any user-visible behavior change must also update unit tests, docs, and the dete
 
 ## Release Notes
 
-- Keep [CHANGELOG.md](../CHANGELOG.md) current for user-visible changes.
+- Do not hand-edit [CHANGELOG.md](../CHANGELOG.md) in normal feature PRs. Release Please owns changelog generation and release-note updates.
 - Do not bump the package version unless a release is being prepared.
-- Prefer Conventional Commits for history clarity.
+- Prefer Conventional Commits so release PRs get the right version bump and readable generated notes.
+- Use standard commit prefixes such as `feat:`, `fix:`, and `chore:` consistently across merged PRs.
 - Keep the doc set small: avoid reintroducing milestone-by-milestone implementation history once it is absorbed into the maintained docs above.

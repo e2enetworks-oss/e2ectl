@@ -8,6 +8,8 @@ Current v1 scope:
 - node read commands
 - node catalog discovery for valid plan and image pairs
 - node create and delete commands
+- VPC list, plan discovery, and create commands
+- SSH key list and create commands
 - deterministic `--json` output for automation
 
 ## Requirements
@@ -197,13 +199,92 @@ e2ectl node catalog os
 e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>
 e2ectl node create --name <name> --plan <plan> --image <image>
 e2ectl node delete <node-id> --force
+e2ectl vpc list
+e2ectl vpc plans
+e2ectl ssh-key list
+```
+
+## VPC Workflow
+
+VPC creation is discovery-first:
+
+1. inspect existing VPCs
+2. inspect hourly and committed billing options
+3. create the VPC with explicit billing and CIDR choices
+
+List VPCs:
+
+```bash
+e2ectl vpc list
+e2ectl vpc list --json
+```
+
+Inspect VPC billing options before creating one:
+
+```bash
+e2ectl vpc plans
+e2ectl vpc plans --json
+```
+
+Create a VPC with an E2E-provided CIDR:
+
+```bash
+e2ectl vpc create \
+  --name prod-vpc \
+  --billing-type hourly \
+  --cidr-source e2e
+```
+
+Create a VPC with a custom CIDR and committed billing:
+
+```bash
+e2ectl vpc create \
+  --name analytics-vpc \
+  --billing-type committed \
+  --committed-plan-id 91 \
+  --post-commit-behavior auto-renew \
+  --cidr-source custom \
+  --cidr 10.10.0.0/23
+```
+
+Committed billing also works with `--cidr-source e2e`; only `--cidr-source custom` requires `--cidr`.
+
+`--cidr-source` is always required.
+If you choose `--cidr-source custom`, you must also pass `--cidr`.
+If you choose `--billing-type committed`, you must also pass `--committed-plan-id`.
+
+## SSH Key Workflow
+
+List SSH keys:
+
+```bash
+e2ectl ssh-key list
+e2ectl ssh-key list --json
+```
+
+Create an SSH key from a file:
+
+```bash
+e2ectl ssh-key create \
+  --label admin-laptop \
+  --public-key-file ~/.ssh/id_ed25519.pub
+```
+
+Create an SSH key from stdin:
+
+```bash
+cat ~/.ssh/id_ed25519.pub | \
+  e2ectl ssh-key create \
+    --label admin-laptop \
+    --public-key-file -
 ```
 
 ## JSON And Automation
 
 - Human-readable output is the default.
 - `--json` emits deterministic JSON intended for scripts and agents.
-- Treat current `--json` output as a compatibility contract.
+- This package is still pre-release, so new domains can redesign accidental internal shapes before `1.0.0`.
+- Once a `--json` shape is merged, treat it as the current contract and review it carefully before changing it.
 - Use `config list --json`, `node list --json`, `node get --json`, and catalog commands with `--json` for automation-safe output.
 
 ## Safety Notes

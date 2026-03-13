@@ -26,6 +26,14 @@ describe('runCli', () => {
         createNodeClient: vi.fn(() => {
           throw new Error('Node client should not be created for this test.');
         }),
+        createSshKeyClient: vi.fn(() => {
+          throw new Error(
+            'SSH key client should not be created for this test.'
+          );
+        }),
+        createVpcClient: vi.fn(() => {
+          throw new Error('VPC client should not be created for this test.');
+        }),
         credentialValidator: {
           validate: vi.fn()
         },
