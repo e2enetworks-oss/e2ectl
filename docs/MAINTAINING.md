@@ -17,6 +17,7 @@ npm run test:manual
 ```
 
 For pre-release smoke checks, also verify a clean-room first-user flow with a temporary `HOME`: import a credential file, save defaults, run `config list`, and exercise read-only node commands against live credentials.
+For release automation and npm publish activation, use [docs/RELEASING.md](./RELEASING.md).
 
 ## Source Layout
 
@@ -57,6 +58,15 @@ Each job runs:
 
 The manual live API suite is intentionally not part of CI.
 
+## Release Workflows
+
+This repo also has two release-specific workflows:
+
+- `.github/workflows/release-please.yml` opens release PRs and creates GitHub tags/releases
+- `.github/workflows/publish.yml` publishes tagged GitHub Releases to npm after rerunning the local verification gate
+
+Those workflows are intentionally designed so the repo can be prepared now and fully activated later, once a company-controlled npm owner account and trusted publishing are configured.
+
 ## Release Smoke Check
 
 Before calling a branch production-ready, verify:
@@ -66,6 +76,7 @@ Before calling a branch production-ready, verify:
 3. `config import` and `config list` behavior
 4. read-only live API calls such as `node catalog os`, `node catalog plans`, and `node list`
 5. normal repo gates: `make lint`, `make test`, `make build`
+6. publish package preview: `npm pack --dry-run`
 
 ## Documentation Duties
 
@@ -75,6 +86,7 @@ Update these when behavior changes:
 - [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
 - [docs/MAINTAINING.md](./MAINTAINING.md) for CI and maintenance policy
 - [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
+- [docs/RELEASING.md](./RELEASING.md) for versioning and npm publish process
 
 Any user-visible behavior change must also update unit tests, docs, and the deterministic `--json` output review. The manual live API suite remains opt-in and is never part of normal CI.
 
