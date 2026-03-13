@@ -99,6 +99,22 @@ src/
     formatter.ts
     defaults.ts
     types.ts
+
+  vpc/
+    index.ts
+    client.ts
+    command.ts
+    service.ts
+    formatter.ts
+    types.ts
+
+  ssh-key/
+    index.ts
+    client.ts
+    command.ts
+    service.ts
+    formatter.ts
+    types.ts
 ```
 
 ### Domain Ownership
@@ -108,6 +124,8 @@ src/
 - `myaccount/` is shared transport only: request execution, API envelope typing, credential validation, and centralized API failure handling.
 - `config/` owns alias storage, import parsing, default alias/default context behavior, and auth/context resolution.
 - `node/` owns node workflows, node create defaults, node-specific API parsing, and node-specific rendering.
+- `vpc/` owns VPC discovery, VPC create validation, VPC-specific API parsing, and VPC output shaping.
+- `ssh-key/` owns SSH key create/list workflows, local key-content loading orchestration, API parsing, and SSH key output shaping.
 
 ### Architectural Rules
 
@@ -118,7 +136,7 @@ src/
 - Keep Commander usage-error normalization centralized at the app boundary so CLI usage failures follow the same error contract as service/domain failures.
 - `src/myaccount/transport.ts` owns generic HTTP execution and generic API failure handling. Do not duplicate backend error translation in `node/client.ts` or future service clients.
 - If a future endpoint returns a different success body, add a transport-level response parser instead of re-implementing auth, timeout, or API failure handling in the domain client.
-- Deterministic `--json` output is a compatibility contract. Review key order, field names, null handling, and sorting before merging changes.
+- Deterministic `--json` output is a contract. This repo is still pre-release, so prefer cleaning up accidental internal shapes before carrying them forward. Once a shape is merged, review key order, field names, null handling, and sorting before changing it.
 - Import across domains only via that domain's `index.ts`. Do not reach into another domain's internal files.
 - Do not introduce placeholder abstractions. If a file or type does not serve the current v1 scope, do not add it.
 
@@ -132,6 +150,7 @@ For new services such as `volume` or `vpc`, keep the existing domain shape:
 - `src/<domain>/formatter.ts` for human and deterministic JSON output
 
 Reuse `config/resolver.ts` for credential/context resolution and keep shared MyAccount request execution inside `src/myaccount/transport.ts`.
+If a domain needs local file or stdin input, inject that I/O into the service as a focused dependency rather than pushing workflow logic back into the command layer.
 
 ## Verification Contract
 
@@ -158,8 +177,10 @@ This includes command help text, prompt/confirmation flow, error wording that op
 ## Release Automation
 
 - `main` is expected to stay releaseable.
-- Use Conventional Commits on merged PRs so Release Please can derive the right version bump.
+- Use Conventional Commits on merged PRs so Release Please can derive the right version bump and generate clean release notes.
+- Prefer standard commit types such as `feat:`, `fix:`, and `chore:`; use `feat!:` or a `BREAKING CHANGE:` footer only for intentional breaking changes.
 - Do not hand-edit `package.json` versions outside the release PR flow.
+- Do not hand-edit [CHANGELOG.md](./CHANGELOG.md) in normal feature PRs. Release Please owns changelog generation at release time.
 - The first public prerelease is forced with a commit body that contains `Release-As: 1.0.0-rc.1`.
 - The first stable release is forced with a commit body that contains `Release-As: 1.0.0`.
 - GitHub release automation and npm publish activation steps live in [docs/RELEASING.md](./docs/RELEASING.md).
@@ -178,14 +199,20 @@ This includes command help text, prompt/confirmation flow, error wording that op
   - `tests/unit/myaccount/`
   - `tests/unit/config/`
   - `tests/unit/node/`
+  - `tests/unit/vpc/`
+  - `tests/unit/ssh-key/`
 - Keep integration coverage focused on real CLI behavior:
   - `tests/integration/app/`
   - `tests/integration/config/`
   - `tests/integration/node/`
+  - `tests/integration/vpc/`
+  - `tests/integration/ssh-key/`
 - `tests/unit/myaccount/` covers transport behavior, request construction, and centralized error handling.
 - `tests/unit/app/` covers CLI entrypoint behavior such as usage-error normalization and exit paths.
 - `tests/unit/config/` covers secure and atomic config persistence in addition to command behavior.
 - `tests/unit/node/` covers node client endpoint parsing plus command/service behavior such as defaults, prompts, and output.
+- `tests/unit/vpc/` covers VPC client paths, create validation, plan summarization, and list/create output.
+- `tests/unit/ssh-key/` covers SSH key client paths, file/stdin loading orchestration, validation, and output.
 
 ## Manual API Checks
 

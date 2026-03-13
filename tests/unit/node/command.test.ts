@@ -3,6 +3,8 @@ import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
+import type { SshKeyClient } from '../../../src/ssh-key/index.js';
+import type { VpcClient } from '../../../src/vpc/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function toJsonOutput(value: unknown): string {
@@ -159,6 +161,12 @@ describe('node commands', () => {
         credentials = resolvedCredentials;
         return stub.stub;
       },
+      createSshKeyClient: vi.fn(() => {
+        throw new Error('SSH key client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
+      createVpcClient: vi.fn(() => {
+        throw new Error('VPC client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => VpcClient,
       credentialValidator: {
         validate: vi.fn()
       },

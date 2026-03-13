@@ -8,6 +8,8 @@ import {
 } from '../myaccount/index.js';
 import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
+import { SshKeyApiClient, type SshKeyClient } from '../ssh-key/index.js';
+import { VpcApiClient, type VpcClient } from '../vpc/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -16,6 +18,8 @@ export interface OutputWriter {
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
+  createVpcClient(credentials: ResolvedCredentials): VpcClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
@@ -34,6 +38,14 @@ export function createRuntime(): CliRuntime {
     confirm: promptForConfirmation,
     createNodeClient: (credentials) =>
       new NodeApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createSshKeyClient: (credentials) =>
+      new SshKeyApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createVpcClient: (credentials) =>
+      new VpcApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     credentialValidator: new ApiCredentialValidator(apiClientOptions),

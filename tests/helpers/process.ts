@@ -10,6 +10,7 @@ export interface CliProcessResult {
 export interface CliProcessOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  stdin?: string;
 }
 
 const CLI_ENTRYPOINT = path.join(process.cwd(), 'dist', 'app', 'index.js');
@@ -34,8 +35,12 @@ export async function runCommand(
       NO_COLOR: '1',
       ...options.env
     },
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: [options.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe']
   });
+
+  if (child.stdout === null || child.stderr === null) {
+    throw new Error('Expected child process stdout and stderr pipes.');
+  }
 
   let stdout = '';
   let stderr = '';
@@ -46,6 +51,14 @@ export async function runCommand(
   child.stderr.on('data', (chunk: Buffer | string) => {
     stderr += chunk.toString();
   });
+
+  if (options.stdin !== undefined) {
+    if (child.stdin === null) {
+      throw new Error('Expected child process stdin pipe.');
+    }
+
+    child.stdin.end(options.stdin);
+  }
 
   return await new Promise((resolve, reject) => {
     child.once('error', reject);

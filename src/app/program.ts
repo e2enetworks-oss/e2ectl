@@ -3,6 +3,8 @@ import { createRequire } from 'node:module';
 
 import { buildConfigCommand } from '../config/index.js';
 import { buildNodeCommand } from '../node/index.js';
+import { buildSshKeyCommand } from '../ssh-key/index.js';
+import { buildVpcCommand } from '../vpc/index.js';
 import { createRuntime, type CliRuntime } from './runtime.js';
 
 interface PackageMetadata {
@@ -25,6 +27,8 @@ export function createProgram(runtime: CliRuntime = createRuntime()): Command {
 
   program.addCommand(buildConfigCommand(runtime));
   program.addCommand(buildNodeCommand(runtime));
+  program.addCommand(buildVpcCommand(runtime));
+  program.addCommand(buildSshKeyCommand(runtime));
   program.helpCommand('help [command]', 'Show help for a command');
 
   program.action(() => {
