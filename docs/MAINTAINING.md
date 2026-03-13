@@ -68,7 +68,7 @@ Fast gate steps:
 3. `make test`
 4. `make build`
 
-Full staging/promotion gate in `integration.yml`:
+Full staging and promotion gate in `integration.yml`:
 
 1. `npm ci`
 2. `make lint`
@@ -104,11 +104,13 @@ Before calling a branch production-ready, verify:
 
 Update these when behavior changes:
 
-- [README.md](../README.md) for operator-facing usage
+- [README.md](../README.md) for operator-facing usage only
 - [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
 - [docs/MAINTAINING.md](./MAINTAINING.md) for CI and maintenance policy
 - [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
 - [docs/RELEASING.md](./RELEASING.md) for versioning and npm publish process
+
+Keep contributor workflow, CI internals, and release mechanics out of `README.md` unless an operator truly needs them to start using the CLI.
 
 Any user-visible behavior change must also update unit tests, docs, and the deterministic `--json` output review. The manual live API suite remains opt-in and is never part of normal CI.
 

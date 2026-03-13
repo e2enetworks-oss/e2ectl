@@ -22,6 +22,13 @@ npm run test:integration
 npm pack --dry-run
 ```
 
+## Documentation Boundaries
+
+- `README.md` is the operator and first-time-user guide.
+- `CONTRIBUTING.md` is the contributor workflow, architecture, and verification contract.
+- `docs/MAINTAINING.md` is the maintainer guide for CI, staging, and release readiness checks.
+- `docs/RELEASING.md` is the release and npm publishing runbook.
+
 ## Local Workflow
 
 ```bash
@@ -220,5 +227,5 @@ GitHub Actions runs for:
 - merge queue (`merge_group`) checks for `main`
 - pushes to `develop` for the full staging gate
 
-The fast `ci.yml` workflow covers Node `18`, `20`, and `22`.
-The dedicated `integration.yml` workflow runs on Node `22` only and is required on pull requests to both `develop` and `main`.
+- `ci.yml` is the fast gate and covers Node `18`, `20`, and `22`.
+- `integration.yml` is the full staging and promotion gate, runs on Node `22`, and is required on pull requests to both `develop` and `main`.
