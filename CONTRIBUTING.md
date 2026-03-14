@@ -132,6 +132,7 @@ src/
 - `myaccount/` is shared transport only: request execution, API envelope typing, credential validation, and centralized API failure handling.
 - `config/` owns alias storage, import parsing, default alias/default context behavior, and auth/context resolution.
 - `node/` owns node workflows, node create defaults, node-specific API parsing, and node-specific rendering.
+- Node billing discovery stays config-first: select an OS row, compare config rows, then choose hourly or one committed option for that exact row.
 - Node operational workflows stay under the `node action` subtree inside `node/`; do not split them into a new top-level domain.
 - `volume/` owns block storage volume discovery, size-to-IOPS resolution, volume create validation, and volume output shaping.
 - `vpc/` owns VPC discovery, VPC create validation, VPC-specific API parsing, and VPC output shaping.
@@ -149,6 +150,7 @@ src/
 - Deterministic `--json` output is a contract. This repo is still pre-release, so prefer cleaning up accidental internal shapes before carrying them forward. Once a shape is merged, review key order, field names, null handling, and sorting before changing it.
 - Import across domains only via that domain's `index.ts`. Do not reach into another domain's internal files.
 - Do not introduce placeholder abstractions. If a file or type does not serve the current v1 scope, do not add it.
+- Keep node-specific billing grouping and normalization inside `node/service.ts` or closely related node code; do not introduce a generic pricing abstraction for this slice.
 
 ### Adding A New Domain
 
@@ -183,7 +185,7 @@ Every user-visible behavior change requires:
 - verification that README examples still match the real CLI help surface when you touch commands or flags
 
 This includes command help text, prompt/confirmation flow, error wording that operators rely on, and machine-facing JSON fields.
-Node plan discovery UX remains the current `node catalog` flow in this slice; PR4 is reserved for discovery UX changes there.
+The current node slice completes the actionable billing discovery path: `node catalog plans` is config-first, and committed `node create` always maps to backend `cn_status=auto_renew` with an explicit `--committed-plan-id`.
 
 ## Release Automation
 

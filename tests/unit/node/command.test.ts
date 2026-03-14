@@ -96,8 +96,18 @@ function createNodeClientStub() {
         },
         plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
         specs: {
+          committed_sku: [
+            {
+              committed_days: 90,
+              committed_sku_id: 2711,
+              committed_sku_name: '90 Days Committed , Rs. 6026.0',
+              committed_sku_price: 6026
+            }
+          ],
           cpu: 4,
           disk_space: 100,
+          minimum_billing_amount: 0,
+          price_per_hour: 3.1,
           price_per_month: 2263,
           ram: '8.00',
           series: 'C3',
@@ -529,6 +539,9 @@ describe('node commands', () => {
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'create',
+        billing: {
+          billing_type: 'hourly'
+        },
         created: 1,
         nodes: [
           {
@@ -545,6 +558,104 @@ describe('node commands', () => {
         requested: 1
       })
     );
+  });
+
+  it('maps committed create flags to cn_id and cn_status', async () => {
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'create',
+      '--name',
+      'new-node',
+      '--plan',
+      'plan-123',
+      '--image',
+      'Ubuntu-24.04-Distro',
+      '--billing-type',
+      'committed',
+      '--committed-plan-id',
+      '2711',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(nodeStub.createNode).toHaveBeenCalledWith({
+      backups: false,
+      cn_id: 2711,
+      cn_status: 'auto_renew',
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'new-node',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [],
+      start_scripts: []
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'create',
+        billing: {
+          billing_type: 'committed',
+          committed_plan_id: 2711,
+          post_commit_behavior: 'auto_renew'
+        },
+        created: 1,
+        nodes: [
+          {
+            created_at: '2026-03-11T10:00:00Z',
+            id: 205,
+            location: 'Delhi',
+            name: 'new-node',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.2',
+            public_ip_address: '1.1.1.2',
+            status: 'Creating'
+          }
+        ],
+        requested: 1
+      })
+    );
+  });
+
+  it('rejects committed-only flags on hourly node creation', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'e2ectl',
+        'node',
+        'create',
+        '--name',
+        'new-node',
+        '--plan',
+        'plan-123',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--billing-type',
+        'hourly',
+        '--committed-plan-id',
+        '2711',
+        '--alias',
+        'prod'
+      ])
+    ).rejects.toMatchObject({
+      message:
+        'Committed plan ID can only be used with --billing-type committed.'
+    });
   });
 
   it('lists OS catalog rows in deterministic json mode', async () => {
@@ -580,7 +691,7 @@ describe('node commands', () => {
     );
   });
 
-  it('lists valid plan and image pairs for a selected catalog row', async () => {
+  it('lists grouped plan and billing options for a selected catalog row', async () => {
     const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -613,31 +724,38 @@ describe('node commands', () => {
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'catalog-plans',
-        plans: [
+        items: [
           {
-            available_inventory_status: true,
-            currency: 'INR',
-            image: 'Ubuntu-24.04-Distro',
-            location: 'Delhi',
-            name: 'C3.8GB',
-            os: {
-              category: 'Ubuntu',
-              image: 'Ubuntu-24.04-Distro',
-              name: 'Ubuntu',
-              version: '24.04'
-            },
-            plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
-            specs: {
-              cpu: 4,
-              disk_space: 100,
-              price_per_month: 2263,
+            available_inventory: true,
+            committed_options: [
+              {
+                days: 90,
+                id: 2711,
+                name: '90 Days Committed , Rs. 6026.0',
+                total_price: 6026
+              }
+            ],
+            config: {
+              disk_gb: 100,
+              family: null,
               ram: '8.00',
               series: 'C3',
-              sku_name: 'C3.8GB'
-            }
+              vcpu: 4
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 3.1,
+              price_per_month: 2263
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+            row: 1,
+            sku: 'C3.8GB'
           }
         ],
         query: {
+          billing_type: 'all',
           category: 'Ubuntu',
           display_category: 'Linux Virtual Node',
           os: 'Ubuntu',
@@ -645,6 +763,35 @@ describe('node commands', () => {
         }
       })
     );
+  });
+
+  it('passes through the requested billing filter for catalog plans', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      'node',
+      'catalog',
+      'plans',
+      '--display-category',
+      'Linux Virtual Node',
+      '--category',
+      'Ubuntu',
+      '--os',
+      'Ubuntu',
+      '--os-version',
+      '24.04',
+      '--billing-type',
+      'hourly',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Create hourly from row 1:');
+    expect(stdout.buffer).not.toContain('Create committed from row 1:');
   });
 
   it('requests power-on through the node action subtree', async () => {

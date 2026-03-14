@@ -11,12 +11,19 @@ import type { NodeClient } from './client.js';
 import { buildDefaultNodeCreateRequest } from './defaults.js';
 import type {
   NodeActionResult,
+  NodeCatalogBillingType,
+  NodeCatalogCommittedOptionSummary,
+  NodeCatalogCommittedSku,
   NodeCatalogOsData,
   NodeCatalogPlan,
+  NodeCatalogPlanItem,
+  NodeCatalogPlansQuery,
   NodeCatalogQuery,
+  NodeCreateBillingType,
   NodeCreateResult,
   NodeDetails,
-  NodeListResult
+  NodeListResult,
+  NodeCommittedCreateStatus
 } from './types.js';
 
 export interface NodeContextOptions {
@@ -26,6 +33,8 @@ export interface NodeContextOptions {
 }
 
 export interface NodeCreateOptions extends NodeContextOptions {
+  billingType?: string;
+  committedPlanId?: string;
   image: string;
   name: string;
   plan: string;
@@ -36,6 +45,7 @@ export interface NodeDeleteOptions extends NodeContextOptions {
 }
 
 export interface NodeCatalogPlansOptions extends NodeContextOptions {
+  billingType?: string;
   category: string;
   displayCategory: string;
   os: string;
@@ -79,8 +89,15 @@ export interface NodeListCommandResult {
   total_page_number?: number;
 }
 
+export interface NodeCreateBillingSummary {
+  billing_type: NodeCreateBillingType;
+  committed_plan_id?: number;
+  post_commit_behavior?: NodeCommittedCreateStatus;
+}
+
 export interface NodeCreateCommandResult {
   action: 'create';
+  billing: NodeCreateBillingSummary;
   result: NodeCreateResult;
 }
 
@@ -103,8 +120,8 @@ export interface NodeCatalogOsCommandResult {
 
 export interface NodeCatalogPlansCommandResult {
   action: 'catalog-plans';
-  plans: NodeCatalogPlan[];
-  query: NodeCatalogQuery;
+  items: NodeCatalogPlanItem[];
+  query: NodeCatalogPlansQuery;
 }
 
 export interface NodePowerOnCommandResult {
@@ -223,6 +240,10 @@ interface ResolvedSshKey {
   label: string;
   ssh_key: string;
 }
+
+const DEFAULT_NODE_CATALOG_BILLING_TYPE: NodeCatalogBillingType = 'all';
+const DEFAULT_NODE_CREATE_BILLING_TYPE: NodeCreateBillingType = 'hourly';
+const COMMITTED_NODE_CREATE_STATUS: NodeCommittedCreateStatus = 'auto_renew';
 
 export class NodeService {
   constructor(private readonly dependencies: NodeServiceDependencies) {}
@@ -344,8 +365,19 @@ export class NodeService {
     options: NodeCreateOptions
   ): Promise<NodeCreateCommandResult> {
     const client = await this.createNodeClient(options);
+    const billingType = normalizeNodeCreateBillingType(options.billingType);
+    const committedPlanId = normalizeCommittedPlanId(
+      billingType,
+      options.committedPlanId
+    );
     const result = await client.createNode(
       buildDefaultNodeCreateRequest({
+        ...(committedPlanId === null
+          ? {}
+          : {
+              cn_id: committedPlanId,
+              cn_status: COMMITTED_NODE_CREATE_STATUS
+            }),
         image: normalizeRequiredString(options.image, 'Image', '--image'),
         name: normalizeRequiredString(options.name, 'Name', '--name'),
         plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
@@ -354,6 +386,16 @@ export class NodeService {
 
     return {
       action: 'create',
+      billing:
+        committedPlanId === null
+          ? {
+              billing_type: billingType
+            }
+          : {
+              billing_type: billingType,
+              committed_plan_id: committedPlanId,
+              post_commit_behavior: COMMITTED_NODE_CREATE_STATUS
+            },
       result
     };
   }
@@ -495,12 +537,20 @@ export class NodeService {
     options: NodeCatalogPlansOptions
   ): Promise<NodeCatalogPlansCommandResult> {
     const client = await this.createNodeClient(options);
+    const billingType = normalizeNodeCatalogBillingType(options.billingType);
     const query = buildNodeCatalogQuery(options);
+    const items = normalizeNodeCatalogPlanItems(
+      await client.listNodeCatalogPlans(query),
+      billingType
+    );
 
     return {
       action: 'catalog-plans',
-      plans: await client.listNodeCatalogPlans(query),
-      query
+      items,
+      query: {
+        ...query,
+        billing_type: billingType
+      }
     };
   }
 
@@ -643,6 +693,246 @@ function assertNodeId(nodeId: string): number {
   }
 
   return Number(nodeId);
+}
+
+function normalizeNodeCatalogBillingType(
+  value: string | undefined
+): NodeCatalogBillingType {
+  return normalizeBillingType(
+    value,
+    ['all', 'committed', 'hourly'],
+    DEFAULT_NODE_CATALOG_BILLING_TYPE
+  );
+}
+
+function normalizeNodeCreateBillingType(
+  value: string | undefined
+): NodeCreateBillingType {
+  return normalizeBillingType(
+    value,
+    ['committed', 'hourly'],
+    DEFAULT_NODE_CREATE_BILLING_TYPE
+  );
+}
+
+function normalizeBillingType<TBillingType extends string>(
+  value: string | undefined,
+  allowedValues: readonly TBillingType[],
+  defaultValue: TBillingType
+): TBillingType {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  if (allowedValues.includes(normalizedValue as TBillingType)) {
+    return normalizedValue as TBillingType;
+  }
+
+  throw new CliError(
+    `Billing type must be one of: ${allowedValues.join(', ')}.`,
+    {
+      code: 'INVALID_BILLING_TYPE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass --billing-type ${allowedValues.join(' or --billing-type ')}.`
+    }
+  );
+}
+
+function normalizeCommittedPlanId(
+  billingType: NodeCreateBillingType,
+  committedPlanId: string | undefined
+): number | null {
+  if (billingType === 'committed') {
+    if (committedPlanId === undefined) {
+      throw new CliError(
+        'Committed plan ID is required when --billing-type committed is used.',
+        {
+          code: 'MISSING_COMMITTED_PLAN_ID',
+          exitCode: EXIT_CODES.usage,
+          suggestion:
+            'Run e2ectl node catalog plans first, then pass one plan id with --committed-plan-id.'
+        }
+      );
+    }
+
+    return normalizeRequiredNumericId(
+      committedPlanId,
+      'Committed plan ID',
+      '--committed-plan-id'
+    );
+  }
+
+  if (committedPlanId !== undefined) {
+    throw new CliError(
+      'Committed plan ID can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --committed-plan-id, or switch to --billing-type committed.'
+      }
+    );
+  }
+
+  return null;
+}
+
+function normalizeNodeCatalogPlanItems(
+  plans: NodeCatalogPlan[],
+  billingType: NodeCatalogBillingType
+): NodeCatalogPlanItem[] {
+  const filteredPlans =
+    billingType === 'committed'
+      ? plans.filter((plan) => hasCommittedOptions(plan))
+      : plans;
+
+  return [...filteredPlans]
+    .sort(compareNodeCatalogPlans)
+    .map((plan, index) => toNodeCatalogPlanItem(plan, billingType, index + 1));
+}
+
+function compareNodeCatalogPlans(
+  left: NodeCatalogPlan,
+  right: NodeCatalogPlan
+): number {
+  return (
+    compareNullableNumber(left.specs?.cpu, right.specs?.cpu) ||
+    compareNullableNumber(
+      parseRamAsNumber(left.specs?.ram),
+      parseRamAsNumber(right.specs?.ram)
+    ) ||
+    compareNullableNumber(left.specs?.disk_space, right.specs?.disk_space) ||
+    compareText(resolveNodeCatalogSku(left), resolveNodeCatalogSku(right)) ||
+    compareText(left.plan, right.plan) ||
+    compareText(left.image, right.image)
+  );
+}
+
+function toNodeCatalogPlanItem(
+  plan: NodeCatalogPlan,
+  billingType: NodeCatalogBillingType,
+  row: number
+): NodeCatalogPlanItem {
+  return {
+    available_inventory: plan.available_inventory_status !== false,
+    committed_options:
+      billingType === 'hourly'
+        ? []
+        : normalizeCommittedOptions(plan.specs?.committed_sku),
+    config: {
+      disk_gb: normalizeOptionalInteger(plan.specs?.disk_space),
+      family: normalizeOptionalText(plan.specs?.family),
+      ram: normalizeOptionalText(plan.specs?.ram),
+      series: normalizeOptionalText(plan.specs?.series),
+      vcpu: normalizeOptionalInteger(plan.specs?.cpu)
+    },
+    currency: normalizeOptionalText(plan.currency),
+    hourly: {
+      minimum_billing_amount: normalizeOptionalNumber(
+        plan.specs?.minimum_billing_amount
+      ),
+      price_per_hour: normalizeOptionalNumber(plan.specs?.price_per_hour),
+      price_per_month: normalizeOptionalNumber(plan.specs?.price_per_month)
+    },
+    image: plan.image,
+    plan: plan.plan,
+    row,
+    sku: resolveNodeCatalogSku(plan)
+  };
+}
+
+function hasCommittedOptions(plan: NodeCatalogPlan): boolean {
+  return normalizeCommittedOptions(plan.specs?.committed_sku).length > 0;
+}
+
+function normalizeCommittedOptions(
+  options: NodeCatalogCommittedSku[] | undefined
+): NodeCatalogCommittedOptionSummary[] {
+  if (options === undefined) {
+    return [];
+  }
+
+  return options
+    .filter(
+      (
+        option
+      ): option is NonNullable<typeof options>[number] & {
+        committed_sku_id: number;
+      } =>
+        typeof option.committed_sku_id === 'number' &&
+        Number.isInteger(option.committed_sku_id) &&
+        option.committed_sku_id > 0
+    )
+    .map((option) => ({
+      days: normalizeOptionalInteger(option.committed_days),
+      id: option.committed_sku_id,
+      name: normalizeOptionalText(option.committed_sku_name) ?? '',
+      total_price: normalizeOptionalNumber(option.committed_sku_price)
+    }))
+    .sort(
+      (left, right) =>
+        compareNullableNumber(left.days, right.days) ||
+        compareNullableNumber(left.total_price, right.total_price) ||
+        left.id - right.id
+    );
+}
+
+function resolveNodeCatalogSku(plan: NodeCatalogPlan): string {
+  return (
+    normalizeOptionalText(plan.specs?.sku_name) ??
+    normalizeOptionalText(plan.name) ??
+    plan.plan
+  );
+}
+
+function normalizeOptionalText(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
+function normalizeOptionalInteger(value: number | undefined): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+function normalizeOptionalNumber(value: number | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseRamAsNumber(value: string | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  const parsedValue = Number.parseFloat(value);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function compareNullableNumber(
+  left: number | null | undefined,
+  right: number | null | undefined
+): number {
+  if (left == null && right == null) {
+    return 0;
+  }
+
+  if (left == null) {
+    return 1;
+  }
+
+  if (right == null) {
+    return -1;
+  }
+
+  return left - right;
+}
+
+function compareText(left: string, right: string): number {
+  return left.localeCompare(right);
 }
 
 function buildNodeCatalogQuery(

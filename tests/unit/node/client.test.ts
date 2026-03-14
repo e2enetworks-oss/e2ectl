@@ -187,6 +187,42 @@ describe('NodeApiClient', () => {
     expect(result.total_number_of_node_created).toBe(1);
   });
 
+  it('preserves committed create fields in the posted node payload', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+    const request: NodeCreateRequest = {
+      backups: false,
+      cn_id: 2711,
+      cn_status: 'auto_renew',
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'node-a',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [],
+      start_scripts: []
+    };
+
+    transport.postMock.mockResolvedValue(
+      envelope({
+        node_create_response: [],
+        total_number_of_node_created: 1,
+        total_number_of_node_requested: 1
+      })
+    );
+
+    await client.createNode(request);
+
+    expect(transport.postMock).toHaveBeenCalledWith('/nodes/', {
+      body: request
+    });
+  });
+
   it('reads the OS catalog from the discovery path', async () => {
     const transport = new StubTransport();
     const client = new NodeApiClient(transport);

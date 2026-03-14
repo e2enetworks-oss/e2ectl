@@ -26,6 +26,7 @@ function createServiceFixture(): {
   attachNodeVpc: ReturnType<typeof vi.fn>;
   attachSshKeys: ReturnType<typeof vi.fn>;
   attachVolumeToNode: ReturnType<typeof vi.fn>;
+  createNode: ReturnType<typeof vi.fn>;
   createNodeClient: ReturnType<typeof vi.fn>;
   createSshKeyClient: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
@@ -33,6 +34,7 @@ function createServiceFixture(): {
   detachNodeVpc: ReturnType<typeof vi.fn>;
   detachVolumeFromNode: ReturnType<typeof vi.fn>;
   getNode: ReturnType<typeof vi.fn>;
+  listNodeCatalogPlans: ReturnType<typeof vi.fn>;
   nodeClient: NodeClient;
   powerOffNode: ReturnType<typeof vi.fn>;
   powerOnNode: ReturnType<typeof vi.fn>;
@@ -90,13 +92,21 @@ function createServiceFixture(): {
       status: 'In Progress'
     })
   );
+  const createNode = vi.fn(() =>
+    Promise.resolve({
+      node_create_response: [],
+      total_number_of_node_created: 1,
+      total_number_of_node_requested: 1
+    })
+  );
+  const listNodeCatalogPlans = vi.fn(() => Promise.resolve([]));
   const nodeClient: NodeClient = {
     attachSshKeys,
-    createNode: vi.fn(),
+    createNode,
     deleteNode: vi.fn(),
     getNode,
     listNodeCatalogOs: vi.fn(),
-    listNodeCatalogPlans: vi.fn(),
+    listNodeCatalogPlans,
     listNodes: vi.fn(),
     powerOffNode,
     powerOnNode,
@@ -192,6 +202,7 @@ function createServiceFixture(): {
     attachNodeVpc,
     attachSshKeys,
     attachVolumeToNode,
+    createNode,
     createNodeClient,
     createSshKeyClient,
     createVolumeClient,
@@ -199,6 +210,7 @@ function createServiceFixture(): {
     detachNodeVpc,
     detachVolumeFromNode,
     getNode,
+    listNodeCatalogPlans,
     nodeClient,
     powerOffNode,
     powerOnNode,
@@ -404,5 +416,269 @@ describe('NodeService', () => {
     });
 
     expect(attachSshKeys).not.toHaveBeenCalled();
+  });
+
+  it('maps committed create options to cn_id and auto_renew status', async () => {
+    const { createNode, service } = createServiceFixture();
+
+    const result = await service.createNode({
+      alias: 'prod',
+      billingType: 'committed',
+      committedPlanId: '2711',
+      image: 'Ubuntu-24.04-Distro',
+      name: 'demo-node',
+      plan: 'plan-123'
+    });
+
+    expect(createNode).toHaveBeenCalledWith({
+      backups: false,
+      cn_id: 2711,
+      cn_status: 'auto_renew',
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'demo-node',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [],
+      start_scripts: []
+    });
+    expect(result.billing).toEqual({
+      billing_type: 'committed',
+      committed_plan_id: 2711,
+      post_commit_behavior: 'auto_renew'
+    });
+  });
+
+  it('validates committed node create flags locally', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        billingType: 'committed',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'plan-123'
+      })
+    ).rejects.toMatchObject({
+      message:
+        'Committed plan ID is required when --billing-type committed is used.'
+    });
+
+    await expect(
+      service.createNode({
+        billingType: 'hourly',
+        committedPlanId: '2711',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'plan-123'
+      })
+    ).rejects.toMatchObject({
+      message:
+        'Committed plan ID can only be used with --billing-type committed.'
+    });
+  });
+
+  it('groups catalog plans by config and keeps committed options nested', async () => {
+    const { listNodeCatalogPlans, service } = createServiceFixture();
+
+    listNodeCatalogPlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'C3.8GB',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+        specs: {
+          committed_sku: [
+            {
+              committed_days: 90,
+              committed_sku_id: 2711,
+              committed_sku_name: '90 Days Committed , Rs. 6026.0',
+              committed_sku_price: 6026
+            }
+          ],
+          cpu: 4,
+          disk_space: 100,
+          family: 'CPU Intensive 3rd Generation',
+          minimum_billing_amount: 0,
+          price_per_hour: 3.1,
+          price_per_month: 2263,
+          ram: '8.00',
+          series: 'C3',
+          sku_name: 'C3.8GB'
+        }
+      },
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'C3.4GB',
+        plan: 'C3-2vCPU-4RAM-50DISK-C3.4GB-Ubuntu-24.04-Delhi',
+        specs: {
+          committed_sku: [],
+          cpu: 2,
+          disk_space: 50,
+          family: 'CPU Intensive 3rd Generation',
+          minimum_billing_amount: 0,
+          price_per_hour: 1.8,
+          price_per_month: 1321,
+          ram: '4.00',
+          series: 'C3',
+          sku_name: 'C3.4GB'
+        }
+      }
+    ]);
+
+    const result = await service.listCatalogPlans({
+      alias: 'prod',
+      billingType: 'all',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+
+    expect(listNodeCatalogPlans).toHaveBeenCalledWith({
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(result).toEqual({
+      action: 'catalog-plans',
+      items: [
+        {
+          available_inventory: true,
+          committed_options: [],
+          config: {
+            disk_gb: 50,
+            family: 'CPU Intensive 3rd Generation',
+            ram: '4.00',
+            series: 'C3',
+            vcpu: 2
+          },
+          currency: 'INR',
+          hourly: {
+            minimum_billing_amount: 0,
+            price_per_hour: 1.8,
+            price_per_month: 1321
+          },
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-2vCPU-4RAM-50DISK-C3.4GB-Ubuntu-24.04-Delhi',
+          row: 1,
+          sku: 'C3.4GB'
+        },
+        {
+          available_inventory: true,
+          committed_options: [
+            {
+              days: 90,
+              id: 2711,
+              name: '90 Days Committed , Rs. 6026.0',
+              total_price: 6026
+            }
+          ],
+          config: {
+            disk_gb: 100,
+            family: 'CPU Intensive 3rd Generation',
+            ram: '8.00',
+            series: 'C3',
+            vcpu: 4
+          },
+          currency: 'INR',
+          hourly: {
+            minimum_billing_amount: 0,
+            price_per_hour: 3.1,
+            price_per_month: 2263
+          },
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+          row: 2,
+          sku: 'C3.8GB'
+        }
+      ],
+      query: {
+        billing_type: 'all',
+        category: 'Ubuntu',
+        display_category: 'Linux Virtual Node',
+        os: 'Ubuntu',
+        osversion: '24.04'
+      }
+    });
+  });
+
+  it('filters catalog plans for committed-only and hourly-only views', async () => {
+    const { listNodeCatalogPlans, service } = createServiceFixture();
+
+    listNodeCatalogPlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'C3.8GB',
+        plan: 'plan-1',
+        specs: {
+          committed_sku: [
+            {
+              committed_days: 90,
+              committed_sku_id: 2711,
+              committed_sku_name: '90 Days Committed , Rs. 6026.0',
+              committed_sku_price: 6026
+            }
+          ],
+          cpu: 4,
+          disk_space: 100,
+          price_per_hour: 3.1,
+          price_per_month: 2263,
+          ram: '8.00',
+          series: 'C3',
+          sku_name: 'C3.8GB'
+        }
+      },
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'C3.4GB',
+        plan: 'plan-2',
+        specs: {
+          committed_sku: [],
+          cpu: 2,
+          disk_space: 50,
+          price_per_hour: 1.8,
+          price_per_month: 1321,
+          ram: '4.00',
+          series: 'C3',
+          sku_name: 'C3.4GB'
+        }
+      }
+    ]);
+
+    const committedOnly = await service.listCatalogPlans({
+      billingType: 'committed',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+    const hourlyOnly = await service.listCatalogPlans({
+      billingType: 'hourly',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+
+    expect(committedOnly.items).toHaveLength(1);
+    expect(committedOnly.items[0]?.committed_options).toHaveLength(1);
+    expect(hourlyOnly.items).toHaveLength(2);
+    expect(
+      hourlyOnly.items.every((item) => item.committed_options.length === 0)
+    ).toBe(true);
   });
 });

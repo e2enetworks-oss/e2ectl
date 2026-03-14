@@ -56,8 +56,8 @@ The intended operator flow is:
 
 1. import a downloaded credential file
 2. save a default alias, project id, and location
-3. use the catalog commands to discover a valid OS, plan, and image
-4. create a node
+3. use the catalog commands to discover a valid OS row, config row, and billing choice
+4. create a node from the exact catalog row
 5. inspect the result
 
 ### 1. Import credentials
@@ -102,7 +102,7 @@ e2ectl config set-context \
 e2ectl node catalog os --alias prod
 ```
 
-### 4. Discover valid plan and image pairs
+### 4. Discover valid configs and billing options
 
 Choose one OS row from the previous command and use those exact values here:
 
@@ -112,12 +112,19 @@ e2ectl node catalog plans \
   --display-category "Linux Virtual Node" \
   --category Ubuntu \
   --os Ubuntu \
-  --os-version 24.04
+  --os-version 24.04 \
+  --billing-type all
 ```
+
+This command is config-first:
+
+- the first table shows candidate configs and exact `plan`/`image` pairs
+- the committed table, when present, shows which committed plan ids belong to which config row
+- the footer prints exact hourly and committed create examples for the returned rows
 
 ### 5. Create a node
 
-Use the exact `plan` and `image` values returned by `node catalog plans`:
+Hourly create from a selected row:
 
 ```bash
 e2ectl node create \
@@ -125,6 +132,18 @@ e2ectl node create \
   --name demo-node \
   --plan <exact-plan-from-catalog> \
   --image <exact-image-from-catalog>
+```
+
+Committed create from a selected row:
+
+```bash
+e2ectl node create \
+  --alias prod \
+  --name demo-node \
+  --plan <exact-plan-from-catalog> \
+  --image <exact-image-from-catalog> \
+  --billing-type committed \
+  --committed-plan-id <exact-committed-plan-id-from-catalog>
 ```
 
 ### 6. Inspect nodes
@@ -199,8 +218,9 @@ e2ectl config list
 e2ectl node list
 e2ectl node get <node-id>
 e2ectl node catalog os
-e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>
+e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value> --billing-type all
 e2ectl node create --name <name> --plan <plan> --image <image>
+e2ectl node create --name <name> --plan <plan> --image <image> --billing-type committed --committed-plan-id <id>
 e2ectl node delete <node-id> --force
 e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>

@@ -48,7 +48,7 @@ src/
 Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
 Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/volume/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
 Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
-Current v1 node operational actions live under `node action`; node plan discovery UX changes remain intentionally out of scope until PR4.
+Current v1 node operational actions still live under `node action`, and node billing discovery is now actionable end-to-end through config-first `node catalog plans` plus committed `node create`.
 
 ## CI Contract
 
@@ -100,9 +100,10 @@ Before calling a branch production-ready, verify:
 1. clean install from source: `npm install`, `make build`, `npm link`
 2. first-time setup from a clean temp `HOME`
 3. `config import` and `config list` behavior
-4. read-only live API calls such as `node catalog os`, `node catalog plans`, `node list`, `volume list`, `volume plans`, `vpc list`, `vpc plans`, and `ssh-key list`
-5. local gates: `make lint`, `make test`, `make build`, `npm run test:integration`
-6. publish package preview: `npm pack --dry-run`
+4. read-only live API calls such as `node catalog os`, `node catalog plans --billing-type all`, `node list`, `volume list`, `volume plans`, `vpc list`, `vpc plans`, and `ssh-key list`
+5. create-path rehearsal against the fake API for both hourly `node create` and committed `node create --billing-type committed --committed-plan-id <id>`
+6. local gates: `make lint`, `make test`, `make build`, `npm run test:integration`
+7. publish package preview: `npm pack --dry-run`
 
 ## Documentation Duties
 
