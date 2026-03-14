@@ -132,6 +132,7 @@ src/
 - `myaccount/` is shared transport only: request execution, API envelope typing, credential validation, and centralized API failure handling.
 - `config/` owns alias storage, import parsing, default alias/default context behavior, and auth/context resolution.
 - `node/` owns node workflows, node create defaults, node-specific API parsing, and node-specific rendering.
+- Node operational workflows stay under the `node action` subtree inside `node/`; do not split them into a new top-level domain.
 - `volume/` owns block storage volume discovery, size-to-IOPS resolution, volume create validation, and volume output shaping.
 - `vpc/` owns VPC discovery, VPC create validation, VPC-specific API parsing, and VPC output shaping.
 - `ssh-key/` owns SSH key create/list workflows, local key-content loading orchestration, API parsing, and SSH key output shaping.
@@ -182,6 +183,7 @@ Every user-visible behavior change requires:
 - verification that README examples still match the real CLI help surface when you touch commands or flags
 
 This includes command help text, prompt/confirmation flow, error wording that operators rely on, and machine-facing JSON fields.
+Node plan discovery UX remains the current `node catalog` flow in this slice; PR4 is reserved for discovery UX changes there.
 
 ## Release Automation
 

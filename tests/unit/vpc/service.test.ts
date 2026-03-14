@@ -33,7 +33,9 @@ function createServiceFixture(): {
   let credentials: ResolvedCredentials | undefined;
 
   const client: VpcClient = {
+    attachNodeVpc: vi.fn(),
     createVpc,
+    detachNodeVpc: vi.fn(),
     listVpcPlans,
     listVpcs
   };

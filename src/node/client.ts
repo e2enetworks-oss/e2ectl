@@ -5,6 +5,9 @@ import type {
 } from '../myaccount/index.js';
 
 import type {
+  NodeActionRequest,
+  NodeActionResult,
+  NodeActionSshKey,
   NodeCatalogOsData,
   NodeCatalogPlan,
   NodeCatalogQuery,
@@ -25,16 +28,33 @@ type NodeListApiResponse = ApiResponse<
 >;
 
 export interface NodeClient {
+  attachSshKeys(
+    nodeId: string,
+    sshKeys: NodeActionSshKey[]
+  ): Promise<NodeActionResult>;
   createNode(body: NodeCreateRequest): Promise<NodeCreateResult>;
   deleteNode(nodeId: string): Promise<NodeDeleteResult>;
   getNode(nodeId: string): Promise<NodeDetails>;
   listNodeCatalogOs(): Promise<NodeCatalogOsData>;
   listNodeCatalogPlans(query: NodeCatalogQuery): Promise<NodeCatalogPlan[]>;
   listNodes(): Promise<NodeListResult>;
+  powerOffNode(nodeId: string): Promise<NodeActionResult>;
+  powerOnNode(nodeId: string): Promise<NodeActionResult>;
+  saveNodeImage(nodeId: string, name: string): Promise<NodeActionResult>;
 }
 
 export class NodeApiClient implements NodeClient {
   constructor(private readonly transport: MyAccountTransport) {}
+
+  async attachSshKeys(
+    nodeId: string,
+    sshKeys: NodeActionSshKey[]
+  ): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      ssh_keys: sshKeys,
+      type: 'add_ssh_keys'
+    });
+  }
 
   async createNode(body: NodeCreateRequest): Promise<NodeCreateResult> {
     const response = await this.transport.post<ApiEnvelope<NodeCreateResult>>(
@@ -98,5 +118,39 @@ export class NodeApiClient implements NodeClient {
         ? {}
         : { total_page_number: response.total_page_number })
     };
+  }
+
+  async powerOffNode(nodeId: string): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      type: 'power_off'
+    });
+  }
+
+  async powerOnNode(nodeId: string): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      type: 'power_on'
+    });
+  }
+
+  async saveNodeImage(nodeId: string, name: string): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      name,
+      type: 'save_images'
+    });
+  }
+
+  private async runNodeAction(
+    nodeId: string,
+    body: NodeActionRequest
+  ): Promise<NodeActionResult> {
+    const response = await this.transport.request<
+      ApiEnvelope<NodeActionResult>
+    >({
+      body,
+      method: 'PUT',
+      path: `/nodes/${nodeId}/actions/`
+    });
+
+    return response.data;
   }
 }

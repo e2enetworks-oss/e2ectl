@@ -63,3 +63,18 @@ export interface VpcCreateResult {
   vpc_id: number;
   vpc_name: string;
 }
+
+export interface VpcNodeActionRequest {
+  action: 'attach' | 'detach';
+  input_ip?: string;
+  network_id: number;
+  node_id: number;
+  subnet_id?: number;
+}
+
+export interface VpcNodeActionResult {
+  message: string;
+  project_id?: string | null;
+  vpc_id: number;
+  vpc_name: string;
+}

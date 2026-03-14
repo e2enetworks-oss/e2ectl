@@ -9,7 +9,11 @@ import type {
   NodeDetails,
   NodeSummary
 } from './types.js';
-import type { NodeCommandResult } from './service.js';
+import type {
+  NodeActionStatusSummary,
+  NodeCommandResult,
+  NodeResolvedSshKeySummary
+} from './service.js';
 
 export function renderNodeResult(
   result: NodeCommandResult,
@@ -169,6 +173,15 @@ function formatCell(value: number | string | undefined): string {
   return value === undefined ? '' : String(value);
 }
 
+function formatNodeActionSummary(result: NodeActionStatusSummary): string[] {
+  return [
+    `Action ID: ${result.action_id}`,
+    `Status: ${result.status}`,
+    `Created At: ${result.created_at}`,
+    ...(result.image_id === null ? [] : [`Image ID: ${result.image_id}`])
+  ];
+}
+
 function formatPrice(
   value: number | undefined,
   currency: string | undefined
@@ -178,6 +191,10 @@ function formatPrice(
   }
 
   return currency === undefined ? String(value) : `${value} ${currency}`;
+}
+
+function formatResolvedSshKeys(keys: NodeResolvedSshKeySummary[]): string {
+  return keys.map((key) => `${key.label} (${key.id})`).join(', ');
 }
 
 function hasVisibleValue(value: string): boolean {
@@ -220,6 +237,89 @@ function renderNodeHuman(result: NodeCommandResult): string {
       return result.nodes.length === 0
         ? 'No nodes found.\n'
         : `${formatNodesTable(result.nodes)}\n`;
+    case 'power-off':
+      return (
+        [`Requested power off for node ${result.node_id}.`]
+          .concat(formatNodeActionSummary(result.result))
+          .join('\n') + '\n'
+      );
+    case 'power-on':
+      return (
+        [`Requested power on for node ${result.node_id}.`]
+          .concat(formatNodeActionSummary(result.result))
+          .join('\n') + '\n'
+      );
+    case 'save-image':
+      return (
+        [
+          `Requested save image for node ${result.node_id} as ${result.image_name}.`
+        ]
+          .concat(formatNodeActionSummary(result.result))
+          .join('\n') + '\n'
+      );
+    case 'ssh-key-attach':
+      return (
+        [
+          `Requested SSH key attach for node ${result.node_id}.`,
+          `SSH Keys: ${formatResolvedSshKeys(result.ssh_keys)}`
+        ]
+          .concat(formatNodeActionSummary(result.result))
+          .join('\n') + '\n'
+      );
+    case 'volume-attach':
+      return (
+        [
+          `Requested volume attach for node ${result.node_id}.`,
+          `Volume ID: ${result.volume.id}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
+      );
+    case 'volume-detach':
+      return (
+        [
+          `Requested volume detach for node ${result.node_id}.`,
+          `Volume ID: ${result.volume.id}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
+      );
+    case 'vpc-attach': {
+      const lines = [
+        `Requested VPC attach for node ${result.node_id}.`,
+        `VPC ID: ${result.vpc.id}`,
+        `VPC Name: ${result.vpc.name}`
+      ];
+
+      if (result.vpc.subnet_id !== null) {
+        lines.push(`Subnet ID: ${result.vpc.subnet_id}`);
+      }
+
+      if (result.vpc.private_ip !== null) {
+        lines.push(`Private IP: ${result.vpc.private_ip}`);
+      }
+
+      lines.push(`Message: ${result.result.message}`);
+
+      return `${lines.join('\n')}\n`;
+    }
+    case 'vpc-detach': {
+      const lines = [
+        `Requested VPC detach for node ${result.node_id}.`,
+        `VPC ID: ${result.vpc.id}`,
+        `VPC Name: ${result.vpc.name}`
+      ];
+
+      if (result.vpc.subnet_id !== null) {
+        lines.push(`Subnet ID: ${result.vpc.subnet_id}`);
+      }
+
+      if (result.vpc.private_ip !== null) {
+        lines.push(`Private IP: ${result.vpc.private_ip}`);
+      }
+
+      lines.push(`Message: ${result.result.message}`);
+
+      return `${lines.join('\n')}\n`;
+    }
   }
 }
 
@@ -270,11 +370,103 @@ function renderNodeJson(result: NodeCommandResult): string {
         total_count: result.total_count ?? null,
         total_page_number: result.total_page_number ?? null
       });
+    case 'power-off':
+      return renderJson({
+        action: 'power-off',
+        node_id: result.node_id,
+        result: normalizeNodeActionJson(result.result)
+      });
+    case 'power-on':
+      return renderJson({
+        action: 'power-on',
+        node_id: result.node_id,
+        result: normalizeNodeActionJson(result.result)
+      });
+    case 'save-image':
+      return renderJson({
+        action: 'save-image',
+        image_name: result.image_name,
+        node_id: result.node_id,
+        result: normalizeNodeActionJson(result.result)
+      });
+    case 'ssh-key-attach':
+      return renderJson({
+        action: 'ssh-key-attach',
+        node_id: result.node_id,
+        result: normalizeNodeActionJson(result.result),
+        ssh_keys: result.ssh_keys.map((key) => ({
+          id: key.id,
+          label: key.label
+        }))
+      });
+    case 'volume-attach':
+      return renderJson({
+        action: 'volume-attach',
+        node_id: result.node_id,
+        node_vm_id: result.node_vm_id,
+        result: {
+          message: result.result.message
+        },
+        volume: {
+          id: result.volume.id
+        }
+      });
+    case 'volume-detach':
+      return renderJson({
+        action: 'volume-detach',
+        node_id: result.node_id,
+        node_vm_id: result.node_vm_id,
+        result: {
+          message: result.result.message
+        },
+        volume: {
+          id: result.volume.id
+        }
+      });
+    case 'vpc-attach':
+      return renderJson({
+        action: 'vpc-attach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message,
+          project_id: result.result.project_id
+        },
+        vpc: {
+          id: result.vpc.id,
+          name: result.vpc.name,
+          private_ip: result.vpc.private_ip,
+          subnet_id: result.vpc.subnet_id
+        }
+      });
+    case 'vpc-detach':
+      return renderJson({
+        action: 'vpc-detach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message,
+          project_id: result.result.project_id
+        },
+        vpc: {
+          id: result.vpc.id,
+          name: result.vpc.name,
+          private_ip: result.vpc.private_ip,
+          subnet_id: result.vpc.subnet_id
+        }
+      });
   }
 }
 
 function renderJson(value: unknown): string {
   return `${stableStringify(value as JsonValue)}\n`;
+}
+
+function normalizeNodeActionJson(result: NodeActionStatusSummary): JsonValue {
+  return {
+    action_id: result.action_id,
+    created_at: result.created_at,
+    image_id: result.image_id,
+    status: result.status
+  };
 }
 
 function sortNodeCatalogPlans(plans: NodeCatalogPlan[]): NodeCatalogPlan[] {

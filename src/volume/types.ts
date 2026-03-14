@@ -63,3 +63,13 @@ export interface VolumeCreateResult {
   label_id?: number | null;
   resource_type?: string | null;
 }
+
+export interface VolumeNodeActionRequest {
+  vm_id: number;
+}
+
+export interface VolumeNodeActionResult {
+  image_id: number;
+  message: string;
+  vm_id: number;
+}

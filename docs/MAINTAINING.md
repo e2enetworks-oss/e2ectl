@@ -48,6 +48,7 @@ src/
 Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
 Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/volume/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
 Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
+Current v1 node operational actions live under `node action`; node plan discovery UX changes remain intentionally out of scope until PR4.
 
 ## CI Contract
 

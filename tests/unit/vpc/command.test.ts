@@ -58,7 +58,9 @@ function createVpcClientStub() {
   );
 
   const stub: VpcClient = {
+    attachNodeVpc: vi.fn(),
     createVpc,
+    detachNodeVpc: vi.fn(),
     listVpcPlans,
     listVpcs
   };

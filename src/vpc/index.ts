@@ -5,6 +5,8 @@ export type {
   VpcCreateRequest,
   VpcCreateResult,
   VpcListResult,
+  VpcNodeActionRequest,
+  VpcNodeActionResult,
   VpcPlan,
   VpcSubnetSummary,
   VpcSummary

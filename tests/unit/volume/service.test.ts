@@ -33,7 +33,9 @@ function createServiceFixture(): {
   let credentials: ResolvedCredentials | undefined;
 
   const client: VolumeClient = {
+    attachVolumeToNode: vi.fn(),
     createVolume,
+    detachVolumeFromNode: vi.fn(),
     listVolumePlans,
     listVolumes
   };

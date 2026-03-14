@@ -135,3 +135,39 @@ export interface NodeCreateResult {
 export interface NodeDeleteResult {
   message: string;
 }
+
+export type NodeActionType =
+  | 'add_ssh_keys'
+  | 'power_off'
+  | 'power_on'
+  | 'save_images';
+
+export interface NodeActionSshKey {
+  label: string;
+  ssh_key: string;
+}
+
+export type NodeActionRequest =
+  | {
+      type: 'power_on';
+    }
+  | {
+      type: 'power_off';
+    }
+  | {
+      name: string;
+      type: 'save_images';
+    }
+  | {
+      ssh_keys: NodeActionSshKey[];
+      type: 'add_ssh_keys';
+    };
+
+export interface NodeActionResult {
+  action_type: string;
+  created_at: string;
+  id: number;
+  image_id?: string;
+  resource_id: string;
+  status: string;
+}

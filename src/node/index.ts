@@ -1,6 +1,10 @@
 export { buildNodeCommand } from './command.js';
 export { NodeApiClient, type NodeClient } from './client.js';
 export type {
+  NodeActionRequest,
+  NodeActionResult,
+  NodeActionSshKey,
+  NodeActionType,
   NodeCatalogCommittedSku,
   NodeCatalogOsData,
   NodeCatalogOsEntry,

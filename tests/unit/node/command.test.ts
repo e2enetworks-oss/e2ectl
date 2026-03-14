@@ -13,36 +13,13 @@ function toJsonOutput(value: unknown): string {
 }
 
 function createNodeClientStub() {
-  const listNodes = vi.fn(() =>
+  const attachSshKeys = vi.fn(() =>
     Promise.resolve({
-      nodes: [
-        {
-          id: 101,
-          is_locked: false,
-          name: 'node-a',
-          plan: 'C3.8GB',
-          private_ip_address: '10.0.0.1',
-          public_ip_address: '1.1.1.1',
-          status: 'Running'
-        }
-      ],
-      total_count: 1,
-      total_page_number: 1
-    })
-  );
-  const getNode = vi.fn(() =>
-    Promise.resolve({
-      created_at: '2026-03-11T10:00:00Z',
-      disk: '100 GB',
-      id: 101,
-      location: 'Delhi',
-      memory: '8 GB',
-      name: 'node-a',
-      plan: 'C3.8GB',
-      private_ip_address: '10.0.0.1',
-      public_ip_address: '1.1.1.1',
-      status: 'Running',
-      vcpus: '4'
+      action_type: 'Add SSH Keys',
+      created_at: '2026-03-14T08:00:00Z',
+      id: 801,
+      resource_id: '101',
+      status: 'Done'
     })
   );
   const createNode = vi.fn((body: NodeCreateRequest) =>
@@ -66,6 +43,22 @@ function createNodeClientStub() {
   const deleteNode = vi.fn(() =>
     Promise.resolve({
       message: 'Success'
+    })
+  );
+  const getNode = vi.fn(() =>
+    Promise.resolve({
+      created_at: '2026-03-11T10:00:00Z',
+      disk: '100 GB',
+      id: 101,
+      location: 'Delhi',
+      memory: '8 GB',
+      name: 'node-a',
+      plan: 'C3.8GB',
+      private_ip_address: '10.0.0.1',
+      public_ip_address: '1.1.1.1',
+      status: 'Running',
+      vcpus: '4',
+      vm_id: 100157
     })
   );
   const listNodeCatalogOs = vi.fn(() =>
@@ -113,23 +106,183 @@ function createNodeClientStub() {
       }
     ])
   );
+  const listNodes = vi.fn(() =>
+    Promise.resolve({
+      nodes: [
+        {
+          id: 101,
+          is_locked: false,
+          name: 'node-a',
+          plan: 'C3.8GB',
+          private_ip_address: '10.0.0.1',
+          public_ip_address: '1.1.1.1',
+          status: 'Running'
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    })
+  );
+  const powerOffNode = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'Power Off',
+      created_at: '2026-03-14T08:15:00Z',
+      id: 702,
+      resource_id: '101',
+      status: 'In Progress'
+    })
+  );
+  const powerOnNode = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'Power On',
+      created_at: '2026-03-14T08:10:00Z',
+      id: 701,
+      resource_id: '101',
+      status: 'In Progress'
+    })
+  );
+  const saveNodeImage = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'Save Image',
+      created_at: '2026-03-14T08:20:00Z',
+      id: 703,
+      image_id: 'img-455',
+      resource_id: '101',
+      status: 'In Progress'
+    })
+  );
 
   const stub: NodeClient = {
-    createNode,
-    deleteNode,
-    getNode,
-    listNodeCatalogOs,
-    listNodeCatalogPlans,
-    listNodes
-  };
-
-  return {
+    attachSshKeys,
     createNode,
     deleteNode,
     getNode,
     listNodeCatalogOs,
     listNodeCatalogPlans,
     listNodes,
+    powerOffNode,
+    powerOnNode,
+    saveNodeImage
+  };
+
+  return {
+    attachSshKeys,
+    createNode,
+    deleteNode,
+    getNode,
+    listNodeCatalogOs,
+    listNodeCatalogPlans,
+    listNodes,
+    powerOffNode,
+    powerOnNode,
+    saveNodeImage,
+    stub
+  };
+}
+
+function createSshKeyClientStub() {
+  const createSshKey = vi.fn();
+  const listSshKeys = vi.fn(() =>
+    Promise.resolve([
+      {
+        label: 'admin',
+        pk: 12,
+        ssh_key: 'ssh-ed25519 AAAA admin@example.com',
+        timestamp: '14-Mar-2026'
+      },
+      {
+        label: 'deploy',
+        pk: 13,
+        ssh_key: 'ssh-ed25519 BBBB deploy@example.com',
+        timestamp: '14-Mar-2026'
+      }
+    ])
+  );
+
+  const stub: SshKeyClient = {
+    createSshKey,
+    listSshKeys
+  };
+
+  return {
+    createSshKey,
+    listSshKeys,
+    stub
+  };
+}
+
+function createVolumeClientStub() {
+  const attachVolumeToNode = vi.fn(() =>
+    Promise.resolve({
+      image_id: 8801,
+      message: 'Block Storage is Attached to VM.',
+      vm_id: 100157
+    })
+  );
+  const createVolume = vi.fn();
+  const detachVolumeFromNode = vi.fn(() =>
+    Promise.resolve({
+      image_id: 8801,
+      message: 'Block Storage Detach Process is Started.',
+      vm_id: 100157
+    })
+  );
+  const listVolumePlans = vi.fn();
+  const listVolumes = vi.fn();
+
+  const stub: VolumeClient = {
+    attachVolumeToNode,
+    createVolume,
+    detachVolumeFromNode,
+    listVolumePlans,
+    listVolumes
+  };
+
+  return {
+    attachVolumeToNode,
+    createVolume,
+    detachVolumeFromNode,
+    listVolumePlans,
+    listVolumes,
+    stub
+  };
+}
+
+function createVpcClientStub() {
+  const attachNodeVpc = vi.fn(() =>
+    Promise.resolve({
+      message: 'VPC attached successfully.',
+      project_id: '12345',
+      vpc_id: 23082,
+      vpc_name: 'prod-vpc'
+    })
+  );
+  const createVpc = vi.fn();
+  const detachNodeVpc = vi.fn(() =>
+    Promise.resolve({
+      message: 'VPC detached successfully.',
+      project_id: '12345',
+      vpc_id: 23082,
+      vpc_name: 'prod-vpc'
+    })
+  );
+  const listVpcPlans = vi.fn();
+  const listVpcs = vi.fn();
+
+  const stub: VpcClient = {
+    attachNodeVpc,
+    createVpc,
+    detachNodeVpc,
+    listVpcPlans,
+    listVpcs
+  };
+
+  return {
+    attachNodeVpc,
+    createVpc,
+    detachNodeVpc,
+    listVpcPlans,
+    listVpcs,
     stub
   };
 }
@@ -140,16 +293,22 @@ describe('node commands', () => {
     isInteractive?: boolean;
   }): {
     confirm: ReturnType<typeof vi.fn>;
+    nodeStub: ReturnType<typeof createNodeClientStub>;
     prompt: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
+    sshKeyStub: ReturnType<typeof createSshKeyClientStub>;
     stdout: MemoryWriter;
-    stub: ReturnType<typeof createNodeClientStub>;
+    volumeStub: ReturnType<typeof createVolumeClientStub>;
+    vpcStub: ReturnType<typeof createVpcClientStub>;
   } {
     const configPath = createTestConfigPath('node-test');
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
-    const stub = createNodeClientStub();
+    const nodeStub = createNodeClientStub();
+    const sshKeyStub = createSshKeyClientStub();
+    const volumeStub = createVolumeClientStub();
+    const vpcStub = createVpcClientStub();
     const confirm = vi.fn(() =>
       Promise.resolve(options?.confirmResult ?? true)
     );
@@ -160,17 +319,11 @@ describe('node commands', () => {
       confirm,
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
-        return stub.stub;
+        return nodeStub.stub;
       },
-      createSshKeyClient: vi.fn(() => {
-        throw new Error('SSH key client should not be created for this test.');
-      }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
-      createVolumeClient: vi.fn(() => {
-        throw new Error('Volume client should not be created for this test.');
-      }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
-      createVpcClient: vi.fn(() => {
-        throw new Error('VPC client should not be created for this test.');
-      }) as unknown as (credentials: ResolvedCredentials) => VpcClient,
+      createSshKeyClient: vi.fn(() => sshKeyStub.stub),
+      createVolumeClient: vi.fn(() => volumeStub.stub),
+      createVpcClient: vi.fn(() => vpcStub.stub),
       credentialValidator: {
         validate: vi.fn()
       },
@@ -183,11 +336,14 @@ describe('node commands', () => {
 
     return {
       confirm,
+      nodeStub,
       prompt,
       receivedCredentials: () => credentials,
       runtime,
+      sshKeyStub,
       stdout,
-      stub
+      volumeStub,
+      vpcStub
     };
   }
 
@@ -315,14 +471,15 @@ describe('node commands', () => {
           private_ip_address: '10.0.0.1',
           public_ip_address: '1.1.1.1',
           status: 'Running',
-          vcpus: '4'
+          vcpus: '4',
+          vm_id: 100157
         }
       })
     );
   });
 
   it('creates a public-node request that stays compatible with backend serializer defaults', async () => {
-    const { runtime, stdout, stub } = createRuntimeFixture();
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
@@ -342,7 +499,7 @@ describe('node commands', () => {
       'prod'
     ]);
 
-    const request = stub.createNode.mock.calls[0]?.[0];
+    const request = nodeStub.createNode.mock.calls[0]?.[0];
 
     expect(request).toMatchObject({
       backups: false,
@@ -424,7 +581,7 @@ describe('node commands', () => {
   });
 
   it('lists valid plan and image pairs for a selected catalog row', async () => {
-    const { runtime, stdout, stub } = createRuntimeFixture();
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
@@ -447,7 +604,7 @@ describe('node commands', () => {
       'prod'
     ]);
 
-    expect(stub.listNodeCatalogPlans).toHaveBeenCalledWith({
+    expect(nodeStub.listNodeCatalogPlans).toHaveBeenCalledWith({
       category: 'Ubuntu',
       display_category: 'Linux Virtual Node',
       os: 'Ubuntu',
@@ -490,8 +647,222 @@ describe('node commands', () => {
     );
   });
 
+  it('requests power-on through the node action subtree', async () => {
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'action',
+      'power-on',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(nodeStub.powerOnNode).toHaveBeenCalledWith('101');
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'power-on',
+        node_id: 101,
+        result: {
+          action_id: 701,
+          created_at: '2026-03-14T08:10:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })
+    );
+  });
+
+  it('requests save-image with the provided name', async () => {
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'action',
+      'save-image',
+      '101',
+      '--name',
+      'node-a-image',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(nodeStub.saveNodeImage).toHaveBeenCalledWith('101', 'node-a-image');
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'save-image',
+        image_name: 'node-a-image',
+        node_id: 101,
+        result: {
+          action_id: 703,
+          created_at: '2026-03-14T08:20:00Z',
+          image_id: 'img-455',
+          status: 'In Progress'
+        }
+      })
+    );
+  });
+
+  it('routes VPC attach through the dedicated VPC client', async () => {
+    const { runtime, stdout, vpcStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'action',
+      'vpc',
+      'attach',
+      '101',
+      '--vpc-id',
+      '23082',
+      '--subnet-id',
+      '991',
+      '--private-ip',
+      '10.0.0.25',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(vpcStub.attachNodeVpc).toHaveBeenCalledWith({
+      action: 'attach',
+      input_ip: '10.0.0.25',
+      network_id: 23082,
+      node_id: 101,
+      subnet_id: 991
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'vpc-attach',
+        node_id: 101,
+        result: {
+          message: 'VPC attached successfully.',
+          project_id: '12345'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: '10.0.0.25',
+          subnet_id: 991
+        }
+      })
+    );
+  });
+
+  it('resolves node vm ids before detaching volumes', async () => {
+    const { nodeStub, runtime, stdout, volumeStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'action',
+      'volume',
+      'detach',
+      '101',
+      '--volume-id',
+      '8801',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(nodeStub.getNode).toHaveBeenCalledWith('101');
+    expect(volumeStub.detachVolumeFromNode).toHaveBeenCalledWith(8801, {
+      vm_id: 100157
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'volume-detach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage Detach Process is Started.'
+        },
+        volume: {
+          id: 8801
+        }
+      })
+    );
+  });
+
+  it('resolves saved ssh key ids before sending the node action request', async () => {
+    const { nodeStub, runtime, sshKeyStub, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'node',
+      'action',
+      'ssh-key',
+      'attach',
+      '101',
+      '--ssh-key-id',
+      '12',
+      '--ssh-key-id',
+      '13',
+      '--ssh-key-id',
+      '12',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(sshKeyStub.listSshKeys).toHaveBeenCalledTimes(1);
+    expect(nodeStub.attachSshKeys).toHaveBeenCalledWith('101', [
+      {
+        label: 'admin',
+        ssh_key: 'ssh-ed25519 AAAA admin@example.com'
+      },
+      {
+        label: 'deploy',
+        ssh_key: 'ssh-ed25519 BBBB deploy@example.com'
+      }
+    ]);
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'ssh-key-attach',
+        node_id: 101,
+        result: {
+          action_id: 801,
+          created_at: '2026-03-14T08:00:00Z',
+          image_id: null,
+          status: 'Done'
+        },
+        ssh_keys: [
+          {
+            id: 12,
+            label: 'admin'
+          },
+          {
+            id: 13,
+            label: 'deploy'
+          }
+        ]
+      })
+    );
+  });
+
   it('cancels deletion when the confirmation is declined', async () => {
-    const { confirm, runtime, stdout, stub } = createRuntimeFixture({
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture({
       confirmResult: false,
       isInteractive: true
     });
@@ -512,7 +883,7 @@ describe('node commands', () => {
     expect(confirm).toHaveBeenCalledWith(
       'Delete node 101? This cannot be undone.'
     );
-    expect(stub.deleteNode).not.toHaveBeenCalled();
+    expect(nodeStub.deleteNode).not.toHaveBeenCalled();
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'delete',
@@ -523,7 +894,7 @@ describe('node commands', () => {
   });
 
   it('requires force outside an interactive terminal', async () => {
-    const { runtime, stub } = createRuntimeFixture({
+    const { nodeStub, runtime } = createRuntimeFixture({
       isInteractive: false
     });
     await seedProfile(runtime);
@@ -540,11 +911,11 @@ describe('node commands', () => {
         'prod'
       ])
     ).rejects.toThrow(/requires confirmation/i);
-    expect(stub.deleteNode).not.toHaveBeenCalled();
+    expect(nodeStub.deleteNode).not.toHaveBeenCalled();
   });
 
   it('deletes a node when force is supplied', async () => {
-    const { confirm, runtime, stdout, stub } = createRuntimeFixture({
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture({
       isInteractive: false
     });
     await seedProfile(runtime);
@@ -563,7 +934,7 @@ describe('node commands', () => {
     ]);
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(stub.deleteNode).toHaveBeenCalledWith('101');
+    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101');
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'delete',
@@ -592,7 +963,7 @@ describe('node commands', () => {
     ).rejects.toThrow(/Node ID must be numeric/i);
   });
 
-  it('shows node help with the catalog namespace', () => {
+  it('shows node help with the action and catalog namespaces', () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);
     const nodeCommand = program.commands.find(
@@ -600,6 +971,7 @@ describe('node commands', () => {
     );
 
     expect(nodeCommand).toBeDefined();
+    expect(nodeCommand?.helpInformation()).toContain('action');
     expect(nodeCommand?.helpInformation()).toContain('catalog');
     expect(nodeCommand?.helpInformation()).toContain('create');
   });

@@ -54,7 +54,9 @@ function createVolumeClientStub() {
   );
 
   const stub: VolumeClient = {
+    attachVolumeToNode: vi.fn(),
     createVolume,
+    detachVolumeFromNode: vi.fn(),
     listVolumePlans,
     listVolumes
   };

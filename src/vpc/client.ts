@@ -8,6 +8,8 @@ import type {
   VpcCreateRequest,
   VpcCreateResult,
   VpcListResult,
+  VpcNodeActionRequest,
+  VpcNodeActionResult,
   VpcPlan,
   VpcSummary
 } from './types.js';
@@ -21,13 +23,30 @@ type VpcListApiResponse = ApiResponse<
 >;
 
 export interface VpcClient {
+  attachNodeVpc(body: VpcNodeActionRequest): Promise<VpcNodeActionResult>;
   createVpc(body: VpcCreateRequest): Promise<VpcCreateResult>;
+  detachNodeVpc(body: VpcNodeActionRequest): Promise<VpcNodeActionResult>;
   listVpcPlans(): Promise<VpcPlan[]>;
   listVpcs(pageNumber: number, perPage: number): Promise<VpcListResult>;
 }
 
 export class VpcApiClient implements VpcClient {
   constructor(private readonly transport: MyAccountTransport) {}
+
+  async attachNodeVpc(
+    body: VpcNodeActionRequest
+  ): Promise<VpcNodeActionResult> {
+    const response = await this.transport.post<
+      ApiEnvelope<Omit<VpcNodeActionResult, 'message'>>
+    >('/vpc/node/attach/', {
+      body
+    });
+
+    return {
+      message: response.message,
+      ...response.data
+    };
+  }
 
   async createVpc(body: VpcCreateRequest): Promise<VpcCreateResult> {
     const response = await this.transport.post<ApiEnvelope<VpcCreateResult>>(
@@ -38,6 +57,21 @@ export class VpcApiClient implements VpcClient {
     );
 
     return response.data;
+  }
+
+  async detachNodeVpc(
+    body: VpcNodeActionRequest
+  ): Promise<VpcNodeActionResult> {
+    const response = await this.transport.post<
+      ApiEnvelope<Omit<VpcNodeActionResult, 'message'>>
+    >('/vpc/node/detach/', {
+      body
+    });
+
+    return {
+      message: response.message,
+      ...response.data
+    };
   }
 
   async listVpcPlans(): Promise<VpcPlan[]> {

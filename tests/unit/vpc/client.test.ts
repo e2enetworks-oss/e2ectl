@@ -41,6 +41,48 @@ class StubTransport implements MyAccountTransport {
 }
 
 describe('VpcApiClient', () => {
+  it('attaches VPCs to nodes through the dedicated action path', async () => {
+    const transport = new StubTransport();
+    const client = new VpcApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          project_id: '46429',
+          vpc_id: 23082,
+          vpc_name: 'prod-vpc'
+        },
+        {
+          message: 'VPC attached successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachNodeVpc({
+      action: 'attach',
+      input_ip: '10.0.0.25',
+      network_id: 23082,
+      node_id: 101,
+      subnet_id: 991
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith('/vpc/node/attach/', {
+      body: {
+        action: 'attach',
+        input_ip: '10.0.0.25',
+        network_id: 23082,
+        node_id: 101,
+        subnet_id: 991
+      }
+    });
+    expect(result).toEqual({
+      message: 'VPC attached successfully.',
+      project_id: '46429',
+      vpc_id: 23082,
+      vpc_name: 'prod-vpc'
+    });
+  });
+
   it('creates VPCs through the VPC resource path', async () => {
     const transport = new StubTransport();
     const client = new VpcApiClient(transport);
@@ -134,6 +176,38 @@ describe('VpcApiClient', () => {
       ],
       total_count: 1,
       total_page_number: 1
+    });
+  });
+
+  it('detaches VPCs from nodes through the dedicated action path', async () => {
+    const transport = new StubTransport();
+    const client = new VpcApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          project_id: '46429',
+          vpc_id: 23082,
+          vpc_name: 'prod-vpc'
+        },
+        {
+          message: 'VPC detached successfully.'
+        }
+      )
+    );
+
+    await client.detachNodeVpc({
+      action: 'detach',
+      network_id: 23082,
+      node_id: 101
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith('/vpc/node/detach/', {
+      body: {
+        action: 'detach',
+        network_id: 23082,
+        node_id: 101
+      }
     });
   });
 });

@@ -8,6 +8,7 @@ Current v1 scope:
 - node read commands
 - node catalog discovery for valid plan and image pairs
 - node create and delete commands
+- node action commands for power, save-image, VPC attachment, volume attachment, and SSH key attachment
 - block storage volume list, plan discovery, and create commands
 - VPC list, plan discovery, and create commands
 - SSH key list and create commands
@@ -201,11 +202,52 @@ e2ectl node catalog os
 e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>
 e2ectl node create --name <name> --plan <plan> --image <image>
 e2ectl node delete <node-id> --force
+e2ectl node action power-on <node-id>
+e2ectl node action save-image <node-id> --name <image-name>
 e2ectl volume list
 e2ectl volume plans
 e2ectl vpc list
 e2ectl vpc plans
 e2ectl ssh-key list
+```
+
+## Node Actions
+
+Node operational workflows live under `node action`. These commands stay non-interactive and support `--json`.
+
+Power controls:
+
+```bash
+e2ectl node action power-on 101 --alias prod
+e2ectl node action power-off 101 --alias prod
+```
+
+Save a node image:
+
+```bash
+e2ectl node action save-image 101 --name node-a-image --alias prod
+```
+
+Attach or detach a VPC:
+
+```bash
+e2ectl node action vpc attach 101 --vpc-id 23082 --alias prod
+e2ectl node action vpc attach 101 --vpc-id 23082 --subnet-id 991 --private-ip 10.0.0.25 --alias prod
+e2ectl node action vpc detach 101 --vpc-id 23082 --alias prod
+```
+
+Attach or detach a volume:
+
+```bash
+e2ectl node action volume attach 101 --volume-id 8801 --alias prod
+e2ectl node action volume detach 101 --volume-id 8801 --alias prod
+```
+
+Attach one or more saved SSH keys:
+
+```bash
+e2ectl ssh-key list --alias prod
+e2ectl node action ssh-key attach 101 --ssh-key-id 12 --ssh-key-id 13 --alias prod
 ```
 
 ## Volume Workflow

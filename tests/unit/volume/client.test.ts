@@ -41,6 +41,40 @@ class StubTransport implements MyAccountTransport {
 }
 
 describe('VolumeApiClient', () => {
+  it('attaches volumes to nodes through the block storage vm attach path', async () => {
+    const transport = new StubTransport();
+    const client = new VolumeApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {
+          image_id: 25550,
+          vm_id: 100157
+        },
+        {
+          message: 'Block Storage is Attached to VM.'
+        }
+      )
+    );
+
+    const result = await client.attachVolumeToNode(25550, {
+      vm_id: 100157
+    });
+
+    expect(transport.requestMock).toHaveBeenCalledWith({
+      body: {
+        vm_id: 100157
+      },
+      method: 'PUT',
+      path: '/block_storage/25550/vm/attach/'
+    });
+    expect(result).toEqual({
+      image_id: 25550,
+      message: 'Block Storage is Attached to VM.',
+      vm_id: 100157
+    });
+  });
+
   it('creates volumes through the block storage collection path', async () => {
     const transport = new StubTransport();
     const client = new VolumeApiClient(transport);
@@ -140,6 +174,35 @@ describe('VolumeApiClient', () => {
       ],
       total_count: 1,
       total_page_number: 1
+    });
+  });
+
+  it('detaches volumes from nodes through the block storage vm detach path', async () => {
+    const transport = new StubTransport();
+    const client = new VolumeApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {
+          image_id: 25550,
+          vm_id: 100157
+        },
+        {
+          message: 'Block Storage Detach Process is Started.'
+        }
+      )
+    );
+
+    await client.detachVolumeFromNode(25550, {
+      vm_id: 100157
+    });
+
+    expect(transport.requestMock).toHaveBeenCalledWith({
+      body: {
+        vm_id: 100157
+      },
+      method: 'PUT',
+      path: '/block_storage/25550/vm/detach/'
     });
   });
 });

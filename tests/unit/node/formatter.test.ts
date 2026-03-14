@@ -1,6 +1,7 @@
 import {
   formatNodeCatalogOsTable,
   formatNodeCatalogPlansTable,
+  renderNodeResult,
   formatNodeCreateResult,
   formatNodeDetails,
   formatNodesTable,
@@ -128,5 +129,90 @@ describe('node formatter', () => {
     expect(table).toContain('Ubuntu-24.04-Distro');
     expect(table).toContain('2263 INR');
     expect(table).toContain('C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi');
+  });
+
+  it('renders clean human summaries for node power and attachment actions', () => {
+    const powerOutput = renderNodeResult(
+      {
+        action: 'power-on',
+        node_id: 101,
+        result: {
+          action_id: 701,
+          created_at: '2026-03-14T08:10:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      },
+      false
+    );
+    const sshKeyOutput = renderNodeResult(
+      {
+        action: 'ssh-key-attach',
+        node_id: 101,
+        result: {
+          action_id: 801,
+          created_at: '2026-03-14T08:00:00Z',
+          image_id: null,
+          status: 'Done'
+        },
+        ssh_keys: [
+          {
+            id: 12,
+            label: 'admin'
+          },
+          {
+            id: 13,
+            label: 'deploy'
+          }
+        ]
+      },
+      false
+    );
+
+    expect(powerOutput).toContain('Requested power on for node 101.');
+    expect(powerOutput).toContain('Action ID: 701');
+    expect(sshKeyOutput).toContain('SSH Keys: admin (12), deploy (13)');
+    expect(sshKeyOutput).toContain('Status: Done');
+  });
+
+  it('renders deterministic json for the new node action results', () => {
+    const output = renderNodeResult(
+      {
+        action: 'vpc-attach',
+        node_id: 101,
+        result: {
+          message: 'VPC attached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: '10.0.0.25',
+          subnet_id: 991
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      JSON.stringify(
+        {
+          action: 'vpc-attach',
+          node_id: 101,
+          result: {
+            message: 'VPC attached successfully.',
+            project_id: '46429'
+          },
+          vpc: {
+            id: 23082,
+            name: 'prod-vpc',
+            private_ip: '10.0.0.25',
+            subnet_id: 991
+          }
+        },
+        null,
+        2
+      ) + '\n'
+    );
   });
 });

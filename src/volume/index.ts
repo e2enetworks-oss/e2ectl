@@ -6,6 +6,8 @@ export type {
   VolumeCreateRequest,
   VolumeCreateResult,
   VolumeListResult,
+  VolumeNodeActionRequest,
+  VolumeNodeActionResult,
   VolumePlan,
   VolumeSummary
 } from './types.js';
