@@ -1,8 +1,13 @@
 # Maintaining e2ectl
 
+This document is for maintainers responsible for CI, branch hygiene, release readiness, and documentation quality.
+
+For contributor workflow, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+For release execution, see [docs/RELEASING.md](./RELEASING.md).
+
 ## Repository Gates
 
-Before pushing or merging:
+Before pushing, merging, or promoting a branch:
 
 ```bash
 make lint
@@ -18,61 +23,52 @@ Optional live verification:
 npm run test:manual
 ```
 
-For pre-release smoke checks, also verify a clean-room first-user flow with a temporary `HOME`: import a credential file, save defaults, run `config list`, and exercise read-only node commands against live credentials.
-For release automation and npm publish activation, use [docs/RELEASING.md](./RELEASING.md).
+If the plain `npm pack --dry-run` command fails locally because of npm cache permissions, rerun with a temporary cache:
 
-## Branch Roles
-
-- `develop` is the staging branch for pre-v1 integration and hardening.
-- `main` is the release branch.
-- Pull requests into `develop` run both the fast gate and the full staging gate.
-- Pushes to `develop` rerun the full staging gate on the merged branch tip.
-- Promotion from `develop` to `main` reruns the full gate and merge queue checks before release automation on `main`.
-
-## Source Layout
-
-The maintained v1 tree is:
-
-```text
-src/
-  app/
-  core/
-  myaccount/
-  config/
-  node/
-  volume/
-  vpc/
-  ssh-key/
+```bash
+env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
 ```
 
-Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
-Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/volume/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
-Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
-Current v1 node operational actions still live under `node action`, and node billing discovery is now actionable end-to-end through config-first `node catalog plans` plus committed `node create`.
+## Branch Policy
+
+- `develop` is the staging branch for integration and hardening
+- `main` is the release branch
+- all feature work lands in `develop` first
+- promotion from `develop` to `main` should happen only from a green staging tip
 
 ## CI Contract
 
-GitHub Actions verifies:
+### Fast gate
+
+Runs on:
 
 - pull requests to `develop`
 - pull requests to `main`
-- merge queue (`merge_group`) checks for `main`
-- pushes to `develop`
+- merge queue checks for `main`
 
-Fast `ci.yml` matrix:
+Matrix:
 
 - Node 18
 - Node 20
 - Node 22
 
-Fast gate steps:
+Steps:
 
 1. `npm ci`
 2. `make lint`
 3. `make test`
 4. `make build`
 
-Full staging and promotion gate in `integration.yml`:
+### Full gate
+
+Runs on:
+
+- pushes to `develop`
+- pull requests to `develop`
+- pull requests to `main`
+- merge queue checks for `main`
+
+Steps:
 
 1. `npm ci`
 2. `make lint`
@@ -81,48 +77,41 @@ Full staging and promotion gate in `integration.yml`:
 5. `npm run test:integration`
 6. `npm pack --dry-run`
 
-The manual live API suite is intentionally not part of CI.
-The integration lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the compiled CLI can talk to a fake local MyAccount server during automated tests, and it also includes a local tarball install smoke path.
+The integration lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the compiled CLI can talk to a fake local MyAccount server, and it also exercises a local tarball install smoke path.
 
-## Release Workflows
-
-This repo also has two release-specific workflows:
-
-- `.github/workflows/release-please.yml` opens release PRs and creates GitHub tags/releases from `main`
-- `.github/workflows/publish.yml` publishes tagged GitHub Releases to npm after rerunning the local verification gate
-
-Those workflows are intentionally designed so the repo can be prepared now and fully activated later, once a company-controlled npm owner account and trusted publishing are configured.
-
-## Release Smoke Check
+## Release Readiness Checklist
 
 Before calling a branch production-ready, verify:
 
 1. clean install from source: `npm install`, `make build`, `npm link`
-2. first-time setup from a clean temp `HOME`
+2. first-run setup from a clean temporary `HOME`
 3. `config import` and `config list` behavior
-4. read-only live API calls such as `node catalog os`, `node catalog plans --billing-type all`, `node list`, `volume list`, `volume plans`, `vpc list`, `vpc plans`, and `ssh-key list`
-5. create-path rehearsal against the fake API for both hourly `node create` and committed `node create --billing-type committed --committed-plan-id <id>`
-6. local gates: `make lint`, `make test`, `make build`, `npm run test:integration`
-7. publish package preview: `npm pack --dry-run`
+4. read-only command coverage against current live credentials where appropriate:
+   - `node catalog os`
+   - `node catalog plans --billing-type all`
+   - `node list`
+   - `volume list`
+   - `volume plans`
+   - `vpc list`
+   - `vpc plans`
+   - `ssh-key list`
+5. create-path verification via fake API for:
+   - hourly `node create`
+   - committed `node create --billing-type committed --committed-plan-id <id>`
+6. local gate completion:
+   - `make lint`
+   - `make test`
+   - `make build`
+   - `npm run test:integration`
+   - `npm pack --dry-run`
 
-## Documentation Duties
+## Documentation Discipline
 
-Update these when behavior changes:
+Keep the maintained docs small and audience-specific:
 
-- [README.md](../README.md) for operator-facing usage only
-- [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
-- [docs/MAINTAINING.md](./MAINTAINING.md) for CI and maintenance policy
-- [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
-- [docs/RELEASING.md](./RELEASING.md) for versioning and npm publish process
+- [README.md](../README.md): operator onboarding and daily usage
+- [CONTRIBUTING.md](../CONTRIBUTING.md): contributor workflow and architecture rules
+- [docs/MAINTAINING.md](./MAINTAINING.md): CI, branch, and readiness checks
+- [docs/RELEASING.md](./RELEASING.md): release and npm publishing runbook
 
-Keep contributor workflow, CI internals, and release mechanics out of `README.md` unless an operator truly needs them to start using the CLI.
-
-Any user-visible behavior change must also update unit tests, docs, and the deterministic `--json` output review. The manual live API suite remains opt-in and is never part of normal CI.
-
-## Release Notes
-
-- Do not hand-edit [CHANGELOG.md](../CHANGELOG.md) in normal feature PRs. Release Please owns changelog generation and release-note updates.
-- Do not bump the package version unless a release is being prepared.
-- Prefer Conventional Commits so release PRs get the right version bump and readable generated notes.
-- Use standard commit prefixes such as `feat:`, `fix:`, and `chore:` consistently across merged PRs.
-- Keep the doc set small: avoid reintroducing milestone-by-milestone implementation history once it is absorbed into the maintained docs above.
+Release Please owns [CHANGELOG.md](../CHANGELOG.md). Do not hand-edit changelog entries or package versions outside the release flow.
