@@ -1,5 +1,6 @@
 import Table from 'cli-table3';
 
+import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   VolumeCommandResult,
@@ -108,7 +109,7 @@ function renderVolumeHuman(result: VolumeCommandResult): string {
         `Derived IOPS: ${result.resolved_plan.iops}\n` +
         `Billing: ${result.billing.type}${committedSummary}${postCommitSummary}${hourlyReference}\n` +
         '\n' +
-        'Next: run e2ectl volume list to inspect the current state.\n'
+        `Next: run ${formatCliCommand('volume list')} to inspect the current state.\n`
       );
     }
     case 'list':
@@ -133,8 +134,8 @@ function renderVolumeHuman(result: VolumeCommandResult): string {
       return (
         `${scopeSummary}\n${basePlansSection}\n${committedSection}\n` +
         'Create with explicit size and billing:\n' +
-        'e2ectl volume create --name <name> --size <size-gb> --billing-type hourly\n' +
-        'e2ectl volume create --name <name> --size <size-gb> --billing-type committed --committed-plan-id <id>\n'
+        `${formatCliCommand('volume create --name <name> --size <size-gb> --billing-type hourly')}\n` +
+        `${formatCliCommand('volume create --name <name> --size <size-gb> --billing-type committed --committed-plan-id <id>')}\n`
       );
     }
   }
@@ -250,7 +251,7 @@ function renderCommittedPlansSection(
     return (
       `Committed Terms\n${formatVolumeCommittedPlanReferenceTable(sharedCommittedPlans)}\n` +
       'Committed totals vary by size. Inspect one size for exact committed pricing:\n' +
-      'e2ectl volume plans --size <size-gb>\n'
+      `${formatCliCommand('volume plans --size <size-gb>')}\n`
     );
   }
 
@@ -258,7 +259,7 @@ function renderCommittedPlansSection(
     return (
       'Committed Pricing\n' +
       'Committed options vary by size. Inspect one size for exact committed pricing:\n' +
-      'e2ectl volume plans --size <size-gb>\n'
+      `${formatCliCommand('volume plans --size <size-gb>')}\n`
     );
   }
 

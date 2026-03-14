@@ -1,4 +1,5 @@
 import { MYACCOUNT_BASE_URL_ENV_VAR } from '../../../src/app/runtime.js';
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import { seedDefaultProfile } from '../../helpers/config-fixtures.js';
 import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
@@ -39,7 +40,7 @@ describe('volume create validation through the built CLI', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run e2ectl volume plans --size 250, then pass one plan id with --committed-plan-id.\n'
+      `Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run ${formatCliCommand('volume plans --size 250')}, then pass one plan id with --committed-plan-id.\n`
     );
   });
 
@@ -183,7 +184,7 @@ describe('volume create validation through the built CLI', () => {
       expect(result.exitCode).toBe(2);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe(
-        'Error: No active volume plan matches 250 GB in the selected location.\n\nNext step: Run e2ectl volume plans to inspect available sizes, then retry with one of the listed GB values.\n'
+        `Error: No active volume plan matches 250 GB in the selected location.\n\nNext step: Run ${formatCliCommand('volume plans')} to inspect available sizes, then retry with one of the listed GB values.\n`
       );
     } finally {
       await server.close();
@@ -248,7 +249,7 @@ describe('volume create validation through the built CLI', () => {
       expect(result.exitCode).toBe(2);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe(
-        'Error: Multiple active volume plans match 250 GB, so the CLI cannot derive a unique IOPS value safely.\n\nDetails:\n- size_gb=250, iops=5000, available=true, hourly_price=1.71\n- size_gb=250, iops=6000, available=true, hourly_price=1.71\n\nNext step: Review e2ectl volume plans and wait for the platform plan set to become unambiguous for that size.\n'
+        `Error: Multiple active volume plans match 250 GB, so the CLI cannot derive a unique IOPS value safely.\n\nDetails:\n- size_gb=250, iops=5000, available=true, hourly_price=1.71\n- size_gb=250, iops=6000, available=true, hourly_price=1.71\n\nNext step: Review ${formatCliCommand('volume plans')} and wait for the platform plan set to become unambiguous for that size.\n`
       );
     } finally {
       await server.close();

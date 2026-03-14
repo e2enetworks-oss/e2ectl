@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import {
   formatNodeCatalogCommittedOptionsTable,
   formatNodeCatalogOsTable,
@@ -278,7 +279,9 @@ describe('node formatter', () => {
     expect(output).toContain('Committed Options by Config');
     expect(output).toContain('Create hourly from row 1:');
     expect(output).toContain(
-      'e2ectl node create --name <name> --plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi --image Ubuntu-24.04-Distro'
+      formatCliCommand(
+        'node create --name <name> --plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi --image Ubuntu-24.04-Distro'
+      )
     );
     expect(output).toContain(
       '--billing-type committed --committed-plan-id 2711'

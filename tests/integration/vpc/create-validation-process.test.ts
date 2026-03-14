@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import { runBuiltCli } from '../../helpers/process.js';
 
 describe('vpc create validation through the built CLI', () => {
@@ -52,7 +53,7 @@ describe('vpc create validation through the built CLI', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run e2ectl vpc plans first, then pass one plan id with --committed-plan-id.\n'
+      `Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run ${formatCliCommand('vpc plans')} first, then pass one plan id with --committed-plan-id.\n`
     );
   });
 });

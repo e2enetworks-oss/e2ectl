@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 
+import { formatCliCommand } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderVolumeResult } from './formatter.js';
 import {
@@ -78,7 +79,7 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
   command
     .command('create')
     .description(
-      'Create a block storage volume. Inspect `e2ectl volume plans` first so the CLI can derive IOPS from a valid size.'
+      `Create a block storage volume. Inspect \`${formatCliCommand('volume plans')}\` first so the CLI can derive IOPS from a valid size.`
     )
     .requiredOption('--name <name>', 'Volume name.')
     .requiredOption('--size <size>', 'Volume size in GB.')
@@ -88,7 +89,7 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
     )
     .option(
       '--committed-plan-id <committedPlanId>',
-      'Committed volume plan identifier from `e2ectl volume plans`.'
+      `Committed volume plan identifier from \`${formatCliCommand('volume plans')}\`.`
     )
     .option(
       '--post-commit-behavior <behavior>',

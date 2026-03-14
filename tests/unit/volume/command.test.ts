@@ -1,3 +1,4 @@
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import { stableStringify } from '../../../src/core/json.js';
@@ -131,7 +132,7 @@ describe('volume commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'volume',
       'list',
@@ -171,7 +172,7 @@ describe('volume commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'volume',
       'plans',
       '--alias',
@@ -190,7 +191,7 @@ describe('volume commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'volume',
       'plans',
@@ -238,7 +239,7 @@ describe('volume commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'volume',
       'create',

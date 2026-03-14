@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { createRequire } from 'node:module';
 
+import { CLI_COMMAND_NAME, CLI_VERSION } from './metadata.js';
 import { buildConfigCommand } from '../config/index.js';
 import { buildNodeCommand } from '../node/index.js';
 import { buildSshKeyCommand } from '../ssh-key/index.js';
@@ -8,20 +8,13 @@ import { buildVolumeCommand } from '../volume/index.js';
 import { buildVpcCommand } from '../vpc/index.js';
 import { createRuntime, type CliRuntime } from './runtime.js';
 
-interface PackageMetadata {
-  version: string;
-}
-
-const require = createRequire(import.meta.url);
-const packageMetadata = require('../../package.json') as PackageMetadata;
-
 export function createProgram(runtime: CliRuntime = createRuntime()): Command {
   const program = new Command();
 
   program
-    .name('e2ectl')
+    .name(CLI_COMMAND_NAME)
     .description('CLI for the E2E Networks MyAccount platform.')
-    .version(packageMetadata.version)
+    .version(CLI_VERSION)
     .option('--json', 'Emit deterministic JSON output.')
     .showSuggestionAfterError()
     .showHelpAfterError('(use --help for usage)');

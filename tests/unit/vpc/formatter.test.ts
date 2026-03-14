@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import {
   formatVpcCommittedPlansTable,
   formatVpcHourlyPlansTable,
@@ -90,10 +91,14 @@ describe('vpc formatter', () => {
     );
 
     expect(output).toContain(
-      'e2ectl vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source e2e'
+      formatCliCommand(
+        'vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source e2e'
+      )
     );
     expect(output).toContain(
-      'e2ectl vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source custom --cidr <cidr>'
+      formatCliCommand(
+        'vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source custom --cidr <cidr>'
+      )
     );
   });
 
@@ -123,6 +128,6 @@ describe('vpc formatter', () => {
 
     expect(output).toContain('Created VPC request: prod-vpc');
     expect(output).toContain('Billing: committed');
-    expect(output).toContain('e2ectl vpc list');
+    expect(output).toContain(formatCliCommand('vpc list'));
   });
 });

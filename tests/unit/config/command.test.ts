@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import type {
@@ -99,7 +100,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'add',
@@ -152,7 +153,7 @@ describe('config commands', () => {
       default_location: 'Delhi'
     });
 
-    await program.parseAsync(['node', 'e2ectl', 'config', 'list']);
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'config', 'list']);
 
     expect(stdout.buffer).toContain('prod');
     expect(stdout.buffer).toContain('****3456');
@@ -176,7 +177,13 @@ describe('config commands', () => {
       auth_token: 'auth-888888'
     });
 
-    await program.parseAsync(['node', 'e2ectl', '--json', 'config', 'list']);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'config',
+      'list'
+    ]);
 
     expect(stdout.buffer).toBe(
       toJsonOutput({
@@ -223,7 +230,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'set-default',
@@ -268,7 +275,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'set-context',
@@ -311,7 +318,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'remove',
@@ -335,7 +342,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'add',
         '--alias',
@@ -358,7 +365,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'add',
         '--alias',
@@ -399,7 +406,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'config',
       'import',
       '--file',
@@ -451,7 +458,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'import',
@@ -520,7 +527,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'config',
       'import',
       '--file',
@@ -562,7 +569,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'import',
         '--file',
@@ -612,7 +619,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'import',
         '--file',

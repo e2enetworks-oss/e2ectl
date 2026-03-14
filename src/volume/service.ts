@@ -3,6 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { VolumeClient } from './client.js';
 import type {
@@ -160,7 +161,7 @@ export class VolumeService {
         {
           code: 'MISSING_COMMITTED_PLAN_ID',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Run e2ectl volume plans --size ${sizeGb}, then pass one plan id with --committed-plan-id.`
+          suggestion: `Run ${formatCliCommand(`volume plans --size ${sizeGb}`)}, then pass one plan id with --committed-plan-id.`
         }
       );
     }
@@ -199,8 +200,7 @@ export class VolumeService {
         {
           code: 'VOLUME_PLAN_NOT_FOUND',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Run e2ectl volume plans to inspect available sizes, then retry with one of the listed GB values.'
+          suggestion: `Run ${formatCliCommand('volume plans')} to inspect available sizes, then retry with one of the listed GB values.`
         }
       );
     }
@@ -215,8 +215,7 @@ export class VolumeService {
               `size_gb=${plan.size_gb}, iops=${plan.iops}, available=${plan.available}, hourly_price=${plan.hourly_price ?? 'unknown'}`
           ),
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Review e2ectl volume plans and wait for the platform plan set to become unambiguous for that size.'
+          suggestion: `Review ${formatCliCommand('volume plans')} and wait for the platform plan set to become unambiguous for that size.`
         }
       );
     }
@@ -228,8 +227,7 @@ export class VolumeService {
         {
           code: 'UNAVAILABLE_VOLUME_PLAN',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Run e2ectl volume plans again later and choose a size marked as available.'
+          suggestion: `Run ${formatCliCommand('volume plans')} again later and choose a size marked as available.`
         }
       );
     }
@@ -297,8 +295,7 @@ export class VolumeService {
         {
           code: 'VOLUME_PLAN_NOT_FOUND',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Run e2ectl volume plans to inspect available sizes, then retry with one of the listed GB values.'
+          suggestion: `Run ${formatCliCommand('volume plans')} to inspect available sizes, then retry with one of the listed GB values.`
         }
       );
     }
@@ -672,7 +669,7 @@ function selectCommittedPlan(
     {
       code: 'INVALID_COMMITTED_PLAN_ID',
       exitCode: EXIT_CODES.usage,
-      suggestion: `Run e2ectl volume plans --size ${plan.size_gb} and choose a committed plan id listed for that size.`
+      suggestion: `Run ${formatCliCommand(`volume plans --size ${plan.size_gb}`)} and choose a committed plan id listed for that size.`
     }
   );
 }

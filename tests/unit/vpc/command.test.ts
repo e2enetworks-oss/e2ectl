@@ -1,3 +1,4 @@
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import { stableStringify } from '../../../src/core/json.js';
@@ -135,7 +136,7 @@ describe('vpc commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'vpc',
       'list',
@@ -180,7 +181,7 @@ describe('vpc commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'vpc',
       'plans',
       '--alias',
@@ -199,7 +200,7 @@ describe('vpc commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'vpc',
       'create',

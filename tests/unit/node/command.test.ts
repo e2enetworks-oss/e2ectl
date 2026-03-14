@@ -1,3 +1,4 @@
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
@@ -373,7 +374,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'list',
@@ -413,7 +414,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'node',
       'list',
       '--alias',
@@ -438,7 +439,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'node',
       'get',
       '101',
@@ -458,7 +459,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'get',
@@ -495,7 +496,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'create',
@@ -567,7 +568,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'create',
@@ -636,7 +637,7 @@ describe('node commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'node',
         'create',
         '--name',
@@ -665,7 +666,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'catalog',
@@ -698,7 +699,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'catalog',
@@ -772,7 +773,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'node',
       'catalog',
       'plans',
@@ -801,7 +802,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'action',
@@ -833,7 +834,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'action',
@@ -868,7 +869,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'action',
@@ -917,7 +918,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'action',
@@ -956,7 +957,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'action',
@@ -1018,7 +1019,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'delete',
@@ -1050,7 +1051,7 @@ describe('node commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'node',
         'delete',
         '101',
@@ -1070,7 +1071,7 @@ describe('node commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'node',
       'delete',
@@ -1100,7 +1101,7 @@ describe('node commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'node',
         'get',
         'node-abc',

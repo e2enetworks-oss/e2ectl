@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 
+import { formatCliCommand } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderVpcResult } from './formatter.js';
 import {
@@ -68,7 +69,7 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
   command
     .command('create')
     .description(
-      'Create a VPC. Inspect `e2ectl vpc plans` first to choose hourly or committed billing intentionally.'
+      `Create a VPC. Inspect \`${formatCliCommand('vpc plans')}\` first to choose hourly or committed billing intentionally.`
     )
     .requiredOption('--name <name>', 'VPC name.')
     .requiredOption(
@@ -82,7 +83,7 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
     )
     .option(
       '--committed-plan-id <committedPlanId>',
-      'Committed VPC plan identifier from `e2ectl vpc plans`.'
+      `Committed VPC plan identifier from \`${formatCliCommand('vpc plans')}\`.`
     )
     .option(
       '--post-commit-behavior <behavior>',

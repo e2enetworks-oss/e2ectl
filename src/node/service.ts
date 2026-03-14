@@ -3,6 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { SshKeyClient, SshKeySummary } from '../ssh-key/index.js';
 import type { VolumeClient } from '../volume/index.js';
@@ -749,8 +750,7 @@ function normalizeCommittedPlanId(
         {
           code: 'MISSING_COMMITTED_PLAN_ID',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Run e2ectl node catalog plans first, then pass one plan id with --committed-plan-id.'
+          suggestion: `Run ${formatCliCommand('node catalog plans')} first, then pass one plan id with --committed-plan-id.`
         }
       );
     }
@@ -1058,8 +1058,7 @@ function resolveSavedSshKeys(
       {
         code: 'SSH_KEY_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Run e2ectl ssh-key list to inspect saved SSH key ids, then retry with one or more listed ids.'
+        suggestion: `Run ${formatCliCommand('ssh-key list')} to inspect saved SSH key ids, then retry with one or more listed ids.`
       }
     );
   }

@@ -1,5 +1,6 @@
 import Table from 'cli-table3';
 
+import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   VpcCommandResult,
@@ -118,7 +119,7 @@ function renderVpcHuman(result: VpcCommandResult): string {
         `Billing: ${billingSummary}\n` +
         `CIDR: ${cidrSummary}\n` +
         '\n' +
-        'Next: run e2ectl vpc list to inspect the VPC state.\n'
+        `Next: run ${formatCliCommand('vpc list')} to inspect the VPC state.\n`
       );
     }
     case 'list':
@@ -138,10 +139,10 @@ function renderVpcHuman(result: VpcCommandResult): string {
       return (
         `${hourlySection}\n${committedSection}\n` +
         'Create with explicit billing and CIDR choices:\n' +
-        'e2ectl vpc create --name <name> --billing-type hourly --cidr-source e2e\n' +
-        'e2ectl vpc create --name <name> --billing-type hourly --cidr-source custom --cidr <cidr>\n' +
-        'e2ectl vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source e2e\n' +
-        'e2ectl vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source custom --cidr <cidr>\n'
+        `${formatCliCommand('vpc create --name <name> --billing-type hourly --cidr-source e2e')}\n` +
+        `${formatCliCommand('vpc create --name <name> --billing-type hourly --cidr-source custom --cidr <cidr>')}\n` +
+        `${formatCliCommand('vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source e2e')}\n` +
+        `${formatCliCommand('vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source custom --cidr <cidr>')}\n`
       );
     }
   }

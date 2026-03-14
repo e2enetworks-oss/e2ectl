@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import { stableStringify } from '../../../src/core/json.js';
@@ -109,7 +110,7 @@ describe('ssh-key commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'ssh-key',
       'list',
@@ -154,7 +155,7 @@ describe('ssh-key commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'ssh-key',
       'create',

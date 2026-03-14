@@ -1,5 +1,6 @@
 import Table from 'cli-table3';
 
+import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   NodeCatalogBillingType,
@@ -285,7 +286,7 @@ function renderNodeHuman(result: NodeCommandResult): string {
 
       return (
         `${formatNodeCatalogOsTable(entries)}\n\nUse one row with:\n` +
-        'e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>\n'
+        `${formatCliCommand('node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>')}\n`
       );
     }
     case 'catalog-plans': {
@@ -654,7 +655,9 @@ function findCommittedCreateExample(items: NodeCatalogPlanItem[]):
 }
 
 function buildHourlyCreateExample(item: NodeCatalogPlanItem): string {
-  return `e2ectl node create --name <name> --plan ${item.plan} --image ${item.image}`;
+  return formatCliCommand(
+    `node create --name <name> --plan ${item.plan} --image ${item.image}`
+  );
 }
 
 function buildCommittedCreateExample(
@@ -662,7 +665,7 @@ function buildCommittedCreateExample(
   committedPlanId: number
 ): string {
   return (
-    `e2ectl node create --name <name> --plan ${item.plan} --image ${item.image} ` +
+    `${formatCliCommand(`node create --name <name> --plan ${item.plan} --image ${item.image}`)} ` +
     `--billing-type committed --committed-plan-id ${committedPlanId}`
   );
 }

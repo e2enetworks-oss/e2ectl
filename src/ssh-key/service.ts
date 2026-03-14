@@ -3,6 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { SshKeyClient } from './client.js';
 import type { SshKeyCreateResult, SshKeySummary } from './types.js';
@@ -160,7 +161,7 @@ export class SshKeyService {
           exitCode: EXIT_CODES.usage,
           suggestion:
             publicKeyFile === '-'
-              ? 'Pipe a public key into the command, for example: cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create --label demo --public-key-file -'
+              ? `Pipe a public key into the command, for example: cat ~/.ssh/id_ed25519.pub | ${formatCliCommand('ssh-key create --label demo --public-key-file -')}`
               : 'Verify that the file exists, is readable, and contains a public SSH key.'
         }
       );

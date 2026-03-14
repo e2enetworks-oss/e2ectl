@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import {
   formatVolumeCommittedPlansTable,
   formatVolumeListTable,
@@ -90,10 +91,14 @@ describe('volume formatter', () => {
     expect(output).toContain('Base Plans (1)');
     expect(output).toContain('Committed Options For 250 GB');
     expect(output).toContain(
-      'e2ectl volume create --name <name> --size <size-gb> --billing-type hourly'
+      formatCliCommand(
+        'volume create --name <name> --size <size-gb> --billing-type hourly'
+      )
     );
     expect(output).toContain(
-      'e2ectl volume create --name <name> --size <size-gb> --billing-type committed --committed-plan-id <id>'
+      formatCliCommand(
+        'volume create --name <name> --size <size-gb> --billing-type committed --committed-plan-id <id>'
+      )
     );
   });
 
@@ -147,7 +152,7 @@ describe('volume formatter', () => {
     expect(output).toContain('Showing 2 plan rows.');
     expect(output).toContain('Committed Terms');
     expect(output).toContain('30 Days Committed');
-    expect(output).toContain('e2ectl volume plans --size <size-gb>');
+    expect(output).toContain(formatCliCommand('volume plans --size <size-gb>'));
     expect(output).not.toContain('Committed Options For 250 GB');
   });
 
@@ -188,6 +193,6 @@ describe('volume formatter', () => {
     expect(output).toContain('Created volume: data-01');
     expect(output).toContain('Derived IOPS: 5000');
     expect(output).toContain('Committed Plan: 31');
-    expect(output).toContain('e2ectl volume list');
+    expect(output).toContain(formatCliCommand('volume list'));
   });
 });

@@ -1,4 +1,5 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
@@ -300,7 +301,7 @@ export class ConfigService {
       throw new CliError(`Profile "${alias}" was not found.`, {
         code: 'PROFILE_NOT_FOUND',
         exitCode: EXIT_CODES.config,
-        suggestion: 'Run `e2ectl config list` to inspect the saved aliases.'
+        suggestion: `Run \`${formatCliCommand('config list')}\` to inspect the saved aliases.`
       });
     }
   }
@@ -544,8 +545,7 @@ function getProfile(
     throw new CliError(`Profile "${alias}" could not be resolved.`, {
       code: 'PROFILE_NOT_FOUND',
       exitCode: EXIT_CODES.config,
-      suggestion:
-        'Retry the command or inspect the saved aliases with `e2ectl config list`.'
+      suggestion: `Retry the command or inspect the saved aliases with \`${formatCliCommand('config list')}\`.`
     });
   }
 

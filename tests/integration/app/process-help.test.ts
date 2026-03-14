@@ -1,3 +1,4 @@
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { runBuiltCli } from '../../helpers/process.js';
 
 describe('built CLI help', () => {
@@ -6,7 +7,7 @@ describe('built CLI help', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe('');
-    expect(result.stdout).toContain('Usage: e2ectl');
+    expect(result.stdout).toContain(`Usage: ${CLI_COMMAND_NAME}`);
     expect(result.stdout).toContain('Commands:');
     expect(result.stdout).toContain('config');
     expect(result.stdout).toContain('node');

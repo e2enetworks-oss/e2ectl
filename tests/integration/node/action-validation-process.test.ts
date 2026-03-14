@@ -1,4 +1,5 @@
 import { MYACCOUNT_BASE_URL_ENV_VAR } from '../../../src/app/runtime.js';
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import { seedDefaultProfile } from '../../helpers/config-fixtures.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { runBuiltCli } from '../../helpers/process.js';
@@ -99,7 +100,7 @@ describe('node action validation through the built CLI', () => {
       expect(result.exitCode).toBe(2);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe(
-        'Error: Unknown SSH key ID: 99.\n\nNext step: Run e2ectl ssh-key list to inspect saved SSH key ids, then retry with one or more listed ids.\n'
+        `Error: Unknown SSH key ID: 99.\n\nNext step: Run ${formatCliCommand('ssh-key list')} to inspect saved SSH key ids, then retry with one or more listed ids.\n`
       );
       expect(server.requests).toHaveLength(1);
       expect(server.requests[0]).toMatchObject({

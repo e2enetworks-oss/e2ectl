@@ -1,5 +1,6 @@
 import { Command, Option } from 'commander';
 
+import { formatCliCommand } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderNodeResult } from './formatter.js';
 import {
@@ -70,7 +71,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   command
     .command('create')
     .description(
-      'Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from `e2ectl node catalog plans`.'
+      `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`.`
     )
     .requiredOption('--name <name>', 'Node name.')
     .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
@@ -85,7 +86,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     )
     .option(
       '--committed-plan-id <committedPlanId>',
-      'Committed plan id returned by `e2ectl node catalog plans`.'
+      `Committed plan id returned by \`${formatCliCommand('node catalog plans')}\`.`
     )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
     .option(

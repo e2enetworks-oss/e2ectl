@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { stableStringify } from '../../../src/core/json.js';
 import { runCommand } from '../../helpers/process.js';
 import { createTempHome } from '../../helpers/temp-home.js';
@@ -52,7 +53,9 @@ describe('package install smoke from tarball', () => {
         prefixDirectory,
         'node_modules',
         '.bin',
-        process.platform === 'win32' ? 'e2ectl.cmd' : 'e2ectl'
+        process.platform === 'win32'
+          ? `${CLI_COMMAND_NAME}.cmd`
+          : CLI_COMMAND_NAME
       );
       const helpResult = await runCommand(installedCliPath, ['--help'], {
         env: {
@@ -62,7 +65,7 @@ describe('package install smoke from tarball', () => {
 
       expect(helpResult.exitCode).toBe(0);
       expect(helpResult.stderr).toBe('');
-      expect(helpResult.stdout).toContain('Usage: e2ectl');
+      expect(helpResult.stdout).toContain(`Usage: ${CLI_COMMAND_NAME}`);
 
       const jsonResult = await runCommand(
         installedCliPath,

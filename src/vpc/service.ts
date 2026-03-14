@@ -3,6 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { VpcClient } from './client.js';
 import type {
@@ -174,8 +175,7 @@ export class VpcService {
         {
           code: 'MISSING_COMMITTED_PLAN_ID',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Run e2ectl vpc plans first, then pass one plan id with --committed-plan-id.'
+          suggestion: `Run ${formatCliCommand('vpc plans')} first, then pass one plan id with --committed-plan-id.`
         }
       );
     }

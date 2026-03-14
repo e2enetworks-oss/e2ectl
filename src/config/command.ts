@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 
+import { CLI_COMMAND_NAME } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderConfigResult } from './formatter.js';
 import {
@@ -24,7 +25,7 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
     store: runtime.store
   });
   const command = new Command('config').description(
-    'Manage local e2ectl profiles and per-alias defaults.'
+    `Manage local ${CLI_COMMAND_NAME} profiles and per-alias defaults.`
   );
 
   command.helpCommand('help [command]', 'Show help for a config command');

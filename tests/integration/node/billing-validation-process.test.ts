@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../../../src/app/metadata.js';
 import { runBuiltCli } from '../../helpers/process.js';
 
 describe('node billing validation through the built CLI', () => {
@@ -42,7 +43,7 @@ describe('node billing validation through the built CLI', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run e2ectl node catalog plans first, then pass one plan id with --committed-plan-id.\n'
+      `Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Run ${formatCliCommand('node catalog plans')} first, then pass one plan id with --committed-plan-id.\n`
     );
   });
 
