@@ -1,4 +1,12 @@
-import type { NodeCreateRequest } from './types.js';
+import type { NodeCommittedCreateStatus, NodeCreateRequest } from './types.js';
+
+export interface BuildNodeCreateRequestInput extends Pick<
+  NodeCreateRequest,
+  'image' | 'name' | 'plan'
+> {
+  cn_id?: number;
+  cn_status?: NodeCommittedCreateStatus;
+}
 
 // Keep the create payload aligned with the public-node serializer:
 // send only the explicit CLI choices here and let the backend apply
@@ -14,10 +22,13 @@ export const DEFAULT_NODE_CREATE_REQUEST = {
   number_of_instances: 1,
   ssh_keys: [],
   start_scripts: []
-} as const satisfies Omit<NodeCreateRequest, 'image' | 'name' | 'plan'>;
+} as const satisfies Omit<
+  NodeCreateRequest,
+  'cn_id' | 'cn_status' | 'image' | 'name' | 'plan'
+>;
 
 export function buildDefaultNodeCreateRequest(
-  input: Pick<NodeCreateRequest, 'image' | 'name' | 'plan'>
+  input: BuildNodeCreateRequestInput
 ): NodeCreateRequest {
   return {
     ...DEFAULT_NODE_CREATE_REQUEST,

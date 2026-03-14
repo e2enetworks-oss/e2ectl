@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 import type { CliRuntime } from '../app/index.js';
 import { renderNodeResult } from './formatter.js';
@@ -20,6 +20,13 @@ interface GlobalOptions {
 interface NodeSshKeyAttachCommandOptions extends NodeContextOptions {
   sshKeyId: string[];
 }
+
+const NODE_CATALOG_BILLING_TYPE_CHOICES = [
+  'hourly',
+  'committed',
+  'all'
+] as const;
+const NODE_CREATE_BILLING_TYPE_CHOICES = ['hourly', 'committed'] as const;
 
 export function buildNodeCommand(runtime: CliRuntime): Command {
   const service = new NodeService({
@@ -63,11 +70,23 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   command
     .command('create')
     .description(
-      'Create a new node with the documented default fields. Discover valid plan and image pairs with `e2ectl node catalog` first.'
+      'Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from `e2ectl node catalog plans`.'
     )
     .requiredOption('--name <name>', 'Node name.')
     .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
     .requiredOption('--image <image>', 'MyAccount image identifier.')
+    .addOption(
+      new Option(
+        '--billing-type <billingType>',
+        'Billing type for the create request.'
+      )
+        .choices(NODE_CREATE_BILLING_TYPE_CHOICES)
+        .default('hourly')
+    )
+    .option(
+      '--committed-plan-id <committedPlanId>',
+      'Committed plan id returned by `e2ectl node catalog plans`.'
+    )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
     .option(
       '--project-id <projectId>',
@@ -483,7 +502,9 @@ function buildNodeCatalogCommand(
 
   command
     .command('plans')
-    .description('List valid plan and image pairs for a selected OS row.')
+    .description(
+      'List config-first plan and billing options for a selected OS row.'
+    )
     .requiredOption(
       '--display-category <displayCategory>',
       'Node display category, for example "Linux Virtual Node".'
@@ -497,6 +518,14 @@ function buildNodeCatalogCommand(
       'Operating system family, for example "Ubuntu".'
     )
     .requiredOption('--os-version <osVersion>', 'Operating system version.')
+    .addOption(
+      new Option(
+        '--billing-type <billingType>',
+        'Filter discovery output to hourly, committed, or both.'
+      )
+        .choices(NODE_CATALOG_BILLING_TYPE_CHOICES)
+        .default('all')
+    )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
     .option(
       '--project-id <projectId>',
