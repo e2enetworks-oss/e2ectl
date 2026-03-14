@@ -100,6 +100,14 @@ src/
     defaults.ts
     types.ts
 
+  volume/
+    index.ts
+    client.ts
+    command.ts
+    service.ts
+    formatter.ts
+    types.ts
+
   vpc/
     index.ts
     client.ts
@@ -124,6 +132,7 @@ src/
 - `myaccount/` is shared transport only: request execution, API envelope typing, credential validation, and centralized API failure handling.
 - `config/` owns alias storage, import parsing, default alias/default context behavior, and auth/context resolution.
 - `node/` owns node workflows, node create defaults, node-specific API parsing, and node-specific rendering.
+- `volume/` owns block storage volume discovery, size-to-IOPS resolution, volume create validation, and volume output shaping.
 - `vpc/` owns VPC discovery, VPC create validation, VPC-specific API parsing, and VPC output shaping.
 - `ssh-key/` owns SSH key create/list workflows, local key-content loading orchestration, API parsing, and SSH key output shaping.
 
@@ -199,18 +208,21 @@ This includes command help text, prompt/confirmation flow, error wording that op
   - `tests/unit/myaccount/`
   - `tests/unit/config/`
   - `tests/unit/node/`
+  - `tests/unit/volume/`
   - `tests/unit/vpc/`
   - `tests/unit/ssh-key/`
 - Keep integration coverage focused on real CLI behavior:
   - `tests/integration/app/`
   - `tests/integration/config/`
   - `tests/integration/node/`
+  - `tests/integration/volume/`
   - `tests/integration/vpc/`
   - `tests/integration/ssh-key/`
 - `tests/unit/myaccount/` covers transport behavior, request construction, and centralized error handling.
 - `tests/unit/app/` covers CLI entrypoint behavior such as usage-error normalization and exit paths.
 - `tests/unit/config/` covers secure and atomic config persistence in addition to command behavior.
 - `tests/unit/node/` covers node client endpoint parsing plus command/service behavior such as defaults, prompts, and output.
+- `tests/unit/volume/` covers block storage client paths, plan normalization, size-to-IOPS derivation, create validation, and output shaping.
 - `tests/unit/vpc/` covers VPC client paths, create validation, plan summarization, and list/create output.
 - `tests/unit/ssh-key/` covers SSH key client paths, file/stdin loading orchestration, validation, and output.
 

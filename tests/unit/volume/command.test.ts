@@ -9,47 +9,43 @@ import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
-function createVpcClientStub() {
-  const createVpc = vi.fn(() =>
+function createVolumeClientStub() {
+  const createVolume = vi.fn(() =>
     Promise.resolve({
-      is_credit_sufficient: true,
-      network_id: 27835,
-      project_id: '12345',
-      vpc_id: 3956,
-      vpc_name: 'prod-vpc'
+      id: 25550,
+      image_name: 'data-01'
     })
   );
-  const listVpcPlans = vi.fn(() =>
+  const listVolumePlans = vi.fn(() =>
     Promise.resolve([
       {
+        available_inventory_status: true,
+        bs_size: 0.25,
         committed_sku: [
           {
-            committed_days: 90,
-            committed_sku_id: 91,
-            committed_sku_name: '90 Days',
-            committed_sku_price: 7800
+            committed_days: 30,
+            committed_sku_id: 31,
+            committed_sku_name: '30 Days Committed , INR 1000',
+            committed_sku_price: 1000
           }
         ],
         currency: 'INR',
-        location: 'Delhi',
-        name: 'VPC',
-        price_per_hour: 4.79,
-        price_per_month: 3500
+        iops: 5000,
+        name: '250 GB',
+        price: 5
       }
     ])
   );
-  const listVpcs = vi.fn(() =>
+  const listVolumes = vi.fn(() =>
     Promise.resolve({
       items: [
         {
-          created_at: '2026-03-13T08:00:00Z',
-          ipv4_cidr: '10.20.0.0/23',
-          is_e2e_vpc: true,
-          name: 'prod-vpc',
-          network_id: 27835,
-          state: 'Active',
-          subnets: [],
-          vm_count: 2
+          block_id: 25550,
+          name: 'data-01',
+          size: 238419,
+          size_string: '250 GB',
+          status: 'Available',
+          vm_detail: {}
         }
       ],
       total_count: 1,
@@ -57,31 +53,31 @@ function createVpcClientStub() {
     })
   );
 
-  const stub: VpcClient = {
-    createVpc,
-    listVpcPlans,
-    listVpcs
+  const stub: VolumeClient = {
+    createVolume,
+    listVolumePlans,
+    listVolumes
   };
 
   return {
-    createVpc,
-    listVpcPlans,
-    listVpcs,
+    createVolume,
+    listVolumePlans,
+    listVolumes,
     stub
   };
 }
 
-describe('vpc commands', () => {
+describe('volume commands', () => {
   function createRuntimeFixture(): {
     receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
     stdout: MemoryWriter;
-    stub: ReturnType<typeof createVpcClientStub>;
+    stub: ReturnType<typeof createVolumeClientStub>;
   } {
-    const configPath = createTestConfigPath('vpc-test');
+    const configPath = createTestConfigPath('volume-test');
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
-    const stub = createVpcClientStub();
+    const stub = createVolumeClientStub();
     let credentials: ResolvedCredentials | undefined;
 
     const runtime: CliRuntime = {
@@ -92,13 +88,13 @@ describe('vpc commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
-      createVolumeClient: vi.fn(() => {
-        throw new Error('Volume client should not be created for this test.');
-      }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
-      createVpcClient: (resolvedCredentials) => {
+      createVolumeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;
       },
+      createVpcClient: vi.fn(() => {
+        throw new Error('VPC client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => VpcClient,
       credentialValidator: {
         validate: vi.fn()
       },
@@ -126,7 +122,7 @@ describe('vpc commands', () => {
     });
   }
 
-  it('lists VPCs in deterministic json mode using alias defaults', async () => {
+  it('lists volumes in deterministic json mode using alias defaults', async () => {
     const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -135,7 +131,7 @@ describe('vpc commands', () => {
       'node',
       'e2ectl',
       '--json',
-      'vpc',
+      'volume',
       'list',
       '--alias',
       'prod'
@@ -151,18 +147,13 @@ describe('vpc commands', () => {
         action: 'list',
         items: [
           {
-            attached_vm_count: 2,
-            cidr: '10.20.0.0/23',
-            cidr_source: 'e2e',
-            created_at: '2026-03-13T08:00:00Z',
-            gateway_ip: null,
-            location: null,
-            name: 'prod-vpc',
-            network_id: 27835,
-            project_name: null,
-            state: 'Active',
-            subnet_count: 0,
-            subnets: []
+            attached: false,
+            attachment: null,
+            id: 25550,
+            name: 'data-01',
+            size_gb: 250,
+            size_label: '250 GB',
+            status: 'Available'
           }
         ],
         total_count: 1,
@@ -171,7 +162,7 @@ describe('vpc commands', () => {
     );
   });
 
-  it('renders VPC plans in human-readable mode', async () => {
+  it('renders volume plans in human-readable mode', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -179,18 +170,66 @@ describe('vpc commands', () => {
     await program.parseAsync([
       'node',
       'e2ectl',
-      'vpc',
+      'volume',
       'plans',
       '--alias',
       'prod'
     ]);
 
-    expect(stdout.buffer).toContain('Hourly');
-    expect(stdout.buffer).toContain('Committed');
+    expect(stdout.buffer).toContain('Showing 1 plan row.');
+    expect(stdout.buffer).toContain('Committed Options For 250 GB');
     expect(stdout.buffer).toContain('Plan ID');
   });
 
-  it('creates VPCs with committed billing in deterministic json mode', async () => {
+  it('renders filtered volume plans in deterministic json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      'e2ectl',
+      '--json',
+      'volume',
+      'plans',
+      '--alias',
+      'prod',
+      '--size',
+      '250',
+      '--available-only'
+    ]);
+
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'plans',
+        filters: {
+          available_only: true,
+          size_gb: 250
+        },
+        items: [
+          {
+            available: true,
+            committed_options: [
+              {
+                id: 31,
+                name: '30 Days Committed',
+                savings_percent: 18.78,
+                term_days: 30,
+                total_price: 1000
+              }
+            ],
+            currency: 'INR',
+            hourly_price: 1.71,
+            iops: 5000,
+            size_gb: 250
+          }
+        ],
+        total_count: 1
+      })}\n`
+    );
+  });
+
+  it('creates volumes with committed billing in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -199,47 +238,55 @@ describe('vpc commands', () => {
       'node',
       'e2ectl',
       '--json',
-      'vpc',
+      'volume',
       'create',
       '--alias',
       'prod',
       '--name',
-      'prod-vpc',
+      'data-01',
+      '--size',
+      '250',
       '--billing-type',
       'committed',
-      '--cidr-source',
-      'custom',
-      '--cidr',
-      '10.10.0.0/23',
       '--committed-plan-id',
-      '91'
+      '31'
     ]);
 
-    expect(stub.createVpc).toHaveBeenCalledWith({
-      cn_id: 91,
+    expect(stub.createVolume).toHaveBeenCalledWith({
+      cn_id: 31,
       cn_status: 'auto_renew',
-      ipv4: '10.10.0.0/23',
-      is_e2e_vpc: false,
-      vpc_name: 'prod-vpc'
+      iops: 5000,
+      name: 'data-01',
+      size: 250
     });
     expect(stdout.buffer).toBe(
       `${stableStringify({
         action: 'create',
         billing: {
-          committed_plan_id: 91,
+          committed_plan: {
+            id: 31,
+            name: '30 Days Committed',
+            savings_percent: 18.78,
+            term_days: 30,
+            total_price: 1000
+          },
           post_commit_behavior: 'auto-renew',
           type: 'committed'
         },
-        cidr: {
-          source: 'custom',
-          value: '10.10.0.0/23'
+        requested: {
+          name: 'data-01',
+          size_gb: 250
         },
-        credit_sufficient: true,
-        vpc: {
-          name: 'prod-vpc',
-          network_id: 27835,
-          project_id: '12345',
-          vpc_id: 3956
+        resolved_plan: {
+          available: true,
+          currency: 'INR',
+          hourly_price: 1.71,
+          iops: 5000,
+          size_gb: 250
+        },
+        volume: {
+          id: 25550,
+          name: 'data-01'
         }
       })}\n`
     );

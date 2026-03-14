@@ -7,6 +7,6 @@ describe('createProgram', () => {
     expect(program.name()).toBe('e2ectl');
     expect(
       program.commands.map((command: { name(): string }) => command.name())
-    ).toEqual(['config', 'node', 'vpc', 'ssh-key']);
+    ).toEqual(['config', 'node', 'volume', 'vpc', 'ssh-key']);
   });
 });

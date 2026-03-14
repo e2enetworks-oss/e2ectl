@@ -8,6 +8,7 @@ Current v1 scope:
 - node read commands
 - node catalog discovery for valid plan and image pairs
 - node create and delete commands
+- block storage volume list, plan discovery, and create commands
 - VPC list, plan discovery, and create commands
 - SSH key list and create commands
 - deterministic `--json` output for automation
@@ -187,6 +188,7 @@ Use the built-in help for the full surface:
 e2ectl --help
 e2ectl config --help
 e2ectl node --help
+e2ectl volume --help
 ```
 
 Common day-to-day commands:
@@ -199,10 +201,66 @@ e2ectl node catalog os
 e2ectl node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>
 e2ectl node create --name <name> --plan <plan> --image <image>
 e2ectl node delete <node-id> --force
+e2ectl volume list
+e2ectl volume plans
 e2ectl vpc list
 e2ectl vpc plans
 e2ectl ssh-key list
 ```
+
+## Volume Workflow
+
+Volume creation is discovery-first:
+
+1. inspect existing volumes
+2. inspect valid sizes, derived IOPS, and committed options
+3. choose a listed size in GB
+4. let the CLI derive IOPS from that size automatically
+5. pass a committed plan id only when using committed billing
+6. create the volume explicitly
+
+List volumes:
+
+```bash
+e2ectl volume list
+e2ectl volume list --json
+```
+
+Inspect volume plans before creating one:
+
+```bash
+e2ectl volume plans
+e2ectl volume plans --available-only
+e2ectl volume plans --size 250
+e2ectl volume plans --json
+```
+
+`volume plans` stays compact by default for large catalogs.
+Use `--size` to inspect one GB size with exact committed pricing, and `--available-only` to hide unavailable inventory rows.
+
+Create an hourly volume:
+
+```bash
+e2ectl volume create \
+  --name data-01 \
+  --size 250 \
+  --billing-type hourly
+```
+
+Create a committed volume:
+
+```bash
+e2ectl volume create \
+  --name analytics-data \
+  --size 250 \
+  --billing-type committed \
+  --committed-plan-id 31 \
+  --post-commit-behavior auto-renew
+```
+
+`--name`, `--size`, and `--billing-type` are always required.
+`--committed-plan-id` is required only for `--billing-type committed`.
+The CLI does not expose `--iops`; it derives IOPS automatically from the selected size plan returned by `volume plans`.
 
 ## VPC Workflow
 
@@ -285,7 +343,7 @@ cat ~/.ssh/id_ed25519.pub | \
 - `--json` emits deterministic JSON intended for scripts and agents.
 - This package is still pre-release, so new domains can redesign accidental internal shapes before `1.0.0`.
 - Once a `--json` shape is merged, treat it as the current contract and review it carefully before changing it.
-- Use `config list --json`, `node list --json`, `node get --json`, and catalog commands with `--json` for automation-safe output.
+- Use `config list --json`, `node list --json`, `node get --json`, `volume list --json`, `volume plans --json`, and other discovery commands with `--json` for automation-safe output.
 
 ## Safety Notes
 

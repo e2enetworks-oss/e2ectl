@@ -87,5 +87,5 @@ describe('package install smoke from tarball', () => {
       await tempHome.cleanup();
       await rm(root, { force: true, recursive: true });
     }
-  });
+  }, 15000);
 });

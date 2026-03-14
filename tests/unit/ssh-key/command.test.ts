@@ -7,6 +7,7 @@ import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient } from '../../../src/node/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
+import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -68,6 +69,9 @@ describe('ssh-key commands', () => {
         credentials = resolvedCredentials;
         return stub.stub;
       },
+      createVolumeClient: vi.fn(() => {
+        throw new Error('Volume client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
       createVpcClient: vi.fn(() => {
         throw new Error('VPC client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VpcClient,

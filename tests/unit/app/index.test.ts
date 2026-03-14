@@ -31,6 +31,9 @@ describe('runCli', () => {
             'SSH key client should not be created for this test.'
           );
         }),
+        createVolumeClient: vi.fn(() => {
+          throw new Error('Volume client should not be created for this test.');
+        }),
         createVpcClient: vi.fn(() => {
           throw new Error('VPC client should not be created for this test.');
         }),

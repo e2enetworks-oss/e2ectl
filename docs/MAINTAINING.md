@@ -40,12 +40,13 @@ src/
   myaccount/
   config/
   node/
+  volume/
   vpc/
   ssh-key/
 ```
 
 Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
-Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
+Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep domain-specific endpoint parsing in `src/node/client.ts`, `src/volume/client.ts`, `src/vpc/client.ts`, and `src/ssh-key/client.ts`. Cross-domain imports should go through each domain `index.ts`.
 Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
 
 ## CI Contract
@@ -98,7 +99,7 @@ Before calling a branch production-ready, verify:
 1. clean install from source: `npm install`, `make build`, `npm link`
 2. first-time setup from a clean temp `HOME`
 3. `config import` and `config list` behavior
-4. read-only live API calls such as `node catalog os`, `node catalog plans`, `node list`, `vpc list`, `vpc plans`, and `ssh-key list`
+4. read-only live API calls such as `node catalog os`, `node catalog plans`, `node list`, `volume list`, `volume plans`, `vpc list`, `vpc plans`, and `ssh-key list`
 5. local gates: `make lint`, `make test`, `make build`, `npm run test:integration`
 6. publish package preview: `npm pack --dry-run`
 
