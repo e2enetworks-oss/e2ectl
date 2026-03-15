@@ -24,8 +24,11 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "node ./scripts/clean.mjs dist .tmp && tsc -p tsconfig.build.json",
     "clean": "node ./scripts/clean.mjs",
+    "coverage": "npm run coverage:unit && npm run coverage:integration",
+    "coverage:integration": "npm run build && c8 --all --src src --exclude-after-remap --exclude \"tests/**\" --exclude \"dist/**\" --exclude \"scripts/**\" --reporter text --reporter html --reporter lcov --report-dir coverage/integration node ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "coverage:unit": "vitest run --coverage",
     "dev": "node --import tsx ./src/app/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -47,6 +50,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "c8": "^11.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.4.0",

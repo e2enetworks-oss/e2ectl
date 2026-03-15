@@ -23,6 +23,24 @@ Optional live verification:
 npm run test:manual
 ```
 
+Coverage reporting remains an explicit local workflow and is not part of the default CI gate:
+
+```bash
+make coverage
+```
+
+The coverage lanes write separate reports to:
+
+- `coverage/unit/index.html`
+- `coverage/unit/lcov.info`
+- `coverage/integration/index.html`
+- `coverage/integration/lcov.info`
+
+Coverage lane behavior:
+
+- unit coverage uses Vitest V8 coverage directly
+- integration coverage rebuilds `dist/` first and uses child-process-aware Node V8 coverage so the spawned CLI process is actually measured
+
 If the plain `npm pack --dry-run` command fails locally because of npm cache permissions, rerun with a temporary cache:
 
 ```bash

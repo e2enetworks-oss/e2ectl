@@ -24,7 +24,10 @@ Useful commands:
 
 ```bash
 make dev
+make coverage
 node dist/app/index.js --help
+npm run coverage:unit
+npm run coverage:integration
 npm run test:manual
 npm pack --dry-run
 ```
@@ -105,6 +108,33 @@ What the gate covers:
 - `npm run test:integration`: process-level and fake-API integration tests
 - `npm pack --dry-run`: publishable package preview
 
+Coverage is explicit and separate from the default gate:
+
+```bash
+make coverage
+```
+
+If you only want one lane, run:
+
+```bash
+npm run coverage:unit
+npm run coverage:integration
+```
+
+Coverage reports stay split by test type:
+
+- unit HTML report: `coverage/unit/index.html`
+- unit LCOV output: `coverage/unit/lcov.info`
+- integration HTML report: `coverage/integration/index.html`
+- integration LCOV output: `coverage/integration/lcov.info`
+
+Coverage lanes are collected differently on purpose:
+
+- `npm run coverage:unit` uses Vitest V8 coverage for the in-process unit suite
+- `npm run coverage:integration` rebuilds `dist/` first, then uses child-process-aware Node V8 coverage so the built CLI process spawned by the integration suite is actually measured
+
+You do not need to run `make build` first for `npm run coverage:integration` or `make coverage`; the integration lane handles that prerequisite itself.
+
 Manual live checks remain opt-in:
 
 ```bash
@@ -120,6 +150,8 @@ npm run test:manual
 
 - Put unit tests under `tests/unit/<domain>/`
 - Put integration tests under `tests/integration/<domain>/`
+- Keep unit and integration coverage reporting separate; manual tests stay out of coverage in this repo
+- Treat integration coverage as coverage of the built CLI process, not just the Vitest runner
 - Keep integration tests focused on real CLI behavior, fake-API request verification, and package smoke checks
 - Treat `--json` output as a contract and review it whenever commands or response shaping changes
 - Prefer adding or updating tests in the domain you touched rather than broad unrelated changes
