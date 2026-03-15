@@ -12,8 +12,3 @@ All notable changes to this project will be documented in this file.
 - Node action commands for power control, image save, and SSH key, volume, and VPC attachment workflows.
 - Block storage volume, VPC, and SSH key management commands.
 - Deterministic `--json` output for automation and scripting.
-
-## [0.1.0] - Mar 11, 2026
-
-- Initial scaffold for the `e2ectl` CLI.
-- M0 and M1 foundations: CLI wiring, config store, auth resolution, and test harness.
