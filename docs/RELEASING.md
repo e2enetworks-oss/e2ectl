@@ -1,88 +1,48 @@
 # Releasing e2ectl
 
-This repository is set up for automated GitHub releases and npm publishing.
+This is the steady-state release runbook for `e2ectl`.
 
-The intended public launch path is:
+For CI ownership and promotion readiness, use [docs/MAINTAINING.md](./MAINTAINING.md). For day-to-day contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-1. publish `1.0.0-rc.1` to npm dist-tag `next`
-2. validate install and operator flow
-3. publish `1.0.0` to npm dist-tag `latest`
+## Prerequisites
+
+Before running the release flow, confirm the repository is already set up for automated publishing:
+
+- the npm package name `e2ectl` is owned by a company-controlled npm account
+- npm trusted publishing is configured for this repository
+- `RELEASE_PLEASE_TOKEN` is configured so Release Please tags and GitHub Releases trigger downstream publish workflows reliably
+- maintainers can merge to `main` and approve release PRs under the current repository rules
+
+Without `RELEASE_PLEASE_TOKEN`, Release Please can still open release PRs with the default `GITHUB_TOKEN`, but tags and releases created that way will not trigger the publish workflow automatically.
 
 ## Normal Release Flow
 
-1. merge feature work into `develop`
-2. confirm the `develop` tip is green
-3. open a promotion PR from `develop` to `main`
-4. merge the promotion PR after CI and merge queue checks pass
-5. let Release Please open or update a release PR on `main`
-6. review and merge the release PR
-7. let Release Please create the git tag and GitHub Release
-8. let the publish workflow publish the package to npm
+1. Merge feature work into `develop`.
+2. Wait for the `develop` tip to pass the promotion gate from [docs/MAINTAINING.md](./MAINTAINING.md).
+3. Open a promotion PR from `develop` to `main`.
+4. Merge the promotion PR after the `main`-targeted checks and merge queue requirements pass.
+5. Wait for Release Please to open or update the release PR on `main`.
+6. Review the generated version bump and changelog, then merge the release PR.
+7. Confirm Release Please created the git tag and GitHub Release.
+8. Confirm the `publish` workflow completes and the package is available on npm.
 
-Version bump rules:
-
-- `fix:` -> patch
-- `feat:` -> minor
-- `feat!:` or `BREAKING CHANGE:` -> major
+If the publish workflow needs to be rerun for an existing tag, use the `publish` workflow dispatch input `release_tag`.
 
 ## Dist-Tag Policy
 
-- prerelease versions such as `1.0.0-rc.1` publish to `next`
-- stable versions such as `1.0.0` publish to `latest`
+- Tags with a prerelease suffix publish to npm dist-tag `next`.
+- Stable tags publish to npm dist-tag `latest`.
 
-The publish workflow derives the npm dist-tag from the git tag:
+Examples:
 
-- tags with a prerelease suffix publish to `next`
-- stable tags publish to `latest`
+- `v1.2.0-rc.1` -> `next`
+- `v1.2.0` -> `latest`
 
-## Activation Prerequisites
-
-End-to-end publishing requires all of the following:
-
-1. the unscoped npm package `e2ectl` is owned by a company-controlled npm account
-2. npm trusted publishing is configured for this repository and the publish workflow
-3. the repository has a `RELEASE_PLEASE_TOKEN` secret
-
-Why `RELEASE_PLEASE_TOKEN` matters:
-
-- the default `GITHUB_TOKEN` can still open release PRs
-- but tags and releases created with the default token may not trigger downstream publish workflows reliably
-- use `RELEASE_PLEASE_TOKEN` so the publish workflow runs automatically after Release Please creates a GitHub Release
-
-## First Public Prerelease
-
-Force the first prerelease with a commit body containing:
-
-```text
-Release-As: 1.0.0-rc.1
-```
-
-After that lands on `main`:
-
-1. Release Please opens a release PR for `1.0.0-rc.1`
-2. review the generated changelog and version bump
-3. merge the release PR
-4. Release Please creates tag `v1.0.0-rc.1` and a GitHub Release
-5. the publish workflow publishes `e2ectl@1.0.0-rc.1` to npm dist-tag `next`
-
-## First Stable Release
-
-After the release candidate is validated, force the stable cut with a commit body containing:
-
-```text
-Release-As: 1.0.0
-```
-
-After that lands on `main`:
-
-1. Release Please opens a release PR for `1.0.0`
-2. review and merge the release PR
-3. Release Please creates tag `v1.0.0` and a GitHub Release
-4. the publish workflow publishes `e2ectl@1.0.0` to npm dist-tag `latest`
+The dist-tag is derived automatically from the git tag in `.github/workflows/publish.yml`.
 
 ## Verification Before Promotion
 
-Before promoting `develop` to `main`, the staging branch should already be green on:
+Before promoting `develop` to `main`, complete the promotion gate owned by [docs/MAINTAINING.md](./MAINTAINING.md):
 
 ```bash
 make lint
@@ -92,7 +52,7 @@ npm run test:integration
 npm pack --dry-run
 ```
 
-The publish workflow then re-runs release-time verification on the tagged commit:
+The publish workflow reruns release-time verification on the tagged commit:
 
 ```bash
 make lint
@@ -101,19 +61,42 @@ make build
 npm pack --dry-run
 ```
 
+If the release needs live API confidence beyond the automated gate, run the opt-in manual node read checks before promotion.
+
 ## Maintainer Checklist
 
-Before turning the release workflows on for real publishing:
+Before merging the promotion PR:
 
-1. create the company-controlled npm user account
-2. claim the unscoped npm package name `e2ectl`
-3. configure npm trusted publishing for this repo and the publish workflow
-4. add the `RELEASE_PLEASE_TOKEN` repository secret
-5. confirm GitHub Actions can create and approve pull requests if repo settings require it
-6. cut `1.0.0-rc.1`
+- confirm the exact `develop` commit is green on the promotion gate
+- confirm docs and command examples are current
+- confirm any release automation or dist-tag changes were documented in this file
+
+Before merging the Release Please PR:
+
+- review the generated version bump
+- review the generated changelog for accuracy and scope
+- confirm no one hand-edited package versions or changelog entries outside the release PR
+
+After publish completes:
+
+- verify the GitHub Release and tag exist
+- verify the package resolves from npm with the expected dist-tag
+- verify the install path matches the published release you intended to promote
 
 ## Changelog And Versioning Policy
 
-- Release Please owns [CHANGELOG.md](../CHANGELOG.md)
-- do not hand-edit changelog entries in normal feature PRs
-- do not bump package versions manually outside the release PR flow
+- Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates.
+- Conventional Commits drive the default version bump:
+  - `fix:` -> patch
+  - `feat:` -> minor
+  - `feat!:` or `BREAKING CHANGE:` -> major
+- Do not hand-edit changelog entries or `package.json` versions in normal feature PRs.
+- If a release needs an explicit version override, use a commit body with `Release-As: x.y.z`.
+
+## Appendix: Repository Bootstrap
+
+These are one-time setup tasks, not part of the normal release path:
+
+- claim the unscoped npm package name `e2ectl`
+- configure npm trusted publishing for this repository
+- add the `RELEASE_PLEASE_TOKEN` repository secret

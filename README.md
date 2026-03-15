@@ -2,12 +2,11 @@
 
 `e2ectl` is the command-line interface for managing E2E Networks MyAccount resources from the terminal.
 
-It is designed for operators and automation workflows that need:
+It is built for operators and automation that need:
 
-- profile-based authentication and saved execution defaults
+- saved MyAccount profiles and per-alias defaults
 - discovery-first node creation
-- node lifecycle and attachment actions
-- block storage, VPC, and SSH key workflows
+- node, volume, VPC, and SSH key workflows
 - deterministic `--json` output for scripts and agents
 
 ## Requirements
@@ -17,78 +16,50 @@ It is designed for operators and automation workflows that need:
 
 ## Install
 
-Preferred install once published:
-
 ```bash
 npm install -g e2ectl
 e2ectl --help
 ```
 
-For prereleases:
+If you want prerelease builds, install the `next` dist-tag instead:
 
 ```bash
 npm install -g e2ectl@next
 e2ectl --help
 ```
 
-Until the first public release, install from source:
-
-```bash
-npm install
-npm run build
-npm link
-e2ectl --help
-```
-
 ## Quickstart
 
-The normal operator flow is:
-
-1. import credentials
-2. save a default alias, project id, and location
-3. discover a valid OS row and config row
-4. create a node from that exact catalog output
-5. inspect or manage the resulting resources
-
-### 1. Import credentials
-
-```bash
-e2ectl config import --file ~/Downloads/config.json
-```
-
-For non-interactive setup:
+### 1. Import credentials and save a default profile
 
 ```bash
 e2ectl config import \
   --file ~/Downloads/config.json \
-  --default prod \
+  --default <profile-alias> \
   --default-project-id <project-id> \
   --default-location <location> \
   --no-input
 ```
 
-### 2. Review or update saved defaults
+`<profile-alias>` must match one alias from the downloaded credential file. `<location>` must be `Delhi` or `Chennai`.
+
+### 2. Confirm the saved profile and defaults
 
 ```bash
 e2ectl config list
-e2ectl config set-default --alias prod
-e2ectl config set-context \
-  --alias prod \
-  --default-project-id <project-id> \
-  --default-location <location>
 ```
 
 ### 3. Discover valid operating system rows
 
 ```bash
-e2ectl node catalog os --alias prod
+e2ectl node catalog os --alias <profile-alias>
 ```
 
-### 4. Discover valid node configs and billing options
+### 4. Discover exact plan, image, and billing values
 
 ```bash
 e2ectl node catalog plans \
-  --alias prod \
+  --alias <profile-alias> \
   --display-category "Linux Virtual Node" \
   --category Ubuntu \
   --os Ubuntu \
@@ -96,146 +67,127 @@ e2ectl node catalog plans \
   --billing-type all
 ```
 
-This command is config-first:
+Use the returned `plan`, `image`, and optional committed plan id exactly as shown.
 
-- the primary table shows valid config rows and exact `plan` and `image` values
-- the committed table shows which committed plan ids belong to which config row
-- the footer prints exact `node create` examples
-
-Optionally narrow the output to one returned family label with `--family "CPU Intensive 3rd Generation"`.
-
-### 5. Create a node
-
-Hourly:
+### 5. Create and inspect a node
 
 ```bash
 e2ectl node create \
-  --alias prod \
-  --name demo-node \
-  --plan <exact-plan-from-catalog> \
-  --image <exact-image-from-catalog>
+  --alias <profile-alias> \
+  --name <node-name> \
+  --plan <plan> \
+  --image <image>
+
+e2ectl node list --alias <profile-alias>
+e2ectl node get <node-id> --alias <profile-alias>
 ```
 
-Committed:
+For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values returned by `node catalog plans`.
+
+If the selected profile already has a saved project id and location, later commands can omit `--project-id` and `--location`.
+
+## Common Workflows
+
+### Nodes
 
 ```bash
-e2ectl node create \
-  --alias prod \
-  --name demo-node \
-  --plan <exact-plan-from-catalog> \
-  --image <exact-image-from-catalog> \
-  --billing-type committed \
-  --committed-plan-id <exact-committed-plan-id-from-catalog>
-```
-
-### 6. Inspect the result
-
-```bash
-e2ectl node list --alias prod
-e2ectl node get <node-id> --alias prod
-```
-
-If the selected alias already has a saved project id and location, later commands can omit `--project-id` and `--location`.
-
-## Common Resource Workflows
-
-### Node operations
-
-Inspect and manage nodes:
-
-```bash
-e2ectl node list
-e2ectl node get <node-id>
-e2ectl node delete <node-id> --force
-e2ectl node action power-on <node-id>
-e2ectl node action save-image <node-id> --name <image-name>
-```
-
-Attach resources to a node:
-
-```bash
-e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
-e2ectl node action volume attach <node-id> --volume-id <volume-id>
-e2ectl node action ssh-key attach <node-id> --ssh-key-id <key-id>
+e2ectl node list --alias <profile-alias>
+e2ectl node get <node-id> --alias <profile-alias>
+e2ectl node action power-off <node-id> --alias <profile-alias>
+e2ectl node action power-on <node-id> --alias <profile-alias>
+e2ectl node action save-image <node-id> --name <image-name> --alias <profile-alias>
+e2ectl node action vpc attach <node-id> --vpc-id <vpc-id> --alias <profile-alias>
+e2ectl node action volume attach <node-id> --volume-id <volume-id> --alias <profile-alias>
+e2ectl node action ssh-key attach <node-id> --ssh-key-id <ssh-key-id> --alias <profile-alias>
+e2ectl node delete <node-id> --alias <profile-alias>
 ```
 
 ### Volumes
 
-Inspect the catalog and create a volume:
-
 ```bash
-e2ectl volume list
-e2ectl volume plans
+e2ectl volume plans --alias <profile-alias>
 e2ectl volume create \
-  --name data-01 \
-  --size 250 \
-  --billing-type hourly
+  --name <volume-name> \
+  --size <size-gb> \
+  --billing-type hourly \
+  --alias <profile-alias>
 e2ectl volume create \
-  --name analytics-data \
-  --size 250 \
+  --name <volume-name> \
+  --size <size-gb> \
   --billing-type committed \
-  --committed-plan-id 31 \
-  --post-commit-behavior auto-renew
+  --committed-plan-id <committed-plan-id> \
+  --post-commit-behavior auto-renew \
+  --alias <profile-alias>
+e2ectl volume list --alias <profile-alias>
 ```
+
+If you already know the target size, use `e2ectl volume plans --size <size-gb> --alias <profile-alias>` to inspect exact committed options first.
 
 ### VPCs
 
-Inspect the catalog and create a VPC:
-
 ```bash
-e2ectl vpc list
-e2ectl vpc plans
+e2ectl vpc plans --alias <profile-alias>
 e2ectl vpc create \
-  --name prod-vpc \
+  --name <vpc-name> \
   --billing-type hourly \
-  --cidr-source e2e
+  --cidr-source e2e \
+  --alias <profile-alias>
 e2ectl vpc create \
-  --name analytics-vpc \
+  --name <vpc-name> \
   --billing-type committed \
-  --committed-plan-id 91 \
+  --committed-plan-id <committed-plan-id> \
   --post-commit-behavior auto-renew \
   --cidr-source custom \
-  --cidr 10.10.0.0/23
+  --cidr <custom-cidr> \
+  --alias <profile-alias>
+e2ectl vpc list --alias <profile-alias>
 ```
 
-### SSH keys
-
-List or create saved SSH keys:
+### SSH Keys
 
 ```bash
-e2ectl ssh-key list
+e2ectl ssh-key list --alias <profile-alias>
 e2ectl ssh-key create \
-  --label admin-laptop \
-  --public-key-file ~/.ssh/id_ed25519.pub
+  --label <key-label> \
+  --public-key-file ~/.ssh/id_ed25519.pub \
+  --alias <profile-alias>
+cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
+  --label <key-label> \
+  --public-key-file - \
+  --alias <profile-alias>
 ```
 
-Use `--public-key-file -` to read a public key from stdin.
-
-## Configuration And Authentication
+## Configuration And Precedence
 
 Profiles are stored in `~/.e2e/config.json`.
 
-Supported environment overrides:
+Environment variables:
 
 - `E2E_API_KEY`
 - `E2E_AUTH_TOKEN`
 - `E2E_PROJECT_ID`
 - `E2E_LOCATION`
 
-Resolution order:
+Authentication precedence:
 
-1. command flags
-2. environment variables
+1. `E2E_API_KEY` and `E2E_AUTH_TOKEN`
+2. the selected alias via `--alias`
+3. the default saved alias
+
+Project context precedence:
+
+1. `--project-id` and `--location`
+2. `E2E_PROJECT_ID` and `E2E_LOCATION`
 3. the selected alias via `--alias`
 4. the default saved alias
 
-You can also add a profile manually:
+If you prefer to add a profile manually:
 
 ```bash
 e2ectl config add \
-  --alias prod \
+  --alias <profile-alias> \
   --api-key <api-key> \
-  --auth-token <bearer-token> \
+  --auth-token <auth-token> \
   --default-project-id <project-id> \
   --default-location <location>
 ```
@@ -243,31 +195,26 @@ e2ectl config add \
 ## JSON And Automation
 
 - Human-readable output is the default.
-- `--json` emits deterministic machine-friendly output.
-- Discovery commands such as `config list --json`, `node catalog os --json`, `node catalog plans --json`, `volume plans --json`, `vpc plans --json`, and `ssh-key list --json` are the safest entry points for automation.
+- `--json` switches any command to deterministic machine-readable output.
+- Discovery and list commands are the safest automation entry points, especially `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, and `ssh-key list`.
 
 ## Safety Notes
 
-- Saved credentials are written to `~/.e2e/` with restrictive permissions.
-- `config import` validates credentials and alias state before writing.
+- `config import` validates credentials before writing them to disk.
+- Saved profiles are written under `~/.e2e/` with restrictive permissions.
 - `node delete` prompts unless `--force` is supplied.
-- API failures are normalized centrally so operators get consistent CLI errors.
+- Use discovery commands before create commands so you pass exact plan, image, and committed plan identifiers.
 
 ## More Help
-
-Use built-in help for the full command surface:
 
 ```bash
 e2ectl --help
 e2ectl config --help
 e2ectl node --help
+e2ectl node catalog plans --help
 e2ectl volume --help
 e2ectl vpc --help
 e2ectl ssh-key --help
 ```
 
-For deeper project docs:
-
-- [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor workflow and architecture
-- [docs/MAINTAINING.md](./docs/MAINTAINING.md) for CI and maintenance policy
-- [docs/RELEASING.md](./docs/RELEASING.md) for release automation and npm publishing
+Contributor and maintainer docs live in [CONTRIBUTING.md](./CONTRIBUTING.md), [docs/MAINTAINING.md](./docs/MAINTAINING.md), and [docs/RELEASING.md](./docs/RELEASING.md).

@@ -1,13 +1,20 @@
 # Maintaining e2ectl
 
-This document is for maintainers responsible for CI, branch hygiene, release readiness, and documentation quality.
+This document is for maintainers responsible for branch policy, CI health, release readiness, and documentation quality.
 
-For contributor workflow, see [CONTRIBUTING.md](../CONTRIBUTING.md).
-For release execution, see [docs/RELEASING.md](./RELEASING.md).
+For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release execution, use [docs/RELEASING.md](./RELEASING.md).
 
-## Repository Gates
+## Branch Policy
 
-Before pushing, merging, or promoting a branch:
+- `develop` is the staging branch for feature integration and hardening.
+- `main` is the release branch.
+- Land normal feature work in `develop` first.
+- Promote only a green `develop` tip to `main`.
+- Keep `main` protected behind pull request checks and merge queue policy where configured.
+
+## Promotion Gate
+
+A `develop` commit is ready for promotion only when the full gate is green:
 
 ```bash
 make lint
@@ -17,42 +24,11 @@ npm run test:integration
 npm pack --dry-run
 ```
 
-Optional live verification:
+Operational notes:
 
-```bash
-npm run test:manual
-```
-
-Coverage reporting remains an explicit local workflow and is not part of the default CI gate:
-
-```bash
-make coverage
-```
-
-The coverage lanes write separate reports to:
-
-- `coverage/unit/index.html`
-- `coverage/unit/lcov.info`
-- `coverage/integration/index.html`
-- `coverage/integration/lcov.info`
-
-Coverage lane behavior:
-
-- unit coverage uses Vitest V8 coverage directly
-- integration coverage rebuilds `dist/` first and uses child-process-aware Node V8 coverage so the spawned CLI process is actually measured
-
-If the plain `npm pack --dry-run` command fails locally because of npm cache permissions, rerun with a temporary cache:
-
-```bash
-env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
-```
-
-## Branch Policy
-
-- `develop` is the staging branch for integration and hardening
-- `main` is the release branch
-- all feature work lands in `develop` first
-- promotion from `develop` to `main` should happen only from a green staging tip
+- `make coverage` is optional and remains outside the default promotion gate.
+- `npm run test:manual` is opt-in live verification and never a required CI lane.
+- If `npm pack --dry-run` fails locally because of npm cache permissions, rerun with `env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run`.
 
 ## CI Contract
 
@@ -64,11 +40,10 @@ Runs on:
 - pull requests to `main`
 - merge queue checks for `main`
 
-Matrix:
+Configuration:
 
-- Node 18
-- Node 20
-- Node 22
+- Ubuntu runners
+- Node.js 18, 20, and 22 matrix
 
 Steps:
 
@@ -77,7 +52,7 @@ Steps:
 3. `make test`
 4. `make build`
 
-### Full gate
+### Integration gate
 
 Runs on:
 
@@ -85,6 +60,11 @@ Runs on:
 - pull requests to `develop`
 - pull requests to `main`
 - merge queue checks for `main`
+
+Configuration:
+
+- Ubuntu runner
+- Node.js 22
 
 Steps:
 
@@ -95,41 +75,33 @@ Steps:
 5. `npm run test:integration`
 6. `npm pack --dry-run`
 
-The integration lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the compiled CLI can talk to a fake local MyAccount server, and it also exercises a local tarball install smoke path.
+The integration lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
 
-## Release Readiness Checklist
+## Release Readiness Checks
 
-Before calling a branch production-ready, verify:
+Before opening a promotion PR from `develop` to `main`, confirm:
 
-1. clean install from source: `npm install`, `make build`, `npm link`
-2. first-run setup from a clean temporary `HOME`
-3. `config import` and `config list` behavior
-4. read-only command coverage against current live credentials where appropriate:
-   - `node catalog os`
-   - `node catalog plans --billing-type all`
-   - `node list`
-   - `volume list`
-   - `volume plans`
-   - `vpc list`
-   - `vpc plans`
-   - `ssh-key list`
-5. create-path verification via fake API for:
-   - hourly `node create`
-   - committed `node create --billing-type committed --committed-plan-id <id>`
-6. local gate completion:
-   - `make lint`
-   - `make test`
-   - `make build`
-   - `npm run test:integration`
-   - `npm pack --dry-run`
+- the promotion gate above is green on the exact `develop` commit being promoted
+- docs are updated for any operator, contributor, CI, or release-flow changes
+- command examples still match the built CLI help surface
+- any changed `--json` output has been reviewed as a machine-facing contract
+- automated fake-API coverage still covers the affected create, list, catalog, and attachment flows
+
+If a release needs additional confidence against live credentials, run the opt-in manual lane separately. Today that lane covers read-only node checks (`node catalog os`, `node catalog plans`, `node list`, and optional `node get`) only.
 
 ## Documentation Discipline
 
-Keep the maintained docs small and audience-specific:
+Each maintained doc has one audience:
 
-- [README.md](../README.md): operator onboarding and daily usage
-- [CONTRIBUTING.md](../CONTRIBUTING.md): contributor workflow and architecture rules
-- [docs/MAINTAINING.md](./MAINTAINING.md): CI, branch, and readiness checks
-- [docs/RELEASING.md](./RELEASING.md): release and npm publishing runbook
+- [README.md](../README.md): operators and automation users
+- [CONTRIBUTING.md](../CONTRIBUTING.md): code contributors
+- [docs/MAINTAINING.md](./MAINTAINING.md): maintainers and CI owners
+- [docs/RELEASING.md](./RELEASING.md): maintainers executing releases
 
-Release Please owns [CHANGELOG.md](../CHANGELOG.md). Do not hand-edit changelog entries or package versions outside the release flow.
+Documentation rules:
+
+- Keep one clear home for each recurring fact and link instead of duplicating full explanations.
+- Update user-facing docs whenever command behavior, examples, environment precedence, or safety guidance changes.
+- Update maintainer docs whenever CI policy, branch policy, or release readiness rules change.
+- Update release docs whenever versioning, dist-tag policy, or publish automation changes.
+- Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates. Do not hand-edit them in normal maintenance work.

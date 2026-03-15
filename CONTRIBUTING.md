@@ -1,9 +1,8 @@
 # Contributing
 
-This document is for contributors working on the `e2ectl` codebase.
+This document is for contributors changing the `e2ectl` codebase.
 
-If you are trying to use the CLI, start with [README.md](./README.md).
-If you maintain CI or releases, also read [docs/MAINTAINING.md](./docs/MAINTAINING.md) and [docs/RELEASING.md](./docs/RELEASING.md).
+If you are using the CLI, start with [README.md](./README.md). If you are maintaining CI or running a release, use [docs/MAINTAINING.md](./docs/MAINTAINING.md) and [docs/RELEASING.md](./docs/RELEASING.md).
 
 ## Requirements
 
@@ -20,7 +19,7 @@ make build
 npm run test:integration
 ```
 
-Useful commands:
+Useful day-to-day commands:
 
 ```bash
 make dev
@@ -32,23 +31,11 @@ npm run test:manual
 npm pack --dry-run
 ```
 
-## Scope Of This Document
-
-Use each doc for one audience:
-
-- [README.md](./README.md): operator-facing usage and onboarding
-- [CONTRIBUTING.md](./CONTRIBUTING.md): contributor workflow, architecture, and verification rules
-- [docs/MAINTAINING.md](./docs/MAINTAINING.md): CI, branch policy, and maintenance checks
-- [docs/RELEASING.md](./docs/RELEASING.md): release and npm publishing runbook
-
-Do not move contributor or CI internals into `README.md` unless an operator truly needs them.
-
 ## Branch Roles
 
-- `develop` is the staging branch for pre-v1 integration and hardening
-- `main` is the release branch
-- target `develop` for normal feature work
-- promotion from `develop` to `main` reruns the full gate before release automation
+- `develop` is the staging branch for ongoing feature integration.
+- `main` is the release branch.
+- Target `develop` for normal feature work unless the maintainers asked for a release-only change.
 
 ## Architecture Contract
 
@@ -66,31 +53,30 @@ src/
   ssh-key/
 ```
 
-### Domain ownership
+Domain ownership:
 
-- `app/` is bootstrap only. It wires the Commander program, runtime, stdout/stderr, prompts, config store, transport, and domain factories.
-- `core/` contains shared low-level helpers such as errors, deterministic JSON helpers, and masking.
-- `myaccount/` owns shared request execution, credential validation, API envelope typing, and centralized API failure handling.
-- `config/` owns profile persistence, import parsing, alias/default-context behavior, and auth/context resolution.
-- `node/` owns node discovery, create/delete flows, node actions, node-specific parsing, and node rendering.
-- `volume/` owns block storage list/plans/create flows, size-to-IOPS resolution, and volume output shaping.
-- `vpc/` owns VPC list/plans/create flows, CIDR validation, and VPC output shaping.
-- `ssh-key/` owns SSH key list/create flows, file or stdin loading, and SSH key output shaping.
+- `src/app/` wires Commander, runtime services, stdout/stderr, prompts, config store, and domain factories.
+- `src/core/` contains low-level shared helpers such as errors, deterministic JSON helpers, and masking.
+- `src/myaccount/` owns shared transport, credential validation, API envelope typing, and centralized API failure handling.
+- `src/config/` owns profile persistence, import parsing, alias/default-context behavior, and auth/context resolution.
+- `src/node/` owns node discovery, create/delete flows, actions, and output shaping.
+- `src/volume/` owns volume list, plans, create flows, and output shaping.
+- `src/vpc/` owns VPC list, plans, create flows, and output shaping.
+- `src/ssh-key/` owns SSH key list, create flows, and output shaping.
 
-### Architectural rules
+Architectural rules:
 
-- Commands stay thin. `command.ts` defines CLI surface area and delegates immediately.
-- Services orchestrate validation, defaults, prompts, and cross-domain workflows.
-- Clients own endpoint paths and success-shape parsing.
-- Formatters own human-readable output and deterministic `--json`.
+- Commands stay thin. `command.ts` files define the CLI surface and delegate immediately.
+- Services orchestrate validation, defaults, prompts, and cross-domain workflows. They do not own rendering.
+- Clients own endpoint paths and response parsing.
+- Formatters own human-readable output and deterministic `--json` output.
 - Generic API failure handling stays centralized in `src/myaccount/transport.ts`.
-- Cross-domain imports go through each domain `index.ts`, not internal files.
-- Clean up accidental pre-release JSON shapes before carrying them into `1.0.0`.
-- Do not introduce placeholder abstractions or speculative generic layers.
+- Cross-domain imports should go through each domain `index.ts`.
+- Prefer small, explicit implementations over speculative abstractions.
 
 ## Verification Contract
 
-Before opening or merging a PR, run the relevant local gate:
+Before asking for review, run the local gate:
 
 ```bash
 make lint
@@ -100,92 +86,70 @@ npm run test:integration
 npm pack --dry-run
 ```
 
-What the gate covers:
+What this covers:
 
-- `make lint`: formatting, ESLint, and TypeScript `--noEmit`
+- `make lint`: formatting check, ESLint, and TypeScript `--noEmit`
 - `make test`: unit tests
 - `make build`: production compile
-- `npm run test:integration`: process-level and fake-API integration tests
+- `npm run test:integration`: built CLI process checks, fake-API coverage, and tarball install smoke
 - `npm pack --dry-run`: publishable package preview
 
-Coverage is explicit and separate from the default gate:
+The maintainer-owned CI policy and promotion gate live in [docs/MAINTAINING.md](./docs/MAINTAINING.md).
+
+## Testing Expectations
+
+- Put unit tests under `tests/unit/<domain>/`.
+- Put integration tests under `tests/integration/<domain>/`.
+- Add or update tests in the domain you touched instead of broad unrelated changes.
+- Treat `--json` output as a contract whenever command behavior or formatters change.
+- Coverage is explicit, not part of the default gate:
 
 ```bash
 make coverage
 ```
 
-If you only want one lane, run:
-
-```bash
-npm run coverage:unit
-npm run coverage:integration
-```
-
-Coverage reports stay split by test type:
-
-- unit HTML report: `coverage/unit/index.html`
-- unit LCOV output: `coverage/unit/lcov.info`
-- integration HTML report: `coverage/integration/index.html`
-- integration LCOV output: `coverage/integration/lcov.info`
-
-Coverage lanes are collected differently on purpose:
-
-- `npm run coverage:unit` uses Vitest V8 coverage for the in-process unit suite
-- `npm run coverage:integration` rebuilds `dist/` first, then uses child-process-aware Node V8 coverage so the built CLI process spawned by the integration suite is actually measured
-
-You do not need to run `make build` first for `npm run coverage:integration` or `make coverage`; the integration lane handles that prerequisite itself.
-
-Manual live checks remain opt-in:
+- Unit and integration coverage reports are written under `coverage/unit/` and `coverage/integration/`.
+- `npm run coverage:integration` rebuilds `dist/` first and measures the spawned CLI process, not just the Vitest runner.
+- Manual live checks are opt-in, read-only node checks only:
 
 ```bash
 E2ECTL_RUN_MANUAL_E2E=1 \
 E2E_API_KEY=<api-key> \
-E2E_AUTH_TOKEN=<token> \
+E2E_AUTH_TOKEN=<auth-token> \
 E2E_PROJECT_ID=<project-id> \
-E2E_LOCATION=Delhi \
+E2E_LOCATION=<location> \
 npm run test:manual
 ```
 
-## Testing Expectations
+## Documentation Expectations
 
-- Put unit tests under `tests/unit/<domain>/`
-- Put integration tests under `tests/integration/<domain>/`
-- Keep unit and integration coverage reporting separate; manual tests stay out of coverage in this repo
-- Treat integration coverage as coverage of the built CLI process, not just the Vitest runner
-- Keep integration tests focused on real CLI behavior, fake-API request verification, and package smoke checks
-- Treat `--json` output as a contract and review it whenever commands or response shaping changes
-- Prefer adding or updating tests in the domain you touched rather than broad unrelated changes
-
-Every user-visible behavior change should include:
+Every user-visible behavior change should ship with:
 
 - tests
 - docs updates
-- example validation against the real CLI surface
+- examples validated against the real CLI surface
 
-## Behavior Changes
+Update docs by audience:
 
-If you change command behavior, also update:
+- [README.md](./README.md) for operator-facing usage and onboarding
+- [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor workflow and architecture rules
+- [docs/MAINTAINING.md](./docs/MAINTAINING.md) for CI, branch, and readiness policy
+- [docs/RELEASING.md](./docs/RELEASING.md) for release mechanics
 
-- user-facing examples in [README.md](./README.md)
-- contributor or maintenance rules here or in [docs/MAINTAINING.md](./docs/MAINTAINING.md) when process expectations changed
-- release guidance in [docs/RELEASING.md](./docs/RELEASING.md) if release flow changes
+Do not leave stale command examples behind after behavior changes.
 
-Do not ship behavior changes with stale command examples.
+## Conventional Commits And Release Please
 
-## Conventional Commits And Releases
-
-Release Please owns versioning and changelog generation on `main`.
-
-- Use Conventional Commits such as `feat:`, `fix:`, and `chore:`
-- Use `feat!:` or a `BREAKING CHANGE:` footer only for intentional breaking changes
-- Do not hand-edit `package.json` versions outside the release PR flow
-- Do not hand-edit [CHANGELOG.md](./CHANGELOG.md) in normal feature PRs
-- Release override markers and first-release procedures live in [docs/RELEASING.md](./docs/RELEASING.md)
+- Use Conventional Commits such as `feat:`, `fix:`, and `chore:`.
+- Use `feat!:` or a `BREAKING CHANGE:` footer only for intentional breaking changes.
+- Release Please owns version bumps and [CHANGELOG.md](./CHANGELOG.md) on `main`.
+- Do not hand-edit `package.json` versions or changelog entries in normal feature work.
+- If release automation needs to change, update [docs/RELEASING.md](./docs/RELEASING.md) in the same PR.
 
 ## Pull Requests
 
-- Keep changes scoped and reviewable
-- Update docs whenever operator flow, contributor workflow, CI expectations, or release mechanics change
-- Keep JSON output deterministic for automation
-- Avoid broad refactors when implementing a narrow feature slice
-- Run the relevant local gate before asking for review
+- Keep changes scoped and reviewable.
+- Avoid broad refactors when implementing a narrow fix or feature.
+- Target `develop` unless maintainers asked for a release-only exception.
+- Include the verification commands you actually ran.
+- Call out doc updates when operator flow, contributor workflow, CI expectations, or release mechanics changed.
