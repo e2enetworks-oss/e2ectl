@@ -226,6 +226,7 @@ describe('node formatter', () => {
     expect(table).toContain('Ubuntu-24.04-Distro');
     expect(table).toContain('3.1 INR/hr');
     expect(table).toContain('C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi');
+    expect(committedTable).toContain('Config #');
     expect(committedTable).toContain('Committed Plan ID');
     expect(committedTable).toContain('4 vCPU / 8 GB / 100 GB');
     expect(committedTable).toContain('2711');
@@ -271,13 +272,24 @@ describe('node formatter', () => {
           display_category: 'Linux Virtual Node',
           os: 'Ubuntu',
           osversion: '24.04'
+        },
+        summary: {
+          available_families: ['CPU Intensive 3rd Generation'],
+          empty_reason: null
         }
       },
       false
     );
 
+    expect(output).toContain('Filters: OS=Ubuntu 24.04, Billing=all');
+    expect(output).toContain(
+      'Available Families: CPU Intensive 3rd Generation'
+    );
+    expect(output).not.toContain('Family=');
+    expect(output).toContain('Candidate Configs');
     expect(output).toContain('Committed Options by Config');
-    expect(output).toContain('Create hourly from row 1:');
+    expect(output).toContain('Create hourly from config #1:');
+    expect(output).toContain('Create committed from config #1:');
     expect(output).toContain(
       formatCliCommand(
         'node create --name <name> --plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi --image Ubuntu-24.04-Distro'
@@ -354,9 +366,9 @@ describe('node formatter', () => {
       false
     );
 
-    expect(output).toContain('Create hourly from row 2:');
-    expect(output).toContain('Create committed from row 2:');
-    expect(output).not.toContain('Create hourly from row 1:');
+    expect(output).toContain('Create hourly from config #2:');
+    expect(output).toContain('Create committed from config #2:');
+    expect(output).not.toContain('Create hourly from config #1:');
   });
 
   it('handles empty committed options cleanly when requested', () => {
@@ -401,9 +413,132 @@ describe('node formatter', () => {
     expect(output).toContain(
       'No committed options found for the selected configs.'
     );
-    expect(output).toContain('Create hourly from row 1:');
+    expect(output).toContain('Create hourly from config #1:');
     expect(output).toContain(
       'Committed create example unavailable because the selected configs returned no committed options.'
+    );
+  });
+
+  it('renders E1 and E1WC zero disk as N/A in human tables and config summaries', () => {
+    const items = [
+      {
+        available_inventory: true,
+        committed_options: [
+          {
+            days: 90,
+            id: 2711,
+            name: '90 Days Committed , Rs. 6026.0',
+            total_price: 6026
+          }
+        ],
+        config: {
+          disk_gb: 0,
+          family: 'General Purpose',
+          ram: '6.00',
+          series: 'E1',
+          vcpu: 2
+        },
+        currency: 'INR',
+        hourly: {
+          minimum_billing_amount: 0,
+          price_per_hour: 2.25,
+          price_per_month: 1642.5
+        },
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        row: 1,
+        sku: 'E1.6GB'
+      },
+      {
+        available_inventory: true,
+        committed_options: [],
+        config: {
+          disk_gb: 0,
+          family: 'General Purpose',
+          ram: '8.00',
+          series: 'E1WC',
+          vcpu: 4
+        },
+        currency: 'INR',
+        hourly: {
+          minimum_billing_amount: 0,
+          price_per_hour: 3.5,
+          price_per_month: 2555
+        },
+        image: 'Windows-2022-Distro',
+        plan: 'E1WC-4vCPU-8RAM-0DISK-E1WC.8GB-Windows-2022-Delhi',
+        row: 2,
+        sku: 'E1WC.8GB'
+      }
+    ];
+
+    const planTable = formatNodeCatalogPlansTable([...items]);
+    const committedTable = formatNodeCatalogCommittedOptionsTable([items[0]!]);
+
+    expect(planTable).toContain('N/A');
+    expect(planTable).not.toContain('0 GB');
+    expect(committedTable).toContain('2 vCPU / 6 GB / N/A');
+  });
+
+  it('renders a family-specific no-match message when the family filter excludes all configs', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'all',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'General Purpose',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: ['Compute Intensive', 'General Purpose'],
+          empty_reason: 'no_family_match'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Filters: OS=Ubuntu 24.04, Billing=all, Family=General Purpose'
+    );
+    expect(output).toContain(
+      'Available Families: Compute Intensive, General Purpose'
+    );
+    expect(output).toContain(
+      'No configs were found for family General Purpose.'
+    );
+  });
+
+  it('renders the committed-family empty state when the family exists but has no committed options', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'committed',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'General Purpose',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: ['General Purpose'],
+          empty_reason: 'no_committed_for_family'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Filters: OS=Ubuntu 24.04, Billing=committed, Family=General Purpose'
+    );
+    expect(output).toContain('Available Families: General Purpose');
+    expect(output).toContain(
+      'No committed plan options found for family General Purpose.'
     );
   });
 

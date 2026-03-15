@@ -49,6 +49,7 @@ export interface NodeCatalogPlansOptions extends NodeContextOptions {
   billingType?: string;
   category: string;
   displayCategory: string;
+  family?: string;
   os: string;
   osVersion: string;
 }
@@ -123,6 +124,18 @@ export interface NodeCatalogPlansCommandResult {
   action: 'catalog-plans';
   items: NodeCatalogPlanItem[];
   query: NodeCatalogPlansQuery;
+  summary?: NodeCatalogPlansSummary;
+}
+
+export type NodeCatalogPlansEmptyReason =
+  | 'no_committed'
+  | 'no_committed_for_family'
+  | 'no_family_match'
+  | 'no_plans';
+
+export interface NodeCatalogPlansSummary {
+  available_families: string[];
+  empty_reason: NodeCatalogPlansEmptyReason | null;
 }
 
 export interface NodePowerOnCommandResult {
@@ -538,19 +551,20 @@ export class NodeService {
   ): Promise<NodeCatalogPlansCommandResult> {
     const client = await this.createNodeClient(options);
     const billingType = normalizeNodeCatalogBillingType(options.billingType);
+    const family = normalizeOptionalNodeCatalogFamily(options.family);
     const query = buildNodeCatalogQuery(options);
-    const items = normalizeNodeCatalogPlanItems(
-      await client.listNodeCatalogPlans(query),
-      billingType
-    );
+    const plans = await client.listNodeCatalogPlans(query);
+    const items = normalizeNodeCatalogPlanItems(plans, billingType, family);
 
     return {
       action: 'catalog-plans',
       items,
       query: {
+        billing_type: billingType,
         ...query,
-        billing_type: billingType
-      }
+        ...(family === undefined ? {} : { family })
+      },
+      summary: summarizeNodeCatalogPlans(plans, items, billingType, family)
     };
   }
 
@@ -779,16 +793,69 @@ function normalizeCommittedPlanId(
 
 function normalizeNodeCatalogPlanItems(
   plans: NodeCatalogPlan[],
-  billingType: NodeCatalogBillingType
+  billingType: NodeCatalogBillingType,
+  family?: string
 ): NodeCatalogPlanItem[] {
+  const familyFilteredPlans = filterNodeCatalogPlansByFamily(plans, family);
   const filteredPlans =
     billingType === 'committed'
-      ? plans.filter((plan) => hasCommittedOptions(plan))
-      : plans;
+      ? filterNodeCatalogPlansForCommittedBilling(familyFilteredPlans)
+      : familyFilteredPlans;
 
   return [...filteredPlans]
     .sort(compareNodeCatalogPlans)
     .map((plan, index) => toNodeCatalogPlanItem(plan, billingType, index + 1));
+}
+
+function summarizeNodeCatalogPlans(
+  plans: NodeCatalogPlan[],
+  items: NodeCatalogPlanItem[],
+  billingType: NodeCatalogBillingType,
+  family?: string
+): NodeCatalogPlansSummary {
+  const familyFilteredPlans = filterNodeCatalogPlansByFamily(plans, family);
+
+  let emptyReason: NodeCatalogPlansEmptyReason | null = null;
+  if (items.length === 0) {
+    if (family !== undefined && familyFilteredPlans.length === 0) {
+      emptyReason = 'no_family_match';
+    } else if (billingType === 'committed') {
+      emptyReason =
+        family === undefined ? 'no_committed' : 'no_committed_for_family';
+    } else {
+      emptyReason = 'no_plans';
+    }
+  }
+
+  return {
+    available_families: collectNodeCatalogFamilies(plans),
+    empty_reason: emptyReason
+  };
+}
+
+function filterNodeCatalogPlansByFamily(
+  plans: NodeCatalogPlan[],
+  family?: string
+): NodeCatalogPlan[] {
+  return family === undefined
+    ? plans
+    : plans.filter(
+        (plan) => normalizeOptionalText(plan.specs?.family) === family
+      );
+}
+
+function filterNodeCatalogPlansForCommittedBilling(
+  plans: NodeCatalogPlan[]
+): NodeCatalogPlan[] {
+  return plans.filter((plan) => hasCommittedOptions(plan));
+}
+
+function collectNodeCatalogFamilies(plans: NodeCatalogPlan[]): string[] {
+  return [
+    ...new Set(plans.map((plan) => normalizeOptionalText(plan.specs?.family)))
+  ]
+    .filter((family): family is string => family !== null)
+    .sort(compareText);
 }
 
 function compareNodeCatalogPlans(
@@ -955,6 +1022,16 @@ function buildNodeCatalogQuery(
       '--os-version'
     )
   };
+}
+
+function normalizeOptionalNodeCatalogFamily(
+  value: string | undefined
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return normalizeRequiredString(value, 'Family', '--family');
 }
 
 function normalizeDistinctNumericIds(

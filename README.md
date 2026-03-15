@@ -102,6 +102,8 @@ This command is config-first:
 - the committed table shows which committed plan ids belong to which config row
 - the footer prints exact `node create` examples
 
+Optionally narrow the output to one returned family label with `--family "General Purpose"`.
+
 ### 5. Create a node
 
 Hourly:

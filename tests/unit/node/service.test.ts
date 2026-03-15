@@ -608,6 +608,10 @@ describe('NodeService', () => {
         display_category: 'Linux Virtual Node',
         os: 'Ubuntu',
         osversion: '24.04'
+      },
+      summary: {
+        available_families: ['CPU Intensive 3rd Generation'],
+        empty_reason: null
       }
     });
   });
@@ -680,5 +684,150 @@ describe('NodeService', () => {
     expect(
       hourlyOnly.items.every((item) => item.committed_options.length === 0)
     ).toBe(true);
+  });
+
+  it('filters catalog plans by family client-side and reports empty family matches deterministically', async () => {
+    const { listNodeCatalogPlans, service } = createServiceFixture();
+
+    listNodeCatalogPlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'gp-1',
+        plan: 'plan-general',
+        specs: {
+          committed_sku: [],
+          cpu: 2,
+          disk_space: 50,
+          family: 'General Purpose',
+          price_per_hour: 1.8,
+          price_per_month: 1321,
+          ram: '4.00',
+          series: 'C3',
+          sku_name: 'gp-1'
+        }
+      },
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'ci-1',
+        plan: 'plan-compute',
+        specs: {
+          committed_sku: [],
+          cpu: 4,
+          disk_space: 100,
+          family: 'Compute Intensive',
+          price_per_hour: 3.1,
+          price_per_month: 2263,
+          ram: '8.00',
+          series: 'C3',
+          sku_name: 'ci-1'
+        }
+      }
+    ]);
+
+    const matchingFamily = await service.listCatalogPlans({
+      billingType: 'all',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      family: 'General Purpose',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+    const missingFamily = await service.listCatalogPlans({
+      billingType: 'all',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      family: 'Memory Optimized',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+
+    expect(listNodeCatalogPlans).toHaveBeenNthCalledWith(1, {
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(listNodeCatalogPlans).toHaveBeenNthCalledWith(2, {
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(matchingFamily.items).toHaveLength(1);
+    expect(matchingFamily.items[0]).toMatchObject({
+      config: {
+        family: 'General Purpose'
+      },
+      plan: 'plan-general'
+    });
+    expect(matchingFamily.query).toEqual({
+      billing_type: 'all',
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      family: 'General Purpose',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(matchingFamily.summary).toEqual({
+      available_families: ['Compute Intensive', 'General Purpose'],
+      empty_reason: null
+    });
+    expect(missingFamily.items).toEqual([]);
+    expect(missingFamily.query).toEqual({
+      billing_type: 'all',
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      family: 'Memory Optimized',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(missingFamily.summary).toEqual({
+      available_families: ['Compute Intensive', 'General Purpose'],
+      empty_reason: 'no_family_match'
+    });
+  });
+
+  it('distinguishes existing family matches with no committed options from true family misses', async () => {
+    const { listNodeCatalogPlans, service } = createServiceFixture();
+
+    listNodeCatalogPlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        currency: 'INR',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'gp-hourly',
+        plan: 'plan-general-hourly',
+        specs: {
+          committed_sku: [],
+          cpu: 2,
+          disk_space: 50,
+          family: 'General Purpose',
+          price_per_hour: 1.8,
+          price_per_month: 1321,
+          ram: '4.00',
+          series: 'C3',
+          sku_name: 'gp-hourly'
+        }
+      }
+    ]);
+
+    const result = await service.listCatalogPlans({
+      billingType: 'committed',
+      category: 'Ubuntu',
+      displayCategory: 'Linux Virtual Node',
+      family: 'General Purpose',
+      os: 'Ubuntu',
+      osVersion: '24.04'
+    });
+
+    expect(result.items).toEqual([]);
+    expect(result.summary).toEqual({
+      available_families: ['General Purpose'],
+      empty_reason: 'no_committed_for_family'
+    });
   });
 });

@@ -527,6 +527,10 @@ function buildNodeCatalogCommand(
         .choices(NODE_CATALOG_BILLING_TYPE_CHOICES)
         .default('all')
     )
+    .option(
+      '--family <family>',
+      'Optional family label returned by the catalog, for example "General Purpose".'
+    )
     .option('--alias <alias>', 'Saved profile alias to use for this command.')
     .option(
       '--project-id <projectId>',

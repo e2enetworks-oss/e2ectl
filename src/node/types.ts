@@ -71,6 +71,7 @@ export type NodeCatalogQuery = Record<
 
 export interface NodeCatalogPlansQuery extends NodeCatalogQuery {
   billing_type: NodeCatalogBillingType;
+  family?: string;
 }
 
 export interface NodeCatalogPlanOsInfo {

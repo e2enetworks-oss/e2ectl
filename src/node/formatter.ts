@@ -7,6 +7,7 @@ import type {
   NodeCatalogOsData,
   NodeCatalogOsEntry,
   NodeCatalogPlanItem,
+  NodeCatalogPlansQuery,
   NodeCreateResult,
   NodeDetails,
   NodeSummary
@@ -15,7 +16,8 @@ import type {
   NodeCreateBillingSummary,
   NodeActionStatusSummary,
   NodeCommandResult,
-  NodeResolvedSshKeySummary
+  NodeResolvedSshKeySummary,
+  NodeCatalogPlansSummary
 } from './service.js';
 
 export function renderNodeResult(
@@ -134,7 +136,7 @@ export function formatNodeCatalogPlansTable(
       item.image,
       formatCell(item.config.vcpu),
       formatMemory(item.config.ram),
-      formatDisk(item.config.disk_gb),
+      formatDisk(item.config.disk_gb, item.config.series),
       formatHourlyPrice(item.hourly.price_per_hour, item.currency),
       item.available_inventory ? 'yes' : 'no'
     ]);
@@ -147,7 +149,14 @@ export function formatNodeCatalogCommittedOptionsTable(
   items: NodeCatalogPlanItem[]
 ): string {
   const table = new Table({
-    head: ['Row', 'SKU', 'Config', 'Committed Plan ID', 'Term', 'Total Price']
+    head: [
+      'Config #',
+      'SKU',
+      'Config',
+      'Committed Plan ID',
+      'Term',
+      'Total Price'
+    ]
   });
 
   for (const item of items) {
@@ -205,7 +214,7 @@ function formatConfigSummary(item: NodeCatalogPlanItem): string {
   return [
     formatQuantity(item.config.vcpu, 'vCPU'),
     formatQuantity(trimNumericString(item.config.ram), 'GB'),
-    formatQuantity(item.config.disk_gb, 'GB')
+    formatDisk(item.config.disk_gb, item.config.series)
   ]
     .filter((part) => part.length > 0)
     .join(' / ');
@@ -215,7 +224,14 @@ function formatCommittedTerm(days: number | null): string {
   return days === null ? '' : `${days} days`;
 }
 
-function formatDisk(value: number | null): string {
+function formatDisk(
+  value: number | null,
+  series: string | null | undefined
+): string {
+  if (value === 0 && isCustomStorageSeries(series)) {
+    return 'N/A';
+  }
+
   return formatQuantity(value, 'GB');
 }
 
@@ -290,13 +306,28 @@ function renderNodeHuman(result: NodeCommandResult): string {
       );
     }
     case 'catalog-plans': {
+      const filterSummary = formatNodeCatalogFilterSummary(result.query);
+      const familySummary = formatNodeCatalogFamiliesSummary(
+        result.summary,
+        result.items
+      );
       if (result.items.length === 0) {
-        return result.query.billing_type === 'committed'
-          ? 'No committed plan options found for the selected OS row.\n'
-          : 'No plans found for the selected OS row.\n';
+        return [
+          filterSummary,
+          familySummary,
+          formatNodeCatalogEmptyMessage(result)
+        ]
+          .filter((section) => section.length > 0)
+          .join('\n\n')
+          .concat('\n');
       }
 
-      const sections = [formatNodeCatalogPlansTable(result.items)];
+      const sections = [
+        filterSummary,
+        ...(familySummary.length === 0 ? [] : [familySummary]),
+        'Candidate Configs',
+        formatNodeCatalogPlansTable(result.items)
+      ];
 
       if (result.query.billing_type !== 'hourly') {
         sections.push(formatCommittedOptionsSection(result.items));
@@ -606,6 +637,50 @@ function formatCommittedOptionsSection(items: NodeCatalogPlanItem[]): string {
   return `Committed Options by Config\n${formatNodeCatalogCommittedOptionsTable(items)}`;
 }
 
+function formatNodeCatalogFilterSummary(query: NodeCatalogPlansQuery): string {
+  const filters = [
+    `OS=${query.os} ${query.osversion}`,
+    `Billing=${query.billing_type}`
+  ];
+
+  if (query.family !== undefined) {
+    filters.push(`Family=${query.family}`);
+  }
+
+  return `Filters: ${filters.join(', ')}`;
+}
+
+function formatNodeCatalogFamiliesSummary(
+  summary: NodeCatalogPlansSummary | undefined,
+  items: NodeCatalogPlanItem[]
+): string {
+  const availableFamilies =
+    summary?.available_families ?? collectVisibleFamiliesFromItems(items);
+
+  return availableFamilies.length === 0
+    ? ''
+    : `Available Families: ${availableFamilies.join(', ')}`;
+}
+
+function formatNodeCatalogEmptyMessage(
+  result: Extract<NodeCommandResult, { action: 'catalog-plans' }>
+): string {
+  const emptyReason = result.summary?.empty_reason;
+
+  switch (emptyReason) {
+    case 'no_committed':
+      return 'No committed plan options found for the selected OS row.';
+    case 'no_committed_for_family':
+      return `No committed plan options found for family ${result.query.family}.`;
+    case 'no_family_match':
+      return `No configs were found for family ${result.query.family}.`;
+    case 'no_plans':
+      return 'No plans found for the selected OS row.';
+    default:
+      return formatFallbackNodeCatalogEmptyMessage(result.query);
+  }
+}
+
 function formatNodeCatalogCreateExamples(
   items: NodeCatalogPlanItem[],
   billingType: NodeCatalogBillingType
@@ -613,7 +688,7 @@ function formatNodeCatalogCreateExamples(
   const committedExample = findCommittedCreateExample(items);
   const hourlyExampleItem = committedExample?.item ?? items[0]!;
   const exampleLines = [
-    `Create hourly from row ${hourlyExampleItem.row}:`,
+    `Create hourly from config #${hourlyExampleItem.row}:`,
     buildHourlyCreateExample(hourlyExampleItem)
   ];
 
@@ -626,7 +701,7 @@ function formatNodeCatalogCreateExamples(
     } else {
       exampleLines.push(
         '',
-        `Create committed from row ${committedExample.item.row}:`,
+        `Create committed from config #${committedExample.item.row}:`,
         buildCommittedCreateExample(
           committedExample.item,
           committedExample.option.id
@@ -685,4 +760,28 @@ function trimNumericString(value: string | null): string | null {
 
   const normalizedValue = Number.parseFloat(value);
   return Number.isFinite(normalizedValue) ? normalizedValue.toString() : value;
+}
+
+function isCustomStorageSeries(series: string | null | undefined): boolean {
+  return series === 'E1' || series === 'E1WC';
+}
+
+function collectVisibleFamiliesFromItems(
+  items: NodeCatalogPlanItem[]
+): string[] {
+  return [...new Set(items.map((item) => item.config.family))]
+    .filter((family): family is string => family !== null)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function formatFallbackNodeCatalogEmptyMessage(
+  query: NodeCatalogPlansQuery
+): string {
+  if (query.family !== undefined) {
+    return `No configs were found for family ${query.family}.`;
+  }
+
+  return query.billing_type === 'committed'
+    ? 'No committed plan options found for the selected OS row.'
+    : 'No plans found for the selected OS row.';
 }

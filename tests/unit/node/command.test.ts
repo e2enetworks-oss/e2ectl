@@ -791,8 +791,58 @@ describe('node commands', () => {
       'prod'
     ]);
 
-    expect(stdout.buffer).toContain('Create hourly from row 1:');
-    expect(stdout.buffer).not.toContain('Create committed from row 1:');
+    expect(stdout.buffer).toContain('Filters: OS=Ubuntu 24.04, Billing=hourly');
+    expect(stdout.buffer).toContain('Candidate Configs');
+    expect(stdout.buffer).toContain('Create hourly from config #1:');
+    expect(stdout.buffer).not.toContain('Create committed from config #1:');
+  });
+
+  it('applies the optional family filter client-side for catalog plans', async () => {
+    const { nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'catalog',
+      'plans',
+      '--display-category',
+      'Linux Virtual Node',
+      '--category',
+      'Ubuntu',
+      '--os',
+      'Ubuntu',
+      '--os-version',
+      '24.04',
+      '--family',
+      'General Purpose',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(nodeStub.listNodeCatalogPlans).toHaveBeenCalledWith({
+      category: 'Ubuntu',
+      display_category: 'Linux Virtual Node',
+      os: 'Ubuntu',
+      osversion: '24.04'
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'all',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'General Purpose',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      })
+    );
   });
 
   it('requests power-on through the node action subtree', async () => {
