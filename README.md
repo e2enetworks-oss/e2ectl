@@ -201,7 +201,8 @@ e2ectl config add \
 ## Safety Notes
 
 - `config import` validates credentials before writing them to disk.
-- Saved profiles are written under `~/.e2e/` with restrictive permissions.
+- Re-importing an existing alias keeps its saved project/location defaults unless you pass new import defaults.
+- Saved profiles are written under `~/.e2e/` with restrictive permissions, and POSIX reads reject config files broader than `0600`.
 - `node delete` prompts unless `--force` is supplied.
 - Use discovery commands before create commands so you pass exact plan, image, and committed plan identifiers.
 

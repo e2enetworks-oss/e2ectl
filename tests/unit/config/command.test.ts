@@ -548,6 +548,117 @@ describe('config commands', () => {
     expect(stdout.buffer).toContain('No default profile was set.');
   });
 
+  it('preserves saved per-alias defaults when an import overwrites an existing alias', async () => {
+    const { confirm, prompt, runtime, store, validator } =
+      createRuntimeFixture();
+    const program = createProgram({
+      ...runtime,
+      isInteractive: false
+    });
+    const filePath = await createImportFile({
+      prod: {
+        api_auth_token: 'auth-imported',
+        api_key: 'api-imported'
+      }
+    });
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-existing',
+      auth_token: 'auth-existing',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'config',
+      'import',
+      '--file',
+      filePath,
+      '--force',
+      '--no-input'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(prompt).not.toHaveBeenCalled();
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-imported',
+        auth_token: 'auth-imported',
+        default_project_id: '46429',
+        default_location: 'Delhi'
+      }
+    ]);
+    await expect(store.read()).resolves.toEqual({
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-imported',
+          auth_token: 'auth-imported',
+          default_project_id: '46429',
+          default_location: 'Delhi'
+        }
+      }
+    });
+  });
+
+  it('replaces saved per-alias defaults when import defaults are explicitly provided', async () => {
+    const { runtime, store, validator } = createRuntimeFixture();
+    const program = createProgram({
+      ...runtime,
+      isInteractive: false
+    });
+    const filePath = await createImportFile({
+      prod: {
+        api_auth_token: 'auth-imported',
+        api_key: 'api-imported'
+      }
+    });
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-existing',
+      auth_token: 'auth-existing',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'config',
+      'import',
+      '--file',
+      filePath,
+      '--force',
+      '--default-project-id',
+      '99999',
+      '--default-location',
+      'Chennai',
+      '--no-input'
+    ]);
+
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-imported',
+        auth_token: 'auth-imported',
+        default_project_id: '46429',
+        default_location: 'Delhi'
+      }
+    ]);
+    await expect(store.read()).resolves.toEqual({
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-imported',
+          auth_token: 'auth-imported',
+          default_project_id: '99999',
+          default_location: 'Chennai'
+        }
+      }
+    });
+  });
+
   it('leaves the saved config unchanged when the requested default alias is blank', async () => {
     const { runtime, store } = createRuntimeFixture();
     const program = createProgram(runtime);

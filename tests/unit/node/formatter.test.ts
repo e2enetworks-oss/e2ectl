@@ -1,4 +1,5 @@
 import { formatCliCommand } from '../../../src/app/metadata.js';
+import { stableStringify } from '../../../src/core/json.js';
 import {
   formatNodeCatalogCommittedOptionsTable,
   formatNodeCatalogOsTable,
@@ -55,6 +56,65 @@ describe('node formatter', () => {
     expect(output).toContain('Requested: 1');
     expect(output).toContain('Created: 1');
     expect(output).toContain('node-b');
+  });
+
+  it('sorts node list json output by id for deterministic automation output', () => {
+    const output = renderNodeResult(
+      {
+        action: 'list',
+        nodes: [
+          {
+            id: 205,
+            is_locked: false,
+            name: 'node-b',
+            plan: 'C3.16GB',
+            private_ip_address: '10.0.0.2',
+            public_ip_address: '1.1.1.2',
+            status: 'Running'
+          },
+          {
+            id: 101,
+            is_locked: false,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.1',
+            public_ip_address: '1.1.1.1',
+            status: 'Running'
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'list',
+        nodes: [
+          {
+            id: 101,
+            is_locked: false,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.1',
+            public_ip_address: '1.1.1.1',
+            status: 'Running'
+          },
+          {
+            id: 205,
+            is_locked: false,
+            name: 'node-b',
+            plan: 'C3.16GB',
+            private_ip_address: '10.0.0.2',
+            public_ip_address: '1.1.1.2',
+            status: 'Running'
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      })}\n`
+    );
   });
 
   it('renders billing metadata for node create results', () => {

@@ -13,6 +13,15 @@ describe('node list against a fake MyAccount API', () => {
           code: 200,
           data: [
             {
+              id: 205,
+              is_locked: false,
+              name: 'node-b',
+              plan: 'C3.16GB',
+              private_ip_address: '10.0.0.2',
+              public_ip_address: '1.1.1.2',
+              status: 'Running'
+            },
+            {
               id: 101,
               is_locked: false,
               name: 'node-a',
@@ -24,7 +33,7 @@ describe('node list against a fake MyAccount API', () => {
           ],
           errors: {},
           message: 'OK',
-          total_count: 1,
+          total_count: 2,
           total_page_number: 1
         }
       })
@@ -55,9 +64,18 @@ describe('node list against a fake MyAccount API', () => {
               private_ip_address: '10.0.0.1',
               public_ip_address: '1.1.1.1',
               status: 'Running'
+            },
+            {
+              id: 205,
+              is_locked: false,
+              name: 'node-b',
+              plan: 'C3.16GB',
+              private_ip_address: '10.0.0.2',
+              public_ip_address: '1.1.1.2',
+              status: 'Running'
             }
           ],
-          total_count: 1,
+          total_count: 2,
           total_page_number: 1
         })}\n`
       );

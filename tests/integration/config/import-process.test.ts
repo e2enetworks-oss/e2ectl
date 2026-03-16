@@ -91,4 +91,82 @@ describe('config import process flow', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('preserves saved per-alias defaults when overwriting an existing alias', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/iam/multi-crn/': () => ({
+        body: {
+          code: 200,
+          data: {
+            multi_crn: []
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await tempHome.writeConfig({
+        default: 'prod',
+        profiles: {
+          prod: {
+            api_key: 'api-existing',
+            auth_token: 'auth-existing',
+            default_project_id: '46429',
+            default_location: 'Delhi'
+          }
+        }
+      });
+      const importFilePath = await tempHome.writeImportFile('overwrite.json', {
+        prod: {
+          api_auth_token: 'auth-imported',
+          api_key: 'api-imported'
+        }
+      });
+
+      const result = await runBuiltCli(
+        ['config', 'import', '--file', importFilePath, '--force', '--no-input'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain(
+        `Imported 1 profile from "${importFilePath}".`
+      );
+      expect(result.stdout).toContain('Default profile remains "prod".');
+
+      const savedConfig = await readJsonFile<ConfigFile>(tempHome.configPath);
+      expect(savedConfig).toEqual({
+        default: 'prod',
+        profiles: {
+          prod: {
+            api_key: 'api-imported',
+            auth_token: 'auth-imported',
+            default_project_id: '46429',
+            default_location: 'Delhi'
+          }
+        }
+      });
+
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]).toMatchObject({
+        method: 'GET',
+        pathname: '/myaccount/api/v1/iam/multi-crn/',
+        query: {
+          apikey: 'api-imported'
+        }
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });
