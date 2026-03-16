@@ -175,6 +175,7 @@ export class ConfigService {
       }
 
       importedProfiles[alias] = {
+        ...preserveExistingProfileContext(currentConfig.profiles[alias]),
         api_key: importedProfile.api_key,
         auth_token: importedProfile.auth_token
       };
@@ -500,6 +501,27 @@ function applyImportedDefaults(
       }
     ])
   );
+}
+
+function preserveExistingProfileContext(
+  profile: ProfileConfig | undefined
+): Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>> {
+  if (profile === undefined) {
+    return {};
+  }
+
+  return {
+    ...(profile.default_project_id === undefined
+      ? {}
+      : {
+          default_project_id: profile.default_project_id
+        }),
+    ...(profile.default_location === undefined
+      ? {}
+      : {
+          default_location: profile.default_location
+        })
+  };
 }
 
 function assertHasAtLeastOneContextValue(options: SetContextInput): void {

@@ -522,7 +522,7 @@ function renderNodeJson(result: NodeCommandResult): string {
     case 'list':
       return renderJson({
         action: 'list',
-        nodes: result.nodes,
+        nodes: sortNodeSummariesById(result.nodes),
         total_count: result.total_count ?? null,
         total_page_number: result.total_page_number ?? null
       });
@@ -614,6 +614,10 @@ function renderNodeJson(result: NodeCommandResult): string {
 
 function renderJson(value: unknown): string {
   return `${stableStringify(value as JsonValue)}\n`;
+}
+
+function sortNodeSummariesById(nodes: NodeSummary[]): NodeSummary[] {
+  return [...nodes].sort((left, right) => left.id - right.id);
 }
 
 function normalizeNodeActionJson(result: NodeActionStatusSummary): JsonValue {
