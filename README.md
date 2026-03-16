@@ -11,7 +11,7 @@ It is built for operators and automation that need:
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+
 - npm
 
 ## Install
@@ -20,6 +20,8 @@ It is built for operators and automation that need:
 npm install -g e2ectl
 e2ectl --help
 ```
+
+`e2ectl` requires Node.js 20 or newer.
 
 If you want prerelease builds, install the `next` dist-tag instead:
 
@@ -42,6 +44,8 @@ e2ectl config import \
 ```
 
 `<profile-alias>` must match one alias from the downloaded credential file. `<location>` must be `Delhi` or `Chennai`.
+
+For v1, profile onboarding is supported through `config import` so credentials are not passed on argv.
 
 ### 2. Confirm the saved profile and defaults
 
@@ -180,17 +184,6 @@ Project context precedence:
 2. `E2E_PROJECT_ID` and `E2E_LOCATION`
 3. the selected alias via `--alias`
 4. the default saved alias
-
-If you prefer to add a profile manually:
-
-```bash
-e2ectl config add \
-  --alias <profile-alias> \
-  --api-key <api-key> \
-  --auth-token <auth-token> \
-  --default-project-id <project-id> \
-  --default-location <location>
-```
 
 ## JSON And Automation
 

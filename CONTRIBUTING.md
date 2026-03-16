@@ -6,7 +6,7 @@ If you are using the CLI, start with [README.md](./README.md). If you are mainta
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+
 - npm
 
 ## Local Setup

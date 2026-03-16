@@ -43,7 +43,6 @@ describe('vpc formatter', () => {
     const committedTable = formatVpcCommittedPlansTable([
       {
         currency: 'INR',
-        effective_price_per_hour: 3.56,
         id: 91,
         name: '90 Days',
         term_days: 90,
@@ -54,7 +53,8 @@ describe('vpc formatter', () => {
     expect(hourlyTable).toContain('4.79 INR');
     expect(hourlyTable).toContain('3500 INR');
     expect(committedTable).toContain('90 Days');
-    expect(committedTable).toContain('3.56 INR');
+    expect(committedTable).not.toContain('Effective Price/Hour');
+    expect(committedTable).not.toContain('3.56 INR');
   });
 
   it('renders VPC plan guidance for both committed CIDR modes', () => {
@@ -66,7 +66,6 @@ describe('vpc formatter', () => {
           items: [
             {
               currency: 'INR',
-              effective_price_per_hour: 3.56,
               id: 91,
               name: '90 Days',
               term_days: 90,
@@ -99,6 +98,39 @@ describe('vpc formatter', () => {
       formatCliCommand(
         'vpc create --name <name> --billing-type committed --committed-plan-id <id> --cidr-source custom --cidr <cidr>'
       )
+    );
+  });
+
+  it('omits non-authoritative committed hourly pricing from json output', () => {
+    const output = renderVpcResult(
+      {
+        action: 'plans',
+        committed: {
+          default_post_commit_behavior: 'auto-renew',
+          items: [
+            {
+              currency: 'INR',
+              id: 91,
+              name: '90 Days',
+              term_days: 90,
+              total_price: 7800
+            }
+          ],
+          supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+        },
+        hourly: {
+          items: []
+        }
+      },
+      true
+    );
+
+    const payload = JSON.parse(output) as {
+      committed: { items: Array<Record<string, unknown>> };
+    };
+
+    expect(payload.committed.items[0]).not.toHaveProperty(
+      'effective_price_per_hour'
     );
   });
 

@@ -26,6 +26,7 @@ npm pack --dry-run
 
 Operational notes:
 
+- Public runtime support starts at Node.js 20.
 - `make coverage` is optional and remains outside the default promotion gate.
 - `npm run test:manual` is opt-in live verification and never a required CI lane.
 - If `npm pack --dry-run` fails locally because of npm cache permissions, rerun with `env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run`.
@@ -43,7 +44,7 @@ Runs on:
 Configuration:
 
 - Ubuntu runners
-- Node.js 18, 20, and 22 matrix
+- Node.js 20 and 22 matrix
 
 Steps:
 
@@ -63,8 +64,8 @@ Runs on:
 
 Configuration:
 
-- Ubuntu runner
-- Node.js 22
+- Ubuntu runners
+- Node.js 20 and 22 matrix
 
 Steps:
 

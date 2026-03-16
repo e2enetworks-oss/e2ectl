@@ -61,7 +61,6 @@ describe('vpc plans against a fake MyAccount API', () => {
             items: [
               {
                 currency: 'INR',
-                effective_price_per_hour: 4.11,
                 id: 31,
                 name: '30 Days',
                 term_days: 30,
@@ -69,7 +68,6 @@ describe('vpc plans against a fake MyAccount API', () => {
               },
               {
                 currency: 'INR',
-                effective_price_per_hour: 3.56,
                 id: 91,
                 name: '90 Days',
                 term_days: 90,
@@ -90,6 +88,15 @@ describe('vpc plans against a fake MyAccount API', () => {
             ]
           }
         })}\n`
+      );
+      const payload = JSON.parse(result.stdout) as {
+        committed: { items: Array<Record<string, unknown>> };
+      };
+      expect(payload.committed.items[0]).not.toHaveProperty(
+        'effective_price_per_hour'
+      );
+      expect(payload.committed.items[1]).not.toHaveProperty(
+        'effective_price_per_hour'
       );
 
       expect(server.requests).toHaveLength(1);

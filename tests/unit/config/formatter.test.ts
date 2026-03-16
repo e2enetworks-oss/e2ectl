@@ -61,7 +61,7 @@ describe('config formatter', () => {
   it('renders deterministic json payloads for config results', () => {
     const output = renderConfigResult(
       {
-        action: 'saved',
+        action: 'set-default',
         alias: 'prod',
         config: {
           profiles: {
@@ -78,7 +78,7 @@ describe('config formatter', () => {
 
     expect(output).toBe(
       '{\n' +
-        '  "action": "saved",\n' +
+        '  "action": "set-default",\n' +
         '  "default": "prod",\n' +
         '  "profiles": [\n' +
         '    {\n' +

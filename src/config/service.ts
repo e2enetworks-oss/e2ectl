@@ -4,14 +4,6 @@ import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
 
-export interface AddProfileInput {
-  alias: string;
-  apiKey: string;
-  authToken: string;
-  defaultLocation?: string;
-  defaultProjectId?: string;
-}
-
 export interface ImportProfilesInput {
   default?: string;
   defaultLocation?: string;
@@ -37,12 +29,6 @@ export interface SetDefaultInput {
 
 export interface ConfigListCommandResult {
   action: 'list';
-  config: ConfigFile;
-}
-
-export interface ConfigSavedCommandResult {
-  action: 'saved';
-  alias: string;
   config: ConfigFile;
 }
 
@@ -79,7 +65,6 @@ export type ConfigCommandResult =
   | ConfigImportedCommandResult
   | ConfigListCommandResult
   | ConfigRemovedCommandResult
-  | ConfigSavedCommandResult
   | ConfigSetContextCommandResult
   | ConfigSetDefaultCommandResult;
 
@@ -97,7 +82,6 @@ interface ConfigStoreLike {
     alias: string,
     patch: Partial<ProfileConfig>
   ): Promise<ConfigFile>;
-  upsertProfile(alias: string, profile: ProfileConfig): Promise<ConfigFile>;
   write(config: ConfigFile): Promise<void>;
 }
 
@@ -111,31 +95,6 @@ export interface ConfigServiceDependencies {
 
 export class ConfigService {
   constructor(private readonly dependencies: ConfigServiceDependencies) {}
-
-  async addProfile(
-    options: AddProfileInput
-  ): Promise<ConfigSavedCommandResult> {
-    validateOptionalContextDefaults(
-      options.defaultProjectId,
-      options.defaultLocation
-    );
-
-    const alias = normalizeRequiredAlias(
-      options.alias,
-      'Profile alias',
-      '--alias'
-    );
-    const profile = buildProfileFromOptions(options);
-
-    await this.dependencies.credentialValidator.validate(profile);
-    const config = await this.dependencies.store.upsertProfile(alias, profile);
-
-    return {
-      action: 'saved',
-      alias,
-      config
-    };
-  }
 
   async importProfiles(
     options: ImportProfilesInput
@@ -537,25 +496,6 @@ function assertHasAtLeastOneContextValue(options: SetContextInput): void {
     exitCode: EXIT_CODES.usage,
     suggestion: 'Pass --default-project-id, --default-location, or both.'
   });
-}
-
-function buildProfileFromOptions(options: AddProfileInput): ProfileConfig {
-  const defaultProjectId = normalizeOptionalString(options.defaultProjectId);
-  const defaultLocation = normalizeOptionalString(options.defaultLocation);
-  const profile: ProfileConfig = {
-    api_key: options.apiKey.trim(),
-    auth_token: options.authToken.trim()
-  };
-
-  if (defaultProjectId !== undefined) {
-    profile.default_project_id = defaultProjectId;
-  }
-
-  if (defaultLocation !== undefined) {
-    profile.default_location = defaultLocation;
-  }
-
-  return profile;
 }
 
 function getProfile(

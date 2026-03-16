@@ -12,4 +12,17 @@ describe('built CLI help', () => {
     expect(result.stdout).toContain('config');
     expect(result.stdout).toContain('node');
   });
+
+  it('does not expose config add in compiled help output', async () => {
+    const result = await runBuiltCli(['config', '--help']);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('import');
+    expect(result.stdout).toContain('list');
+    expect(result.stdout).toContain('set-context');
+    expect(result.stdout).toContain('set-default');
+    expect(result.stdout).toContain('remove');
+    expect(result.stdout).not.toMatch(/^\s+add\b/m);
+  });
 });

@@ -94,54 +94,6 @@ describe('config commands', () => {
     return filePath;
   }
 
-  it('adds a profile with optional default context and prints masked json output', async () => {
-    const { runtime, stdout, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'config',
-      'add',
-      '--alias',
-      'prod',
-      '--api-key',
-      'api-123456',
-      '--auth-token',
-      'auth-654321',
-      '--default-project-id',
-      '12345',
-      '--default-location',
-      'Delhi'
-    ]);
-
-    expect(validator.calls).toEqual([
-      {
-        api_key: 'api-123456',
-        auth_token: 'auth-654321',
-        default_project_id: '12345',
-        default_location: 'Delhi'
-      }
-    ]);
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'saved',
-        default: 'prod',
-        profiles: [
-          {
-            alias: 'prod',
-            api_key: '****3456',
-            auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '12345',
-            isDefault: true
-          }
-        ]
-      })
-    );
-  });
-
   it('lists profiles with masked table output and default context columns', async () => {
     const { runtime, stdout, store } = createRuntimeFixture();
     const program = createProgram(runtime);
@@ -333,54 +285,6 @@ describe('config commands', () => {
         profiles: []
       })
     );
-  });
-
-  it('rejects unsupported default locations before validation', async () => {
-    const { runtime, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'config',
-        'add',
-        '--alias',
-        'prod',
-        '--api-key',
-        'api-123456',
-        '--auth-token',
-        'auth-654321',
-        '--default-location',
-        'Noida'
-      ])
-    ).rejects.toThrow(/Unsupported default location/i);
-    expect(validator.calls).toHaveLength(0);
-  });
-
-  it('rejects blank aliases before validation and does not persist config', async () => {
-    const { runtime, store, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'config',
-        'add',
-        '--alias',
-        '   ',
-        '--api-key',
-        'api-123456',
-        '--auth-token',
-        'auth-654321'
-      ])
-    ).rejects.toThrow(/Profile alias cannot be empty/i);
-
-    expect(validator.calls).toHaveLength(0);
-    await expect(store.read()).resolves.toEqual({
-      profiles: {}
-    });
   });
 
   it('imports aliases, prompts for shared default context, and offers a default alias', async () => {

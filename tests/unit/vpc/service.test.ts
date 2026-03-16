@@ -205,7 +205,7 @@ describe('VpcService', () => {
     });
   });
 
-  it('separates hourly and committed plan options and matches frontend hourly derivation', async () => {
+  it('separates hourly and committed plan options without derived pricing fields', async () => {
     const { listVpcPlans, service } = createServiceFixture();
 
     listVpcPlans.mockResolvedValue([
@@ -240,12 +240,14 @@ describe('VpcService', () => {
     expect(result.committed.items).toEqual([
       {
         currency: 'INR',
-        effective_price_per_hour: 3.56,
         id: 91,
         name: '90 Days',
         term_days: 90,
         total_price: 7800
       }
     ]);
+    expect(result.committed.items[0]).not.toHaveProperty(
+      'effective_price_per_hour'
+    );
   });
 });

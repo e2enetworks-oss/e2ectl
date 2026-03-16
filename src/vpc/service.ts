@@ -14,8 +14,6 @@ import type {
 } from './types.js';
 
 const VPC_LIST_PAGE_SIZE = 100;
-const FRONTEND_BILLING_MONTH_DAYS = 30;
-const FRONTEND_BILLING_MONTH_HOURS = 730;
 
 export type VpcBillingType = 'committed' | 'hourly';
 export type VpcCidrSource = 'custom' | 'e2e';
@@ -69,7 +67,6 @@ export interface VpcHourlyPlanItem {
 
 export interface VpcCommittedPlanItem {
   currency: string | null;
-  effective_price_per_hour: number | null;
   id: number;
   name: string;
   term_days: number;
@@ -416,35 +413,13 @@ function normalizeCommittedVpcPlan(
     return undefined;
   }
 
-  const effectivePricePerHour = calculateCommittedEffectivePricePerHour(
-    plan.committed_days,
-    plan.committed_sku_price
-  );
-
   return {
     currency: currency ?? null,
-    effective_price_per_hour: effectivePricePerHour,
     id: plan.committed_sku_id,
     name: plan.committed_sku_name,
     term_days: plan.committed_days,
     total_price: plan.committed_sku_price
   };
-}
-
-function calculateCommittedEffectivePricePerHour(
-  termDays: number,
-  totalPrice: number
-): number | null {
-  // Match the current frontend discovery calculation until the backend
-  // exposes an authoritative effective hourly value for committed VPC plans.
-  const billedMonths = Math.floor(termDays / FRONTEND_BILLING_MONTH_DAYS);
-  if (billedMonths <= 0) {
-    return null;
-  }
-
-  return Number(
-    (totalPrice / (billedMonths * FRONTEND_BILLING_MONTH_HOURS)).toFixed(2)
-  );
 }
 
 function normalizeBillingType(value: string): VpcBillingType {

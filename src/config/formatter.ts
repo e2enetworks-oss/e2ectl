@@ -66,8 +66,6 @@ function renderConfigHuman(result: ConfigCommandResult): string {
     }
     case 'removed':
       return `Removed profile "${result.alias}".\n`;
-    case 'saved':
-      return `Saved profile "${result.alias}".\n`;
     case 'set-context':
       return `Updated default context for "${result.alias}".\n`;
     case 'set-default':
@@ -91,7 +89,6 @@ function renderConfigJson(result: ConfigCommandResult): string {
       });
     case 'list':
     case 'removed':
-    case 'saved':
     case 'set-context':
     case 'set-default':
       return renderJson({

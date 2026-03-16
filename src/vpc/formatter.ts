@@ -65,13 +65,7 @@ export function formatVpcCommittedPlansTable(
   items: VpcCommittedPlanItem[]
 ): string {
   const table = new Table({
-    head: [
-      'Plan ID',
-      'Name',
-      'Term (Days)',
-      'Total Price',
-      'Effective Price/Hour'
-    ]
+    head: ['Plan ID', 'Name', 'Term (Days)', 'Total Price']
   });
 
   sortVpcCommittedPlans(items).forEach((item) => {
@@ -79,8 +73,7 @@ export function formatVpcCommittedPlansTable(
       String(item.id),
       item.name,
       String(item.term_days),
-      formatPrice(item.total_price, item.currency),
-      formatPrice(item.effective_price_per_hour, item.currency)
+      formatPrice(item.total_price, item.currency)
     ]);
   });
 
@@ -206,7 +199,6 @@ function normalizeVpcCommittedPlanJsonItem(
 ): JsonValue {
   return {
     currency: item.currency,
-    effective_price_per_hour: item.effective_price_per_hour,
     id: item.id,
     name: item.name,
     term_days: item.term_days,
