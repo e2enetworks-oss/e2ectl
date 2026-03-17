@@ -1,13 +1,8 @@
 # e2ectl
 
-`e2ectl` is the command-line interface for managing E2E Networks MyAccount resources from the terminal.
+Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It is built for operators and automation that need:
-
-- saved MyAccount profiles and per-alias defaults
-- discovery-first node creation
-- node, volume, VPC, and SSH key workflows
-- deterministic `--json` output for scripts and agents
+Create and manage nodes, volumes, VPCs, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
 
 ## Requirements
 
@@ -21,18 +16,171 @@ npm install -g e2ectl
 e2ectl --help
 ```
 
-`e2ectl` requires Node.js 20 or newer.
-
-If you want prerelease builds, install the `next` dist-tag instead:
+For prerelease builds:
 
 ```bash
 npm install -g e2ectl@next
-e2ectl --help
 ```
 
 ## Quickstart
 
 ### 1. Import credentials and save a default profile
+
+```bash
+e2ectl config import --file ~/Downloads/config.json
+```
+
+In an interactive terminal, `e2ectl` can walk you through setting a default alias and shared default project/location values (`Delhi` or `Chennai`).
+
+For profile onboarding, credentials are imported from file.
+
+### 2. Confirm the saved profile
+
+```bash
+e2ectl config list
+```
+
+Once a default alias and default project/location values are saved, you can omit `--alias`, `--project-id`, and `--location` from subsequent commands. The examples below assume that default context is already active.
+
+### 3. Discover valid plans, images, and billing options
+
+```bash
+# List available operating systems
+e2ectl node catalog os
+
+# Get exact plan, image, and billing values
+e2ectl node catalog plans \
+  --display-category "Linux Virtual Node" \
+  --category Ubuntu \
+  --os Ubuntu \
+  --os-version 24.04 \
+  --billing-type all
+```
+
+Always use `node catalog` before creating a node. It returns the exact `plan`, `image`, and committed plan identifiers you need.
+
+### 4. Create a node
+
+```bash
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --image <image>
+```
+
+For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values from `node catalog plans`.
+
+## Common Workflows
+
+### Nodes
+
+```bash
+e2ectl node list
+e2ectl node get <node-id>
+
+# Power management
+e2ectl node action power-off <node-id>
+e2ectl node action power-on <node-id>
+
+# Save a node as a reusable image
+e2ectl node action save-image <node-id> --name <image-name>
+
+# Attach resources
+e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
+e2ectl node action volume attach <node-id> --volume-id <volume-id>
+e2ectl node action ssh-key attach <node-id> --ssh-key-id <ssh-key-id>
+
+# Delete (prompts for confirmation unless --force is passed)
+e2ectl node delete <node-id>
+```
+
+### Volumes
+
+```bash
+# Discover volume plans (optionally filter by size)
+e2ectl volume plans
+e2ectl volume plans --size <size-gb>
+
+# Create with hourly billing
+e2ectl volume create \
+  --name <volume-name> \
+  --size <size-gb> \
+  --billing-type hourly
+
+# Create with committed billing
+e2ectl volume create \
+  --name <volume-name> \
+  --size <size-gb> \
+  --billing-type committed \
+  --committed-plan-id <committed-plan-id> \
+  --post-commit-behavior auto-renew
+
+e2ectl volume list
+```
+
+### VPCs
+
+```bash
+e2ectl vpc plans
+
+# Create with E2E-assigned CIDR
+e2ectl vpc create \
+  --name <vpc-name> \
+  --billing-type hourly \
+  --cidr-source e2e
+
+# Create with custom CIDR and committed billing
+e2ectl vpc create \
+  --name <vpc-name> \
+  --billing-type committed \
+  --committed-plan-id <committed-plan-id> \
+  --post-commit-behavior auto-renew \
+  --cidr-source custom \
+  --cidr <custom-cidr>
+
+e2ectl vpc list
+```
+
+### SSH Keys
+
+```bash
+e2ectl ssh-key list
+
+# From file
+e2ectl ssh-key create \
+  --label <key-label> \
+  --public-key-file ~/.ssh/id_ed25519.pub
+
+# From stdin
+cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
+  --label <key-label> \
+  --public-key-file -
+```
+
+## Configuration
+
+Profiles are stored in `~/.e2e/config.json`.
+
+### Environment Variables
+
+| Variable         | Purpose                       |
+| ---------------- | ----------------------------- |
+| `E2E_API_KEY`    | API key for authentication    |
+| `E2E_AUTH_TOKEN` | Auth token for authentication |
+| `E2E_PROJECT_ID` | Default project id            |
+| `E2E_LOCATION`   | Default location              |
+
+### Precedence
+
+**Authentication** resolves in this order: environment variables (`E2E_API_KEY` + `E2E_AUTH_TOKEN`) -> `--alias` flag -> default saved alias.
+
+**Project context** resolves in this order: `--project-id` / `--location` flags -> environment variables -> `--alias` flag -> default saved alias.
+
+## JSON and Automation
+
+Human-readable output is the default. Add `--json` to any command for deterministic machine-readable output.
+
+For non-interactive environments (CI, scripts), pass all values explicitly with `--no-input`:
 
 ```bash
 e2ectl config import \
@@ -43,163 +191,9 @@ e2ectl config import \
   --no-input
 ```
 
-`<profile-alias>` must match one alias from the downloaded credential file. `<location>` must be `Delhi` or `Chennai`.
+The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, and `ssh-key list`.
 
-For v1, profile onboarding is supported through `config import` so credentials are not passed on argv.
-
-### 2. Confirm the saved profile and defaults
-
-```bash
-e2ectl config list
-```
-
-### 3. Discover valid operating system rows
-
-```bash
-e2ectl node catalog os --alias <profile-alias>
-```
-
-### 4. Discover exact plan, image, and billing values
-
-```bash
-e2ectl node catalog plans \
-  --alias <profile-alias> \
-  --display-category "Linux Virtual Node" \
-  --category Ubuntu \
-  --os Ubuntu \
-  --os-version 24.04 \
-  --billing-type all
-```
-
-Use the returned `plan`, `image`, and optional committed plan id exactly as shown.
-
-### 5. Create and inspect a node
-
-```bash
-e2ectl node create \
-  --alias <profile-alias> \
-  --name <node-name> \
-  --plan <plan> \
-  --image <image>
-
-e2ectl node list --alias <profile-alias>
-e2ectl node get <node-id> --alias <profile-alias>
-```
-
-For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values returned by `node catalog plans`.
-
-If the selected profile already has a saved project id and location, later commands can omit `--project-id` and `--location`.
-
-## Common Workflows
-
-### Nodes
-
-```bash
-e2ectl node list --alias <profile-alias>
-e2ectl node get <node-id> --alias <profile-alias>
-e2ectl node action power-off <node-id> --alias <profile-alias>
-e2ectl node action power-on <node-id> --alias <profile-alias>
-e2ectl node action save-image <node-id> --name <image-name> --alias <profile-alias>
-e2ectl node action vpc attach <node-id> --vpc-id <vpc-id> --alias <profile-alias>
-e2ectl node action volume attach <node-id> --volume-id <volume-id> --alias <profile-alias>
-e2ectl node action ssh-key attach <node-id> --ssh-key-id <ssh-key-id> --alias <profile-alias>
-e2ectl node delete <node-id> --alias <profile-alias>
-```
-
-### Volumes
-
-```bash
-e2ectl volume plans --alias <profile-alias>
-e2ectl volume create \
-  --name <volume-name> \
-  --size <size-gb> \
-  --billing-type hourly \
-  --alias <profile-alias>
-e2ectl volume create \
-  --name <volume-name> \
-  --size <size-gb> \
-  --billing-type committed \
-  --committed-plan-id <committed-plan-id> \
-  --post-commit-behavior auto-renew \
-  --alias <profile-alias>
-e2ectl volume list --alias <profile-alias>
-```
-
-If you already know the target size, use `e2ectl volume plans --size <size-gb> --alias <profile-alias>` to inspect exact committed options first.
-
-### VPCs
-
-```bash
-e2ectl vpc plans --alias <profile-alias>
-e2ectl vpc create \
-  --name <vpc-name> \
-  --billing-type hourly \
-  --cidr-source e2e \
-  --alias <profile-alias>
-e2ectl vpc create \
-  --name <vpc-name> \
-  --billing-type committed \
-  --committed-plan-id <committed-plan-id> \
-  --post-commit-behavior auto-renew \
-  --cidr-source custom \
-  --cidr <custom-cidr> \
-  --alias <profile-alias>
-e2ectl vpc list --alias <profile-alias>
-```
-
-### SSH Keys
-
-```bash
-e2ectl ssh-key list --alias <profile-alias>
-e2ectl ssh-key create \
-  --label <key-label> \
-  --public-key-file ~/.ssh/id_ed25519.pub \
-  --alias <profile-alias>
-cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
-  --label <key-label> \
-  --public-key-file - \
-  --alias <profile-alias>
-```
-
-## Configuration And Precedence
-
-Profiles are stored in `~/.e2e/config.json`.
-
-Environment variables:
-
-- `E2E_API_KEY`
-- `E2E_AUTH_TOKEN`
-- `E2E_PROJECT_ID`
-- `E2E_LOCATION`
-
-Authentication precedence:
-
-1. `E2E_API_KEY` and `E2E_AUTH_TOKEN`
-2. the selected alias via `--alias`
-3. the default saved alias
-
-Project context precedence:
-
-1. `--project-id` and `--location`
-2. `E2E_PROJECT_ID` and `E2E_LOCATION`
-3. the selected alias via `--alias`
-4. the default saved alias
-
-## JSON And Automation
-
-- Human-readable output is the default.
-- `--json` switches any command to deterministic machine-readable output.
-- Discovery and list commands are the safest automation entry points, especially `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, and `ssh-key list`.
-
-## Safety Notes
-
-- `config import` validates credentials before writing them to disk.
-- Re-importing an existing alias keeps its saved project/location defaults unless you pass new import defaults.
-- Saved profiles are written under `~/.e2e/` with restrictive permissions, and POSIX reads reject config files broader than `0600`.
-- `node delete` prompts unless `--force` is supplied.
-- Use discovery commands before create commands so you pass exact plan, image, and committed plan identifiers.
-
-## More Help
+## Help
 
 ```bash
 e2ectl --help
