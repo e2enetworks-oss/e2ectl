@@ -6,7 +6,7 @@ If you are using the CLI, start with [README.md](./README.md). If you are mainta
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 24+
 - npm
 
 ## Local Setup
@@ -60,9 +60,9 @@ Domain ownership:
 - `src/myaccount/` owns shared transport, credential validation, API envelope typing, and centralized API failure handling.
 - `src/config/` owns profile persistence, import parsing, alias/default-context behavior, and auth/context resolution.
 - `src/node/` owns node discovery, create/delete flows, actions, and output shaping.
-- `src/volume/` owns volume list, plans, create flows, and output shaping.
-- `src/vpc/` owns VPC list, plans, create flows, and output shaping.
-- `src/ssh-key/` owns SSH key list, create flows, and output shaping.
+- `src/volume/` owns volume list/get/delete, plans, create flows, and output shaping.
+- `src/vpc/` owns VPC list/get/delete, plans, create flows, and output shaping.
+- `src/ssh-key/` owns SSH key list/get/delete, create flows, and output shaping.
 
 Architectural rules:
 
@@ -83,6 +83,7 @@ make lint
 make test
 make build
 npm run test:integration
+npm run coverage:unit
 npm pack --dry-run
 ```
 
@@ -92,6 +93,7 @@ What this covers:
 - `make test`: unit tests
 - `make build`: production compile
 - `npm run test:integration`: built CLI process checks, fake-API coverage, and tarball install smoke
+- `npm run coverage:unit`: unit tests with the enforced 80% coverage floor used by CI
 - `npm pack --dry-run`: publishable package preview
 
 The maintainer-owned CI policy and promotion gate live in [docs/MAINTAINING.md](./docs/MAINTAINING.md).
@@ -102,7 +104,7 @@ The maintainer-owned CI policy and promotion gate live in [docs/MAINTAINING.md](
 - Put integration tests under `tests/integration/<domain>/`.
 - Add or update tests in the domain you touched instead of broad unrelated changes.
 - Treat `--json` output as a contract whenever command behavior or formatters change.
-- Coverage is explicit, not part of the default gate:
+- Coverage remains explicit locally:
 
 ```bash
 make coverage

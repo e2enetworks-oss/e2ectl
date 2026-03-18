@@ -35,14 +35,21 @@ function createSshKeyClientStub() {
       }
     ])
   );
+  const deleteSshKey = vi.fn(() =>
+    Promise.resolve({
+      message: 'SSH Key has been deleted successfully.'
+    })
+  );
 
   const stub: SshKeyClient = {
     createSshKey,
+    deleteSshKey,
     listSshKeys
   };
 
   return {
     createSshKey,
+    deleteSshKey,
     listSshKeys,
     stub
   };
@@ -184,6 +191,68 @@ describe('ssh-key commands', () => {
           public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop',
           type: 'ED25519'
         }
+      })}\n`
+    );
+  });
+
+  it('gets one SSH key in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'ssh-key',
+      'get',
+      '15398',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stub.listSshKeys).toHaveBeenCalledTimes(1);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'get',
+        item: {
+          attached_nodes: 2,
+          created_at: '19-Feb-2025',
+          id: 15398,
+          label: 'demo',
+          project_id: null,
+          project_name: 'default-project',
+          public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop',
+          type: 'ED25519'
+        }
+      })}\n`
+    );
+  });
+
+  it('deletes one SSH key in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'ssh-key',
+      'delete',
+      '15398',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stub.deleteSshKey).toHaveBeenCalledWith(15398);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        id: 15398,
+        message: 'SSH Key has been deleted successfully.'
       })}\n`
     );
   });

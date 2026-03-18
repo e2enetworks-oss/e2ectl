@@ -17,6 +17,23 @@ function createVolumeClientStub() {
       image_name: 'data-01'
     })
   );
+  const deleteVolume = vi.fn(() =>
+    Promise.resolve({
+      message: 'Block Storage Deleted'
+    })
+  );
+  const getVolume = vi.fn(() =>
+    Promise.resolve({
+      block_id: 25550,
+      is_block_storage_exporting_to_eos: false,
+      name: 'data-01',
+      size: 238419,
+      size_string: '250 GB',
+      snapshot_exist: false,
+      status: 'Available',
+      vm_detail: {}
+    })
+  );
   const listVolumePlans = vi.fn(() =>
     Promise.resolve([
       {
@@ -57,13 +74,17 @@ function createVolumeClientStub() {
   const stub: VolumeClient = {
     attachVolumeToNode: vi.fn(),
     createVolume,
+    deleteVolume,
     detachVolumeFromNode: vi.fn(),
+    getVolume,
     listVolumePlans,
     listVolumes
   };
 
   return {
     createVolume,
+    deleteVolume,
+    getVolume,
     listVolumePlans,
     listVolumes,
     stub
@@ -228,6 +249,69 @@ describe('volume commands', () => {
           }
         ],
         total_count: 1
+      })}\n`
+    );
+  });
+
+  it('gets one volume in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'volume',
+      'get',
+      '25550',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stub.getVolume).toHaveBeenCalledWith(25550);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'get',
+        volume: {
+          attached: false,
+          attachment: null,
+          exporting_to_eos: false,
+          id: 25550,
+          name: 'data-01',
+          size_gb: 250,
+          size_label: '250 GB',
+          snapshot_exists: false,
+          status: 'Available'
+        }
+      })}\n`
+    );
+  });
+
+  it('deletes one volume in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'volume',
+      'delete',
+      '25550',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stub.deleteVolume).toHaveBeenCalledWith(25550);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: 'Block Storage Deleted',
+        volume_id: 25550
       })}\n`
     );
   });

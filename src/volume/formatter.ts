@@ -5,6 +5,7 @@ import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   VolumeCommandResult,
   VolumeCommittedPlanItem,
+  VolumeDetailItem,
   VolumeListItem,
   VolumePlanItem,
   VolumePlansCommandResult
@@ -112,6 +113,12 @@ function renderVolumeHuman(result: VolumeCommandResult): string {
         `Next: run ${formatCliCommand('volume list')} to inspect the current state.\n`
       );
     }
+    case 'delete':
+      return result.cancelled
+        ? 'Deletion cancelled.\n'
+        : `Deleted volume ${result.volume_id}.\nMessage: ${result.message ?? ''}\n`;
+    case 'get':
+      return `${formatVolumeDetails(result.volume)}\n`;
     case 'list':
       return result.items.length === 0
         ? 'No volumes found.\n'
@@ -174,6 +181,24 @@ function normalizeVolumeJson(result: VolumeCommandResult): JsonValue {
           name: result.volume.name
         }
       };
+    case 'delete':
+      return result.cancelled
+        ? {
+            action: 'delete',
+            cancelled: true,
+            volume_id: result.volume_id
+          }
+        : {
+            action: 'delete',
+            cancelled: false,
+            message: result.message ?? '',
+            volume_id: result.volume_id
+          };
+    case 'get':
+      return {
+        action: 'get',
+        volume: normalizeVolumeDetailJson(result.volume)
+      };
     case 'list':
       return {
         action: 'list',
@@ -221,6 +246,27 @@ function normalizeVolumeListJson(item: VolumeListItem): JsonValue {
     size_gb: item.size_gb,
     size_label: item.size_label,
     status: item.status
+  };
+}
+
+function normalizeVolumeDetailJson(item: VolumeDetailItem): JsonValue {
+  return {
+    attached: item.attached,
+    attachment:
+      item.attachment === null
+        ? null
+        : {
+            node_id: item.attachment.node_id,
+            vm_id: item.attachment.vm_id,
+            vm_name: item.attachment.vm_name
+          },
+    id: item.id,
+    name: item.name,
+    size_gb: item.size_gb,
+    size_label: item.size_label,
+    status: item.status,
+    exporting_to_eos: item.exporting_to_eos,
+    snapshot_exists: item.snapshot_exists
   };
 }
 
@@ -329,6 +375,24 @@ function formatAttachment(item: VolumeListItem): string {
   }
 
   return `${label} (node ${item.attachment.node_id})`;
+}
+
+function formatVolumeDetails(item: VolumeDetailItem): string {
+  const lines = [
+    `ID: ${item.id}`,
+    `Name: ${item.name}`,
+    `Status: ${item.status}`,
+    `Size: ${item.size_label ?? ''}`,
+    `Attached: ${item.attached ? 'yes' : 'no'}`,
+    `Snapshot Exists: ${item.snapshot_exists ? 'yes' : 'no'}`,
+    `Exporting To EOS: ${item.exporting_to_eos ? 'yes' : 'no'}`
+  ];
+
+  if (item.attachment !== null) {
+    lines.push(`Attached To: ${formatAttachment(item)}`);
+  }
+
+  return lines.join('\n');
 }
 
 function formatPrice(value: number | null, currency: string | null): string {

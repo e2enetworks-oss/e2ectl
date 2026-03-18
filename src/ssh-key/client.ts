@@ -7,6 +7,7 @@ export interface SshKeyClient {
     label: string;
     ssh_key: string;
   }): Promise<SshKeyCreateResult>;
+  deleteSshKey(sshKeyId: number): Promise<{ message: string }>;
   listSshKeys(): Promise<SshKeySummary[]>;
 }
 
@@ -25,6 +26,16 @@ export class SshKeyApiClient implements SshKeyClient {
     );
 
     return response.data;
+  }
+
+  async deleteSshKey(sshKeyId: number): Promise<{ message: string }> {
+    const response = await this.transport.delete<
+      ApiEnvelope<Record<string, unknown>>
+    >(`/delete_ssh_key/${sshKeyId}/`);
+
+    return {
+      message: response.message
+    };
   }
 
   async listSshKeys(): Promise<SshKeySummary[]> {

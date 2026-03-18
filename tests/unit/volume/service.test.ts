@@ -22,12 +22,16 @@ function createConfig(): ConfigFile {
 function createServiceFixture(): {
   createVolume: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
+  deleteVolume: ReturnType<typeof vi.fn>;
+  getVolume: ReturnType<typeof vi.fn>;
   listVolumePlans: ReturnType<typeof vi.fn>;
   listVolumes: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   service: VolumeService;
 } {
   const createVolume = vi.fn();
+  const deleteVolume = vi.fn();
+  const getVolume = vi.fn();
   const listVolumePlans = vi.fn();
   const listVolumes = vi.fn();
   let credentials: ResolvedCredentials | undefined;
@@ -35,7 +39,9 @@ function createServiceFixture(): {
   const client: VolumeClient = {
     attachVolumeToNode: vi.fn(),
     createVolume,
+    deleteVolume,
     detachVolumeFromNode: vi.fn(),
+    getVolume,
     listVolumePlans,
     listVolumes
   };
@@ -46,7 +52,9 @@ function createServiceFixture(): {
     }
   );
   const service = new VolumeService({
+    confirm: vi.fn(() => Promise.resolve(true)),
     createVolumeClient,
+    isInteractive: true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
       read: () => Promise.resolve(createConfig())
@@ -56,6 +64,8 @@ function createServiceFixture(): {
   return {
     createVolume,
     createVolumeClient,
+    deleteVolume,
+    getVolume,
     listVolumePlans,
     listVolumes,
     receivedCredentials: () => credentials,
@@ -139,6 +149,68 @@ describe('VolumeService', () => {
       ],
       total_count: 2,
       total_page_number: 2
+    });
+  });
+
+  it('gets one volume through the detail path and normalizes detail flags', async () => {
+    const { getVolume, service } = createServiceFixture();
+
+    getVolume.mockResolvedValue({
+      block_id: 22,
+      is_block_storage_exporting_to_eos: true,
+      name: 'zeta-data',
+      size: 476837,
+      size_string: '500 GB',
+      snapshot_exist: true,
+      status: 'Attached',
+      vm_detail: {
+        node_id: 301,
+        vm_id: 100157,
+        vm_name: 'node-b'
+      }
+    });
+
+    const result = await service.getVolume('22', { alias: 'prod' });
+
+    expect(getVolume).toHaveBeenCalledWith(22);
+    expect(result).toEqual({
+      action: 'get',
+      volume: {
+        attached: true,
+        attachment: {
+          node_id: 301,
+          vm_id: 100157,
+          vm_name: 'node-b'
+        },
+        exporting_to_eos: true,
+        id: 22,
+        name: 'zeta-data',
+        size_gb: 500,
+        size_label: '500 GB',
+        snapshot_exists: true,
+        status: 'Attached'
+      }
+    });
+  });
+
+  it('deletes one volume with an explicit force flag', async () => {
+    const { deleteVolume, service } = createServiceFixture();
+
+    deleteVolume.mockResolvedValue({
+      message: 'Block Storage Deleted'
+    });
+
+    const result = await service.deleteVolume('22', {
+      alias: 'prod',
+      force: true
+    });
+
+    expect(deleteVolume).toHaveBeenCalledWith(22);
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      message: 'Block Storage Deleted',
+      volume_id: 22
     });
   });
 

@@ -115,6 +115,12 @@ function renderVpcHuman(result: VpcCommandResult): string {
         `Next: run ${formatCliCommand('vpc list')} to inspect the VPC state.\n`
       );
     }
+    case 'delete':
+      return result.cancelled
+        ? 'Deletion cancelled.\n'
+        : `Deleted VPC ${result.vpc.id}.\nMessage: ${result.message ?? ''}\n`;
+    case 'get':
+      return `${formatVpcDetails(result.vpc)}\n`;
     case 'list':
       return result.items.length === 0
         ? 'No VPCs found.\n'
@@ -166,6 +172,32 @@ function normalizeVpcJson(result: VpcCommandResult): JsonValue {
           project_id: result.vpc.project_id,
           vpc_id: result.vpc.vpc_id
         }
+      };
+    case 'delete':
+      return result.cancelled
+        ? {
+            action: 'delete',
+            cancelled: true,
+            vpc: {
+              id: result.vpc.id,
+              name: result.vpc.name,
+              project_id: result.vpc.project_id
+            }
+          }
+        : {
+            action: 'delete',
+            cancelled: false,
+            message: result.message ?? '',
+            vpc: {
+              id: result.vpc.id,
+              name: result.vpc.name,
+              project_id: result.vpc.project_id
+            }
+          };
+    case 'get':
+      return {
+        action: 'get',
+        vpc: normalizeVpcListJsonItem(result.vpc)
       };
     case 'list':
       return {
@@ -285,4 +317,30 @@ function sortVpcListItems(items: VpcListItem[]): VpcListItem[] {
 
     return leftKey.localeCompare(rightKey);
   });
+}
+
+function formatVpcDetails(item: VpcListItem): string {
+  const lines = [
+    `Network ID: ${item.network_id}`,
+    `Name: ${item.name}`,
+    `State: ${item.state}`,
+    `CIDR: ${item.cidr}`,
+    `Source: ${item.cidr_source === 'e2e' ? 'E2E' : 'Custom'}`,
+    `Attached VMs: ${item.attached_vm_count}`,
+    `Subnets: ${item.subnet_count}`,
+    `Gateway IP: ${item.gateway_ip ?? ''}`,
+    `Location: ${item.location ?? ''}`,
+    `Project: ${item.project_name ?? ''}`,
+    `Created At: ${item.created_at ?? ''}`
+  ];
+
+  if (item.subnets.length > 0) {
+    lines.push(
+      `Subnet Details: ${item.subnets
+        .map((subnet) => `${subnet.name} (${subnet.id}, ${subnet.cidr})`)
+        .join(', ')}`
+    );
+  }
+
+  return lines.join('\n');
 }

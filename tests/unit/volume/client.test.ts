@@ -104,6 +104,32 @@ describe('VolumeApiClient', () => {
     });
   });
 
+  it('gets volume details through the block storage detail path', async () => {
+    const transport = new StubTransport();
+    const client = new VolumeApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope({
+        block_id: 25550,
+        is_block_storage_exporting_to_eos: false,
+        name: 'data-01',
+        size: 238419,
+        size_string: '250 GB',
+        snapshot_exist: false,
+        status: 'Available',
+        vm_detail: {}
+      })
+    );
+
+    const result = await client.getVolume(25550);
+
+    expect(transport.getMock).toHaveBeenCalledWith(
+      '/block_storage/25550/',
+      undefined
+    );
+    expect(result.block_id).toBe(25550);
+  });
+
   it('reads volume plans from the backend discovery path', async () => {
     const transport = new StubTransport();
     const client = new VolumeApiClient(transport);
@@ -203,6 +229,25 @@ describe('VolumeApiClient', () => {
       },
       method: 'PUT',
       path: '/block_storage/25550/vm/detach/'
+    });
+  });
+
+  it('deletes volumes through the block storage detail path', async () => {
+    const transport = new StubTransport();
+    const client = new VolumeApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope({}, { message: 'Deleted' })
+    );
+
+    const result = await client.deleteVolume(25550);
+
+    expect(transport.deleteMock).toHaveBeenCalledWith(
+      '/block_storage/25550/',
+      undefined
+    );
+    expect(result).toEqual({
+      message: 'Deleted'
     });
   });
 });

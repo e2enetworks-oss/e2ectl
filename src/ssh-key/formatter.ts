@@ -36,6 +36,12 @@ function renderSshKeyHuman(result: SshKeyCommandResult): string {
         `ID: ${result.item.id}\n` +
         `Type: ${result.item.type}\n`
       );
+    case 'delete':
+      return result.cancelled
+        ? 'Deletion cancelled.\n'
+        : `Deleted SSH key ${result.id}.\nMessage: ${result.message ?? ''}\n`;
+    case 'get':
+      return `${formatSshKeyDetails(result.item)}\n`;
     case 'list':
       return result.items.length === 0
         ? 'No SSH keys found.\n'
@@ -52,6 +58,24 @@ function normalizeJsonResult(result: SshKeyCommandResult): JsonValue {
     case 'create':
       return {
         action: 'create',
+        item: normalizeJsonItem(result.item)
+      };
+    case 'delete':
+      return result.cancelled
+        ? {
+            action: 'delete',
+            cancelled: true,
+            id: result.id
+          }
+        : {
+            action: 'delete',
+            cancelled: false,
+            id: result.id,
+            message: result.message ?? ''
+          };
+    case 'get':
+      return {
+        action: 'get',
         item: normalizeJsonItem(result.item)
       };
     case 'list':
@@ -90,4 +114,16 @@ function sortSshKeyItems(items: SshKeyItem[]): SshKeyItem[] {
 
     return leftKey.localeCompare(rightKey);
   });
+}
+
+function formatSshKeyDetails(item: SshKeyItem): string {
+  return [
+    `ID: ${item.id}`,
+    `Label: ${item.label}`,
+    `Type: ${item.type}`,
+    `Attached Nodes: ${item.attached_nodes}`,
+    `Created: ${item.created_at}`,
+    `Project: ${item.project_name ?? ''}`,
+    `Public Key: ${item.public_key}`
+  ].join('\n');
 }

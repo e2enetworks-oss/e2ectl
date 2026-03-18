@@ -212,6 +212,7 @@ function createSshKeyClientStub() {
 
   const stub: SshKeyClient = {
     createSshKey,
+    deleteSshKey: vi.fn(),
     listSshKeys
   };
 
@@ -244,7 +245,9 @@ function createVolumeClientStub() {
   const stub: VolumeClient = {
     attachVolumeToNode,
     createVolume,
+    deleteVolume: vi.fn(),
     detachVolumeFromNode,
+    getVolume: vi.fn(),
     listVolumePlans,
     listVolumes
   };
@@ -283,7 +286,9 @@ function createVpcClientStub() {
   const stub: VpcClient = {
     attachNodeVpc,
     createVpc,
+    deleteVpc: vi.fn(),
     detachNodeVpc,
+    getVpc: vi.fn(),
     listVpcPlans,
     listVpcs
   };

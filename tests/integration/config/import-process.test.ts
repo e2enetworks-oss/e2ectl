@@ -169,4 +169,47 @@ describe('config import process flow', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('surfaces alias-specific invalid credential errors during import', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/iam/multi-crn/': () => ({
+        status: 401,
+        body: {
+          detail: 'Authentication credentials were not provided.'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      const importFilePath = await tempHome.writeImportFile('invalid.json', {
+        prod: {
+          api_auth_token: 'auth-token-5678',
+          api_key: 'api-key-1234'
+        }
+      });
+
+      const result = await runBuiltCli(
+        ['config', 'import', '--file', importFilePath, '--no-input'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(3);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(
+        'Error: Imported credentials for alias "prod" are invalid.\n\nDetails:\n- MyAccount API request failed: Authentication credentials were not provided.\n\nNext step: Verify the API key and auth token for that alias, then re-import the credentials.\n'
+      );
+      await expect(tempHome.readConfig()).resolves.toEqual({
+        profiles: {}
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

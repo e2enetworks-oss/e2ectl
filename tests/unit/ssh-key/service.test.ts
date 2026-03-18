@@ -21,6 +21,7 @@ function createConfig(): ConfigFile {
 
 function createServiceFixture(): {
   createSshKey: ReturnType<typeof vi.fn>;
+  deleteSshKey: ReturnType<typeof vi.fn>;
   listSshKeys: ReturnType<typeof vi.fn>;
   readPublicKeyFile: ReturnType<typeof vi.fn>;
   readPublicKeyFromStdin: ReturnType<typeof vi.fn>;
@@ -28,6 +29,7 @@ function createServiceFixture(): {
   service: SshKeyService;
 } {
   const createSshKey = vi.fn();
+  const deleteSshKey = vi.fn();
   const listSshKeys = vi.fn();
   const readPublicKeyFile = vi.fn();
   const readPublicKeyFromStdin = vi.fn();
@@ -35,13 +37,16 @@ function createServiceFixture(): {
 
   const client: SshKeyClient = {
     createSshKey,
+    deleteSshKey,
     listSshKeys
   };
   const service = new SshKeyService({
+    confirm: vi.fn(() => Promise.resolve(true)),
     createSshKeyClient: vi.fn((resolvedCredentials: ResolvedCredentials) => {
       credentials = resolvedCredentials;
       return client;
     }),
+    isInteractive: true,
     readPublicKeyFile,
     readPublicKeyFromStdin,
     store: {
@@ -52,6 +57,7 @@ function createServiceFixture(): {
 
   return {
     createSshKey,
+    deleteSshKey,
     listSshKeys,
     readPublicKeyFile,
     readPublicKeyFromStdin,
@@ -100,6 +106,38 @@ describe('SshKeyService', () => {
         label: 'demo',
         project_id: '46429',
         project_name: null,
+        public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop',
+        type: 'ED25519'
+      }
+    });
+  });
+
+  it('gets one SSH key by filtering the saved list', async () => {
+    const { listSshKeys, service } = createServiceFixture();
+
+    listSshKeys.mockResolvedValue([
+      {
+        label: 'demo',
+        pk: 15398,
+        project_name: 'default-project',
+        ssh_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop',
+        ssh_key_type: 'ED25519',
+        timestamp: '19-Feb-2025',
+        total_attached_nodes: 2
+      }
+    ]);
+
+    const result = await service.getSshKey('15398', { alias: 'prod' });
+
+    expect(result).toEqual({
+      action: 'get',
+      item: {
+        attached_nodes: 2,
+        created_at: '19-Feb-2025',
+        id: 15398,
+        label: 'demo',
+        project_id: null,
+        project_name: 'default-project',
         public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop',
         type: 'ED25519'
       }
@@ -194,6 +232,27 @@ describe('SshKeyService', () => {
           type: 'ED25519'
         }
       ]
+    });
+  });
+
+  it('deletes one SSH key with an explicit force flag', async () => {
+    const { deleteSshKey, service } = createServiceFixture();
+
+    deleteSshKey.mockResolvedValue({
+      message: 'SSH Key has been deleted successfully.'
+    });
+
+    const result = await service.deleteSshKey('15398', {
+      alias: 'prod',
+      force: true
+    });
+
+    expect(deleteSshKey).toHaveBeenCalledWith(15398);
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      id: 15398,
+      message: 'SSH Key has been deleted successfully.'
     });
   });
 });

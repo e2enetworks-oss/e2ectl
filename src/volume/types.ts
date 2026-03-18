@@ -15,12 +15,16 @@ export interface VolumeApiDrData {
 export interface VolumeSummary {
   block_id: number;
   dr_data?: VolumeApiDrData;
+  is_block_storage_exporting_to_eos?: boolean;
   name: string;
   size: number;
   size_string?: string;
+  snapshot_exist?: boolean;
   status: string;
   vm_detail?: VolumeApiAttachment;
 }
+
+export type VolumeDetails = VolumeSummary;
 
 export interface VolumeListResult {
   items: VolumeSummary[];

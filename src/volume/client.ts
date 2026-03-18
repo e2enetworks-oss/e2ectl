@@ -7,6 +7,7 @@ import type {
 import type {
   VolumeCreateRequest,
   VolumeCreateResult,
+  VolumeDetails,
   VolumeListResult,
   VolumeNodeActionRequest,
   VolumeNodeActionResult,
@@ -28,10 +29,12 @@ export interface VolumeClient {
     body: VolumeNodeActionRequest
   ): Promise<VolumeNodeActionResult>;
   createVolume(body: VolumeCreateRequest): Promise<VolumeCreateResult>;
+  deleteVolume(volumeId: number): Promise<{ message: string }>;
   detachVolumeFromNode(
     volumeId: number,
     body: VolumeNodeActionRequest
   ): Promise<VolumeNodeActionResult>;
+  getVolume(volumeId: number): Promise<VolumeDetails>;
   listVolumePlans(): Promise<VolumePlan[]>;
   listVolumes(pageNumber: number, perPage: number): Promise<VolumeListResult>;
 }
@@ -68,6 +71,16 @@ export class VolumeApiClient implements VolumeClient {
     return response.data;
   }
 
+  async deleteVolume(volumeId: number): Promise<{ message: string }> {
+    const response = await this.transport.delete<
+      ApiEnvelope<Record<string, unknown>>
+    >(`/block_storage/${volumeId}/`);
+
+    return {
+      message: response.message
+    };
+  }
+
   async detachVolumeFromNode(
     volumeId: number,
     body: VolumeNodeActionRequest
@@ -84,6 +97,14 @@ export class VolumeApiClient implements VolumeClient {
       message: response.message,
       ...response.data
     };
+  }
+
+  async getVolume(volumeId: number): Promise<VolumeDetails> {
+    const response = await this.transport.get<ApiEnvelope<VolumeDetails>>(
+      `/block_storage/${volumeId}/`
+    );
+
+    return response.data;
   }
 
   async listVolumePlans(): Promise<VolumePlan[]> {

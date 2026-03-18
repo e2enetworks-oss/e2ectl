@@ -21,7 +21,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "node ./scripts/clean.mjs dist .tmp && tsc -p tsconfig.build.json",

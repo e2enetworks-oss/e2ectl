@@ -91,6 +91,25 @@ describe('SshKeyApiClient', () => {
     });
     expect(result.project_id).toBe('46429');
   });
+
+  it('deletes SSH keys through the API v1 delete path', async () => {
+    const transport = new StubTransport();
+    const client = new SshKeyApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope({}, { message: 'SSH Key has been deleted successfully.' })
+    );
+
+    const result = await client.deleteSshKey(15398);
+
+    expect(transport.deleteMock).toHaveBeenCalledWith(
+      '/delete_ssh_key/15398/',
+      undefined
+    );
+    expect(result).toEqual({
+      message: 'SSH Key has been deleted successfully.'
+    });
+  });
 });
 
 function envelope<TData>(
