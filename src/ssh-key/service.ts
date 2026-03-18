@@ -1,5 +1,5 @@
 import {
-  resolveCredentials,
+  resolveStoredCredentials,
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
@@ -30,6 +30,10 @@ export interface SshKeyCreateOptions extends SshKeyContextOptions {
   publicKeyFile: string;
 }
 
+export interface SshKeyDeleteOptions extends SshKeyContextOptions {
+  force?: boolean;
+}
+
 export interface SshKeyItem {
   attached_nodes: number;
   created_at: string;
@@ -51,8 +55,22 @@ export interface SshKeyCreateCommandResult {
   item: SshKeyItem;
 }
 
+export interface SshKeyDeleteCommandResult {
+  action: 'delete';
+  cancelled: boolean;
+  id: number;
+  message?: string;
+}
+
+export interface SshKeyGetCommandResult {
+  action: 'get';
+  item: SshKeyItem;
+}
+
 export type SshKeyCommandResult =
   | SshKeyCreateCommandResult
+  | SshKeyDeleteCommandResult
+  | SshKeyGetCommandResult
   | SshKeyListCommandResult;
 
 interface SshKeyStore {
@@ -61,7 +79,9 @@ interface SshKeyStore {
 }
 
 export interface SshKeyServiceDependencies {
+  confirm(message: string): Promise<boolean>;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
+  isInteractive: boolean;
   readPublicKeyFile(path: string): Promise<string>;
   readPublicKeyFromStdin(): Promise<string>;
   store: SshKeyStore;
@@ -92,6 +112,62 @@ export class SshKeyService {
     };
   }
 
+  async deleteSshKey(
+    sshKeyId: string,
+    options: SshKeyDeleteOptions
+  ): Promise<SshKeyDeleteCommandResult> {
+    const normalizedSshKeyId = normalizeSshKeyId(sshKeyId);
+
+    if (!(options.force ?? false)) {
+      assertCanDelete(this.dependencies.isInteractive, 'SSH key');
+      const confirmed = await this.dependencies.confirm(
+        `Delete SSH key ${normalizedSshKeyId}? This cannot be undone.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'delete',
+          cancelled: true,
+          id: normalizedSshKeyId
+        };
+      }
+    }
+
+    const client = await this.createClient(options);
+    const result = await client.deleteSshKey(normalizedSshKeyId);
+
+    return {
+      action: 'delete',
+      cancelled: false,
+      id: normalizedSshKeyId,
+      message: result.message
+    };
+  }
+
+  async getSshKey(
+    sshKeyId: string,
+    options: SshKeyContextOptions
+  ): Promise<SshKeyGetCommandResult> {
+    const normalizedSshKeyId = normalizeSshKeyId(sshKeyId);
+    const client = await this.createClient(options);
+    const item = (await client.listSshKeys()).find(
+      (candidate) => candidate.pk === normalizedSshKeyId
+    );
+
+    if (item === undefined) {
+      throw new CliError(`SSH key ${normalizedSshKeyId} was not found.`, {
+        code: 'SSH_KEY_NOT_FOUND',
+        exitCode: EXIT_CODES.network,
+        suggestion: `Run ${formatCliCommand('ssh-key list')} to inspect the available saved SSH keys.`
+      });
+    }
+
+    return {
+      action: 'get',
+      item: normalizeSshKeyItem(item)
+    };
+  }
+
   async listSshKeys(
     options: SshKeyContextOptions
   ): Promise<SshKeyListCommandResult> {
@@ -108,22 +184,10 @@ export class SshKeyService {
   private async createClient(
     options: SshKeyContextOptions
   ): Promise<SshKeyClient> {
-    const config = await this.dependencies.store.read();
-    const credentials = resolveCredentials({
-      ...(options.alias === undefined ? {} : { alias: options.alias }),
-      config,
-      configPath: this.dependencies.store.configPath,
-      ...(options.projectId === undefined
-        ? {}
-        : {
-            projectId: options.projectId
-          }),
-      ...(options.location === undefined
-        ? {}
-        : {
-            location: options.location
-          })
-    });
+    const credentials = await resolveStoredCredentials(
+      this.dependencies.store,
+      options
+    );
 
     return this.dependencies.createSshKeyClient(credentials);
   }
@@ -215,4 +279,31 @@ function normalizeRequiredString(
     exitCode: EXIT_CODES.usage,
     suggestion: `Pass a non-empty value with ${flag}.`
   });
+}
+
+function assertCanDelete(isInteractive: boolean, resourceName: string): void {
+  if (isInteractive) {
+    return;
+  }
+
+  throw new CliError(
+    `Deleting a ${resourceName} requires confirmation in an interactive terminal.`,
+    {
+      code: 'CONFIRMATION_REQUIRED',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Re-run the command with --force to skip the prompt.'
+    }
+  );
+}
+
+function normalizeSshKeyId(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new CliError('SSH key ID must be numeric.', {
+      code: 'INVALID_SSH_KEY_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass the numeric SSH key id as the first argument.'
+    });
+  }
+
+  return Number(value);
 }

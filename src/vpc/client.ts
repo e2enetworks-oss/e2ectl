@@ -7,6 +7,7 @@ import type {
 import type {
   VpcCreateRequest,
   VpcCreateResult,
+  VpcDeleteResult,
   VpcListResult,
   VpcNodeActionRequest,
   VpcNodeActionResult,
@@ -25,7 +26,11 @@ type VpcListApiResponse = ApiResponse<
 export interface VpcClient {
   attachNodeVpc(body: VpcNodeActionRequest): Promise<VpcNodeActionResult>;
   createVpc(body: VpcCreateRequest): Promise<VpcCreateResult>;
+  deleteVpc(
+    vpcId: number
+  ): Promise<{ message: string; result: VpcDeleteResult }>;
   detachNodeVpc(body: VpcNodeActionRequest): Promise<VpcNodeActionResult>;
+  getVpc(vpcId: number): Promise<VpcSummary>;
   listVpcPlans(): Promise<VpcPlan[]>;
   listVpcs(pageNumber: number, perPage: number): Promise<VpcListResult>;
 }
@@ -59,6 +64,19 @@ export class VpcApiClient implements VpcClient {
     return response.data;
   }
 
+  async deleteVpc(
+    vpcId: number
+  ): Promise<{ message: string; result: VpcDeleteResult }> {
+    const response = await this.transport.delete<ApiEnvelope<VpcDeleteResult>>(
+      `/vpc/${vpcId}/`
+    );
+
+    return {
+      message: response.message,
+      result: response.data
+    };
+  }
+
   async detachNodeVpc(
     body: VpcNodeActionRequest
   ): Promise<VpcNodeActionResult> {
@@ -72,6 +90,14 @@ export class VpcApiClient implements VpcClient {
       message: response.message,
       ...response.data
     };
+  }
+
+  async getVpc(vpcId: number): Promise<VpcSummary> {
+    const response = await this.transport.get<ApiEnvelope<VpcSummary>>(
+      `/vpc/${vpcId}/`
+    );
+
+    return response.data;
   }
 
   async listVpcPlans(): Promise<VpcPlan[]> {

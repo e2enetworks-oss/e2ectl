@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -47,7 +47,7 @@ jobs:
       - name: Verify release artefacts
         run: |
           make lint
-          make test
+          npm run coverage:unit
           make build
 
       - name: Decide npm dist-tag

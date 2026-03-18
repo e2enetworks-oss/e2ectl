@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isNonEmptyString } from '../core/guards.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 
@@ -204,10 +205,6 @@ function firstProfileAlias(
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
-}
-
-function isNonEmptyString(value: string | undefined): value is string {
-  return value !== undefined && value.trim().length > 0;
 }
 
 async function assertSecureConfigFilePermissions(

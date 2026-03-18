@@ -5,6 +5,7 @@ export type {
   VolumeCommittedPlan,
   VolumeCreateRequest,
   VolumeCreateResult,
+  VolumeDetails,
   VolumeListResult,
   VolumeNodeActionRequest,
   VolumeNodeActionResult,

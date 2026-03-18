@@ -46,17 +46,22 @@ Before promoting `develop` to `main`, complete the promotion gate owned by [docs
 
 ```bash
 make lint
-make test
+npm run coverage:unit
 make build
 npm run test:integration
 npm pack --dry-run
 ```
 
-The publish workflow reruns release-time verification on the tagged commit:
+Operational notes:
+
+- Public runtime support starts at Node.js 24.
+- `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI and release-time verification.
+
+The publish workflow reruns release-time verification on the tagged commit with Node.js 24:
 
 ```bash
 make lint
-make test
+npm run coverage:unit
 make build
 npm pack --dry-run
 ```

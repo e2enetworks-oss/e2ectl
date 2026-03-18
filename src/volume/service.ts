@@ -1,5 +1,5 @@
 import {
-  resolveCredentials,
+  resolveStoredCredentials,
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
@@ -39,6 +39,10 @@ export interface VolumeCreateOptions extends VolumeContextOptions {
   size: string;
 }
 
+export interface VolumeDeleteOptions extends VolumeContextOptions {
+  force?: boolean;
+}
+
 export interface VolumeAttachmentItem {
   node_id: number | null;
   vm_id: number | null;
@@ -53,6 +57,11 @@ export interface VolumeListItem {
   size_gb: number | null;
   size_label: string | null;
   status: string;
+}
+
+export interface VolumeDetailItem extends VolumeListItem {
+  exporting_to_eos: boolean;
+  snapshot_exists: boolean;
 }
 
 export interface VolumeCommittedPlanItem {
@@ -113,8 +122,22 @@ export interface VolumeCreateCommandResult {
   };
 }
 
+export interface VolumeDeleteCommandResult {
+  action: 'delete';
+  cancelled: boolean;
+  message?: string;
+  volume_id: number;
+}
+
+export interface VolumeGetCommandResult {
+  action: 'get';
+  volume: VolumeDetailItem;
+}
+
 export type VolumeCommandResult =
   | VolumeCreateCommandResult
+  | VolumeDeleteCommandResult
+  | VolumeGetCommandResult
   | VolumeListCommandResult
   | VolumePlansCommandResult;
 
@@ -124,7 +147,9 @@ interface VolumeStore {
 }
 
 export interface VolumeServiceDependencies {
+  confirm(message: string): Promise<boolean>;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
+  isInteractive: boolean;
   store: VolumeStore;
 }
 
@@ -272,6 +297,53 @@ export class VolumeService {
     };
   }
 
+  async deleteVolume(
+    volumeId: string,
+    options: VolumeDeleteOptions
+  ): Promise<VolumeDeleteCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+
+    if (!(options.force ?? false)) {
+      assertCanDelete(this.dependencies.isInteractive, 'volume');
+      const confirmed = await this.dependencies.confirm(
+        `Delete volume ${normalizedVolumeId}? This cannot be undone.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'delete',
+          cancelled: true,
+          volume_id: normalizedVolumeId
+        };
+      }
+    }
+
+    const client = await this.createClient(options);
+    const result = await client.deleteVolume(normalizedVolumeId);
+
+    return {
+      action: 'delete',
+      cancelled: false,
+      message: result.message,
+      volume_id: normalizedVolumeId
+    };
+  }
+
+  async getVolume(
+    volumeId: string,
+    options: VolumeContextOptions
+  ): Promise<VolumeGetCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const client = await this.createClient(options);
+
+    return {
+      action: 'get',
+      volume: normalizeVolumeDetailItem(
+        await client.getVolume(normalizedVolumeId)
+      )
+    };
+  }
+
   async listVolumePlans(
     options: VolumePlansOptions
   ): Promise<VolumePlansCommandResult> {
@@ -360,22 +432,10 @@ export class VolumeService {
   private async createClient(
     options: VolumeContextOptions
   ): Promise<VolumeClient> {
-    const config = await this.dependencies.store.read();
-    const credentials = resolveCredentials({
-      ...(options.alias === undefined ? {} : { alias: options.alias }),
-      config,
-      configPath: this.dependencies.store.configPath,
-      ...(options.projectId === undefined
-        ? {}
-        : {
-            projectId: options.projectId
-          }),
-      ...(options.location === undefined
-        ? {}
-        : {
-            location: options.location
-          })
-    });
+    const credentials = await resolveStoredCredentials(
+      this.dependencies.store,
+      options
+    );
 
     return this.dependencies.createVolumeClient(credentials);
   }
@@ -426,6 +486,14 @@ function normalizeVolumeListItem(item: VolumeSummary): VolumeListItem {
     size_gb: parseSizeLabelToGb(sizeLabel),
     size_label: sizeLabel,
     status: item.status
+  };
+}
+
+function normalizeVolumeDetailItem(item: VolumeSummary): VolumeDetailItem {
+  return {
+    ...normalizeVolumeListItem(item),
+    exporting_to_eos: item.is_block_storage_exporting_to_eos ?? false,
+    snapshot_exists: item.snapshot_exist ?? false
   };
 }
 
@@ -802,6 +870,33 @@ function normalizeRequiredString(
     exitCode: EXIT_CODES.usage,
     suggestion: `Pass a non-empty value with ${flag}.`
   });
+}
+
+function assertCanDelete(isInteractive: boolean, resourceName: string): void {
+  if (isInteractive) {
+    return;
+  }
+
+  throw new CliError(
+    `Deleting a ${resourceName} requires confirmation in an interactive terminal.`,
+    {
+      code: 'CONFIRMATION_REQUIRED',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Re-run the command with --force to skip the prompt.'
+    }
+  );
+}
+
+function assertVolumeId(volumeId: string): number {
+  if (!/^\d+$/.test(volumeId)) {
+    throw new CliError('Volume ID must be numeric.', {
+      code: 'INVALID_VOLUME_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass the numeric volume id as the first argument.'
+    });
+  }
+
+  return Number(volumeId);
 }
 
 function parseSizeLabelToGb(sizeLabel: string | null): number | null {

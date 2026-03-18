@@ -20,6 +20,28 @@ function createVpcClientStub() {
       vpc_name: 'prod-vpc'
     })
   );
+  const deleteVpc = vi.fn(() =>
+    Promise.resolve({
+      message: 'Delete Vpc Initiated Successfully',
+      result: {
+        project_id: '12345',
+        vpc_id: 27835,
+        vpc_name: 'prod-vpc'
+      }
+    })
+  );
+  const getVpc = vi.fn(() =>
+    Promise.resolve({
+      created_at: '2026-03-13T08:00:00Z',
+      ipv4_cidr: '10.20.0.0/23',
+      is_e2e_vpc: true,
+      name: 'prod-vpc',
+      network_id: 27835,
+      state: 'Active',
+      subnets: [],
+      vm_count: 2
+    })
+  );
   const listVpcPlans = vi.fn(() =>
     Promise.resolve([
       {
@@ -61,13 +83,17 @@ function createVpcClientStub() {
   const stub: VpcClient = {
     attachNodeVpc: vi.fn(),
     createVpc,
+    deleteVpc,
     detachNodeVpc: vi.fn(),
+    getVpc,
     listVpcPlans,
     listVpcs
   };
 
   return {
     createVpc,
+    deleteVpc,
+    getVpc,
     listVpcPlans,
     listVpcs,
     stub
@@ -243,6 +269,76 @@ describe('vpc commands', () => {
           network_id: 27835,
           project_id: '12345',
           vpc_id: 3956
+        }
+      })}\n`
+    );
+  });
+
+  it('gets one VPC in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'vpc',
+      'get',
+      '27835',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stub.getVpc).toHaveBeenCalledWith(27835);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'get',
+        vpc: {
+          attached_vm_count: 2,
+          cidr: '10.20.0.0/23',
+          cidr_source: 'e2e',
+          created_at: '2026-03-13T08:00:00Z',
+          gateway_ip: null,
+          location: null,
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_name: null,
+          state: 'Active',
+          subnet_count: 0,
+          subnets: []
+        }
+      })}\n`
+    );
+  });
+
+  it('deletes one VPC in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'vpc',
+      'delete',
+      '27835',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stub.deleteVpc).toHaveBeenCalledWith(27835);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: 'Delete Vpc Initiated Successfully',
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '12345'
         }
       })}\n`
     );

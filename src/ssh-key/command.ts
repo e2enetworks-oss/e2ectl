@@ -2,12 +2,14 @@ import { readFile } from 'node:fs/promises';
 
 import { Command } from 'commander';
 
+import { addContextOptions } from '../app/context-options.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderSshKeyResult } from './formatter.js';
 import {
   SshKeyService,
   type SshKeyContextOptions,
-  type SshKeyCreateOptions
+  type SshKeyCreateOptions,
+  type SshKeyDeleteOptions
 } from './service.js';
 
 interface GlobalOptions {
@@ -16,8 +18,10 @@ interface GlobalOptions {
 
 export function buildSshKeyCommand(runtime: CliRuntime): Command {
   const service = new SshKeyService({
+    confirm: (message) => runtime.confirm(message),
     createSshKeyClient: (credentials) =>
       runtime.createSshKeyClient(credentials),
+    isInteractive: runtime.isInteractive,
     readPublicKeyFile: async (path) => await readFile(path, 'utf8'),
     readPublicKeyFromStdin: readAllFromStdin,
     store: runtime.store
@@ -28,50 +32,81 @@ export function buildSshKeyCommand(runtime: CliRuntime): Command {
 
   command.helpCommand('help [command]', 'Show help for an ssh-key command');
 
-  command
-    .command('list')
-    .description(
-      'List SSH keys for the selected profile or environment credentials.'
-    )
-    .option('--alias <alias>', 'Saved profile alias to use for this command.')
-    .option(
-      '--project-id <projectId>',
-      'Override the project id for this command.'
-    )
-    .option('--location <location>', 'Override the location for this command.')
-    .action(async (options: SshKeyContextOptions, commandInstance: Command) => {
-      const result = await service.listSshKeys(options);
-      runtime.stdout.write(
-        renderSshKeyResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    });
+  addContextOptions(
+    command
+      .command('list')
+      .description(
+        'List SSH keys for the selected profile or environment credentials.'
+      )
+  ).action(async (options: SshKeyContextOptions, commandInstance: Command) => {
+    const result = await service.listSshKeys(options);
+    runtime.stdout.write(
+      renderSshKeyResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  });
 
-  command
-    .command('create')
-    .description('Create an SSH key from a public key file or stdin.')
-    .requiredOption('--label <label>', 'Label for the SSH key.')
-    .requiredOption(
-      '--public-key-file <path>',
-      'Path to the public key file, or - to read from stdin.'
-    )
-    .option('--alias <alias>', 'Saved profile alias to use for this command.')
-    .option(
-      '--project-id <projectId>',
-      'Override the project id for this command.'
-    )
-    .option('--location <location>', 'Override the location for this command.')
-    .action(async (options: SshKeyCreateOptions, commandInstance: Command) => {
-      const result = await service.createSshKey(options);
+  addContextOptions(
+    command
+      .command('create')
+      .description('Create an SSH key from a public key file or stdin.')
+      .requiredOption('--label <label>', 'Label for the SSH key.')
+      .requiredOption(
+        '--public-key-file <path>',
+        'Path to the public key file, or - to read from stdin.'
+      )
+  ).action(async (options: SshKeyCreateOptions, commandInstance: Command) => {
+    const result = await service.createSshKey(options);
+    runtime.stdout.write(
+      renderSshKeyResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  });
+
+  addContextOptions(
+    command
+      .command('get <sshKeyId>')
+      .description('Get details for a saved SSH key.')
+  ).action(
+    async (
+      sshKeyId: string,
+      options: SshKeyContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getSshKey(sshKeyId, options);
       runtime.stdout.write(
         renderSshKeyResult(
           result,
           commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
         )
       );
-    });
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('delete <sshKeyId>')
+      .description('Delete a saved SSH key.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      sshKeyId: string,
+      options: SshKeyDeleteOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.deleteSshKey(sshKeyId, options);
+      runtime.stdout.write(
+        renderSshKeyResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   command.action(() => {
     command.outputHelp();

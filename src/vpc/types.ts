@@ -64,6 +64,12 @@ export interface VpcCreateResult {
   vpc_name: string;
 }
 
+export interface VpcDeleteResult {
+  project_id?: string | null;
+  vpc_id: number;
+  vpc_name: string;
+}
+
 export interface VpcNodeActionRequest {
   action: 'attach' | 'detach';
   input_ip?: string;

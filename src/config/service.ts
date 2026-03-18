@@ -69,7 +69,10 @@ export type ConfigCommandResult =
   | ConfigSetDefaultCommandResult;
 
 interface ProfileValidator {
-  validate(profile: ProfileConfig): Promise<unknown>;
+  validate(profile: ProfileConfig): Promise<{
+    message?: string;
+    valid: boolean;
+  }>;
 }
 
 interface ConfigStoreLike {
@@ -141,9 +144,27 @@ export class ConfigService {
     }
 
     for (const alias of importedAliases) {
-      await this.dependencies.credentialValidator.validate(
+      const validation = await this.dependencies.credentialValidator.validate(
         getProfile(importedProfiles, alias)
       );
+
+      if (!validation.valid) {
+        const details: string[] = [];
+        if (validation.message !== undefined) {
+          details.push(validation.message);
+        }
+
+        throw new CliError(
+          `Imported credentials for alias "${alias}" are invalid.`,
+          {
+            code: 'INVALID_IMPORTED_CREDENTIALS',
+            details,
+            exitCode: EXIT_CODES.auth,
+            suggestion:
+              'Verify the API key and auth token for that alias, then re-import the credentials.'
+          }
+        );
+      }
     }
 
     const importedDefaults = await this.resolveImportedDefaults(

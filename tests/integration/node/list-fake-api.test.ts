@@ -119,15 +119,18 @@ describe('node list against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(3);
       expect(result.stdout).toBe('');
-      expect(result.stderr).toBe(
-        'Error: MyAccount API request failed: Authentication credentials were not provided.\n' +
-          '\n' +
-          'Details:\n' +
-          '- HTTP status: 403 Forbidden\n' +
-          '- Path: /nodes/\n' +
-          '- Detail: Authentication credentials were not provided.\n' +
-          '\n' +
-          'Next step: Verify the saved token and API key, then run the command again.\n'
+      expect(result.stderr).toContain(
+        'Error: MyAccount API request failed: Authentication credentials were not provided.\n'
+      );
+      expect(result.stderr).toContain('- HTTP status: 403 Forbidden\n');
+      expect(result.stderr).toContain('- Path: /nodes/\n');
+      expect(result.stderr).toContain('- Request URL: http://127.0.0.1:');
+      expect(result.stderr).toContain('apikey=%5BREDACTED%5D');
+      expect(result.stderr).toContain(
+        '- Detail: Authentication credentials were not provided.\n'
+      );
+      expect(result.stderr).toContain(
+        'Next step: Verify the saved token and API key, then run the command again.\n'
       );
     } finally {
       await server.close();

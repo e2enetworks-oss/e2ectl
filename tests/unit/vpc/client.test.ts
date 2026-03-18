@@ -115,6 +115,26 @@ describe('VpcApiClient', () => {
     });
   });
 
+  it('gets VPCs through the VPC detail path', async () => {
+    const transport = new StubTransport();
+    const client = new VpcApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope({
+        ipv4_cidr: '10.20.0.0/23',
+        is_e2e_vpc: true,
+        name: 'prod-vpc',
+        network_id: 27835,
+        state: 'Active'
+      })
+    );
+
+    const result = await client.getVpc(27835);
+
+    expect(transport.getMock).toHaveBeenCalledWith('/vpc/27835/', undefined);
+    expect(result.network_id).toBe(27835);
+  });
+
   it('reads VPC plans from the discovery path', async () => {
     const transport = new StubTransport();
     const client = new VpcApiClient(transport);
@@ -207,6 +227,36 @@ describe('VpcApiClient', () => {
         action: 'detach',
         network_id: 23082,
         node_id: 101
+      }
+    });
+  });
+
+  it('deletes VPCs through the VPC detail path', async () => {
+    const transport = new StubTransport();
+    const client = new VpcApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope(
+        {
+          project_id: '46429',
+          vpc_id: 23082,
+          vpc_name: 'prod-vpc'
+        },
+        {
+          message: 'Delete Vpc Initiated Successfully'
+        }
+      )
+    );
+
+    const result = await client.deleteVpc(23082);
+
+    expect(transport.deleteMock).toHaveBeenCalledWith('/vpc/23082/', undefined);
+    expect(result).toEqual({
+      message: 'Delete Vpc Initiated Successfully',
+      result: {
+        project_id: '46429',
+        vpc_id: 23082,
+        vpc_name: 'prod-vpc'
       }
     });
   });

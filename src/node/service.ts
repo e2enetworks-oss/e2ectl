@@ -1,5 +1,5 @@
 import {
-  resolveCredentials,
+  resolveStoredCredentials,
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
@@ -639,23 +639,7 @@ export class NodeService {
   private async resolveContext(
     options: NodeContextOptions
   ): Promise<ResolvedCredentials> {
-    const config = await this.dependencies.store.read();
-
-    return resolveCredentials({
-      ...(options.alias === undefined ? {} : { alias: options.alias }),
-      config,
-      configPath: this.dependencies.store.configPath,
-      ...(options.projectId === undefined
-        ? {}
-        : {
-            projectId: options.projectId
-          }),
-      ...(options.location === undefined
-        ? {}
-        : {
-            location: options.location
-          })
-    });
+    return await resolveStoredCredentials(this.dependencies.store, options);
   }
 
   private async resolveNodeVmId(

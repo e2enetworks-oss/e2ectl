@@ -1,5 +1,7 @@
+import { isIPv4 } from 'node:net';
+
 import {
-  resolveCredentials,
+  resolveStoredCredentials,
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
@@ -32,6 +34,10 @@ export interface VpcCreateOptions extends VpcContextOptions {
   committedPlanId?: string;
   name: string;
   postCommitBehavior?: string;
+}
+
+export interface VpcDeleteOptions extends VpcContextOptions {
+  force?: boolean;
 }
 
 export interface VpcListItem {
@@ -112,8 +118,26 @@ export interface VpcCreateCommandResult {
   };
 }
 
+export interface VpcDeleteCommandResult {
+  action: 'delete';
+  cancelled: boolean;
+  message?: string;
+  vpc: {
+    id: number;
+    name: string | null;
+    project_id: string | null;
+  };
+}
+
+export interface VpcGetCommandResult {
+  action: 'get';
+  vpc: VpcListItem;
+}
+
 export type VpcCommandResult =
   | VpcCreateCommandResult
+  | VpcDeleteCommandResult
+  | VpcGetCommandResult
   | VpcListCommandResult
   | VpcPlansCommandResult;
 
@@ -123,7 +147,9 @@ interface VpcStore {
 }
 
 export interface VpcServiceDependencies {
+  confirm(message: string): Promise<boolean>;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
+  isInteractive: boolean;
   store: VpcStore;
 }
 
@@ -134,9 +160,9 @@ export class VpcService {
     const billingType = normalizeBillingType(options.billingType);
     const cidrSource = normalizeCidrSource(options.cidrSource);
     const name = normalizeRequiredString(options.name, 'Name', '--name');
-    const cidr = normalizeOptionalString(options.cidr);
+    const requestedCidr = normalizeOptionalString(options.cidr);
 
-    if (cidrSource === 'custom' && cidr === undefined) {
+    if (cidrSource === 'custom' && requestedCidr === undefined) {
       throw new CliError(
         'CIDR is required when --cidr-source custom is used.',
         {
@@ -148,7 +174,7 @@ export class VpcService {
       );
     }
 
-    if (cidrSource === 'e2e' && cidr !== undefined) {
+    if (cidrSource === 'e2e' && requestedCidr !== undefined) {
       throw new CliError('Do not pass --cidr when --cidr-source e2e is used.', {
         code: 'UNEXPECTED_CIDR',
         exitCode: EXIT_CODES.usage,
@@ -156,6 +182,11 @@ export class VpcService {
           'Remove --cidr, or switch to --cidr-source custom when you need to provide your own CIDR.'
       });
     }
+
+    const cidr =
+      cidrSource === 'custom' && requestedCidr !== undefined
+        ? normalizeCustomCidr(requestedCidr)
+        : requestedCidr;
 
     const committedPlanId = normalizeOptionalInteger(
       options.committedPlanId,
@@ -237,6 +268,59 @@ export class VpcService {
     };
   }
 
+  async deleteVpc(
+    vpcId: string,
+    options: VpcDeleteOptions
+  ): Promise<VpcDeleteCommandResult> {
+    const normalizedVpcId = assertVpcId(vpcId);
+
+    if (!(options.force ?? false)) {
+      assertCanDelete(this.dependencies.isInteractive, 'VPC');
+      const confirmed = await this.dependencies.confirm(
+        `Delete VPC ${normalizedVpcId}? This cannot be undone.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'delete',
+          cancelled: true,
+          vpc: {
+            id: normalizedVpcId,
+            name: null,
+            project_id: null
+          }
+        };
+      }
+    }
+
+    const client = await this.createClient(options);
+    const response = await client.deleteVpc(normalizedVpcId);
+
+    return {
+      action: 'delete',
+      cancelled: false,
+      message: response.message,
+      vpc: {
+        id: response.result.vpc_id,
+        name: response.result.vpc_name,
+        project_id: response.result.project_id ?? null
+      }
+    };
+  }
+
+  async getVpc(
+    vpcId: string,
+    options: VpcContextOptions
+  ): Promise<VpcGetCommandResult> {
+    const normalizedVpcId = assertVpcId(vpcId);
+    const client = await this.createClient(options);
+
+    return {
+      action: 'get',
+      vpc: normalizeVpcListItem(await client.getVpc(normalizedVpcId))
+    };
+  }
+
   async listVpcPlans(
     options: VpcContextOptions
   ): Promise<VpcPlansCommandResult> {
@@ -280,22 +364,10 @@ export class VpcService {
   }
 
   private async createClient(options: VpcContextOptions): Promise<VpcClient> {
-    const config = await this.dependencies.store.read();
-    const credentials = resolveCredentials({
-      ...(options.alias === undefined ? {} : { alias: options.alias }),
-      config,
-      configPath: this.dependencies.store.configPath,
-      ...(options.projectId === undefined
-        ? {}
-        : {
-            projectId: options.projectId
-          }),
-      ...(options.location === undefined
-        ? {}
-        : {
-            location: options.location
-          })
-    });
+    const credentials = await resolveStoredCredentials(
+      this.dependencies.store,
+      options
+    );
 
     return this.dependencies.createVpcClient(credentials);
   }
@@ -422,6 +494,38 @@ function normalizeCommittedVpcPlan(
   };
 }
 
+function normalizeCustomCidr(value: string): string {
+  const normalized = value.trim();
+  const [address, prefixText, ...rest] = normalized.split('/');
+
+  if (
+    address === undefined ||
+    prefixText === undefined ||
+    rest.length > 0 ||
+    !isIPv4(address)
+  ) {
+    throwInvalidCidr();
+  }
+
+  if (!/^\d+$/.test(prefixText)) {
+    throwInvalidCidr();
+  }
+
+  const prefix = Number(prefixText);
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
+    throwInvalidCidr();
+  }
+
+  const networkAddress = toIpv4String(
+    Math.floor(toIpv4Number(address) / 2 ** (32 - prefix)) * 2 ** (32 - prefix)
+  );
+  if (networkAddress !== address) {
+    throwInvalidCidr();
+  }
+
+  return `${address}/${prefix}`;
+}
+
 function normalizeBillingType(value: string): VpcBillingType {
   const normalized = value.trim().toLowerCase();
 
@@ -531,6 +635,54 @@ function normalizeRequiredString(
     exitCode: EXIT_CODES.usage,
     suggestion: `Pass a non-empty value with ${flag}.`
   });
+}
+
+function assertCanDelete(isInteractive: boolean, resourceName: string): void {
+  if (isInteractive) {
+    return;
+  }
+
+  throw new CliError(
+    `Deleting a ${resourceName} requires confirmation in an interactive terminal.`,
+    {
+      code: 'CONFIRMATION_REQUIRED',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Re-run the command with --force to skip the prompt.'
+    }
+  );
+}
+
+function assertVpcId(vpcId: string): number {
+  if (!/^\d+$/.test(vpcId)) {
+    throw new CliError('VPC ID must be numeric.', {
+      code: 'INVALID_VPC_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass the numeric VPC id as the first argument.'
+    });
+  }
+
+  return Number(vpcId);
+}
+
+function throwInvalidCidr(): never {
+  throw new CliError('CIDR must be a valid IPv4 CIDR block.', {
+    code: 'INVALID_CIDR',
+    exitCode: EXIT_CODES.usage,
+    suggestion: 'Pass a CIDR like 10.10.0.0/23 with a valid network address.'
+  });
+}
+
+function toIpv4Number(address: string): number {
+  return address
+    .split('.')
+    .map((part) => Number(part))
+    .reduce((value, octet) => value * 256 + octet, 0);
+}
+
+function toIpv4String(value: number): string {
+  return [24, 16, 8, 0]
+    .map((shift) => String(Math.floor(value / 2 ** shift) % 256))
+    .join('.');
 }
 
 function toBackendPostCommitBehavior(

@@ -4,6 +4,7 @@ export type {
   VpcCommittedPlan,
   VpcCreateRequest,
   VpcCreateResult,
+  VpcDeleteResult,
   VpcListResult,
   VpcNodeActionRequest,
   VpcNodeActionResult,

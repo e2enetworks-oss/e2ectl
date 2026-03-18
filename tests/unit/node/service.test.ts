@@ -130,6 +130,7 @@ function createServiceFixture(): {
   );
   const sshKeyClient: SshKeyClient = {
     createSshKey: vi.fn(),
+    deleteSshKey: vi.fn(),
     listSshKeys
   };
   const attachVolumeToNode = vi.fn(() =>
@@ -149,7 +150,9 @@ function createServiceFixture(): {
   const volumeClient: VolumeClient = {
     attachVolumeToNode,
     createVolume: vi.fn(),
+    deleteVolume: vi.fn(),
     detachVolumeFromNode,
+    getVolume: vi.fn(),
     listVolumePlans: vi.fn(),
     listVolumes: vi.fn()
   };
@@ -172,7 +175,9 @@ function createServiceFixture(): {
   const vpcClient: VpcClient = {
     attachNodeVpc,
     createVpc: vi.fn(),
+    deleteVpc: vi.fn(),
     detachNodeVpc,
+    getVpc: vi.fn(),
     listVpcPlans: vi.fn(),
     listVpcs: vi.fn()
   };

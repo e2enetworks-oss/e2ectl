@@ -13,6 +13,7 @@ import {
   VALID_LOCATIONS
 } from './types.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isNonEmptyString } from '../core/guards.js';
 
 export interface ResolveCredentialsOptions {
   alias?: string;
@@ -25,6 +26,11 @@ export interface ResolveCredentialsOptions {
 
 type PartialAuth = Partial<Record<AuthField, string>>;
 type PartialContext = Partial<Record<ContextField, string>>;
+
+export interface CredentialResolutionStore {
+  readonly configPath: string;
+  read(): Promise<ConfigFile>;
+}
 
 export function readAuthFromEnv(
   env: NodeJS.ProcessEnv = process.env
@@ -118,6 +124,19 @@ export function resolveCredentials(
     envContext,
     flagContext
   );
+}
+
+export async function resolveStoredCredentials(
+  store: CredentialResolutionStore,
+  options: Omit<ResolveCredentialsOptions, 'config' | 'configPath'>
+): Promise<ResolvedCredentials> {
+  const config = await store.read();
+
+  return resolveCredentials({
+    ...options,
+    config,
+    configPath: store.configPath
+  });
 }
 
 function buildResolvedCredentials(
@@ -409,8 +428,4 @@ function inferCredentialSource(
   }
 
   return 'env';
-}
-
-function isNonEmptyString(value: string | undefined): value is string {
-  return value !== undefined && value.trim().length > 0;
 }

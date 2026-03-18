@@ -1,12 +1,14 @@
 # e2ectl
 
+[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+
 Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
 Create and manage nodes, volumes, VPCs, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 24+
 - npm
 
 ## Install
@@ -101,6 +103,10 @@ e2ectl node delete <node-id>
 e2ectl volume plans
 e2ectl volume plans --size <size-gb>
 
+# Inspect or delete one volume
+e2ectl volume get <volume-id>
+e2ectl volume delete <volume-id>
+
 # Create with hourly billing
 e2ectl volume create \
   --name <volume-name> \
@@ -138,6 +144,8 @@ e2ectl vpc create \
   --cidr-source custom \
   --cidr <custom-cidr>
 
+e2ectl vpc get <vpc-id>
+e2ectl vpc delete <vpc-id>
 e2ectl vpc list
 ```
 
@@ -145,6 +153,8 @@ e2ectl vpc list
 
 ```bash
 e2ectl ssh-key list
+e2ectl ssh-key get <ssh-key-id>
+e2ectl ssh-key delete <ssh-key-id>
 
 # From file
 e2ectl ssh-key create \

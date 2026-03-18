@@ -18,7 +18,7 @@ A `develop` commit is ready for promotion only when the full gate is green:
 
 ```bash
 make lint
-make test
+npm run coverage:unit
 make build
 npm run test:integration
 npm pack --dry-run
@@ -26,34 +26,15 @@ npm pack --dry-run
 
 Operational notes:
 
-- Public runtime support starts at Node.js 20.
-- `make coverage` is optional and remains outside the default promotion gate.
+- Public runtime support starts at Node.js 24.
+- `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI.
+- `make coverage` remains optional when you also want the integration coverage report.
 - `npm run test:manual` is opt-in live verification and never a required CI lane.
 - If `npm pack --dry-run` fails locally because of npm cache permissions, rerun with `env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run`.
 
 ## CI Contract
 
-### Fast gate
-
-Runs on:
-
-- pull requests to `develop`
-- pull requests to `main`
-- merge queue checks for `main`
-
-Configuration:
-
-- Ubuntu runners
-- Node.js 20 and 22 matrix
-
-Steps:
-
-1. `npm ci`
-2. `make lint`
-3. `make test`
-4. `make build`
-
-### Integration gate
+### Verify gate
 
 Runs on:
 
@@ -65,18 +46,18 @@ Runs on:
 Configuration:
 
 - Ubuntu runners
-- Node.js 20 and 22 matrix
+- Node.js 24 only
 
 Steps:
 
 1. `npm ci`
 2. `make lint`
-3. `make test`
+3. `npm run coverage:unit`
 4. `make build`
 5. `npm run test:integration`
 6. `npm pack --dry-run`
 
-The integration lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
+The verify lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
 
 ## Release Readiness Checks
 
@@ -86,7 +67,7 @@ Before opening a promotion PR from `develop` to `main`, confirm:
 - docs are updated for any operator, contributor, CI, or release-flow changes
 - command examples still match the built CLI help surface
 - any changed `--json` output has been reviewed as a machine-facing contract
-- automated fake-API coverage still covers the affected create, list, catalog, and attachment flows
+- automated fake-API coverage still covers the affected create, list, get, delete, catalog, and attachment flows
 
 If a release needs additional confidence against live credentials, run the opt-in manual lane separately. Today that lane covers read-only node checks (`node catalog os`, `node catalog plans`, `node list`, and optional `node get`) only.
 
