@@ -3,11 +3,11 @@ name: publish
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Git tag to publish, for example v0.3.0"
+        description: 'Git tag to publish, for example v0.3.0'
         required: true
         type: string
 
@@ -42,7 +42,7 @@ jobs:
           node-version: 24
           cache: npm
           registry-url: https://npm.pkg.github.com
-          scope: "@e2enetworks-oss"
+          scope: '@e2enetworks-oss'
 
       - name: Validate release tag
         run: |

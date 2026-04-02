@@ -423,8 +423,14 @@ describe('VpcService.listVpcs — happy path', () => {
     expect(listVpcs).toHaveBeenNthCalledWith(1, 1, 100);
     expect(listVpcs).toHaveBeenNthCalledWith(2, 2, 100);
     expect(result.items).toHaveLength(2);
-    expect(result.items[0]).toMatchObject({ name: 'vpc-page1', network_id: 201 });
-    expect(result.items[1]).toMatchObject({ name: 'vpc-page2', network_id: 202 });
+    expect(result.items[0]).toMatchObject({
+      name: 'vpc-page1',
+      network_id: 201
+    });
+    expect(result.items[1]).toMatchObject({
+      name: 'vpc-page2',
+      network_id: 202
+    });
     expect(result.total_count).toBe(2);
     expect(result.total_page_number).toBe(2);
   });
@@ -554,7 +560,12 @@ describe('VpcService.listVpcs — concurrency', () => {
         total_page_number: 1
       });
 
-      return { expectedNetworkId: 500 + i, expectedName: `vpc-concurrent-${i}`, listVpcs, service };
+      return {
+        expectedNetworkId: 500 + i,
+        expectedName: `vpc-concurrent-${i}`,
+        listVpcs,
+        service
+      };
     });
 
     const results = await Promise.all(

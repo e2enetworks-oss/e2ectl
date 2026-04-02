@@ -776,9 +776,7 @@ describe('VolumeService.listVolumes — pagination', () => {
       total_page_number: 999
     });
 
-    await expect(
-      service.listVolumes({ alias: 'prod' })
-    ).rejects.toMatchObject({
+    await expect(service.listVolumes({ alias: 'prod' })).rejects.toMatchObject({
       code: 'PAGINATION_LIMIT_EXCEEDED'
     });
 

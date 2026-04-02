@@ -57,9 +57,9 @@ describe('normalizeRequiredString', () => {
   });
 
   it('throws EMPTY_REQUIRED_VALUE for a tab-only string', () => {
-    expect(() =>
-      normalizeRequiredString('\t', 'Label', '--flag')
-    ).toThrow(CliError);
+    expect(() => normalizeRequiredString('\t', 'Label', '--flag')).toThrow(
+      CliError
+    );
   });
 
   it('preserves internal whitespace within the value', () => {
@@ -95,9 +95,9 @@ describe('normalizeOptionalString', () => {
   });
 
   it('propagates errors from normalizeRequiredString for empty input', () => {
-    expect(() =>
-      normalizeOptionalString('', 'Label', '--flag')
-    ).toThrow(CliError);
+    expect(() => normalizeOptionalString('', 'Label', '--flag')).toThrow(
+      CliError
+    );
   });
 
   it('propagates errors from normalizeRequiredString for whitespace-only input', () => {
@@ -268,15 +268,13 @@ describe('normalizeOptionalNumericId', () => {
   });
 
   it('delegates to normalizeRequiredNumericId for a valid digit string', () => {
-    expect(
-      normalizeOptionalNumericId('101', 'Node ID', '--node-id')
-    ).toBe(101);
+    expect(normalizeOptionalNumericId('101', 'Node ID', '--node-id')).toBe(101);
   });
 
   it('propagates trimming from the delegate', () => {
-    expect(
-      normalizeOptionalNumericId('  55  ', 'Node ID', '--node-id')
-    ).toBe(55);
+    expect(normalizeOptionalNumericId('  55  ', 'Node ID', '--node-id')).toBe(
+      55
+    );
   });
 
   it('propagates INVALID_NUMERIC_ID for a non-numeric value', () => {
@@ -319,9 +317,9 @@ describe('normalizeBillingType', () => {
   type BillingType = (typeof allowed)[number];
 
   it('returns the value when it exactly matches an allowed value', () => {
-    expect(
-      normalizeBillingType<BillingType>('hourly', allowed, 'hourly')
-    ).toBe('hourly');
+    expect(normalizeBillingType<BillingType>('hourly', allowed, 'hourly')).toBe(
+      'hourly'
+    );
   });
 
   it('returns the value when it exactly matches another allowed value', () => {
@@ -331,9 +329,9 @@ describe('normalizeBillingType', () => {
   });
 
   it('is case-insensitive (uppercase input)', () => {
-    expect(
-      normalizeBillingType<BillingType>('HOURLY', allowed, 'hourly')
-    ).toBe('hourly');
+    expect(normalizeBillingType<BillingType>('HOURLY', allowed, 'hourly')).toBe(
+      'hourly'
+    );
   });
 
   it('is case-insensitive (mixed case input)', () => {
@@ -453,7 +451,9 @@ describe('concurrent invocation safety', () => {
 
   it('resolves mixed optional/required numeric calls without interference', async () => {
     const [r1, r2, r3] = await Promise.all([
-      Promise.resolve(normalizeOptionalNumericId(undefined, 'Node ID', '--node-id')),
+      Promise.resolve(
+        normalizeOptionalNumericId(undefined, 'Node ID', '--node-id')
+      ),
       Promise.resolve(normalizeOptionalNumericId('7', 'Node ID', '--node-id')),
       Promise.resolve(normalizeRequiredNumericId('13', 'Node ID', '--node-id'))
     ]);
@@ -493,18 +493,12 @@ describe('regression safety', () => {
   it('normalizeBillingType is deterministic across repeated calls', () => {
     const allowed = ['hourly', 'committed'] as const;
     for (let i = 0; i < 5; i++) {
-      expect(
-        normalizeBillingType('HOURLY', allowed, 'hourly')
-      ).toBe('hourly');
+      expect(normalizeBillingType('HOURLY', allowed, 'hourly')).toBe('hourly');
     }
   });
 
   it('normalizeOptionalNumericId returning null does not affect subsequent calls', () => {
-    const first = normalizeOptionalNumericId(
-      undefined,
-      'Node ID',
-      '--node-id'
-    );
+    const first = normalizeOptionalNumericId(undefined, 'Node ID', '--node-id');
     const second = normalizeOptionalNumericId('5', 'Node ID', '--node-id');
     expect(first).toBeNull();
     expect(second).toBe(5);
