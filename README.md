@@ -14,20 +14,8 @@ Create and manage nodes, volumes, VPCs, and SSH keys with saved profiles, per-al
 ## Install
 
 ```bash
-npm install -g @e2enetworks-oss/e2ectl --registry=https://npm.pkg.github.com
-e2ectl --help
-```
-
-Or configure the scope once in `~/.npmrc`:
-
-```
-@e2enetworks-oss:registry=https://npm.pkg.github.com
-```
-
-Then install normally:
-
-```bash
 npm install -g @e2enetworks-oss/e2ectl
+e2ectl --help
 ```
 
 For prerelease builds:
@@ -231,3 +219,4 @@ e2ectl ssh-key --help
 
 - [Contributing](./CONTRIBUTING.md) — development setup, conventions, releasing, and PR process
 - [Maintaining](./docs/MAINTAINING.md) — triage, review, and merge guidelines
+- [Releasing](./docs/RELEASING.md) — maintainer release runbook and npm publish setup

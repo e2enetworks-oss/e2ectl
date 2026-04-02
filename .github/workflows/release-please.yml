@@ -1,0 +1,95 @@
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Checkout tagged release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+
+      - name: Setup Node.js
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for trusted publishing
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: npm install -g npm@^11.5.1
+
+      - name: Validate release tag
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not look like a semantic version tag." >&2
+            exit 1
+          fi
+
+          if [[ "$RELEASE_TAG" != "v$RELEASE_VERSION" ]]; then
+            echo "::error::Release Please outputs disagree: tag '$RELEASE_TAG' vs version '$RELEASE_VERSION'." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: npm ci
+
+      - name: Verify release artefacts
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: |
+          make lint
+          npm run coverage:unit
+          make build
+          npm pack --dry-run
+
+      - name: Decide npm dist-tag
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        id: dist-tag
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $RELEASE_VERSION to npm dist-tag $(awk -F= '/^tag=/{print $2}' "$GITHUB_OUTPUT")." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish to npm
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: npm publish --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"

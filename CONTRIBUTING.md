@@ -2,7 +2,7 @@
 
 This document is for contributors changing the `e2ectl` codebase.
 
-If you are using the CLI, start with [README.md](./README.md). If you are maintaining CI or the promotion gate, use [docs/MAINTAINING.md](./docs/MAINTAINING.md).
+If you are using the CLI, start with [README.md](./README.md). If you are maintaining CI or the promotion gate, use [docs/MAINTAINING.md](./docs/MAINTAINING.md). If you are executing releases, use [docs/RELEASING.md](./docs/RELEASING.md).
 
 ## Requirements
 
@@ -136,92 +136,17 @@ Update docs by audience:
 - [README.md](./README.md) for operator-facing usage and onboarding
 - [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor workflow and architecture rules
 - [docs/MAINTAINING.md](./docs/MAINTAINING.md) for CI, branch, and readiness policy
+- [docs/RELEASING.md](./docs/RELEASING.md) for maintainer release mechanics
 
 Do not leave stale command examples behind after behavior changes.
 
-## Conventional Commits
+## Conventional Commits And Release Please
 
 - Use Conventional Commits such as `feat:`, `fix:`, and `chore:`.
 - Use `feat!:` or a `BREAKING CHANGE:` footer only for intentional breaking changes.
-
-## Releasing
-
-Releases are cut by a maintainer from `main`. No automation opens release PRs — the tag push is the trigger.
-
-### Flow
-
-```bash
-# 1. Add an entry under ## [x.y.z] in CHANGELOG.md
-# 2. Bump the version (updates package.json and commits)
-npm version patch   # or minor / major
-# 3. Push the commit and tag
-git push --follow-tags
-```
-
-After the tag lands, CI runs automatically:
-
-1. Builds `dist/`
-2. Publishes `@e2enetworks-oss/e2ectl` to GitHub Packages
-3. Creates a GitHub Release with the changelog section extracted from `CHANGELOG.md`
-
-### Dist-Tag Policy
-
-- Tags with a prerelease suffix (`v1.2.0-rc.1`) publish to dist-tag `next`
-- Stable tags (`v1.2.0`) publish to dist-tag `latest`
-
-### If Publish Needs a Rerun
-
-Use the `publish` workflow's manual dispatch input `release_tag` to rerun for an existing tag without pushing a new one.
-
-### Testing a Publish Without Merging
-
-You can smoke-test the full publish pipeline from a PR branch without touching `latest`.
-
-**Step 1 — push a pre-release tag from your branch**
-
-```bash
-# Replace x.y.z with the next planned version
-git tag vx.y.z-rc.1
-git push origin vx.y.z-rc.1
-```
-
-The `-rc.1` suffix makes `publish.yml` use dist-tag `next`, so the stable
-`npm install @e2enetworks-oss/e2ectl` is unaffected.
-
-**Step 2 — watch the workflow**
-
-Go to **Actions → publish** on GitHub and confirm the run completes green.
-
-**Step 3 — verify the package**
-
-```bash
-# Confirm the next dist-tag was updated
-npm view @e2enetworks-oss/e2ectl dist-tags
-# → { latest: '...', next: 'x.y.z-rc.1' }
-
-# Install and smoke-test
-npm install -g @e2enetworks-oss/e2ectl@next
-e2ectl --version
-```
-
-A pre-release GitHub Release is created automatically alongside the publish.
-
-**Step 4 — ship the stable release**
-
-Once the PR is merged and `main` is ready:
-
-```bash
-git tag vx.y.z
-git push origin vx.y.z
-```
-
-This publishes under `latest` and creates the stable GitHub Release.
-
-### After Publish
-
-- Verify the GitHub Release and tag exist
-- Verify the package resolves from GitHub Packages with the expected dist-tag
-- Verify the install path works: `npm install -g @e2enetworks-oss/e2ectl`
+- Release Please owns version bumps and [CHANGELOG.md](./CHANGELOG.md) on `main`.
+- Do not hand-edit `package.json` versions or changelog entries in normal feature work.
+- If release automation changes, update [docs/RELEASING.md](./docs/RELEASING.md) in the same PR.
 
 ## Pull Requests
 
