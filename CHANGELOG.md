@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-02
+
 ### Added
 
 - Config profile management for importing credentials, listing profiles, and setting default project and location context.

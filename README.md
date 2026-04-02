@@ -1,6 +1,6 @@
 # e2ectl
 
-[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/main/graph/badge.svg)](https://codecov.io/gh/e2enetworks-oss/e2ectl) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](https://github.com/e2enetworks-oss/e2ectl/tree/main/docs) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
@@ -14,14 +14,26 @@ Create and manage nodes, volumes, VPCs, and SSH keys with saved profiles, per-al
 ## Install
 
 ```bash
-npm install -g e2ectl
+npm install -g @e2enetworks-oss/e2ectl --registry=https://npm.pkg.github.com
 e2ectl --help
+```
+
+Or configure the scope once in `~/.npmrc`:
+
+```
+@e2enetworks-oss:registry=https://npm.pkg.github.com
+```
+
+Then install normally:
+
+```bash
+npm install -g @e2enetworks-oss/e2ectl
 ```
 
 For prerelease builds:
 
 ```bash
-npm install -g e2ectl@next
+npm install -g @e2enetworks-oss/e2ectl@next
 ```
 
 ## Quickstart
@@ -215,4 +227,8 @@ e2ectl vpc --help
 e2ectl ssh-key --help
 ```
 
-Contributor and maintainer docs live in [CONTRIBUTING.md](./CONTRIBUTING.md), [docs/MAINTAINING.md](./docs/MAINTAINING.md), and [docs/RELEASING.md](./docs/RELEASING.md).
+## Documentation
+
+- [Contributing](./CONTRIBUTING.md) — development setup, conventions, and PR process
+- [Maintaining](./docs/MAINTAINING.md) — triage, review, and merge guidelines
+- [Releasing](./docs/RELEASING.md) — how to cut a release and publish to GitHub Packages

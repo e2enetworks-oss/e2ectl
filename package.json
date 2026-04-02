@@ -1,7 +1,7 @@
 {
-  "name": "e2ectl",
-  "version": "0.1.0",
-  "description": "OSS CLI for E2E Networks MyAccount.",
+  "name": "@e2enetworks-oss/e2ectl",
+  "version": "0.2.0",
+  "description": "CLI for E2E Networks.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {
     "url": "https://github.com/e2enetworks-oss/e2ectl/issues"
@@ -18,7 +18,8 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
   },
   "engines": {
     "node": ">=24"

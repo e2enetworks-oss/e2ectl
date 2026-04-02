@@ -1,29 +1,34 @@
 name: publish
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Git tag to publish, for example v1.0.0-rc.1
+        description: "Git tag to publish, for example v0.3.0"
         required: true
         type: string
 
+# GITHUB_TOKEN is sufficient — no PAT required.
+# Trigger: push a tag from your local machine or CI:
+#   npm version patch   # bumps package.json + commits
+#   git push --follow-tags
 permissions:
-  contents: read
+  contents: write
+  packages: write
   id-token: write
 
 concurrency:
-  group: publish-${{ github.event.release.tag_name || inputs.release_tag }}
+  group: publish-${{ github.ref_name || inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
-  npm:
+  publish:
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Checkout tagged release
@@ -36,36 +41,49 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@^11.5.1
+          registry-url: https://npm.pkg.github.com
+          scope: "@e2enetworks-oss"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify release artefacts
-        run: |
-          make lint
-          npm run coverage:unit
-          make build
+      - name: Build
+        run: make build
 
       - name: Decide npm dist-tag
         id: dist-tag
         run: |
           VERSION="${RELEASE_TAG#v}"
-
           if [[ "$VERSION" == *-* ]]; then
             echo "tag=next" >> "$GITHUB_OUTPUT"
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
-
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing $VERSION to npm dist-tag $(cat "$GITHUB_OUTPUT" | awk -F= '/^tag=/{print $2}')." >> "$GITHUB_STEP_SUMMARY"
+          echo "Publishing $VERSION as dist-tag $(grep -oP '(?<=^tag=).*' "$GITHUB_OUTPUT" | tail -1)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          # Extract the block between ## [VERSION] and the next ## [
+          BODY=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          # Write to a temp file to safely pass multiline content
+          echo "$BODY" > /tmp/release-notes.md
+          echo "notes_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
 
       - name: Preview package contents
         run: npm pack --dry-run
 
-      - name: Publish to npm
+      - name: Publish to GitHub Packages
         run: npm publish --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          body_path: ${{ steps.changelog.outputs.notes_file }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
