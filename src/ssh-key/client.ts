@@ -2,6 +2,8 @@ import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
 
 import type { SshKeyCreateResult, SshKeySummary } from './types.js';
 
+const SSH_KEYS_PATH = '/ssh_keys/';
+
 export interface SshKeyClient {
   createSshKey(input: {
     label: string;
@@ -19,7 +21,7 @@ export class SshKeyApiClient implements SshKeyClient {
     ssh_key: string;
   }): Promise<SshKeyCreateResult> {
     const response = await this.transport.post<ApiEnvelope<SshKeyCreateResult>>(
-      '/ssh_keys/',
+      SSH_KEYS_PATH,
       {
         body: input
       }
@@ -31,17 +33,27 @@ export class SshKeyApiClient implements SshKeyClient {
   async deleteSshKey(sshKeyId: number): Promise<{ message: string }> {
     const response = await this.transport.delete<
       ApiEnvelope<Record<string, unknown>>
-    >(`/delete_ssh_key/${sshKeyId}/`);
+    >(buildDeleteSshKeyPath(sshKeyId));
 
-    return {
-      message: response.message
-    };
+    return mapDeleteSshKeyResponse(response);
   }
 
   async listSshKeys(): Promise<SshKeySummary[]> {
     const response =
-      await this.transport.get<ApiEnvelope<SshKeySummary[]>>('/ssh_keys/');
+      await this.transport.get<ApiEnvelope<SshKeySummary[]>>(SSH_KEYS_PATH);
 
     return response.data;
   }
+}
+
+function buildDeleteSshKeyPath(sshKeyId: number): string {
+  return `/delete_ssh_key/${sshKeyId}/`;
+}
+
+function mapDeleteSshKeyResponse(
+  response: ApiEnvelope<Record<string, unknown>>
+): { message: string } {
+  return {
+    message: response.message
+  };
 }

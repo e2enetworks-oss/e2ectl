@@ -87,28 +87,27 @@ export interface SshKeyServiceDependencies {
   store: SshKeyStore;
 }
 
+interface NormalizedSshKeyCreateInput {
+  label: string;
+  publicKeyFile: string;
+}
+
 export class SshKeyService {
   constructor(private readonly dependencies: SshKeyServiceDependencies) {}
 
   async createSshKey(
     options: SshKeyCreateOptions
   ): Promise<SshKeyCreateCommandResult> {
-    const label = normalizeRequiredString(options.label, 'Label', '--label');
-    const publicKeyFile = normalizeRequiredString(
-      options.publicKeyFile,
-      'Public key file',
-      '--public-key-file'
-    );
-    const publicKey = await this.loadPublicKey(publicKeyFile);
+    const input = normalizeSshKeyCreateInput(options);
+    const publicKey = await this.loadPublicKey(input.publicKeyFile);
     const client = await this.createClient(options);
-    const createdKey = await client.createSshKey({
-      label,
-      ssh_key: publicKey
-    });
+    const createdKey = await client.createSshKey(
+      buildSshKeyCreateRequest(input.label, publicKey)
+    );
 
     return {
       action: 'create',
-      item: normalizeCreatedSshKeyItem(createdKey)
+      item: summarizeCreatedSshKey(createdKey)
     };
   }
 
@@ -150,21 +149,11 @@ export class SshKeyService {
   ): Promise<SshKeyGetCommandResult> {
     const normalizedSshKeyId = normalizeSshKeyId(sshKeyId);
     const client = await this.createClient(options);
-    const item = (await client.listSshKeys()).find(
-      (candidate) => candidate.pk === normalizedSshKeyId
-    );
-
-    if (item === undefined) {
-      throw new CliError(`SSH key ${normalizedSshKeyId} was not found.`, {
-        code: 'SSH_KEY_NOT_FOUND',
-        exitCode: EXIT_CODES.network,
-        suggestion: `Run ${formatCliCommand('ssh-key list')} to inspect the available saved SSH keys.`
-      });
-    }
+    const item = findSshKeyById(await client.listSshKeys(), normalizedSshKeyId);
 
     return {
       action: 'get',
-      item: normalizeSshKeyItem(item)
+      item: summarizeListedSshKey(item)
     };
   }
 
@@ -176,7 +165,7 @@ export class SshKeyService {
     return {
       action: 'list',
       items: (await client.listSshKeys()).map((item) =>
-        normalizeSshKeyItem(item)
+        summarizeListedSshKey(item)
       )
     };
   }
@@ -198,37 +187,13 @@ export class SshKeyService {
         publicKeyFile === '-'
           ? await this.dependencies.readPublicKeyFromStdin()
           : await this.dependencies.readPublicKeyFile(publicKeyFile);
-      const normalized = content.trim();
-
-      if (normalized.length > 0) {
-        return normalized;
-      }
-
-      throw new CliError('Public key content cannot be empty.', {
-        code: 'EMPTY_PUBLIC_KEY',
-        exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Provide a file with SSH public key material, or pipe it in with --public-key-file -.'
-      });
+      return normalizeLoadedPublicKey(content);
     } catch (error: unknown) {
       if (error instanceof CliError) {
         throw error;
       }
 
-      throw new CliError(
-        publicKeyFile === '-'
-          ? 'Could not read SSH public key content from stdin.'
-          : `Could not read SSH public key file: ${publicKeyFile}`,
-        {
-          code: 'PUBLIC_KEY_READ_FAILED',
-          cause: error,
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            publicKeyFile === '-'
-              ? `Pipe a public key into the command, for example: cat ~/.ssh/id_ed25519.pub | ${formatCliCommand('ssh-key create --label demo --public-key-file -')}`
-              : 'Verify that the file exists, is readable, and contains a public SSH key.'
-        }
-      );
+      throw wrapPublicKeyReadError(publicKeyFile, error);
     }
   }
 }
@@ -238,7 +203,83 @@ function inferSshKeyType(publicKey: string): string {
   return SSH_KEY_TYPE_LABELS[prefix] ?? 'Unknown';
 }
 
-function normalizeCreatedSshKeyItem(item: SshKeyCreateResult): SshKeyItem {
+function normalizeSshKeyCreateInput(
+  options: SshKeyCreateOptions
+): NormalizedSshKeyCreateInput {
+  return {
+    label: normalizeRequiredString(options.label, 'Label', '--label'),
+    publicKeyFile: normalizeRequiredString(
+      options.publicKeyFile,
+      'Public key file',
+      '--public-key-file'
+    )
+  };
+}
+
+function buildSshKeyCreateRequest(
+  label: string,
+  publicKey: string
+): {
+  label: string;
+  ssh_key: string;
+} {
+  return {
+    label,
+    ssh_key: publicKey
+  };
+}
+
+function normalizeLoadedPublicKey(content: string): string {
+  const normalized = content.trim();
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  throw new CliError('Public key content cannot be empty.', {
+    code: 'EMPTY_PUBLIC_KEY',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Provide a file with SSH public key material, or pipe it in with --public-key-file -.'
+  });
+}
+
+function wrapPublicKeyReadError(
+  publicKeyFile: string,
+  error: unknown
+): CliError {
+  return new CliError(
+    publicKeyFile === '-'
+      ? 'Could not read SSH public key content from stdin.'
+      : `Could not read SSH public key file: ${publicKeyFile}`,
+    {
+      code: 'PUBLIC_KEY_READ_FAILED',
+      cause: error,
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        publicKeyFile === '-'
+          ? `Pipe a public key into the command, for example: cat ~/.ssh/id_ed25519.pub | ${formatCliCommand('ssh-key create --label demo --public-key-file -')}`
+          : 'Verify that the file exists, is readable, and contains a public SSH key.'
+    }
+  );
+}
+
+function findSshKeyById(
+  items: SshKeySummary[],
+  sshKeyId: number
+): SshKeySummary {
+  const item = items.find((candidate) => candidate.pk === sshKeyId);
+  if (item !== undefined) {
+    return item;
+  }
+
+  throw new CliError(`SSH key ${sshKeyId} was not found.`, {
+    code: 'SSH_KEY_NOT_FOUND',
+    exitCode: EXIT_CODES.network,
+    suggestion: `Run ${formatCliCommand('ssh-key list')} to inspect the available saved SSH keys.`
+  });
+}
+
+function summarizeCreatedSshKey(item: SshKeyCreateResult): SshKeyItem {
   return {
     attached_nodes: 0,
     created_at: item.timestamp,
@@ -251,7 +292,7 @@ function normalizeCreatedSshKeyItem(item: SshKeyCreateResult): SshKeyItem {
   };
 }
 
-function normalizeSshKeyItem(item: SshKeySummary): SshKeyItem {
+function summarizeListedSshKey(item: SshKeySummary): SshKeyItem {
   return {
     attached_nodes: item.total_attached_nodes ?? 0,
     created_at: item.timestamp,
