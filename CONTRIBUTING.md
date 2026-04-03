@@ -57,7 +57,7 @@ Domain ownership:
 
 - `src/app/` wires Commander, runtime services, stdout/stderr, prompts, config store, and domain factories.
 - `src/core/` contains low-level shared helpers such as errors, deterministic JSON helpers, and masking.
-- `src/myaccount/` owns shared transport, credential validation, API envelope typing, and centralized API failure handling.
+- `src/myaccount/` owns shared API transport, credential validation, request/response typing, and centralized API failure handling.
 - `src/config/` owns profile persistence, import parsing, alias/default-context behavior, and auth/context resolution.
 - `src/node/` owns node discovery, create/delete flows, actions, and output shaping.
 - `src/volume/` owns volume list/get/delete, plans, create flows, and output shaping.
@@ -67,8 +67,8 @@ Domain ownership:
 Architectural rules:
 
 - Commands stay thin. `command.ts` files define the CLI surface and delegate immediately.
-- Services orchestrate validation, defaults, prompts, and cross-domain workflows. They do not own rendering.
-- Clients own endpoint paths and response parsing.
+- Services orchestrate CLI validation, defaults, prompts, and cross-domain workflows. They do not own rendering.
+- Clients own reusable API paths and response parsing.
 - Formatters own human-readable output and deterministic `--json` output.
 - When adding new domains or cleaning existing ones, keep the same seam: `command.ts` for Commander wiring, `service.ts` for CLI orchestration, `client.ts` for reusable API access, and `formatter.ts` for rendering.
 - Generic API failure handling stays centralized in `src/myaccount/transport.ts`.
