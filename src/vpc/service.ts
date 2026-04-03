@@ -11,12 +11,15 @@ import type { VpcClient } from './client.js';
 import type {
   VpcCommittedPlan,
   VpcCreateRequest,
+  VpcCreateResult,
+  VpcDeleteResult,
   VpcPlan,
   VpcSummary
 } from './types.js';
 
 const VPC_LIST_PAGE_SIZE = 100;
 const VPC_LIST_MAX_PAGES = 500;
+const DEFAULT_VPC_POST_COMMIT_BEHAVIOR: VpcPostCommitBehavior = 'auto-renew';
 
 export type VpcBillingType = 'committed' | 'hourly';
 export type VpcCidrSource = 'custom' | 'e2e';
@@ -142,6 +145,29 @@ export type VpcCommandResult =
   | VpcListCommandResult
   | VpcPlansCommandResult;
 
+interface NormalizedVpcCreateBilling {
+  committedPlanId: number | null;
+  postCommitBehavior: VpcPostCommitBehavior | null;
+  type: VpcBillingType;
+}
+
+interface NormalizedVpcCreateCidr {
+  source: VpcCidrSource;
+  value: string | null;
+}
+
+interface NormalizedVpcCreateInput {
+  billing: NormalizedVpcCreateBilling;
+  cidr: NormalizedVpcCreateCidr;
+  name: string;
+}
+
+interface CollectedVpcListData {
+  items: VpcSummary[];
+  totalCount: number;
+  totalPageNumber: number;
+}
+
 interface VpcStore {
   readonly configPath: string;
   read(): Promise<ConfigFile>;
@@ -158,115 +184,11 @@ export class VpcService {
   constructor(private readonly dependencies: VpcServiceDependencies) {}
 
   async createVpc(options: VpcCreateOptions): Promise<VpcCreateCommandResult> {
-    const billingType = normalizeBillingType(options.billingType);
-    const cidrSource = normalizeCidrSource(options.cidrSource);
-    const name = normalizeRequiredString(options.name, 'Name', '--name');
-    const requestedCidr = normalizeOptionalString(options.cidr);
-
-    if (cidrSource === 'custom' && requestedCidr === undefined) {
-      throw new CliError(
-        'CIDR is required when --cidr-source custom is used.',
-        {
-          code: 'MISSING_CUSTOM_CIDR',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Pass a private CIDR block with --cidr, for example 10.10.0.0/23.'
-        }
-      );
-    }
-
-    if (cidrSource === 'e2e' && requestedCidr !== undefined) {
-      throw new CliError('Do not pass --cidr when --cidr-source e2e is used.', {
-        code: 'UNEXPECTED_CIDR',
-        exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Remove --cidr, or switch to --cidr-source custom when you need to provide your own CIDR.'
-      });
-    }
-
-    const cidr =
-      cidrSource === 'custom' && requestedCidr !== undefined
-        ? normalizeCustomCidr(requestedCidr)
-        : requestedCidr;
-
-    const committedPlanId = normalizeOptionalInteger(
-      options.committedPlanId,
-      'Committed plan ID',
-      '--committed-plan-id'
-    );
-    const postCommitBehavior = normalizePostCommitBehavior(
-      options.postCommitBehavior
-    );
-
-    if (billingType === 'committed' && committedPlanId === undefined) {
-      throw new CliError(
-        'Committed plan ID is required when --billing-type committed is used.',
-        {
-          code: 'MISSING_COMMITTED_PLAN_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatCliCommand('vpc plans')} first, then pass one plan id with --committed-plan-id.`
-        }
-      );
-    }
-
-    if (billingType === 'hourly' && committedPlanId !== undefined) {
-      throw new CliError(
-        'Committed plan ID can only be used with --billing-type committed.',
-        {
-          code: 'UNEXPECTED_COMMITTED_PLAN_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Remove --committed-plan-id, or switch to --billing-type committed.'
-        }
-      );
-    }
-
-    if (billingType === 'hourly' && postCommitBehavior !== undefined) {
-      throw new CliError(
-        '--post-commit-behavior can only be used with --billing-type committed.',
-        {
-          code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Remove --post-commit-behavior, or switch to --billing-type committed.'
-        }
-      );
-    }
-
+    const input = normalizeVpcCreateInput(options);
     const client = await this.createClient(options);
-    const request = buildVpcCreateRequest({
-      billingType,
-      cidrSource,
-      name,
-      ...(cidr === undefined ? {} : { cidr }),
-      ...(committedPlanId === undefined ? {} : { committedPlanId }),
-      ...(postCommitBehavior === undefined ? {} : { postCommitBehavior })
-    });
-    const result = await client.createVpc(request);
+    const result = await client.createVpc(buildVpcCreateRequest(input));
 
-    return {
-      action: 'create',
-      billing: {
-        committed_plan_id:
-          billingType === 'committed' ? (committedPlanId ?? null) : null,
-        post_commit_behavior:
-          billingType === 'committed'
-            ? (postCommitBehavior ?? 'auto-renew')
-            : null,
-        type: billingType
-      },
-      cidr: {
-        source: cidrSource,
-        value: cidrSource === 'custom' ? (cidr ?? null) : null
-      },
-      credit_sufficient: result.is_credit_sufficient,
-      vpc: {
-        name: result.vpc_name,
-        network_id: result.network_id,
-        project_id: result.project_id ?? null,
-        vpc_id: result.vpc_id
-      }
-    };
+    return summarizeVpcCreateResult(input, result);
   }
 
   async deleteVpc(
@@ -282,31 +204,14 @@ export class VpcService {
       );
 
       if (!confirmed) {
-        return {
-          action: 'delete',
-          cancelled: true,
-          vpc: {
-            id: normalizedVpcId,
-            name: null,
-            project_id: null
-          }
-        };
+        return summarizeCancelledVpcDeleteResult(normalizedVpcId);
       }
     }
 
     const client = await this.createClient(options);
     const response = await client.deleteVpc(normalizedVpcId);
 
-    return {
-      action: 'delete',
-      cancelled: false,
-      message: response.message,
-      vpc: {
-        id: response.result.vpc_id,
-        name: response.result.vpc_name,
-        project_id: response.result.project_id ?? null
-      }
-    };
+    return summarizeVpcDeleteResult(response);
   }
 
   async getVpc(
@@ -318,7 +223,7 @@ export class VpcService {
 
     return {
       action: 'get',
-      vpc: normalizeVpcListItem(await client.getVpc(normalizedVpcId))
+      vpc: summarizeVpcListItem(await client.getVpc(normalizedVpcId))
     };
   }
 
@@ -326,54 +231,14 @@ export class VpcService {
     options: VpcContextOptions
   ): Promise<VpcPlansCommandResult> {
     const client = await this.createClient(options);
-    const plans = await client.listVpcPlans();
 
-    return {
-      action: 'plans',
-      committed: {
-        default_post_commit_behavior: 'auto-renew',
-        items: summarizeCommittedVpcPlans(plans),
-        supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
-      },
-      hourly: {
-        items: summarizeHourlyVpcPlans(plans)
-      }
-    };
+    return summarizeVpcPlansResult(await client.listVpcPlans());
   }
 
   async listVpcs(options: VpcContextOptions): Promise<VpcListCommandResult> {
     const client = await this.createClient(options);
-    const items: VpcSummary[] = [];
-    let currentPage = 1;
-    let totalCount = 0;
-    let totalPageNumber = 1;
 
-    do {
-      const page = await client.listVpcs(currentPage, VPC_LIST_PAGE_SIZE);
-      items.push(...page.items);
-      totalCount = page.total_count ?? items.length;
-      totalPageNumber = page.total_page_number ?? 1;
-      currentPage += 1;
-
-      if (currentPage > VPC_LIST_MAX_PAGES) {
-        throw new CliError(
-          `VPC list exceeded the maximum page limit (${VPC_LIST_MAX_PAGES}).`,
-          {
-            code: 'PAGINATION_LIMIT_EXCEEDED',
-            exitCode: EXIT_CODES.network,
-            suggestion:
-              'The API returned an unexpectedly large result set. Retry the command or contact support.'
-          }
-        );
-      }
-    } while (currentPage <= totalPageNumber);
-
-    return {
-      action: 'list',
-      items: items.map((item) => normalizeVpcListItem(item)),
-      total_count: totalCount,
-      total_page_number: totalPageNumber
-    };
+    return summarizeVpcListResult(await collectVpcListData(client));
   }
 
   private async createClient(options: VpcContextOptions): Promise<VpcClient> {
@@ -386,32 +251,251 @@ export class VpcService {
   }
 }
 
-function buildVpcCreateRequest(input: {
-  billingType: VpcBillingType;
-  cidr?: string;
-  cidrSource: VpcCidrSource;
-  committedPlanId?: number;
-  name: string;
-  postCommitBehavior?: VpcPostCommitBehavior;
-}): VpcCreateRequest {
+function normalizeVpcCreateInput(
+  options: VpcCreateOptions
+): NormalizedVpcCreateInput {
+  const billingType = normalizeBillingType(options.billingType);
+  const cidrSource = normalizeCidrSource(options.cidrSource);
+
   return {
-    ...(input.billingType === 'committed' && input.committedPlanId !== undefined
+    billing: normalizeVpcCreateBilling(
+      billingType,
+      options.committedPlanId,
+      options.postCommitBehavior
+    ),
+    cidr: normalizeVpcCreateCidr(cidrSource, options.cidr),
+    name: normalizeRequiredString(options.name, 'Name', '--name')
+  };
+}
+
+function normalizeVpcCreateBilling(
+  billingType: VpcBillingType,
+  committedPlanId: string | undefined,
+  postCommitBehavior: string | undefined
+): NormalizedVpcCreateBilling {
+  const normalizedCommittedPlanId = normalizeOptionalInteger(
+    committedPlanId,
+    'Committed plan ID',
+    '--committed-plan-id'
+  );
+  const normalizedPostCommitBehavior =
+    normalizePostCommitBehavior(postCommitBehavior);
+
+  if (billingType === 'committed') {
+    if (normalizedCommittedPlanId === undefined) {
+      throw new CliError(
+        'Committed plan ID is required when --billing-type committed is used.',
+        {
+          code: 'MISSING_COMMITTED_PLAN_ID',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatCliCommand('vpc plans')} first, then pass one plan id with --committed-plan-id.`
+        }
+      );
+    }
+
+    return {
+      committedPlanId: normalizedCommittedPlanId,
+      postCommitBehavior:
+        normalizedPostCommitBehavior ?? DEFAULT_VPC_POST_COMMIT_BEHAVIOR,
+      type: billingType
+    };
+  }
+
+  if (normalizedCommittedPlanId !== undefined) {
+    throw new CliError(
+      'Committed plan ID can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --committed-plan-id, or switch to --billing-type committed.'
+      }
+    );
+  }
+
+  if (normalizedPostCommitBehavior !== undefined) {
+    throw new CliError(
+      '--post-commit-behavior can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --post-commit-behavior, or switch to --billing-type committed.'
+      }
+    );
+  }
+
+  return {
+    committedPlanId: null,
+    postCommitBehavior: null,
+    type: billingType
+  };
+}
+
+function normalizeVpcCreateCidr(
+  cidrSource: VpcCidrSource,
+  cidr: string | undefined
+): NormalizedVpcCreateCidr {
+  const requestedCidr = normalizeOptionalString(cidr);
+
+  if (cidrSource === 'custom') {
+    if (requestedCidr === undefined) {
+      throw new CliError(
+        'CIDR is required when --cidr-source custom is used.',
+        {
+          code: 'MISSING_CUSTOM_CIDR',
+          exitCode: EXIT_CODES.usage,
+          suggestion:
+            'Pass a private CIDR block with --cidr, for example 10.10.0.0/23.'
+        }
+      );
+    }
+
+    return {
+      source: cidrSource,
+      value: normalizeCustomCidr(requestedCidr)
+    };
+  }
+
+  if (requestedCidr !== undefined) {
+    throw new CliError('Do not pass --cidr when --cidr-source e2e is used.', {
+      code: 'UNEXPECTED_CIDR',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Remove --cidr, or switch to --cidr-source custom when you need to provide your own CIDR.'
+    });
+  }
+
+  return {
+    source: cidrSource,
+    value: null
+  };
+}
+
+function buildVpcCreateRequest(
+  input: NormalizedVpcCreateInput
+): VpcCreateRequest {
+  return {
+    ...(input.billing.committedPlanId !== null &&
+    input.billing.postCommitBehavior !== null
       ? {
-          cn_id: input.committedPlanId,
+          cn_id: input.billing.committedPlanId,
           cn_status: toBackendPostCommitBehavior(
-            input.postCommitBehavior ?? 'auto-renew'
+            input.billing.postCommitBehavior
           )
         }
       : {}),
-    ...(input.cidrSource === 'custom' && input.cidr !== undefined
-      ? { ipv4: input.cidr }
-      : {}),
-    is_e2e_vpc: input.cidrSource === 'e2e',
+    ...(input.cidr.value === null ? {} : { ipv4: input.cidr.value }),
+    is_e2e_vpc: input.cidr.source === 'e2e',
     vpc_name: input.name
   };
 }
 
-function normalizeVpcListItem(item: VpcSummary): VpcListItem {
+function summarizeVpcCreateResult(
+  input: NormalizedVpcCreateInput,
+  result: VpcCreateResult
+): VpcCreateCommandResult {
+  return {
+    action: 'create',
+    billing: {
+      committed_plan_id: input.billing.committedPlanId,
+      post_commit_behavior: input.billing.postCommitBehavior,
+      type: input.billing.type
+    },
+    cidr: {
+      source: input.cidr.source,
+      value: input.cidr.value
+    },
+    credit_sufficient: result.is_credit_sufficient,
+    vpc: {
+      name: result.vpc_name,
+      network_id: result.network_id,
+      project_id: result.project_id ?? null,
+      vpc_id: result.vpc_id
+    }
+  };
+}
+
+function summarizeCancelledVpcDeleteResult(
+  vpcId: number
+): VpcDeleteCommandResult {
+  return {
+    action: 'delete',
+    cancelled: true,
+    vpc: {
+      id: vpcId,
+      name: null,
+      project_id: null
+    }
+  };
+}
+
+function summarizeVpcDeleteResult(response: {
+  message: string;
+  result: VpcDeleteResult;
+}): VpcDeleteCommandResult {
+  return {
+    action: 'delete',
+    cancelled: false,
+    message: response.message,
+    vpc: {
+      id: response.result.vpc_id,
+      name: response.result.vpc_name,
+      project_id: response.result.project_id ?? null
+    }
+  };
+}
+
+function summarizeVpcPlansResult(plans: VpcPlan[]): VpcPlansCommandResult {
+  return {
+    action: 'plans',
+    committed: {
+      default_post_commit_behavior: DEFAULT_VPC_POST_COMMIT_BEHAVIOR,
+      items: summarizeCommittedVpcPlans(plans),
+      supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+    },
+    hourly: {
+      items: summarizeHourlyVpcPlans(plans)
+    }
+  };
+}
+
+async function collectVpcListData(
+  client: VpcClient
+): Promise<CollectedVpcListData> {
+  const items: VpcSummary[] = [];
+  let currentPage = 1;
+  let totalCount = 0;
+  let totalPageNumber = 1;
+
+  do {
+    const page = await client.listVpcs(currentPage, VPC_LIST_PAGE_SIZE);
+    items.push(...page.items);
+    totalCount = page.total_count ?? items.length;
+    totalPageNumber = page.total_page_number ?? 1;
+    currentPage += 1;
+    assertVpcListPageLimit(currentPage);
+  } while (currentPage <= totalPageNumber);
+
+  return {
+    items,
+    totalCount,
+    totalPageNumber
+  };
+}
+
+function summarizeVpcListResult(
+  data: CollectedVpcListData
+): VpcListCommandResult {
+  return {
+    action: 'list',
+    items: data.items.map((item) => summarizeVpcListItem(item)),
+    total_count: data.totalCount,
+    total_page_number: data.totalPageNumber
+  };
+}
+
+function summarizeVpcListItem(item: VpcSummary): VpcListItem {
   const subnets = (item.subnets ?? []).map((subnet) => ({
     cidr: subnet.cidr,
     id: subnet.id,
@@ -434,6 +518,22 @@ function normalizeVpcListItem(item: VpcSummary): VpcListItem {
     subnet_count: subnets.length,
     subnets
   };
+}
+
+function assertVpcListPageLimit(currentPage: number): void {
+  if (currentPage <= VPC_LIST_MAX_PAGES) {
+    return;
+  }
+
+  throw new CliError(
+    `VPC list exceeded the maximum page limit (${VPC_LIST_MAX_PAGES}).`,
+    {
+      code: 'PAGINATION_LIMIT_EXCEEDED',
+      exitCode: EXIT_CODES.network,
+      suggestion:
+        'The API returned an unexpectedly large result set. Retry the command or contact support.'
+    }
+  );
 }
 
 function summarizeHourlyVpcPlans(plans: VpcPlan[]): VpcHourlyPlanItem[] {
@@ -465,7 +565,7 @@ function summarizeCommittedVpcPlans(plans: VpcPlan[]): VpcCommittedPlanItem[] {
   return plans
     .flatMap((plan) =>
       (plan.committed_sku ?? []).map((committedPlan) =>
-        normalizeCommittedVpcPlan(committedPlan, plan.currency)
+        summarizeCommittedVpcPlan(committedPlan, plan.currency)
       )
     )
     .filter((plan): plan is VpcCommittedPlanItem => plan !== undefined)
@@ -485,7 +585,7 @@ function summarizeCommittedVpcPlans(plans: VpcPlan[]): VpcCommittedPlanItem[] {
     });
 }
 
-function normalizeCommittedVpcPlan(
+function summarizeCommittedVpcPlan(
   plan: VpcCommittedPlan,
   currency: string | undefined
 ): VpcCommittedPlanItem | undefined {
