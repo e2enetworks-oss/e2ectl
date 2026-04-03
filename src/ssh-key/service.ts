@@ -5,7 +5,7 @@ import {
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import type { SshKeyClient } from './client.js';
+import type { SshKeyClient, SshKeyCreateRequest } from './client.js';
 import type { SshKeyCreateResult, SshKeySummary } from './types.js';
 
 const SSH_KEY_TYPE_LABELS: Record<string, string> = {
@@ -219,10 +219,7 @@ function normalizeSshKeyCreateInput(
 function buildSshKeyCreateRequest(
   label: string,
   publicKey: string
-): {
-  label: string;
-  ssh_key: string;
-} {
+): SshKeyCreateRequest {
   return {
     label,
     ssh_key: publicKey
