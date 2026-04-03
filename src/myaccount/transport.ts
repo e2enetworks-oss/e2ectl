@@ -1,4 +1,4 @@
-import { CliError, EXIT_CODES } from '../core/errors.js';
+import { AppError, EXIT_CODES } from '../core/errors.js';
 import { isNonEmptyString, isRecord } from '../core/guards.js';
 import { sanitizeUrl } from '../core/url.js';
 
@@ -175,7 +175,7 @@ export class MyAccountApiTransport implements MyAccountTransport {
       }
 
       if (!isApiEnvelope(payload)) {
-        throw new CliError(
+        throw new AppError(
           'The MyAccount API returned an unexpected response shape.',
           {
             code: 'INVALID_API_RESPONSE',
@@ -193,12 +193,12 @@ export class MyAccountApiTransport implements MyAccountTransport {
         throw error;
       }
 
-      if (error instanceof CliError) {
+      if (error instanceof AppError) {
         throw error;
       }
 
       if (isAbortError(error)) {
-        const cliError = new CliError('The MyAccount API request timed out.', {
+        const appError = new AppError('The MyAccount API request timed out.', {
           code: 'API_TIMEOUT',
           details: [
             `Timed out after ${this.timeoutMs}ms`,
@@ -212,14 +212,14 @@ export class MyAccountApiTransport implements MyAccountTransport {
         });
 
         if (method === 'GET') {
-          throw new RetryableRequestError(cliError);
+          throw new RetryableRequestError(appError);
         }
 
-        throw cliError;
+        throw appError;
       }
 
       if (error instanceof Error) {
-        const cliError = new CliError(
+        const appError = new AppError(
           'The MyAccount API request could not be completed.',
           {
             code: 'API_NETWORK_ERROR',
@@ -237,10 +237,10 @@ export class MyAccountApiTransport implements MyAccountTransport {
         );
 
         if (method === 'GET') {
-          throw new RetryableRequestError(cliError);
+          throw new RetryableRequestError(appError);
         }
 
-        throw cliError;
+        throw appError;
       }
 
       throw error;
@@ -265,7 +265,7 @@ export class MyAccountApiTransport implements MyAccountTransport {
         this.credentials.project_id === undefined ||
         this.credentials.location === undefined
       ) {
-        throw new CliError(
+        throw new AppError(
           'MyAccount project context is required for this request.',
           {
             code: 'MISSING_REQUEST_CONTEXT',
@@ -310,9 +310,9 @@ function isAbortError(error: unknown): boolean {
 }
 
 class RetryableRequestError extends Error {
-  readonly original: CliError;
+  readonly original: AppError;
 
-  constructor(original: CliError) {
+  constructor(original: AppError) {
     super(original.message);
     this.original = original;
   }
@@ -388,7 +388,7 @@ function parseCustomSuccessResponse<TResponse>(
       details.push(`Reason: ${error.message}`);
     }
 
-    throw new CliError(
+    throw new AppError(
       'The MyAccount API returned an unexpected response shape.',
       {
         code: 'INVALID_API_RESPONSE',
@@ -403,7 +403,7 @@ function parseCustomSuccessResponse<TResponse>(
 
 function buildFallbackApiError(
   input: FallbackApiErrorInput
-): CliError | undefined {
+): AppError | undefined {
   const { path, payload, preview, response } = input;
   const shouldTreatAsApiFailure =
     !response.ok ||
@@ -430,7 +430,7 @@ function buildFallbackApiError(
       : [`Response preview: ${preview}`])
   ];
 
-  return new CliError(`MyAccount API request failed: ${message}`, {
+  return new AppError(`MyAccount API request failed: ${message}`, {
     code: 'API_REQUEST_FAILED',
     details,
     exitCode:
