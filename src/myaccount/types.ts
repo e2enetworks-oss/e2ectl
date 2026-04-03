@@ -19,6 +19,11 @@ export interface ApiClientOptions {
   timeoutMs?: number;
 }
 
+export interface ApiAuthCredentials {
+  api_key: string;
+  auth_token: string;
+}
+
 export interface ApiEnvelope<TData> {
   code: number;
   data: TData;
@@ -48,10 +53,8 @@ export interface ApiRequestOptions<TResponse = ApiEnvelope<unknown>> {
   query?: Record<string, string | undefined>;
 }
 
-export interface ApiClientCredentials {
+export interface ApiClientCredentials extends ApiAuthCredentials {
   alias?: string;
-  api_key: string;
-  auth_token: string;
   location?: string;
   project_id?: string;
   source: 'env' | 'mixed' | 'profile';

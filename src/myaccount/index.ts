@@ -6,6 +6,7 @@ export {
 } from './credential-validator.js';
 export { MyAccountApiTransport, type MyAccountTransport } from './transport.js';
 export type {
+  ApiAuthCredentials,
   ApiClientCredentials,
   ApiClientOptions,
   ApiEnvelope,

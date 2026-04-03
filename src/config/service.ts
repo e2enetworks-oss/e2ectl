@@ -1,5 +1,6 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { formatCliCommand } from '../app/metadata.js';
+import type { ApiAuthCredentials } from '../myaccount/index.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
@@ -69,7 +70,7 @@ export type ConfigCommandResult =
   | ConfigSetDefaultCommandResult;
 
 interface ProfileValidator {
-  validate(profile: ProfileConfig): Promise<{
+  validate(credentials: ApiAuthCredentials): Promise<{
     message?: string;
     valid: boolean;
   }>;
@@ -144,9 +145,11 @@ export class ConfigService {
     }
 
     for (const alias of importedAliases) {
-      const validation = await this.dependencies.credentialValidator.validate(
-        getProfile(importedProfiles, alias)
-      );
+      const profile = getProfile(importedProfiles, alias);
+      const validation = await this.dependencies.credentialValidator.validate({
+        api_key: profile.api_key,
+        auth_token: profile.auth_token
+      });
 
       if (!validation.valid) {
         const details: string[] = [];

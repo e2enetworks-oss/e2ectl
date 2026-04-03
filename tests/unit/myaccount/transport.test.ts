@@ -1,4 +1,4 @@
-import { CliError } from '../../../src/core/errors.js';
+import { AppError } from '../../../src/core/errors.js';
 import { MyAccountApiTransport } from '../../../src/myaccount/transport.js';
 import type { ApiEnvelope, FetchLike } from '../../../src/myaccount/types.js';
 
@@ -165,7 +165,7 @@ describe('MyAccountApiTransport', () => {
       transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
         includeProjectContext: false
       })
-    ).rejects.toBeInstanceOf(CliError);
+    ).rejects.toBeInstanceOf(AppError);
     await expect(
       transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
         includeProjectContext: false
@@ -412,12 +412,12 @@ describe('MyAccountApiTransport', () => {
 
     const error = await errorPromise;
 
-    expect(error).toBeInstanceOf(CliError);
-    const cliError = error as CliError;
+    expect(error).toBeInstanceOf(AppError);
+    const appError = error as AppError;
 
-    expect(cliError.details.join('\n')).toContain('Request URL: ');
-    expect(cliError.details.join('\n')).toContain('apikey=%5BREDACTED%5D');
-    expect(cliError.details.join('\n')).not.toContain('apikey=api-key');
+    expect(appError.details.join('\n')).toContain('Request URL: ');
+    expect(appError.details.join('\n')).toContain('apikey=%5BREDACTED%5D');
+    expect(appError.details.join('\n')).not.toContain('apikey=api-key');
   });
 
   it('uses a short response preview for non-json failed responses', async () => {
