@@ -4,6 +4,7 @@ import type {
 } from '../../../src/config/index.js';
 import { NodeService } from '../../../src/node/service.js';
 import type { NodeClient } from '../../../src/node/index.js';
+import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
@@ -24,13 +25,16 @@ function createConfig(): ConfigFile {
 
 function createServiceFixture(): {
   attachNodeVpc: ReturnType<typeof vi.fn>;
+  attachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   attachSshKeys: ReturnType<typeof vi.fn>;
   attachVolumeToNode: ReturnType<typeof vi.fn>;
   createNode: ReturnType<typeof vi.fn>;
   createNodeClient: ReturnType<typeof vi.fn>;
+  createSecurityGroupClient: ReturnType<typeof vi.fn>;
   createSshKeyClient: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
   createVpcClient: ReturnType<typeof vi.fn>;
+  detachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   detachNodeVpc: ReturnType<typeof vi.fn>;
   detachVolumeFromNode: ReturnType<typeof vi.fn>;
   getNode: ReturnType<typeof vi.fn>;
@@ -135,6 +139,25 @@ function createServiceFixture(): {
     deleteSshKey: vi.fn(),
     listSshKeys
   };
+  const attachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Group Attached Successfully'
+    })
+  );
+  const detachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Groups Detached Successfully'
+    })
+  );
+  const securityGroupClient: SecurityGroupClient = {
+    attachNodeSecurityGroups,
+    createSecurityGroup: vi.fn(),
+    deleteSecurityGroup: vi.fn(),
+    detachNodeSecurityGroups,
+    getSecurityGroup: vi.fn(),
+    listSecurityGroups: vi.fn(),
+    updateSecurityGroup: vi.fn()
+  };
   const attachVolumeToNode = vi.fn(() =>
     Promise.resolve({
       image_id: 8801,
@@ -198,10 +221,12 @@ function createServiceFixture(): {
   );
   const createVolumeClient = vi.fn(() => volumeClient);
   const createVpcClient = vi.fn(() => vpcClient);
+  const createSecurityGroupClient = vi.fn(() => securityGroupClient);
   const readConfig = vi.fn(() => Promise.resolve(createConfig()));
   const service = new NodeService({
     confirm: vi.fn(() => Promise.resolve(true)),
     createNodeClient,
+    createSecurityGroupClient,
     createSshKeyClient,
     createVolumeClient,
     createVpcClient,
@@ -214,13 +239,16 @@ function createServiceFixture(): {
 
   return {
     attachNodeVpc,
+    attachNodeSecurityGroups,
     attachSshKeys,
     attachVolumeToNode,
     createNode,
     createNodeClient,
+    createSecurityGroupClient,
     createSshKeyClient,
     createVolumeClient,
     createVpcClient,
+    detachNodeSecurityGroups,
     detachNodeVpc,
     detachVolumeFromNode,
     getNode,
@@ -375,6 +403,49 @@ describe('NodeService', () => {
     });
     expect(detachResult.result).toEqual({
       message: 'Block Storage Detach Process is Started.'
+    });
+  });
+
+  it('resolves node vm ids before security-group attach and detach', async () => {
+    const {
+      attachNodeSecurityGroups,
+      detachNodeSecurityGroups,
+      getNode,
+      service
+    } = createServiceFixture();
+
+    const attachResult = await service.attachSecurityGroups('101', {
+      alias: 'prod',
+      securityGroupIds: ['44', '45', '44']
+    });
+    const detachResult = await service.detachSecurityGroups('101', {
+      alias: 'prod',
+      securityGroupIds: ['45']
+    });
+
+    expect(getNode).toHaveBeenNthCalledWith(1, '101');
+    expect(getNode).toHaveBeenNthCalledWith(2, '101');
+    expect(attachNodeSecurityGroups).toHaveBeenCalledWith(100157, {
+      security_group_ids: [44, 45]
+    });
+    expect(detachNodeSecurityGroups).toHaveBeenCalledWith(100157, {
+      security_group_ids: [45]
+    });
+    expect(attachResult).toEqual({
+      action: 'security-group-attach',
+      node_id: 101,
+      result: {
+        message: 'Security Group Attached Successfully'
+      },
+      security_group_ids: [44, 45]
+    });
+    expect(detachResult).toEqual({
+      action: 'security-group-detach',
+      node_id: 101,
+      result: {
+        message: 'Security Groups Detached Successfully'
+      },
+      security_group_ids: [45]
     });
   });
 

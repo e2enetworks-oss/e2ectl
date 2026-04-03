@@ -375,6 +375,22 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .concat(formatNodeActionSummary(result.result))
           .join('\n') + '\n'
       );
+    case 'security-group-attach':
+      return (
+        [
+          `Requested security-group attach for node ${result.node_id}.`,
+          `Security Group IDs: ${result.security_group_ids.join(', ')}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
+      );
+    case 'security-group-detach':
+      return (
+        [
+          `Requested security-group detach for node ${result.node_id}.`,
+          `Security Group IDs: ${result.security_group_ids.join(', ')}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
+      );
     case 'ssh-key-attach':
       return (
         [
@@ -544,6 +560,24 @@ function renderNodeJson(result: NodeCommandResult): string {
         image_name: result.image_name,
         node_id: result.node_id,
         result: normalizeNodeActionJson(result.result)
+      });
+    case 'security-group-attach':
+      return renderJson({
+        action: 'security-group-attach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message
+        },
+        security_group_ids: result.security_group_ids
+      });
+    case 'security-group-detach':
+      return renderJson({
+        action: 'security-group-detach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message
+        },
+        security_group_ids: result.security_group_ids
       });
     case 'ssh-key-attach':
       return renderJson({

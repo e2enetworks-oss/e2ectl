@@ -4,7 +4,7 @@
 
 Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-Create and manage nodes, volumes, VPCs, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
+Create and manage nodes, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
 
 ## Requirements
 
@@ -93,7 +93,11 @@ e2ectl node action save-image <node-id> --name <image-name>
 # Attach resources
 e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
 e2ectl node action volume attach <node-id> --volume-id <volume-id>
+e2ectl node action security-group attach <node-id> --security-group-id <security-group-id>
 e2ectl node action ssh-key attach <node-id> --ssh-key-id <ssh-key-id>
+
+# Detach security groups
+e2ectl node action security-group detach <node-id> --security-group-id <security-group-id>
 
 # Delete (prompts for confirmation unless --force is passed)
 e2ectl node delete <node-id>
@@ -152,6 +156,48 @@ e2ectl vpc delete <vpc-id>
 e2ectl vpc list
 ```
 
+### Security Groups
+
+```bash
+e2ectl security-group list
+e2ectl security-group get <security-group-id>
+e2ectl security-group delete <security-group-id>
+
+# Create from a backend-compatible JSON rules file
+e2ectl security-group create \
+  --name <security-group-name> \
+  --rules-file ./rules.json \
+  [--description <text>] \
+  [--default]
+
+# Update with the full desired rule set
+e2ectl security-group update <security-group-id> \
+  --name <security-group-name> \
+  --rules-file ./rules.json \
+  [--description <text>]
+```
+
+Example `rules.json`:
+
+```json
+[
+  {
+    "network": "any",
+    "rule_type": "Inbound",
+    "protocol_name": "Custom_TCP",
+    "port_range": "22",
+    "description": "ssh"
+  },
+  {
+    "network": "any",
+    "rule_type": "Outbound",
+    "protocol_name": "All",
+    "port_range": "All",
+    "description": ""
+  }
+]
+```
+
 ### SSH Keys
 
 ```bash
@@ -204,7 +250,7 @@ e2ectl config import \
   --no-input
 ```
 
-The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, and `ssh-key list`.
+The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Help
 
@@ -215,6 +261,7 @@ e2ectl node --help
 e2ectl node catalog plans --help
 e2ectl volume --help
 e2ectl vpc --help
+e2ectl security-group --help
 e2ectl ssh-key --help
 ```
 

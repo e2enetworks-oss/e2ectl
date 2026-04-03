@@ -8,6 +8,10 @@ import {
 } from '../myaccount/index.js';
 import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
+import {
+  SecurityGroupApiClient,
+  type SecurityGroupClient
+} from '../security-group/index.js';
 import { SshKeyApiClient, type SshKeyClient } from '../ssh-key/index.js';
 import { VolumeApiClient, type VolumeClient } from '../volume/index.js';
 import { VpcApiClient, type VpcClient } from '../vpc/index.js';
@@ -19,6 +23,9 @@ export interface OutputWriter {
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createSecurityGroupClient(
+    credentials: ResolvedCredentials
+  ): SecurityGroupClient;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
@@ -40,6 +47,10 @@ export function createRuntime(): CliRuntime {
     confirm: promptForConfirmation,
     createNodeClient: (credentials) =>
       new NodeApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createSecurityGroupClient: (credentials) =>
+      new SecurityGroupApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     createSshKeyClient: (credentials) =>

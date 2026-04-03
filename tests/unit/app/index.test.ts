@@ -27,6 +27,11 @@ describe('runCli', () => {
         createNodeClient: vi.fn(() => {
           throw new Error('Node client should not be created for this test.');
         }),
+        createSecurityGroupClient: vi.fn(() => {
+          throw new Error(
+            'Security group client should not be created for this test.'
+          );
+        }),
         createSshKeyClient: vi.fn(() => {
           throw new Error(
             'SSH key client should not be created for this test.'

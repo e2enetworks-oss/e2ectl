@@ -12,6 +12,7 @@ import {
   type CredentialValidationResult
 } from '../../../src/myaccount/index.js';
 import { NodeApiClient } from '../../../src/node/index.js';
+import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
 import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
 import { VolumeApiClient } from '../../../src/volume/index.js';
 import { VpcApiClient } from '../../../src/vpc/index.js';
@@ -62,6 +63,8 @@ describe('config commands', () => {
         confirm,
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
+        createSecurityGroupClient: (credentials: ResolvedCredentials) =>
+          new SecurityGroupApiClient(new MyAccountApiTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
           new SshKeyApiClient(new MyAccountApiTransport(credentials)),
         createVolumeClient: (credentials: ResolvedCredentials) =>
