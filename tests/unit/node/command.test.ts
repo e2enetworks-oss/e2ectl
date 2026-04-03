@@ -4,6 +4,7 @@ import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
+import { NodeService } from '../../../src/node/service.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
@@ -564,6 +565,47 @@ describe('node commands', () => {
         requested: 1
       })
     );
+  });
+
+  it('maps repeated --ssh-key-id flags into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'new-node',
+        '--plan',
+        'plan-123',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--ssh-key-id',
+        '12',
+        '--ssh-key-id',
+        '13',
+        '--ssh-key-id',
+        '12',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      // Keep the real implementation active while still asserting the mapped options.
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'new-node',
+        plan: 'plan-123',
+        sshKeyIds: ['12', '13', '12']
+      });
+      createNodeSpy.mockRestore();
+    }
   });
 
   it('maps committed create flags to cn_id and cn_status', async () => {

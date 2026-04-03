@@ -48,6 +48,7 @@ export interface NodeCreateOptions extends NodeContextOptions {
   image: string;
   name: string;
   plan: string;
+  sshKeyIds?: string[];
 }
 
 export interface NodeDeleteOptions extends NodeContextOptions {
@@ -391,18 +392,36 @@ export class NodeService {
       billingType,
       options.committedPlanId
     );
-    const request = buildDefaultNodeCreateRequest({
-      ...(committedPlanId === null
-        ? {}
-        : {
-            cn_id: committedPlanId,
-            cn_status: COMMITTED_NODE_CREATE_STATUS
-          }),
-      image: normalizeRequiredString(options.image, 'Image', '--image'),
-      name: normalizeRequiredString(options.name, 'Name', '--name'),
-      plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
-    });
-    const client = await this.createNodeClient(options);
+    const sshKeyIds = options.sshKeyIds ?? [];
+    const normalizedSshKeyIds =
+      sshKeyIds.length === 0
+        ? []
+        : normalizeDistinctNumericIds(sshKeyIds, 'SSH key ID', '--ssh-key-id');
+    const credentials = await this.resolveContext(options);
+    const resolvedKeys =
+      normalizedSshKeyIds.length === 0
+        ? []
+        : resolveSavedSshKeys(
+            await this.dependencies
+              .createSshKeyClient(credentials)
+              .listSshKeys(),
+            normalizedSshKeyIds
+          );
+    const request = {
+      ...buildDefaultNodeCreateRequest({
+        ...(committedPlanId === null
+          ? {}
+          : {
+              cn_id: committedPlanId,
+              cn_status: COMMITTED_NODE_CREATE_STATUS
+            }),
+        image: normalizeRequiredString(options.image, 'Image', '--image'),
+        name: normalizeRequiredString(options.name, 'Name', '--name'),
+        plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
+      }),
+      ssh_keys: resolvedKeys.map((key) => key.ssh_key)
+    };
+    const client = this.dependencies.createNodeClient(credentials);
     const result = await client.createNode(request);
 
     return {

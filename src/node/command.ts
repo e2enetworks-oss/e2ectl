@@ -8,7 +8,6 @@ import {
   NodeService,
   type NodeCatalogPlansOptions,
   type NodeContextOptions,
-  type NodeCreateOptions,
   type NodeDeleteOptions,
   type NodeSaveImageOptions,
   type NodeVolumeActionOptions,
@@ -21,6 +20,15 @@ interface GlobalOptions {
 
 interface NodeSshKeyAttachCommandOptions extends NodeContextOptions {
   sshKeyId: string[];
+}
+
+interface NodeCreateCommandOptions extends NodeContextOptions {
+  billingType?: string;
+  committedPlanId?: string;
+  image: string;
+  name: string;
+  plan: string;
+  sshKeyId?: string[] | string;
 }
 
 const NODE_CATALOG_BILLING_TYPE_CHOICES = [
@@ -85,15 +93,44 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         '--committed-plan-id <committedPlanId>',
         `Committed plan id returned by \`${formatCliCommand('node catalog plans')}\`.`
       )
-  ).action(async (options: NodeCreateOptions, commandInstance: Command) => {
-    const result = await service.createNode(options);
-    runtime.stdout.write(
-      renderNodeResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      .option(
+        '--ssh-key-id <sshKeyId>',
+        'Saved SSH key id to attach during node creation. Repeat to attach multiple keys.',
+        collectOptionValue
       )
-    );
-  });
+  ).action(
+    async (options: NodeCreateCommandOptions, commandInstance: Command) => {
+      const result = await service.createNode({
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.billingType === undefined
+          ? {}
+          : { billingType: options.billingType }),
+        ...(options.committedPlanId === undefined
+          ? {}
+          : { committedPlanId: options.committedPlanId }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        image: options.image,
+        name: options.name,
+        plan: options.plan,
+        sshKeyIds: toOptionArray(options.sshKeyId)
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   addContextOptions(
     command.command('get <nodeId>').description('Get details for a node.')

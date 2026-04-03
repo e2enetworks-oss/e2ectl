@@ -38,7 +38,9 @@ function createServiceFixture(): {
   nodeClient: NodeClient;
   powerOffNode: ReturnType<typeof vi.fn>;
   powerOnNode: ReturnType<typeof vi.fn>;
+  readConfig: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
+  receivedSshKeyCredentials: () => ResolvedCredentials | undefined;
   saveNodeImage: ReturnType<typeof vi.fn>;
   service: NodeService;
   listSshKeys: ReturnType<typeof vi.fn>;
@@ -182,14 +184,21 @@ function createServiceFixture(): {
     listVpcs: vi.fn()
   };
   let credentials: ResolvedCredentials | undefined;
+  let sshKeyCredentials: ResolvedCredentials | undefined;
 
   const createNodeClient = vi.fn((resolvedCredentials: ResolvedCredentials) => {
     credentials = resolvedCredentials;
     return nodeClient;
   });
-  const createSshKeyClient = vi.fn(() => sshKeyClient);
+  const createSshKeyClient = vi.fn(
+    (resolvedCredentials: ResolvedCredentials) => {
+      sshKeyCredentials = resolvedCredentials;
+      return sshKeyClient;
+    }
+  );
   const createVolumeClient = vi.fn(() => volumeClient);
   const createVpcClient = vi.fn(() => vpcClient);
+  const readConfig = vi.fn(() => Promise.resolve(createConfig()));
   const service = new NodeService({
     confirm: vi.fn(() => Promise.resolve(true)),
     createNodeClient,
@@ -199,7 +208,7 @@ function createServiceFixture(): {
     isInteractive: true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
-      read: () => Promise.resolve(createConfig())
+      read: readConfig
     }
   });
 
@@ -219,7 +228,9 @@ function createServiceFixture(): {
     nodeClient,
     powerOffNode,
     powerOnNode,
+    readConfig,
     receivedCredentials: () => credentials,
+    receivedSshKeyCredentials: () => sshKeyCredentials,
     saveNodeImage,
     service,
     listSshKeys,
@@ -421,6 +432,72 @@ describe('NodeService', () => {
     });
 
     expect(attachSshKeys).not.toHaveBeenCalled();
+  });
+
+  it('resolves create ssh key ids once and sends raw ssh_keys in the create payload', async () => {
+    const {
+      createNode,
+      createNodeClient,
+      createSshKeyClient,
+      listSshKeys,
+      readConfig,
+      receivedCredentials,
+      receivedSshKeyCredentials,
+      service
+    } = createServiceFixture();
+
+    await service.createNode({
+      alias: 'prod',
+      image: 'Ubuntu-24.04-Distro',
+      name: 'demo-node',
+      plan: 'plan-123',
+      sshKeyIds: ['12', '13', '12']
+    });
+
+    expect(readConfig).toHaveBeenCalledTimes(1);
+    expect(createSshKeyClient).toHaveBeenCalledTimes(1);
+    expect(createNodeClient).toHaveBeenCalledTimes(1);
+    expect(receivedSshKeyCredentials()).toBe(receivedCredentials());
+    expect(listSshKeys).toHaveBeenCalledTimes(1);
+    expect(createNode).toHaveBeenCalledWith({
+      backups: false,
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'demo-node',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [
+        'ssh-ed25519 AAAA admin@example.com',
+        'ssh-ed25519 BBBB deploy@example.com'
+      ],
+      start_scripts: []
+    });
+  });
+
+  it('fails before createNode when a requested create ssh key id does not resolve', async () => {
+    const { createNode, createNodeClient, listSshKeys, service } =
+      createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'plan-123',
+        sshKeyIds: ['12', '99']
+      })
+    ).rejects.toMatchObject({
+      message: 'Unknown SSH key ID: 99.'
+    });
+
+    expect(listSshKeys).toHaveBeenCalledTimes(1);
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
   });
 
   it('maps committed create options to cn_id and auto_renew status', async () => {

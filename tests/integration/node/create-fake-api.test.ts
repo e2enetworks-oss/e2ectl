@@ -117,6 +117,122 @@ describe('node create against a fake MyAccount API', () => {
     }
   });
 
+  it('resolves saved ssh key ids before sending raw ssh_keys in the create payload', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/ssh_keys/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              label: 'admin',
+              pk: 12,
+              ssh_key: 'ssh-ed25519 AAAA admin@example.com',
+              timestamp: '14-Mar-2026'
+            },
+            {
+              label: 'deploy',
+              pk: 13,
+              ssh_key: 'ssh-ed25519 BBBB deploy@example.com',
+              timestamp: '14-Mar-2026'
+            }
+          ],
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'POST /myaccount/api/v1/nodes/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'node',
+          'create',
+          '--name',
+          'demo-node',
+          '--plan',
+          'plan-123',
+          '--image',
+          'Ubuntu-24.04-Distro',
+          '--ssh-key-id',
+          '12',
+          '--ssh-key-id',
+          '13',
+          '--ssh-key-id',
+          '12'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe(
+        `${stableStringify({
+          action: 'create',
+          billing: {
+            billing_type: 'hourly'
+          },
+          created: 1,
+          nodes: [
+            {
+              created_at: '2026-03-11T10:00:00Z',
+              id: 205,
+              location: 'Delhi',
+              name: 'demo-node',
+              plan: 'C3.8GB',
+              private_ip_address: '10.0.0.2',
+              public_ip_address: '1.1.1.2',
+              status: 'Creating'
+            }
+          ],
+          requested: 1
+        })}\n`
+      );
+      expect(server.requests).toHaveLength(2);
+      expect(server.requests[0]).toMatchObject({
+        method: 'GET',
+        pathname: '/myaccount/api/v1/ssh_keys/',
+        query: {
+          apikey: 'prod-api-key',
+          location: 'Delhi',
+          project_id: '46429'
+        }
+      });
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
+        backups: false,
+        default_public_ip: false,
+        disable_password: true,
+        enable_bitninja: false,
+        image: 'Ubuntu-24.04-Distro',
+        is_ipv6_availed: false,
+        is_saved_image: false,
+        label: 'default',
+        name: 'demo-node',
+        number_of_instances: 1,
+        plan: 'plan-123',
+        ssh_keys: [
+          'ssh-ed25519 AAAA admin@example.com',
+          'ssh-ed25519 BBBB deploy@example.com'
+        ],
+        start_scripts: []
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('sends cn_id and auto_renew for committed node creation', async () => {
     const server = await startTestHttpServer({
       'POST /myaccount/api/v1/nodes/': () => ({

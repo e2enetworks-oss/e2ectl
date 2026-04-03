@@ -67,8 +67,11 @@ Always use `node catalog` before creating a node. It returns the exact `plan`, `
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --image <image>
+  --image <image> \
+  [--ssh-key-id <ssh-key-id>]...
 ```
+
+Repeat `--ssh-key-id <ssh-key-id>` to attach one or more saved SSH keys during node creation.
 
 For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values from `node catalog plans`.
 
