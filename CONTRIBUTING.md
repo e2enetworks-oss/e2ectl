@@ -70,6 +70,7 @@ Architectural rules:
 - Services orchestrate validation, defaults, prompts, and cross-domain workflows. They do not own rendering.
 - Clients own endpoint paths and response parsing.
 - Formatters own human-readable output and deterministic `--json` output.
+- When adding new domains or cleaning existing ones, keep the same seam: `command.ts` for Commander wiring, `service.ts` for CLI orchestration, `client.ts` for reusable API access, and `formatter.ts` for rendering.
 - Generic API failure handling stays centralized in `src/myaccount/transport.ts`.
 - Cross-domain imports should go through each domain `index.ts`.
 - Prefer small, explicit implementations over speculative abstractions.

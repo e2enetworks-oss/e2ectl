@@ -27,6 +27,10 @@ type NodeListApiResponse = ApiResponse<
   }
 >;
 
+const NODES_PATH = '/nodes/';
+const NODE_CATALOG_OS_PATH = '/images/os-category/';
+const NODE_CATALOG_PLANS_PATH = '/images/';
+
 export interface NodeClient {
   attachSshKeys(
     nodeId: string,
@@ -58,7 +62,7 @@ export class NodeApiClient implements NodeClient {
 
   async createNode(body: NodeCreateRequest): Promise<NodeCreateResult> {
     const response = await this.transport.post<ApiEnvelope<NodeCreateResult>>(
-      '/nodes/',
+      NODES_PATH,
       {
         body
       }
@@ -70,25 +74,24 @@ export class NodeApiClient implements NodeClient {
   async deleteNode(nodeId: string): Promise<NodeDeleteResult> {
     const response = await this.transport.delete<
       ApiEnvelope<Record<string, never>>
-    >(`/nodes/${nodeId}/`);
+    >(buildNodePath(nodeId));
 
-    return {
-      message: response.message
-    };
+    return mapNodeDeleteResponse(response);
   }
 
   async getNode(nodeId: string): Promise<NodeDetails> {
     const response = await this.transport.get<ApiEnvelope<NodeDetails>>(
-      `/nodes/${nodeId}/`
+      buildNodePath(nodeId)
     );
 
     return response.data;
   }
 
   async listNodeCatalogOs(): Promise<NodeCatalogOsData> {
-    const response = await this.transport.get<ApiEnvelope<NodeCatalogOsData>>(
-      '/images/os-category/'
-    );
+    const response =
+      await this.transport.get<ApiEnvelope<NodeCatalogOsData>>(
+        NODE_CATALOG_OS_PATH
+      );
 
     return response.data;
   }
@@ -97,7 +100,7 @@ export class NodeApiClient implements NodeClient {
     query: NodeCatalogQuery
   ): Promise<NodeCatalogPlan[]> {
     const response = await this.transport.get<ApiEnvelope<NodeCatalogPlan[]>>(
-      '/images/',
+      NODE_CATALOG_PLANS_PATH,
       {
         query
       }
@@ -107,17 +110,9 @@ export class NodeApiClient implements NodeClient {
   }
 
   async listNodes(): Promise<NodeListResult> {
-    const response = await this.transport.get<NodeListApiResponse>('/nodes/');
+    const response = await this.transport.get<NodeListApiResponse>(NODES_PATH);
 
-    return {
-      nodes: response.data,
-      ...(response.total_count === undefined
-        ? {}
-        : { total_count: response.total_count }),
-      ...(response.total_page_number === undefined
-        ? {}
-        : { total_page_number: response.total_page_number })
-    };
+    return mapNodeListResponse(response);
   }
 
   async powerOffNode(nodeId: string): Promise<NodeActionResult> {
@@ -148,9 +143,37 @@ export class NodeApiClient implements NodeClient {
     >({
       body,
       method: 'PUT',
-      path: `/nodes/${nodeId}/actions/`
+      path: buildNodeActionPath(nodeId)
     });
 
     return response.data;
   }
+}
+
+function buildNodePath(nodeId: string): string {
+  return `${NODES_PATH}${nodeId}/`;
+}
+
+function buildNodeActionPath(nodeId: string): string {
+  return `${buildNodePath(nodeId)}actions/`;
+}
+
+function mapNodeDeleteResponse(
+  response: ApiEnvelope<Record<string, never>>
+): NodeDeleteResult {
+  return {
+    message: response.message
+  };
+}
+
+function mapNodeListResponse(response: NodeListApiResponse): NodeListResult {
+  return {
+    nodes: response.data,
+    ...(response.total_count === undefined
+      ? {}
+      : { total_count: response.total_count }),
+    ...(response.total_page_number === undefined
+      ? {}
+      : { total_page_number: response.total_page_number })
+  };
 }
