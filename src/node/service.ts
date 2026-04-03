@@ -399,6 +399,10 @@ export class NodeService {
       options.billingType,
       options.committedPlanId
     );
+    const payloadInput = normalizeNodeCreatePayloadInput(
+      options,
+      billing.committedPlanId
+    );
     const sshKeyIds = options.sshKeyIds ?? [];
     const normalizedSshKeyIds =
       sshKeyIds.length === 0
@@ -409,10 +413,7 @@ export class NodeService {
       credentials,
       normalizedSshKeyIds
     );
-    const request = buildNodeCreatePayload(
-      normalizeNodeCreatePayloadInput(options, billing.committedPlanId),
-      resolvedKeys
-    );
+    const request = buildNodeCreatePayload(payloadInput, resolvedKeys);
     const client = this.dependencies.createNodeClient(credentials);
     const result = await client.createNode(request);
 

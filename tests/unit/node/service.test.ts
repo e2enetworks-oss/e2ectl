@@ -500,6 +500,35 @@ describe('NodeService', () => {
     expect(createNode).not.toHaveBeenCalled();
   });
 
+  it('validates create input before resolving context or ssh keys', async () => {
+    const {
+      createNode,
+      createNodeClient,
+      createSshKeyClient,
+      listSshKeys,
+      readConfig,
+      service
+    } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        image: '   ',
+        name: 'demo-node',
+        plan: 'plan-123',
+        sshKeyIds: ['12']
+      })
+    ).rejects.toMatchObject({
+      message: 'Image cannot be empty.'
+    });
+
+    expect(readConfig).not.toHaveBeenCalled();
+    expect(createSshKeyClient).not.toHaveBeenCalled();
+    expect(listSshKeys).not.toHaveBeenCalled();
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
   it('maps committed create options to cn_id and auto_renew status', async () => {
     const { createNode, service } = createServiceFixture();
 
