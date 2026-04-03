@@ -25,11 +25,13 @@ import {
   normalizeRequiredString
 } from './normalizers.js';
 import type {
+  NodeActionSshKey,
   NodeActionResult,
   NodeCatalogOsData,
   NodeCatalogPlanItem,
   NodeCatalogPlansQuery,
   NodeCreateBillingType,
+  NodeCreateRequest,
   NodeCreateResult,
   NodeDetails,
   NodeListResult,
@@ -265,6 +267,18 @@ interface ResolvedSshKey {
   ssh_key: string;
 }
 
+interface NormalizedNodeCreateBilling {
+  billingType: NodeCreateBillingType;
+  committedPlanId: number | null;
+}
+
+interface NodeCreatePayloadInput {
+  committedPlanId: number | null;
+  image: string;
+  name: string;
+  plan: string;
+}
+
 const DEFAULT_NODE_CREATE_BILLING_TYPE: NodeCreateBillingType = 'hourly';
 const COMMITTED_NODE_CREATE_STATUS: NodeCommittedCreateStatus = 'auto_renew';
 
@@ -290,20 +304,14 @@ export class NodeService {
     );
     const result = await nodeClient.attachSshKeys(
       String(normalizedNodeId),
-      resolvedKeys.map((key) => ({
-        label: key.label,
-        ssh_key: key.ssh_key
-      }))
+      mapResolvedSshKeysToActionPayload(resolvedKeys)
     );
 
     return {
       action: 'ssh-key-attach',
       node_id: normalizedNodeId,
       result: summarizeNodeAction(result),
-      ssh_keys: resolvedKeys.map(({ id, label }) => ({
-        id,
-        label
-      }))
+      ssh_keys: summarizeResolvedSshKeys(resolvedKeys)
     };
   }
 
@@ -387,9 +395,8 @@ export class NodeService {
   async createNode(
     options: NodeCreateOptions
   ): Promise<NodeCreateCommandResult> {
-    const billingType = normalizeNodeCreateBillingType(options.billingType);
-    const committedPlanId = normalizeCommittedPlanId(
-      billingType,
+    const billing = normalizeNodeCreateBilling(
+      options.billingType,
       options.committedPlanId
     );
     const sshKeyIds = options.sshKeyIds ?? [];
@@ -398,44 +405,20 @@ export class NodeService {
         ? []
         : normalizeDistinctNumericIds(sshKeyIds, 'SSH key ID', '--ssh-key-id');
     const credentials = await this.resolveContext(options);
-    const resolvedKeys =
-      normalizedSshKeyIds.length === 0
-        ? []
-        : resolveSavedSshKeys(
-            await this.dependencies
-              .createSshKeyClient(credentials)
-              .listSshKeys(),
-            normalizedSshKeyIds
-          );
-    const request = {
-      ...buildDefaultNodeCreateRequest({
-        ...(committedPlanId === null
-          ? {}
-          : {
-              cn_id: committedPlanId,
-              cn_status: COMMITTED_NODE_CREATE_STATUS
-            }),
-        image: normalizeRequiredString(options.image, 'Image', '--image'),
-        name: normalizeRequiredString(options.name, 'Name', '--name'),
-        plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
-      }),
-      ssh_keys: resolvedKeys.map((key) => key.ssh_key)
-    };
+    const resolvedKeys = await this.resolveCreateSshKeys(
+      credentials,
+      normalizedSshKeyIds
+    );
+    const request = buildNodeCreatePayload(
+      normalizeNodeCreatePayloadInput(options, billing.committedPlanId),
+      resolvedKeys
+    );
     const client = this.dependencies.createNodeClient(credentials);
     const result = await client.createNode(request);
 
     return {
       action: 'create',
-      billing:
-        committedPlanId === null
-          ? {
-              billing_type: billingType
-            }
-          : {
-              billing_type: billingType,
-              committed_plan_id: committedPlanId,
-              post_commit_behavior: COMMITTED_NODE_CREATE_STATUS
-            },
+      billing: summarizeNodeCreateBilling(billing),
       result
     };
   }
@@ -669,6 +652,18 @@ export class NodeService {
     return await resolveStoredCredentials(this.dependencies.store, options);
   }
 
+  private async resolveCreateSshKeys(
+    credentials: ResolvedCredentials,
+    requestedIds: number[]
+  ): Promise<ResolvedSshKey[]> {
+    if (requestedIds.length === 0) {
+      return [];
+    }
+
+    const sshKeyClient = this.dependencies.createSshKeyClient(credentials);
+    return resolveSavedSshKeys(await sshKeyClient.listSshKeys(), requestedIds);
+  }
+
   private async resolveNodeVmId(
     nodeClient: NodeClient,
     nodeId: number
@@ -728,6 +723,33 @@ function normalizeNodeCreateBillingType(
     ['committed', 'hourly'],
     DEFAULT_NODE_CREATE_BILLING_TYPE
   );
+}
+
+function normalizeNodeCreateBilling(
+  billingType: string | undefined,
+  committedPlanId: string | undefined
+): NormalizedNodeCreateBilling {
+  const normalizedBillingType = normalizeNodeCreateBillingType(billingType);
+
+  return {
+    billingType: normalizedBillingType,
+    committedPlanId: normalizeCommittedPlanId(
+      normalizedBillingType,
+      committedPlanId
+    )
+  };
+}
+
+function normalizeNodeCreatePayloadInput(
+  options: NodeCreateOptions,
+  committedPlanId: number | null
+): NodeCreatePayloadInput {
+  return {
+    committedPlanId,
+    image: normalizeRequiredString(options.image, 'Image', '--image'),
+    name: normalizeRequiredString(options.name, 'Name', '--name'),
+    plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
+  };
 }
 
 function normalizeCommittedPlanId(
@@ -795,6 +817,26 @@ function normalizeDistinctNumericIds(
   return normalizedValues;
 }
 
+function buildNodeCreatePayload(
+  input: NodeCreatePayloadInput,
+  resolvedKeys: ResolvedSshKey[]
+): NodeCreateRequest {
+  return {
+    ...buildDefaultNodeCreateRequest({
+      ...(input.committedPlanId === null
+        ? {}
+        : {
+            cn_id: input.committedPlanId,
+            cn_status: COMMITTED_NODE_CREATE_STATUS
+          }),
+      image: input.image,
+      name: input.name,
+      plan: input.plan
+    }),
+    ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
+  };
+}
+
 function resolveSavedSshKeys(
   availableKeys: SshKeySummary[],
   requestedIds: number[]
@@ -834,6 +876,30 @@ function resolveSavedSshKeys(
   });
 }
 
+function mapResolvedSshKeysToActionPayload(
+  resolvedKeys: ResolvedSshKey[]
+): NodeActionSshKey[] {
+  return resolvedKeys.map((key) => ({
+    label: key.label,
+    ssh_key: key.ssh_key
+  }));
+}
+
+function mapResolvedSshKeysToCreatePayload(
+  resolvedKeys: ResolvedSshKey[]
+): string[] {
+  return resolvedKeys.map((key) => key.ssh_key);
+}
+
+function summarizeResolvedSshKeys(
+  resolvedKeys: ResolvedSshKey[]
+): NodeResolvedSshKeySummary[] {
+  return resolvedKeys.map(({ id, label }) => ({
+    id,
+    label
+  }));
+}
+
 function summarizeNodeAction(
   result: NodeActionResult
 ): NodeActionStatusSummary {
@@ -843,4 +909,18 @@ function summarizeNodeAction(
     image_id: result.image_id ?? null,
     status: result.status
   };
+}
+
+function summarizeNodeCreateBilling(
+  billing: NormalizedNodeCreateBilling
+): NodeCreateBillingSummary {
+  return billing.committedPlanId === null
+    ? {
+        billing_type: billing.billingType
+      }
+    : {
+        billing_type: billing.billingType,
+        committed_plan_id: billing.committedPlanId,
+        post_commit_behavior: COMMITTED_NODE_CREATE_STATUS
+      };
 }
