@@ -73,6 +73,11 @@ describe('ssh-key commands', () => {
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
+      createSecurityGroupClient: vi.fn(() => {
+        throw new Error(
+          'Security group client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => never,
       createSshKeyClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;

@@ -8,6 +8,6 @@ describe('createProgram', () => {
     expect(program.name()).toBe(CLI_COMMAND_NAME);
     expect(
       program.commands.map((command: { name(): string }) => command.name())
-    ).toEqual(['config', 'node', 'volume', 'vpc', 'ssh-key']);
+    ).toEqual(['config', 'node', 'volume', 'vpc', 'security-group', 'ssh-key']);
   });
 });

@@ -22,6 +22,10 @@ interface NodeSshKeyAttachCommandOptions extends NodeContextOptions {
   sshKeyId: string[];
 }
 
+interface NodeSecurityGroupActionCommandOptions extends NodeContextOptions {
+  securityGroupId: string[];
+}
+
 interface NodeCreateCommandOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
@@ -42,6 +46,8 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   const service = new NodeService({
     confirm: (message) => runtime.confirm(message),
     createNodeClient: (credentials) => runtime.createNodeClient(credentials),
+    createSecurityGroupClient: (credentials) =>
+      runtime.createSecurityGroupClient(credentials),
     createSshKeyClient: (credentials) =>
       runtime.createSshKeyClient(credentials),
     createVolumeClient: (credentials) =>
@@ -247,6 +253,7 @@ function buildNodeActionCommand(
 
   command.addCommand(buildNodeActionVpcCommand(service, runtime));
   command.addCommand(buildNodeActionVolumeCommand(service, runtime));
+  command.addCommand(buildNodeActionSecurityGroupCommand(service, runtime));
   command.addCommand(buildNodeActionSshKeyCommand(service, runtime));
 
   command.action(() => {
@@ -360,6 +367,102 @@ function buildNodeActionVolumeCommand(
       commandInstance: Command
     ) => {
       const result = await service.detachVolume(nodeId, options);
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildNodeActionSecurityGroupCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('security-group').description(
+    'Attach or detach security groups on a node.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node action security-group command'
+  );
+
+  addContextOptions(
+    command
+      .command('attach <nodeId>')
+      .description('Attach one or more security groups to a node.')
+      .requiredOption(
+        '--security-group-id <securityGroupId>',
+        'Security group id to attach. Repeat to attach multiple security groups.',
+        collectOptionValue
+      )
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeSecurityGroupActionCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.attachSecurityGroups(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        securityGroupIds: toOptionArray(options.securityGroupId)
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('detach <nodeId>')
+      .description('Detach one or more security groups from a node.')
+      .requiredOption(
+        '--security-group-id <securityGroupId>',
+        'Security group id to detach. Repeat to detach multiple security groups.',
+        collectOptionValue
+      )
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeSecurityGroupActionCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachSecurityGroups(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        securityGroupIds: toOptionArray(options.securityGroupId)
+      });
       runtime.stdout.write(
         renderNodeResult(
           result,

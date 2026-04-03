@@ -5,6 +5,7 @@ import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
 import { NodeService } from '../../../src/node/service.js';
+import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
@@ -224,6 +225,35 @@ function createSshKeyClientStub() {
   };
 }
 
+function createSecurityGroupClientStub() {
+  const attachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Group Attached Successfully'
+    })
+  );
+  const detachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Groups Detached Successfully'
+    })
+  );
+
+  const stub: SecurityGroupClient = {
+    attachNodeSecurityGroups,
+    createSecurityGroup: vi.fn(),
+    deleteSecurityGroup: vi.fn(),
+    detachNodeSecurityGroups,
+    getSecurityGroup: vi.fn(),
+    listSecurityGroups: vi.fn(),
+    updateSecurityGroup: vi.fn()
+  };
+
+  return {
+    attachNodeSecurityGroups,
+    detachNodeSecurityGroups,
+    stub
+  };
+}
+
 function createVolumeClientStub() {
   const attachVolumeToNode = vi.fn(() =>
     Promise.resolve({
@@ -314,6 +344,7 @@ describe('node commands', () => {
     prompt: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
+    securityGroupStub: ReturnType<typeof createSecurityGroupClientStub>;
     sshKeyStub: ReturnType<typeof createSshKeyClientStub>;
     stdout: MemoryWriter;
     volumeStub: ReturnType<typeof createVolumeClientStub>;
@@ -323,6 +354,7 @@ describe('node commands', () => {
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
     const nodeStub = createNodeClientStub();
+    const securityGroupStub = createSecurityGroupClientStub();
     const sshKeyStub = createSshKeyClientStub();
     const volumeStub = createVolumeClientStub();
     const vpcStub = createVpcClientStub();
@@ -338,6 +370,7 @@ describe('node commands', () => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
       },
+      createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),
       createVpcClient: vi.fn(() => vpcStub.stub),
@@ -357,6 +390,7 @@ describe('node commands', () => {
       prompt,
       receivedCredentials: () => credentials,
       runtime,
+      securityGroupStub,
       sshKeyStub,
       stdout,
       volumeStub,
@@ -606,6 +640,86 @@ describe('node commands', () => {
       });
       createNodeSpy.mockRestore();
     }
+  });
+
+  it('attaches security groups after resolving the node vm id', async () => {
+    const { runtime, stdout, securityGroupStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'security-group',
+      'attach',
+      '101',
+      '--security-group-id',
+      '44',
+      '--security-group-id',
+      '45',
+      '--security-group-id',
+      '44',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(securityGroupStub.attachNodeSecurityGroups).toHaveBeenCalledWith(
+      100157,
+      {
+        security_group_ids: [44, 45]
+      }
+    );
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      })
+    );
+  });
+
+  it('detaches security groups in deterministic json mode', async () => {
+    const { runtime, stdout, securityGroupStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'security-group',
+      'detach',
+      '101',
+      '--security-group-id',
+      '45',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(securityGroupStub.detachNodeSecurityGroups).toHaveBeenCalledWith(
+      100157,
+      {
+        security_group_ids: [45]
+      }
+    );
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'security-group-detach',
+        node_id: 101,
+        result: {
+          message: 'Security Groups Detached Successfully'
+        },
+        security_group_ids: [45]
+      })
+    );
   });
 
   it('maps committed create flags to cn_id and cn_status', async () => {

@@ -5,6 +5,7 @@ import {
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import type { SecurityGroupClient } from '../security-group/index.js';
 import type { SshKeyClient, SshKeySummary } from '../ssh-key/index.js';
 import type { VolumeClient } from '../volume/index.js';
 import type { VpcClient } from '../vpc/index.js';
@@ -68,6 +69,10 @@ export interface NodeCatalogPlansOptions extends NodeContextOptions {
 
 export interface NodeSaveImageOptions extends NodeContextOptions {
   name: string;
+}
+
+export interface NodeSecurityGroupActionOptions extends NodeContextOptions {
+  securityGroupIds: string[];
 }
 
 export interface NodeVpcActionOptions extends NodeContextOptions {
@@ -230,6 +235,24 @@ export interface NodeSshKeyAttachCommandResult {
   ssh_keys: NodeResolvedSshKeySummary[];
 }
 
+export interface NodeSecurityGroupAttachCommandResult {
+  action: 'security-group-attach';
+  node_id: number;
+  result: {
+    message: string;
+  };
+  security_group_ids: number[];
+}
+
+export interface NodeSecurityGroupDetachCommandResult {
+  action: 'security-group-detach';
+  node_id: number;
+  result: {
+    message: string;
+  };
+  security_group_ids: number[];
+}
+
 export type NodeCommandResult =
   | NodeCatalogOsCommandResult
   | NodeCatalogPlansCommandResult
@@ -240,6 +263,8 @@ export type NodeCommandResult =
   | NodePowerOffCommandResult
   | NodePowerOnCommandResult
   | NodeSaveImageCommandResult
+  | NodeSecurityGroupAttachCommandResult
+  | NodeSecurityGroupDetachCommandResult
   | NodeSshKeyAttachCommandResult
   | NodeVolumeAttachCommandResult
   | NodeVolumeDetachCommandResult
@@ -254,6 +279,9 @@ interface NodeStore {
 export interface NodeServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createSecurityGroupClient(
+    credentials: ResolvedCredentials
+  ): SecurityGroupClient;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
@@ -312,6 +340,34 @@ export class NodeService {
       node_id: normalizedNodeId,
       result: summarizeNodeAction(result),
       ssh_keys: summarizeResolvedSshKeys(resolvedKeys)
+    };
+  }
+
+  async attachSecurityGroups(
+    nodeId: string,
+    options: NodeSecurityGroupActionOptions
+  ): Promise<NodeSecurityGroupAttachCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const securityGroupIds = normalizeDistinctNumericIds(
+      options.securityGroupIds,
+      'Security group ID',
+      '--security-group-id'
+    );
+    const credentials = await this.resolveContext(options);
+    const nodeClient = this.dependencies.createNodeClient(credentials);
+    const client = this.dependencies.createSecurityGroupClient(credentials);
+    const nodeVmId = await this.resolveNodeVmId(nodeClient, normalizedNodeId);
+    const result = await client.attachNodeSecurityGroups(nodeVmId, {
+      security_group_ids: securityGroupIds
+    });
+
+    return {
+      action: 'security-group-attach',
+      node_id: normalizedNodeId,
+      result: {
+        message: result.message
+      },
+      security_group_ids: securityGroupIds
     };
   }
 
@@ -453,6 +509,34 @@ export class NodeService {
       cancelled: false,
       message: result.message,
       node_id: normalizedNodeId
+    };
+  }
+
+  async detachSecurityGroups(
+    nodeId: string,
+    options: NodeSecurityGroupActionOptions
+  ): Promise<NodeSecurityGroupDetachCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const securityGroupIds = normalizeDistinctNumericIds(
+      options.securityGroupIds,
+      'Security group ID',
+      '--security-group-id'
+    );
+    const credentials = await this.resolveContext(options);
+    const nodeClient = this.dependencies.createNodeClient(credentials);
+    const client = this.dependencies.createSecurityGroupClient(credentials);
+    const nodeVmId = await this.resolveNodeVmId(nodeClient, normalizedNodeId);
+    const result = await client.detachNodeSecurityGroups(nodeVmId, {
+      security_group_ids: securityGroupIds
+    });
+
+    return {
+      action: 'security-group-detach',
+      node_id: normalizedNodeId,
+      result: {
+        message: result.message
+      },
+      security_group_ids: securityGroupIds
     };
   }
 
