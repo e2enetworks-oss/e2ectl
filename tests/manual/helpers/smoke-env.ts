@@ -1,14 +1,19 @@
-const REQUIRED_SMOKE_ENV_VARS = [
-  'E2E_API_KEY',
-  'E2E_AUTH_TOKEN',
-  'E2E_PROJECT_ID',
-  'E2E_LOCATION',
+import {
+  normalizeOptionalEnvValue,
+  readRequiredEnvValues,
+  REQUIRED_MANUAL_BASE_ENV_VARS,
+  toManualCliEnv
+} from './manual-env.js';
+
+const REQUIRED_SMOKE_ONLY_ENV_VARS = [
   'E2ECTL_SMOKE_NODE_PLAN',
   'E2ECTL_SMOKE_NODE_IMAGE',
   'E2ECTL_SMOKE_DNS_DOMAIN'
 ] as const;
-
-const OPTIONAL_BASE_URL_ENV_VAR = 'E2ECTL_MYACCOUNT_BASE_URL';
+const REQUIRED_SMOKE_ENV_VARS = [
+  ...REQUIRED_MANUAL_BASE_ENV_VARS,
+  ...REQUIRED_SMOKE_ONLY_ENV_VARS
+] as const;
 
 export interface SmokeEnv {
   apiKey: string;
@@ -25,43 +30,27 @@ export interface SmokeEnv {
 }
 
 export function readSmokeEnv(env: NodeJS.ProcessEnv = process.env): SmokeEnv {
-  const missing = REQUIRED_SMOKE_ENV_VARS.filter((name) => {
-    const value = env[name];
-    return value === undefined || value.trim().length === 0;
+  const requiredValues = readRequiredEnvValues({
+    env,
+    purpose: 'Manual smoke',
+    requiredVars: REQUIRED_SMOKE_ENV_VARS
   });
 
-  if (missing.length > 0) {
-    throw new Error(
-      `Manual smoke requires ${REQUIRED_SMOKE_ENV_VARS.join(', ')}. Missing: ${missing.join(', ')}.`
-    );
-  }
-
-  const apiKey = env.E2E_API_KEY!.trim();
-  const authToken = env.E2E_AUTH_TOKEN!.trim();
-  const projectId = env.E2E_PROJECT_ID!.trim();
-  const location = env.E2E_LOCATION!.trim();
-  const nodePlan = env.E2ECTL_SMOKE_NODE_PLAN!.trim();
-  const nodeImage = env.E2ECTL_SMOKE_NODE_IMAGE!.trim();
-  const dnsDomain = env.E2ECTL_SMOKE_DNS_DOMAIN!.trim();
-  const manifestPath = normalizeOptional(env.E2ECTL_SMOKE_MANIFEST);
+  const apiKey = requiredValues.E2E_API_KEY!;
+  const authToken = requiredValues.E2E_AUTH_TOKEN!;
+  const projectId = requiredValues.E2E_PROJECT_ID!;
+  const location = requiredValues.E2E_LOCATION!;
+  const nodePlan = requiredValues.E2ECTL_SMOKE_NODE_PLAN!;
+  const nodeImage = requiredValues.E2ECTL_SMOKE_NODE_IMAGE!;
+  const dnsDomain = requiredValues.E2ECTL_SMOKE_DNS_DOMAIN!;
+  const manifestPath = normalizeOptionalEnvValue(env.E2ECTL_SMOKE_MANIFEST);
   const prefix = normalizePrefix(env.E2ECTL_SMOKE_PREFIX);
   const recordTtl = normalizeRecordTtl(env.E2ECTL_SMOKE_RECORD_TTL);
-  const baseUrl = normalizeOptional(env[OPTIONAL_BASE_URL_ENV_VAR]);
 
   return {
     apiKey,
     authToken,
-    cliEnv: {
-      E2E_API_KEY: apiKey,
-      E2E_AUTH_TOKEN: authToken,
-      E2E_LOCATION: location,
-      E2E_PROJECT_ID: projectId,
-      ...(baseUrl === undefined
-        ? {}
-        : {
-            [OPTIONAL_BASE_URL_ENV_VAR]: baseUrl
-          })
-    },
+    cliEnv: toManualCliEnv(requiredValues, env),
     dnsDomain,
     location,
     ...(manifestPath === undefined ? {} : { manifestPath }),
@@ -73,17 +62,8 @@ export function readSmokeEnv(env: NodeJS.ProcessEnv = process.env): SmokeEnv {
   };
 }
 
-function normalizeOptional(value: string | undefined): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  return normalized.length === 0 ? undefined : normalized;
-}
-
 function normalizePrefix(value: string | undefined): string {
-  const normalized = normalizeOptional(value) ?? 'release-smoke';
+  const normalized = normalizeOptionalEnvValue(value) ?? 'release-smoke';
   const sanitized = normalized
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
@@ -94,7 +74,7 @@ function normalizePrefix(value: string | undefined): string {
 }
 
 function normalizeRecordTtl(value: string | undefined): string {
-  const normalized = normalizeOptional(value) ?? '300';
+  const normalized = normalizeOptionalEnvValue(value) ?? '300';
 
   if (!/^\d+$/.test(normalized) || Number.parseInt(normalized, 10) <= 0) {
     throw new Error(

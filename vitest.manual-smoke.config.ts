@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-const MANUAL_SMOKE_TEST_TIMEOUT_MS = 20 * 60 * 1000;
+const MANUAL_SMOKE_TEST_TIMEOUT_MS = 30 * 60 * 1000;
 
 export default defineConfig({
   test: {

@@ -1,12 +1,25 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
-import { access, readFile, unlink, writeFile } from 'node:fs/promises';
+import { access, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+import {
+  classifyCleanupError,
+  classifyCleanupMessage,
+  formatError,
+  isMissingFileError,
+  toDnsDeleteContent
+} from './helpers/manual-smoke-cleanup.mjs';
+import {
+  loadSmokeManifest,
+  updateSmokeManifest
+} from './helpers/manual-smoke-manifest.mjs';
+import { runProcess } from './helpers/process.mjs';
+
 const CLI_ENTRYPOINT = path.resolve(process.cwd(), 'dist', 'app', 'index.js');
 const BASE_URL_ENV_VAR = 'E2ECTL_MYACCOUNT_BASE_URL';
+const CLEANUP_COMMAND_TIMEOUT_MS = 2 * 60 * 1000;
 
 const manifestPath = parseManifestPath(process.argv.slice(2));
 const cliEnv = readCleanupEnv(process.env);
@@ -26,6 +39,9 @@ await cleanupReservedIp(
   'preserved_reserved_ip',
   'preserved_reserved_ip_deleted'
 );
+await cleanupVolume();
+await cleanupVpc();
+await cleanupSshKey();
 await cleanupSecurityGroup();
 await cleanupTempRulesFile();
 
@@ -54,18 +70,7 @@ async function cleanupDnsRecords() {
     ]);
 
     if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
-      await updateManifest((draft) => {
-        const target = draft.dns_records.find(
-          (candidate) =>
-            candidate.domain_name === record.domain_name &&
-            candidate.name === record.name &&
-            candidate.type === record.type
-        );
-
-        if (target !== undefined) {
-          target.deleted = true;
-        }
-      });
+      await markDnsRecordDeleted(record);
       console.log(
         `Cleaned DNS record ${record.type} ${record.name} ${record.current_value}.`
       );
@@ -82,35 +87,13 @@ async function cleanupDnsRecords() {
         zone_name: record.domain_name
       });
 
-      await updateManifest((draft) => {
-        const target = draft.dns_records.find(
-          (candidate) =>
-            candidate.domain_name === record.domain_name &&
-            candidate.name === record.name &&
-            candidate.type === record.type
-        );
-
-        if (target !== undefined) {
-          target.deleted = true;
-        }
-      });
+      await markDnsRecordDeleted(record);
       console.log(
         `Fallback-cleaned DNS record ${record.type} ${record.name} ${record.current_value}.`
       );
     } catch (error) {
-      if (isAlreadyGoneError(error)) {
-        await updateManifest((draft) => {
-          const target = draft.dns_records.find(
-            (candidate) =>
-              candidate.domain_name === record.domain_name &&
-              candidate.name === record.name &&
-              candidate.type === record.type
-          );
-
-          if (target !== undefined) {
-            target.deleted = true;
-          }
-        });
+      if (classifyCleanupError(error) === 'already-gone') {
+        await markDnsRecordDeleted(record);
         console.log(
           `DNS record ${record.type} ${record.name} ${record.current_value} was already gone.`
         );
@@ -186,7 +169,7 @@ async function cleanupAddonReservedIpAttachment() {
       `Fallback-detached addon reserved IP ${manifest.addon_reserved_ip}.`
     );
   } catch (error) {
-    if (isAlreadyGoneError(error)) {
+    if (classifyCleanupError(error) === 'already-gone') {
       await updateManifest((draft) => {
         draft.addon_reserved_ip_attached_node_id = null;
       });
@@ -235,7 +218,7 @@ async function cleanupNode() {
     });
     console.log(`Fallback-deleted node ${manifest.node_id}.`);
   } catch (error) {
-    if (isAlreadyGoneError(error)) {
+    if (classifyCleanupError(error) === 'already-gone') {
       await updateManifest((draft) => {
         draft.node_deleted = true;
       });
@@ -290,7 +273,7 @@ async function cleanupReservedIp(ipField, deletedField) {
     });
     console.log(`Fallback-deleted reserved IP ${ipAddress}.`);
   } catch (error) {
-    if (isAlreadyGoneError(error)) {
+    if (classifyCleanupError(error) === 'already-gone') {
       await updateManifest((draft) => {
         draft[deletedField] = true;
         if (ipField === 'addon_reserved_ip') {
@@ -304,6 +287,146 @@ async function cleanupReservedIp(ipField, deletedField) {
     hadFailures = true;
     console.error(
       `Failed to delete reserved IP ${ipAddress}: ${formatError(error)}`
+    );
+  }
+}
+
+async function cleanupVolume() {
+  const manifest = await loadManifest();
+  const volumeId = manifest.volume_id ?? null;
+
+  if (volumeId === null || manifest.volume_deleted === true) {
+    return;
+  }
+
+  const cliResult = await runCliCleanup([
+    'volume',
+    'delete',
+    String(volumeId),
+    '--force'
+  ]);
+
+  if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
+    await updateManifest((draft) => {
+      draft.volume_deleted = true;
+    });
+    console.log(`Deleted volume ${volumeId}.`);
+    return;
+  }
+
+  try {
+    const clients = await getFallbackClients();
+
+    await clients.volume.deleteVolume(volumeId);
+
+    await updateManifest((draft) => {
+      draft.volume_deleted = true;
+    });
+    console.log(`Fallback-deleted volume ${volumeId}.`);
+  } catch (error) {
+    if (classifyCleanupError(error) === 'already-gone') {
+      await updateManifest((draft) => {
+        draft.volume_deleted = true;
+      });
+      console.log(`Volume ${volumeId} was already gone.`);
+      return;
+    }
+
+    hadFailures = true;
+    console.error(`Failed to delete volume ${volumeId}: ${formatError(error)}`);
+  }
+}
+
+async function cleanupVpc() {
+  const manifest = await loadManifest();
+  const vpcId = manifest.vpc_id ?? null;
+
+  if (vpcId === null || manifest.vpc_deleted === true) {
+    return;
+  }
+
+  const cliResult = await runCliCleanup([
+    'vpc',
+    'delete',
+    String(vpcId),
+    '--force'
+  ]);
+
+  if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
+    await updateManifest((draft) => {
+      draft.vpc_deleted = true;
+    });
+    console.log(`Deleted VPC ${vpcId}.`);
+    return;
+  }
+
+  try {
+    const clients = await getFallbackClients();
+
+    await clients.vpc.deleteVpc(vpcId);
+
+    await updateManifest((draft) => {
+      draft.vpc_deleted = true;
+    });
+    console.log(`Fallback-deleted VPC ${vpcId}.`);
+  } catch (error) {
+    if (classifyCleanupError(error) === 'already-gone') {
+      await updateManifest((draft) => {
+        draft.vpc_deleted = true;
+      });
+      console.log(`VPC ${vpcId} was already gone.`);
+      return;
+    }
+
+    hadFailures = true;
+    console.error(`Failed to delete VPC ${vpcId}: ${formatError(error)}`);
+  }
+}
+
+async function cleanupSshKey() {
+  const manifest = await loadManifest();
+  const sshKeyId = manifest.ssh_key_id ?? null;
+
+  if (sshKeyId === null || manifest.ssh_key_deleted === true) {
+    return;
+  }
+
+  const cliResult = await runCliCleanup([
+    'ssh-key',
+    'delete',
+    String(sshKeyId),
+    '--force'
+  ]);
+
+  if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
+    await updateManifest((draft) => {
+      draft.ssh_key_deleted = true;
+    });
+    console.log(`Deleted SSH key ${sshKeyId}.`);
+    return;
+  }
+
+  try {
+    const clients = await getFallbackClients();
+
+    await clients.sshKey.deleteSshKey(sshKeyId);
+
+    await updateManifest((draft) => {
+      draft.ssh_key_deleted = true;
+    });
+    console.log(`Fallback-deleted SSH key ${sshKeyId}.`);
+  } catch (error) {
+    if (classifyCleanupError(error) === 'already-gone') {
+      await updateManifest((draft) => {
+        draft.ssh_key_deleted = true;
+      });
+      console.log(`SSH key ${sshKeyId} was already gone.`);
+      return;
+    }
+
+    hadFailures = true;
+    console.error(
+      `Failed to delete SSH key ${sshKeyId}: ${formatError(error)}`
     );
   }
 }
@@ -342,7 +465,7 @@ async function cleanupSecurityGroup() {
       `Fallback-deleted security group ${manifest.security_group_id}.`
     );
   } catch (error) {
-    if (isAlreadyGoneError(error)) {
+    if (classifyCleanupError(error) === 'already-gone') {
       await updateManifest((draft) => {
         draft.security_group_deleted = true;
       });
@@ -394,52 +517,70 @@ async function ensureBuiltCliExists() {
 }
 
 async function loadManifest() {
-  const contents = await readFile(manifestPath, 'utf8');
-  return JSON.parse(contents);
+  return await loadSmokeManifest(manifestPath);
 }
 
 async function updateManifest(mutate) {
-  const manifest = await loadManifest();
+  return await updateSmokeManifest(manifestPath, mutate);
+}
 
-  mutate(manifest);
-  manifest.updated_at = new Date().toISOString();
+async function markDnsRecordDeleted(record) {
+  await updateManifest((draft) => {
+    const target = draft.dns_records.find(
+      (candidate) =>
+        candidate.domain_name === record.domain_name &&
+        candidate.name === record.name &&
+        candidate.type === record.type
+    );
 
-  await writeFile(
-    manifestPath,
-    `${JSON.stringify(manifest, null, 2)}\n`,
-    'utf8'
-  );
+    if (target !== undefined) {
+      target.deleted = true;
+    }
+  });
 }
 
 async function runCliCleanup(args) {
-  const result = await runProcess(
-    process.execPath,
-    [CLI_ENTRYPOINT, '--json', ...args],
-    cliEnv
-  );
+  try {
+    const result = await runProcess(
+      process.execPath,
+      [CLI_ENTRYPOINT, '--json', ...args],
+      {
+        env: cliEnv,
+        timeoutMs: CLEANUP_COMMAND_TIMEOUT_MS
+      }
+    );
 
-  if (result.exitCode === 0) {
+    if (result.exitCode === 0) {
+      return {
+        status: 'ok'
+      };
+    }
+
+    const output = `${result.stderr}\n${result.stdout}`.trim();
+    const classifiedStatus = classifyCleanupMessage(output);
+
+    if (classifiedStatus === 'already-gone') {
+      return {
+        status: classifiedStatus
+      };
+    }
+
+    console.error(`CLI cleanup failed: e2ectl ${args.join(' ')}`);
+    if (output.length > 0) {
+      console.error(output);
+    }
+
     return {
-      status: 'ok'
+      status: classifiedStatus
+    };
+  } catch (error) {
+    console.error(`CLI cleanup failed: e2ectl ${args.join(' ')}`);
+    console.error(formatError(error));
+
+    return {
+      status: classifyCleanupError(error)
     };
   }
-
-  const output = `${result.stderr}\n${result.stdout}`.trim();
-
-  if (isAlreadyGoneMessage(output)) {
-    return {
-      status: 'already-gone'
-    };
-  }
-
-  console.error(`CLI cleanup failed: e2ectl ${args.join(' ')}`);
-  if (output.length > 0) {
-    console.error(output);
-  }
-
-  return {
-    status: 'failed'
-  };
 }
 
 async function getFallbackClients() {
@@ -456,13 +597,19 @@ async function createFallbackClients() {
     { MyAccountApiTransport },
     { NodeApiClient },
     { ReservedIpApiClient },
-    { SecurityGroupApiClient }
+    { SecurityGroupApiClient },
+    { SshKeyApiClient },
+    { VolumeApiClient },
+    { VpcApiClient }
   ] = await Promise.all([
     import('../dist/dns/index.js'),
     import('../dist/myaccount/index.js'),
     import('../dist/node/index.js'),
     import('../dist/reserved-ip/index.js'),
-    import('../dist/security-group/index.js')
+    import('../dist/security-group/index.js'),
+    import('../dist/ssh-key/index.js'),
+    import('../dist/volume/index.js'),
+    import('../dist/vpc/index.js')
   ]);
 
   const transport = new MyAccountApiTransport(
@@ -484,7 +631,10 @@ async function createFallbackClients() {
     dns: new DnsApiClient(transport),
     node: new NodeApiClient(transport),
     reservedIp: new ReservedIpApiClient(transport),
-    securityGroup: new SecurityGroupApiClient(transport)
+    securityGroup: new SecurityGroupApiClient(transport),
+    sshKey: new SshKeyApiClient(transport),
+    volume: new VolumeApiClient(transport),
+    vpc: new VpcApiClient(transport)
   };
 }
 
@@ -505,18 +655,6 @@ async function findReservedIp(clients, ipAddress) {
   const items = await clients.reservedIp.listReservedIps();
 
   return items.find((candidate) => candidate.ip_address === ipAddress);
-}
-
-function toDnsDeleteContent(recordType, value) {
-  return recordType === 'TXT' ? stripEnclosingDoubleQuotes(value) : value;
-}
-
-function stripEnclosingDoubleQuotes(value) {
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1);
-  }
-
-  return value;
 }
 
 function readCleanupEnv(env) {
@@ -554,10 +692,10 @@ function readCleanupEnv(env) {
 function parseManifestPath(args) {
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === '--manifest') {
-      const manifestPath = args[index + 1];
+      const candidate = args[index + 1];
 
-      if (manifestPath !== undefined && manifestPath.trim().length > 0) {
-        return path.resolve(manifestPath);
+      if (candidate !== undefined && candidate.trim().length > 0) {
+        return path.resolve(candidate);
       }
     }
   }
@@ -565,62 +703,4 @@ function parseManifestPath(args) {
   throw new Error(
     'Usage: npm run test:manual:smoke:cleanup -- --manifest <path>'
   );
-}
-
-async function runProcess(command, args, env) {
-  const child = spawn(command, args, {
-    env: {
-      ...process.env,
-      FORCE_COLOR: '0',
-      NO_COLOR: '1',
-      ...env
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-
-  let stdout = '';
-  let stderr = '';
-
-  child.stdout.on('data', (chunk) => {
-    stdout += chunk.toString();
-  });
-  child.stderr.on('data', (chunk) => {
-    stderr += chunk.toString();
-  });
-
-  return await new Promise((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', (exitCode) => {
-      resolve({
-        exitCode: exitCode ?? 1,
-        stderr,
-        stdout
-      });
-    });
-  });
-}
-
-function isAlreadyGoneError(error) {
-  return isAlreadyGoneMessage(formatError(error));
-}
-
-function isAlreadyGoneMessage(message) {
-  return /\bnot found\b/i.test(message) || /\balready gone\b/i.test(message);
-}
-
-function isMissingFileError(error) {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    typeof error.code === 'string' &&
-    error.code === 'ENOENT'
-  );
-}
-
-function formatError(error) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
 }

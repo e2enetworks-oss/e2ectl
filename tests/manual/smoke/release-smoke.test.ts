@@ -32,6 +32,23 @@ interface SecurityGroupCreateJson {
   };
 }
 
+interface SecurityGroupGetJson {
+  action: 'get';
+  security_group: {
+    id: number;
+    rules: unknown[];
+  };
+}
+
+interface SecurityGroupUpdateJson {
+  action: 'update';
+  security_group: {
+    id: number;
+    name: string;
+    rule_count: number;
+  };
+}
+
 interface ReservedIpCreateJson {
   action: 'create';
   reserved_ip: {
@@ -49,6 +66,73 @@ interface ReservedIpGetJson {
   reserved_ip: {
     ip_address: string;
   };
+}
+
+interface VolumePlansJson {
+  action: 'plans';
+  items: Array<{
+    available: boolean;
+    size_gb: number;
+  }>;
+}
+
+interface VolumeCreateJson {
+  action: 'create';
+  volume: {
+    id: number;
+  };
+}
+
+interface VolumeGetJson {
+  action: 'get';
+  volume: {
+    id: number;
+  };
+}
+
+interface VolumeDeleteJson {
+  action: 'delete';
+  volume_id: number;
+}
+
+interface VpcCreateJson {
+  action: 'create';
+  vpc: {
+    id: number;
+  };
+}
+
+interface VpcGetJson {
+  action: 'get';
+  vpc: {
+    id: number;
+  };
+}
+
+interface VpcDeleteJson {
+  action: 'delete';
+  vpc: {
+    id: number;
+  };
+}
+
+interface SshKeyCreateJson {
+  action: 'create';
+  item: {
+    id: number;
+  };
+}
+
+interface SshKeyGetJson {
+  action: 'get';
+  item: {
+    id: number;
+  };
+}
+
+interface SshKeyDeleteJson {
+  action: 'delete';
+  id: number;
 }
 
 interface DnsRecordCreateJson {
@@ -87,9 +171,13 @@ interface DnsRecordDeleteJson {
 
 let smokeEnv: SmokeEnv;
 
-const MANUAL_SMOKE_TEST_TIMEOUT_MS = 20 * 60 * 1000;
+const MANUAL_SMOKE_TEST_TIMEOUT_MS = 30 * 60 * 1000;
+const MANUAL_SMOKE_COMMAND_TIMEOUT_MS = 2 * 60 * 1000;
+const MANUAL_SMOKE_CLEANUP_TIMEOUT_MS = 10 * 60 * 1000;
 const NODE_READY_TIMEOUT_MS = 10 * 60 * 1000;
 const NODE_READY_POLL_INTERVAL_MS = 10 * 1000;
+const MANUAL_SMOKE_PUBLIC_KEY =
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFJlbGVhc2VTbW9rZUtleUZvckUyRUN0bA release-smoke@e2ectl';
 
 describe('manual release smoke workflow', () => {
   beforeAll(async () => {
@@ -105,6 +193,10 @@ describe('manual release smoke workflow', () => {
       const runPrefix = `${smokeEnv.prefix}-${Date.now().toString(36)}`;
       const nodeName = `${runPrefix}-node`;
       const securityGroupName = `${runPrefix}-sg`;
+      const updatedSecurityGroupName = `${securityGroupName}-updated`;
+      const volumeName = `${runPrefix}-volume`;
+      const vpcName = `${runPrefix}-vpc`;
+      const sshKeyLabel = `${runPrefix}-ssh`;
       const dnsRecordHost = runPrefix;
       const initialRecordValue = '203.0.113.10';
       const updatedRecordValue = '203.0.113.11';
@@ -194,6 +286,45 @@ describe('manual release smoke workflow', () => {
         await updateSmokeManifest(manifestPath, (manifest) => {
           manifest.security_group_id = resolvedSecurityGroupId;
         });
+
+        const securityGroupGet = await runJsonCommand<SecurityGroupGetJson>(
+          ['security-group', 'get', String(resolvedSecurityGroupId)],
+          smokeEnv
+        );
+
+        expect(securityGroupGet.security_group.id).toBe(
+          resolvedSecurityGroupId
+        );
+        expect(Array.isArray(securityGroupGet.security_group.rules)).toBe(true);
+
+        const securityGroupUpdate =
+          await runJsonCommand<SecurityGroupUpdateJson>(
+            [
+              'security-group',
+              'update',
+              String(resolvedSecurityGroupId),
+              '--name',
+              updatedSecurityGroupName,
+              '--description',
+              'release smoke update',
+              '--rules-file',
+              '-'
+            ],
+            smokeEnv,
+            {
+              stdin: `${JSON.stringify(buildUpdatedSecurityGroupRules())}\n`
+            }
+          );
+
+        expect(securityGroupUpdate.security_group.id).toBe(
+          resolvedSecurityGroupId
+        );
+        expect(securityGroupUpdate.security_group.name).toBe(
+          updatedSecurityGroupName
+        );
+        expect(securityGroupUpdate.security_group.rule_count).toBe(
+          buildUpdatedSecurityGroupRules().length
+        );
 
         await runJsonCommand(
           [
@@ -332,6 +463,131 @@ describe('manual release smoke workflow', () => {
           manifest.preserved_reserved_ip_deleted = true;
         });
 
+        const availableVolumeSize = await discoverAvailableVolumeSize(smokeEnv);
+        const volumeCreate = await runJsonCommand<VolumeCreateJson>(
+          [
+            'volume',
+            'create',
+            '--name',
+            volumeName,
+            '--size',
+            String(availableVolumeSize),
+            '--billing-type',
+            'hourly'
+          ],
+          smokeEnv
+        );
+        const volumeId = volumeCreate.volume.id;
+
+        if (!Number.isInteger(volumeId)) {
+          throw new Error('Expected volume create to return a volume id.');
+        }
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.volume_id = volumeId;
+        });
+
+        const volumeGet = await runJsonCommand<VolumeGetJson>(
+          ['volume', 'get', String(volumeId)],
+          smokeEnv
+        );
+
+        expect(volumeGet.volume.id).toBe(volumeId);
+
+        const volumeDelete = await runJsonCommand<VolumeDeleteJson>(
+          ['volume', 'delete', String(volumeId), '--force'],
+          smokeEnv
+        );
+
+        expect(volumeDelete.volume_id).toBe(volumeId);
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.volume_deleted = true;
+        });
+
+        const vpcCreate = await runJsonCommand<VpcCreateJson>(
+          [
+            'vpc',
+            'create',
+            '--name',
+            vpcName,
+            '--billing-type',
+            'hourly',
+            '--cidr-source',
+            'e2e'
+          ],
+          smokeEnv
+        );
+        const vpcId = vpcCreate.vpc.id;
+
+        if (!Number.isInteger(vpcId)) {
+          throw new Error('Expected vpc create to return a VPC id.');
+        }
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.vpc_id = vpcId;
+        });
+
+        const vpcGet = await runJsonCommand<VpcGetJson>(
+          ['vpc', 'get', String(vpcId)],
+          smokeEnv
+        );
+
+        expect(vpcGet.vpc.id).toBe(vpcId);
+
+        const vpcDelete = await runJsonCommand<VpcDeleteJson>(
+          ['vpc', 'delete', String(vpcId), '--force'],
+          smokeEnv
+        );
+
+        expect(vpcDelete.vpc.id).toBe(vpcId);
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.vpc_deleted = true;
+        });
+
+        const sshKeyCreate = await runJsonCommand<SshKeyCreateJson>(
+          [
+            'ssh-key',
+            'create',
+            '--label',
+            sshKeyLabel,
+            '--public-key-file',
+            '-'
+          ],
+          smokeEnv,
+          {
+            stdin: `${MANUAL_SMOKE_PUBLIC_KEY}\n`
+          }
+        );
+        const sshKeyId = sshKeyCreate.item.id;
+
+        if (!Number.isInteger(sshKeyId)) {
+          throw new Error('Expected ssh-key create to return an SSH key id.');
+        }
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.ssh_key_id = sshKeyId;
+        });
+
+        const sshKeyGet = await runJsonCommand<SshKeyGetJson>(
+          ['ssh-key', 'get', String(sshKeyId)],
+          smokeEnv
+        );
+
+        expect(sshKeyGet.item.id).toBe(sshKeyId);
+
+        const sshKeyDelete = await runJsonCommand<SshKeyDeleteJson>(
+          ['ssh-key', 'delete', String(sshKeyId), '--force'],
+          smokeEnv
+        );
+
+        expect(sshKeyDelete.id).toBe(sshKeyId);
+
+        await updateSmokeManifest(manifestPath, (manifest) => {
+          manifest.ssh_key_deleted = true;
+        });
+
         const dnsRecordCreate = await runJsonCommand<DnsRecordCreateJson>(
           [
             'dns',
@@ -441,7 +697,6 @@ describe('manual release smoke workflow', () => {
         });
       } catch (error: unknown) {
         workflowError = error;
-        // Keep the manifest path visible if the run exits early and needs cleanup.
         console.error(`Manual smoke manifest: ${manifestPath}`);
       } finally {
         const cleanupResult = await runCommand(
@@ -452,7 +707,8 @@ describe('manual release smoke workflow', () => {
             manifestPath
           ],
           {
-            env: smokeEnv.cliEnv
+            env: smokeEnv.cliEnv,
+            timeoutMs: MANUAL_SMOKE_CLEANUP_TIMEOUT_MS
           }
         );
 
@@ -499,12 +755,62 @@ function buildSecurityGroupRules() {
   ];
 }
 
+function buildUpdatedSecurityGroupRules() {
+  return [
+    {
+      description: 'ssh',
+      network: 'any',
+      port_range: '22',
+      protocol_name: 'Custom_TCP',
+      rule_type: 'Inbound'
+    },
+    {
+      description: 'https',
+      network: 'any',
+      port_range: '443',
+      protocol_name: 'Custom_TCP',
+      rule_type: 'Inbound'
+    },
+    {
+      description: '',
+      network: 'any',
+      port_range: 'All',
+      protocol_name: 'All',
+      rule_type: 'Outbound'
+    }
+  ];
+}
+
+async function discoverAvailableVolumeSize(
+  smokeEnv: SmokeEnv
+): Promise<number> {
+  const volumePlans = await runJsonCommand<VolumePlansJson>(
+    ['volume', 'plans', '--available-only'],
+    smokeEnv
+  );
+  const size = volumePlans.items[0]?.size_gb;
+
+  if (!Number.isInteger(size)) {
+    throw new Error(
+      'Expected volume plans to expose at least one available size for manual smoke.'
+    );
+  }
+
+  return size as number;
+}
+
 async function runJsonCommand<T>(
   args: string[],
-  smokeEnv: SmokeEnv
+  smokeEnv: SmokeEnv,
+  options: {
+    stdin?: string;
+    timeoutMs?: number;
+  } = {}
 ): Promise<T> {
   const result = await runBuiltCli(['--json', ...args], {
-    env: smokeEnv.cliEnv
+    env: smokeEnv.cliEnv,
+    ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
+    timeoutMs: options.timeoutMs ?? MANUAL_SMOKE_COMMAND_TIMEOUT_MS
   });
 
   if (result.exitCode !== 0) {

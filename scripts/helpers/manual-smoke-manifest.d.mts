@@ -1,9 +1,3 @@
-export {
-  createSmokeManifest,
-  loadSmokeManifest,
-  updateSmokeManifest
-} from '../../../scripts/helpers/manual-smoke-manifest.mjs';
-
 export interface SmokeManifestDnsRecord {
   current_value: string;
   deleted: boolean;
@@ -37,3 +31,24 @@ export interface SmokeManifest {
   vpc_deleted: boolean;
   vpc_id: number | null;
 }
+
+export interface CreateSmokeManifestOptions {
+  dnsDomain: string;
+  manifestPath?: string;
+  prefix: string;
+  tempRulesFilePath?: string;
+}
+
+export function createSmokeManifest(
+  options: CreateSmokeManifestOptions
+): Promise<{
+  manifest: SmokeManifest;
+  path: string;
+}>;
+
+export function loadSmokeManifest(manifestPath: string): Promise<SmokeManifest>;
+
+export function updateSmokeManifest(
+  manifestPath: string,
+  mutate: (manifest: SmokeManifest) => void
+): Promise<SmokeManifest>;
