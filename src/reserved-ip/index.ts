@@ -5,5 +5,6 @@ export type {
   ReservedIpFloatingAttachmentNode,
   ReservedIpNodeActionRequest,
   ReservedIpNodeActionResult,
+  ReservedIpReserveNodeRequest,
   ReservedIpSummary
 } from './types.js';

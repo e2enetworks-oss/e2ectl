@@ -26,6 +26,11 @@ export interface ReservedIpNodeActionRequest {
   vm_id: number;
 }
 
+export interface ReservedIpReserveNodeRequest {
+  type: 'live-reserve';
+  vm_id: number;
+}
+
 export interface ReservedIpNodeActionResult {
   ip_address: string;
   message: string;

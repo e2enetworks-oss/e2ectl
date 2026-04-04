@@ -58,6 +58,7 @@ function createServiceFixture(options?: {
   getNode: ReturnType<typeof vi.fn>;
   listReservedIps: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
+  reserveNodePublicIp: ReturnType<typeof vi.fn>;
   service: ReservedIpService;
 } {
   const attachReservedIpToNode = vi.fn();
@@ -66,6 +67,7 @@ function createServiceFixture(options?: {
   const detachReservedIpFromNode = vi.fn();
   const listReservedIps = vi.fn();
   const getNode = vi.fn();
+  const reserveNodePublicIp = vi.fn();
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
@@ -74,7 +76,8 @@ function createServiceFixture(options?: {
     createReservedIp,
     deleteReservedIp,
     detachReservedIpFromNode,
-    listReservedIps
+    listReservedIps,
+    reserveNodePublicIp
   };
   const nodeClient: NodeClient = {
     attachSshKeys: vi.fn(),
@@ -116,6 +119,7 @@ function createServiceFixture(options?: {
     getNode,
     listReservedIps,
     receivedCredentials: () => credentials,
+    reserveNodePublicIp,
     service
   };
 }
@@ -260,7 +264,7 @@ describe('ReservedIpService', () => {
     });
   });
 
-  it('creates reserved IPs and preserves the canonical ip_address in output', async () => {
+  it('creates reserved IPs from the default network without resolving node details', async () => {
     const { createReservedIp, getNode, service } = createServiceFixture();
 
     createReservedIp.mockResolvedValue({
@@ -295,105 +299,99 @@ describe('ReservedIpService', () => {
         status: 'Reserved',
         vm_id: null,
         vm_name: '--'
-      }
+      },
+      source: 'default-network'
     });
     expect(createReservedIp).toHaveBeenCalledTimes(1);
+    expect(createReservedIp).toHaveBeenCalledWith();
     expect(getNode).not.toHaveBeenCalled();
   });
 
-  it('creates reserved IPs from a node by resolving the backend vm_id internally', async () => {
-    const { createReservedIp, getNode, service } = createServiceFixture();
+  it('reserves the current node public IP through the live-reserve action path', async () => {
+    const { getNode, reserveNodePublicIp, service } = createServiceFixture();
 
     getNode.mockResolvedValue({
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running',
       vm_id: 100157
     });
-    createReservedIp.mockResolvedValue({
-      ...sampleReservedIpSummary(),
-      status: 'Assigned',
+    reserveNodePublicIp.mockResolvedValue({
+      ip_address: '164.52.198.55',
+      message: 'IP reserved successfully.',
+      status: 'Live Reserved',
       vm_id: 100157,
       vm_name: 'node-a'
     });
 
-    const result = await service.createReservedIp({
+    const result = await service.reserveNodePublicIp({
       alias: 'prod',
-      fromNode: '101'
+      nodeId: '101'
     });
 
     expect(getNode).toHaveBeenCalledWith('101');
-    expect(createReservedIp).toHaveBeenCalledWith({
-      vm_id: '100157'
+    expect(reserveNodePublicIp).toHaveBeenCalledWith('164.52.198.55', {
+      type: 'live-reserve',
+      vm_id: 100157
     });
     expect(result).toEqual({
-      action: 'create',
-      reserved_ip: {
-        appliance_type: 'NODE',
-        bought_at: '04-11-2024 10:37',
-        floating_ip_attached_nodes: [
-          {
-            id: 101,
-            ip_address_private: '10.0.0.5',
-            ip_address_public: '164.52.198.55',
-            name: 'node-a',
-            security_group_status: 'Updated',
-            status_name: 'Running',
-            vm_id: 100157
-          }
-        ],
-        ip_address: '164.52.198.54',
-        project_name: 'default-project',
-        reserve_id: 12662,
-        reserved_type: 'AddonIP',
-        status: 'Assigned',
-        vm_id: 100157,
-        vm_name: 'node-a'
-      }
+      action: 'reserve-node',
+      ip_address: '164.52.198.55',
+      message: 'IP reserved successfully.',
+      node_id: 101,
+      status: 'Live Reserved'
     });
   });
 
-  it('fails locally when create --from-node receives a non-numeric node id', async () => {
-    const { createReservedIp, createReservedIpClient, getNode, service } =
-      createServiceFixture();
-
-    await expect(
-      service.createReservedIp({
-        alias: 'prod',
-        fromNode: 'node-abc'
-      })
-    ).rejects.toMatchObject({
-      code: 'INVALID_NODE_ID',
-      message: 'Node ID must be numeric.'
-    });
-
-    expect(createReservedIpClient).not.toHaveBeenCalled();
-    expect(getNode).not.toHaveBeenCalled();
-    expect(createReservedIp).not.toHaveBeenCalled();
-  });
-
-  it('fails clearly for create --from-node when node details do not include a vm_id', async () => {
-    const { createReservedIp, getNode, service } = createServiceFixture();
+  it('fails clearly for reserve node when the node has no public IP', async () => {
+    const { getNode, reserveNodePublicIp, service } = createServiceFixture();
 
     getNode.mockResolvedValue({
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: null,
+      status: 'Running',
+      vm_id: 100157
+    });
+
+    await expect(
+      service.reserveNodePublicIp({
+        alias: 'prod',
+        nodeId: '101'
+      })
+    ).rejects.toMatchObject({
+      code: 'NODE_PUBLIC_IP_UNAVAILABLE',
+      message: 'This node does not have a current public IP to reserve.'
+    });
+
+    expect(reserveNodePublicIp).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly for reserve node when node details do not include a vm_id', async () => {
+    const { getNode, reserveNodePublicIp, service } = createServiceFixture();
+
+    getNode.mockResolvedValue({
+      id: 101,
+      name: 'node-a',
+      plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running'
     });
 
     await expect(
-      service.createReservedIp({
+      service.reserveNodePublicIp({
         alias: 'prod',
-        fromNode: '101'
+        nodeId: '101'
       })
     ).rejects.toMatchObject({
       code: 'INVALID_NODE_DETAILS',
       message: 'The MyAccount API did not return a VM ID for this node.'
     });
 
-    expect(createReservedIp).not.toHaveBeenCalled();
+    expect(reserveNodePublicIp).not.toHaveBeenCalled();
   });
 
   it('attaches reserved IPs to nodes after resolving the backend vm_id from the CLI node id', async () => {
@@ -403,6 +401,7 @@ describe('ReservedIpService', () => {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running',
       vm_id: 100157
     });
@@ -445,6 +444,7 @@ describe('ReservedIpService', () => {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running',
       vm_id: 100157
     });
@@ -486,6 +486,7 @@ describe('ReservedIpService', () => {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running'
     });
 
@@ -509,6 +510,7 @@ describe('ReservedIpService', () => {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '164.52.198.55',
       status: 'Running'
     });
 

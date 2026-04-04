@@ -49,7 +49,7 @@ describe('reserved-ip formatter', () => {
     );
   });
 
-  it('renders reserved IP create output with the canonical ip_address and next step', () => {
+  it('renders reserved IP create output with explicit source metadata and next step', () => {
     const output = renderReservedIpResult(
       {
         action: 'create',
@@ -58,13 +58,14 @@ describe('reserved-ip formatter', () => {
           status: 'Reserved',
           vm_id: null,
           vm_name: '--'
-        }
+        },
+        source: 'default-network'
       },
       false
     );
 
     expect(output).toContain('Created reserved IP: 164.52.198.54');
-    expect(output).toContain('Reserve ID: 12662');
+    expect(output).toContain('Source: default-network');
     expect(output).toContain(formatCliCommand('reserved-ip list'));
   });
 
@@ -83,8 +84,8 @@ describe('reserved-ip formatter', () => {
     expect(output).toContain('10.0.0.5');
   });
 
-  it('renders reserved IP node actions in deterministic json mode', () => {
-    const output = renderReservedIpResult(
+  it('renders addon attach output in human mode and reserve-node output in deterministic json mode', () => {
+    const humanOutput = renderReservedIpResult(
       {
         action: 'attach-node',
         message: 'IP assigned successfully.',
@@ -96,20 +97,29 @@ describe('reserved-ip formatter', () => {
           vm_name: 'node-a'
         }
       },
+      false
+    );
+    const jsonOutput = renderReservedIpResult(
+      {
+        action: 'reserve-node',
+        ip_address: '164.52.198.55',
+        message: 'IP reserved successfully.',
+        node_id: 101,
+        status: 'Live Reserved'
+      },
       true
     );
 
-    expect(output).toBe(
+    expect(humanOutput).toContain(
+      'Attached reserved addon IP 164.52.198.54 to node 101.'
+    );
+    expect(jsonOutput).toBe(
       `${stableStringify({
-        action: 'attach-node',
-        message: 'IP assigned successfully.',
+        action: 'reserve-node',
+        ip_address: '164.52.198.55',
+        message: 'IP reserved successfully.',
         node_id: 101,
-        reserved_ip: {
-          ip_address: '164.52.198.54',
-          status: 'Assigned',
-          vm_id: 100157,
-          vm_name: 'node-a'
-        }
+        status: 'Live Reserved'
       })}\n`
     );
   });

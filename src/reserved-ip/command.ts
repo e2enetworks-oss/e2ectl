@@ -5,10 +5,9 @@ import type { CliRuntime } from '../app/index.js';
 import { renderReservedIpResult } from './formatter.js';
 import {
   ReservedIpService,
-  type ReservedIpCreateOptions,
   type ReservedIpContextOptions,
   type ReservedIpDeleteOptions,
-  type ReservedIpNodeActionOptions
+  type ReservedIpNodeTargetOptions
 } from './service.js';
 
 interface GlobalOptions {
@@ -64,25 +63,10 @@ export function buildReservedIpCommand(runtime: CliRuntime): Command {
     }
   );
 
-  addContextOptions(
-    command
-      .command('create')
-      .description('Reserve a new IP.')
-      .option(
-        '--from-node <nodeId>',
-        'Reserve the current public IP from the given e2ectl node id.'
-      )
-  ).action(
-    async (options: ReservedIpCreateOptions, commandInstance: Command) => {
-      const result = await service.createReservedIp(options);
-      runtime.stdout.write(
-        renderReservedIpResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
-  );
+  command.addCommand(buildReservedIpCreateCommand(service, runtime));
+  command.addCommand(buildReservedIpReserveCommand(service, runtime));
+  command.addCommand(buildReservedIpAttachCommand(service, runtime));
+  command.addCommand(buildReservedIpDetachCommand(service, runtime));
 
   addContextOptions(
     command
@@ -105,8 +89,88 @@ export function buildReservedIpCommand(runtime: CliRuntime): Command {
     }
   );
 
-  command.addCommand(buildReservedIpAttachCommand(service, runtime));
-  command.addCommand(buildReservedIpDetachCommand(service, runtime));
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildReservedIpCreateCommand(
+  service: ReservedIpService,
+  runtime: CliRuntime
+): Command {
+  const command = addContextOptions(
+    new Command('create').description(
+      'Allocate a new reserved IP from the default network.'
+    )
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a reserved-ip create command'
+  );
+
+  command.action(
+    async (options: ReservedIpContextOptions, commandInstance: Command) => {
+      const result = await service.createReservedIp(options);
+      runtime.stdout.write(
+        renderReservedIpResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  return command;
+}
+
+function buildReservedIpReserveCommand(
+  service: ReservedIpService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('reserve').description(
+    "Preserve a target resource's current public IP as a reserved IP."
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a reserved-ip reserve command'
+  );
+
+  addContextOptions(
+    command
+      .command('node <nodeId>')
+      .description("Preserve a node's current public IP as a reserved IP.")
+  ).action(
+    async (
+      nodeId: string,
+      options: ReservedIpContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.reserveNodePublicIp({
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        nodeId,
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            })
+      });
+      runtime.stdout.write(
+        renderReservedIpResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   command.action(() => {
     command.outputHelp();
@@ -120,7 +184,7 @@ function buildReservedIpAttachCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('attach').description(
-    'Attach a reserved IP to a supported target.'
+    'Attach a reserved addon IP to a supported target.'
   );
 
   command.helpCommand(
@@ -131,7 +195,7 @@ function buildReservedIpAttachCommand(
   addContextOptions(
     command
       .command('node <ipAddress>')
-      .description('Attach a reserved IP to a node.')
+      .description('Attach a reserved addon IP to a node.')
       .requiredOption(
         '--node-id <nodeId>',
         'Node id shown by e2ectl node list/get.'
@@ -139,7 +203,7 @@ function buildReservedIpAttachCommand(
   ).action(
     async (
       ipAddress: string,
-      options: ReservedIpNodeActionOptions,
+      options: ReservedIpNodeTargetOptions,
       commandInstance: Command
     ) => {
       const result = await service.attachReservedIpToNode(ipAddress, options);
@@ -164,7 +228,7 @@ function buildReservedIpDetachCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('detach').description(
-    'Detach a reserved IP from a supported target.'
+    'Detach a reserved addon IP from a supported target.'
   );
 
   command.helpCommand(
@@ -175,7 +239,7 @@ function buildReservedIpDetachCommand(
   addContextOptions(
     command
       .command('node <ipAddress>')
-      .description('Detach a reserved IP from a node.')
+      .description('Detach a reserved addon IP from a node.')
       .requiredOption(
         '--node-id <nodeId>',
         'Node id shown by e2ectl node list/get.'
@@ -183,7 +247,7 @@ function buildReservedIpDetachCommand(
   ).action(
     async (
       ipAddress: string,
-      options: ReservedIpNodeActionOptions,
+      options: ReservedIpNodeTargetOptions,
       commandInstance: Command
     ) => {
       const result = await service.detachReservedIpFromNode(ipAddress, options);

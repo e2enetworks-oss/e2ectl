@@ -7,7 +7,7 @@ import {
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import type { NodeClient } from '../node/index.js';
+import type { NodeClient, NodeDetails } from '../node/index.js';
 import type { ReservedIpClient } from './client.js';
 import type {
   ReservedIpFloatingAttachmentNode,
@@ -25,13 +25,11 @@ export interface ReservedIpDeleteOptions extends ReservedIpContextOptions {
   force?: boolean;
 }
 
-export interface ReservedIpCreateOptions extends ReservedIpContextOptions {
-  fromNode?: string;
-}
-
-export interface ReservedIpNodeActionOptions extends ReservedIpContextOptions {
+export interface ReservedIpNodeTargetOptions extends ReservedIpContextOptions {
   nodeId: string;
 }
+
+export type ReservedIpNodeActionOptions = ReservedIpNodeTargetOptions;
 
 export interface ReservedIpAttachmentNodeItem {
   id: number | null;
@@ -69,6 +67,7 @@ export interface ReservedIpGetCommandResult {
 export interface ReservedIpCreateCommandResult {
   action: 'create';
   reserved_ip: ReservedIpItem;
+  source: 'default-network';
 }
 
 export interface ReservedIpDeleteCommandResult {
@@ -90,12 +89,21 @@ export interface ReservedIpNodeActionCommandResult {
   };
 }
 
+export interface ReservedIpReserveNodeCommandResult {
+  action: 'reserve-node';
+  ip_address: string;
+  message: string;
+  node_id: number;
+  status: string | null;
+}
+
 export type ReservedIpCommandResult =
   | ReservedIpCreateCommandResult
   | ReservedIpDeleteCommandResult
   | ReservedIpGetCommandResult
   | ReservedIpListCommandResult
-  | ReservedIpNodeActionCommandResult;
+  | ReservedIpNodeActionCommandResult
+  | ReservedIpReserveNodeCommandResult;
 
 interface ReservedIpStore {
   readonly configPath: string;
@@ -115,7 +123,7 @@ export class ReservedIpService {
 
   async attachReservedIpToNode(
     ipAddress: string,
-    options: ReservedIpNodeActionOptions
+    options: ReservedIpNodeTargetOptions
   ): Promise<ReservedIpNodeActionCommandResult> {
     const normalizedIpAddress = assertReservedIpAddress(ipAddress);
     const normalizedNodeId = assertNodeId(options.nodeId);
@@ -140,31 +148,14 @@ export class ReservedIpService {
   }
 
   async createReservedIp(
-    options: ReservedIpCreateOptions
+    options: ReservedIpContextOptions
   ): Promise<ReservedIpCreateCommandResult> {
-    if (options.fromNode === undefined) {
-      const client = await this.createClient(options);
-
-      return {
-        action: 'create',
-        reserved_ip: normalizeReservedIpItem(await client.createReservedIp())
-      };
-    }
-
-    const normalizedNodeId = assertNodeId(options.fromNode, '--from-node');
-    const credentials = await this.resolveContext(options);
-    const reservedIpClient =
-      this.dependencies.createReservedIpClient(credentials);
-    const nodeClient = this.dependencies.createNodeClient(credentials);
-    const nodeVmId = await resolveNodeVmId(nodeClient, normalizedNodeId);
+    const client = await this.createClient(options);
 
     return {
       action: 'create',
-      reserved_ip: normalizeReservedIpItem(
-        await reservedIpClient.createReservedIp({
-          vm_id: String(nodeVmId)
-        })
-      )
+      reserved_ip: normalizeReservedIpItem(await client.createReservedIp()),
+      source: 'default-network'
     };
   }
 
@@ -202,7 +193,7 @@ export class ReservedIpService {
 
   async detachReservedIpFromNode(
     ipAddress: string,
-    options: ReservedIpNodeActionOptions
+    options: ReservedIpNodeTargetOptions
   ): Promise<ReservedIpNodeActionCommandResult> {
     const normalizedIpAddress = assertReservedIpAddress(ipAddress);
     const normalizedNodeId = assertNodeId(options.nodeId);
@@ -224,6 +215,31 @@ export class ReservedIpService {
       normalizedNodeId,
       result
     );
+  }
+
+  async reserveNodePublicIp(
+    options: ReservedIpNodeTargetOptions
+  ): Promise<ReservedIpReserveNodeCommandResult> {
+    const normalizedNodeId = assertNodeId(options.nodeId, '<nodeId>');
+    const credentials = await this.resolveContext(options);
+    const reservedIpClient =
+      this.dependencies.createReservedIpClient(credentials);
+    const nodeClient = this.dependencies.createNodeClient(credentials);
+    const nodeDetails = await getNodeDetails(nodeClient, normalizedNodeId);
+    const nodeVmId = assertNodeVmId(nodeDetails, normalizedNodeId);
+    const nodePublicIp = assertNodePublicIp(nodeDetails, normalizedNodeId);
+    const result = await reservedIpClient.reserveNodePublicIp(nodePublicIp, {
+      type: 'live-reserve',
+      vm_id: nodeVmId
+    });
+
+    return {
+      action: 'reserve-node',
+      ip_address: result.ip_address,
+      message: result.message,
+      node_id: normalizedNodeId,
+      status: result.status
+    };
   }
 
   async getReservedIp(
@@ -347,7 +363,9 @@ function assertNodeId(nodeId: string, flagName = '--node-id'): number {
     throw new CliError('Node ID must be numeric.', {
       code: 'INVALID_NODE_ID',
       exitCode: EXIT_CODES.usage,
-      suggestion: `Pass the numeric e2ectl node id with ${flagName}.`
+      suggestion: flagName.startsWith('--')
+        ? `Pass the numeric e2ectl node id with ${flagName}.`
+        : `Pass the numeric e2ectl node id as ${flagName}.`
     });
   }
 
@@ -373,7 +391,17 @@ async function resolveNodeVmId(
   nodeClient: NodeClient,
   nodeId: number
 ): Promise<number> {
-  const node = await nodeClient.getNode(String(nodeId));
+  return assertNodeVmId(await getNodeDetails(nodeClient, nodeId), nodeId);
+}
+
+async function getNodeDetails(
+  nodeClient: NodeClient,
+  nodeId: number
+): Promise<NodeDetails> {
+  return await nodeClient.getNode(String(nodeId));
+}
+
+function assertNodeVmId(node: NodeDetails, nodeId: number): number {
   const vmId = node.vm_id;
 
   if (vmId !== undefined && Number.isInteger(vmId) && vmId > 0) {
@@ -388,6 +416,25 @@ async function resolveNodeVmId(
       exitCode: EXIT_CODES.network,
       suggestion:
         'Retry the command. If the problem persists, inspect the node details response.'
+    }
+  );
+}
+
+function assertNodePublicIp(node: NodeDetails, nodeId: number): string {
+  const publicIp = node.public_ip_address?.trim();
+
+  if (publicIp !== undefined && publicIp.length > 0 && isIPv4(publicIp)) {
+    return publicIp;
+  }
+
+  throw new CliError(
+    'This node does not have a current public IP to reserve.',
+    {
+      code: 'NODE_PUBLIC_IP_UNAVAILABLE',
+      details: [`Node ID: ${nodeId}`],
+      exitCode: EXIT_CODES.network,
+      suggestion:
+        'Pick a node with an assigned public IP, then retry the reserve command.'
     }
   );
 }

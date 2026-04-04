@@ -4,6 +4,7 @@ import type {
   ReservedIpDeleteResult,
   ReservedIpNodeActionRequest,
   ReservedIpNodeActionResult,
+  ReservedIpReserveNodeRequest,
   ReservedIpSummary
 } from './types.js';
 
@@ -18,20 +19,22 @@ interface ReservedIpNodeActionApiResult {
 
 const RESERVED_IPS_PATH = '/reserve_ips/';
 
-export type ReservedIpCreateQuery = Record<'vm_id', string>;
-
 export interface ReservedIpClient {
   attachReservedIpToNode(
     ipAddress: string,
     body: ReservedIpNodeActionRequest
   ): Promise<ReservedIpNodeActionResult>;
-  createReservedIp(query?: ReservedIpCreateQuery): Promise<ReservedIpSummary>;
+  createReservedIp(): Promise<ReservedIpSummary>;
   deleteReservedIp(ipAddress: string): Promise<ReservedIpDeleteResult>;
   detachReservedIpFromNode(
     ipAddress: string,
     body: ReservedIpNodeActionRequest
   ): Promise<ReservedIpNodeActionResult>;
   listReservedIps(): Promise<ReservedIpSummary[]>;
+  reserveNodePublicIp(
+    ipAddress: string,
+    body: ReservedIpReserveNodeRequest
+  ): Promise<ReservedIpNodeActionResult>;
 }
 
 export class ReservedIpApiClient implements ReservedIpClient {
@@ -50,13 +53,11 @@ export class ReservedIpApiClient implements ReservedIpClient {
     return mapReservedIpNodeActionResponse(response, ipAddress);
   }
 
-  async createReservedIp(
-    query?: ReservedIpCreateQuery
-  ): Promise<ReservedIpSummary> {
-    const response = await this.transport.post<ApiEnvelope<ReservedIpSummary>>(
-      RESERVED_IPS_PATH,
-      query === undefined ? undefined : { query }
-    );
+  async createReservedIp(): Promise<ReservedIpSummary> {
+    const response =
+      await this.transport.post<ApiEnvelope<ReservedIpSummary>>(
+        RESERVED_IPS_PATH
+      );
 
     return response.data;
   }
@@ -91,6 +92,19 @@ export class ReservedIpApiClient implements ReservedIpClient {
       );
 
     return response.data;
+  }
+
+  async reserveNodePublicIp(
+    ipAddress: string,
+    body: ReservedIpReserveNodeRequest
+  ): Promise<ReservedIpNodeActionResult> {
+    const response = await this.transport.post<
+      ApiEnvelope<ReservedIpNodeActionApiResult>
+    >(buildReservedIpActionPath(ipAddress), {
+      body
+    });
+
+    return mapReservedIpNodeActionResponse(response, ipAddress);
   }
 }
 
