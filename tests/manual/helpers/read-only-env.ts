@@ -1,3 +1,5 @@
+import { MYACCOUNT_BASE_URL_ENV_VAR } from '../../../src/app/runtime.js';
+
 import {
   normalizeOptionalEnvValue,
   readRequiredEnvValues,
@@ -17,6 +19,13 @@ export const OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS = {
 
 export interface ReadOnlyEnv {
   cliEnv: NodeJS.ProcessEnv;
+  configProfile: {
+    alias: string;
+    apiKey: string;
+    authToken: string;
+    defaultLocation: string;
+    defaultProjectId: string;
+  };
   fixtures: {
     dnsDomain?: string;
     nodeId?: string;
@@ -57,9 +66,20 @@ export function readReadOnlyEnv(
   const vpcId = normalizeOptionalEnvValue(
     env[OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS.vpcId]
   );
+  const apiKey = requiredValues.E2E_API_KEY!;
+  const authToken = requiredValues.E2E_AUTH_TOKEN!;
+  const defaultLocation = requiredValues.E2E_LOCATION!;
+  const defaultProjectId = requiredValues.E2E_PROJECT_ID!;
 
   return {
     cliEnv: toManualCliEnv(requiredValues, env),
+    configProfile: {
+      alias: 'manual-read-only',
+      apiKey,
+      authToken,
+      defaultLocation,
+      defaultProjectId
+    },
     fixtures: {
       ...(dnsDomain === undefined ? {} : { dnsDomain }),
       ...(nodeId === undefined ? {} : { nodeId }),
@@ -69,5 +89,20 @@ export function readReadOnlyEnv(
       ...(volumeId === undefined ? {} : { volumeId }),
       ...(vpcId === undefined ? {} : { vpcId })
     }
+  };
+}
+
+export function toConfigBackedReadOnlyCliEnv(
+  readOnlyEnv: ReadOnlyEnv,
+  homePath: string
+): NodeJS.ProcessEnv {
+  return {
+    HOME: homePath,
+    ...(readOnlyEnv.cliEnv[MYACCOUNT_BASE_URL_ENV_VAR] === undefined
+      ? {}
+      : {
+          [MYACCOUNT_BASE_URL_ENV_VAR]:
+            readOnlyEnv.cliEnv[MYACCOUNT_BASE_URL_ENV_VAR]
+        })
   };
 }

@@ -1,4 +1,7 @@
-import { readReadOnlyEnv } from '../../manual/helpers/read-only-env.js';
+import {
+  readReadOnlyEnv,
+  toConfigBackedReadOnlyCliEnv
+} from '../../manual/helpers/read-only-env.js';
 
 describe('read-only env parsing', () => {
   it('fails fast with one aggregated error when required base env vars are missing', () => {
@@ -32,6 +35,13 @@ describe('read-only env parsing', () => {
       E2E_LOCATION: 'Delhi',
       E2E_PROJECT_ID: '46429'
     });
+    expect(result.configProfile).toEqual({
+      alias: 'manual-read-only',
+      apiKey: 'demo-api-key',
+      authToken: 'demo-auth-token',
+      defaultLocation: 'Delhi',
+      defaultProjectId: '46429'
+    });
     expect(result.fixtures).toEqual({
       dnsDomain: 'example.com',
       nodeId: '101',
@@ -40,6 +50,23 @@ describe('read-only env parsing', () => {
       sshKeyId: '1001',
       volumeId: '25550',
       vpcId: '27835'
+    });
+  });
+
+  it('builds config-backed read-only env without auth or context vars', () => {
+    const readOnlyEnv = readReadOnlyEnv({
+      E2ECTL_MYACCOUNT_BASE_URL: ' https://api.example.test ',
+      E2E_API_KEY: ' demo-api-key ',
+      E2E_AUTH_TOKEN: ' demo-auth-token ',
+      E2E_LOCATION: ' Delhi ',
+      E2E_PROJECT_ID: ' 46429 '
+    });
+
+    expect(
+      toConfigBackedReadOnlyCliEnv(readOnlyEnv, '/tmp/manual-read-only-home')
+    ).toEqual({
+      E2ECTL_MYACCOUNT_BASE_URL: 'https://api.example.test',
+      HOME: '/tmp/manual-read-only-home'
     });
   });
 });

@@ -10,6 +10,9 @@ export interface SmokeManifest {
   addon_reserved_ip: string | null;
   addon_reserved_ip_attached_node_id: number | null;
   addon_reserved_ip_deleted: boolean;
+  created_dns_domain: string | null;
+  created_dns_domain_deleted: boolean;
+  created_dns_domain_id: number | null;
   created_at: string;
   dns_domain: string;
   dns_records: SmokeManifestDnsRecord[];
@@ -18,16 +21,21 @@ export interface SmokeManifest {
   prefix: string;
   preserved_reserved_ip: string | null;
   preserved_reserved_ip_deleted: boolean;
+  saved_image_deleted: boolean;
+  saved_image_id: string | null;
   security_group_attached_node_id: number | null;
   security_group_deleted: boolean;
   security_group_id: number | null;
+  ssh_key_attached_node_id: number | null;
   ssh_key_deleted: boolean;
   ssh_key_id: number | null;
   temp_rules_file_path: string | null;
   updated_at: string;
   version: 1;
+  volume_attached_node_id: number | null;
   volume_deleted: boolean;
   volume_id: number | null;
+  vpc_attached_node_id: number | null;
   vpc_deleted: boolean;
   vpc_id: number | null;
 }

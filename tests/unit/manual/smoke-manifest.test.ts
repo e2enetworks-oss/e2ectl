@@ -24,11 +24,19 @@ describe('smoke manifest helper', () => {
     });
 
     expect(manifest.addon_reserved_ip).toBeNull();
+    expect(manifest.created_dns_domain).toBeNull();
+    expect(manifest.created_dns_domain_deleted).toBe(false);
+    expect(manifest.created_dns_domain_id).toBeNull();
     expect(manifest.dns_domain).toBe('release.example.com');
+    expect(manifest.saved_image_deleted).toBe(false);
+    expect(manifest.saved_image_id).toBeNull();
     expect(manifest.security_group_id).toBeNull();
+    expect(manifest.ssh_key_attached_node_id).toBeNull();
     expect(manifest.ssh_key_deleted).toBe(false);
     expect(manifest.temp_rules_file_path).toBe('/tmp/release-smoke-rules.json');
+    expect(manifest.volume_attached_node_id).toBeNull();
     expect(manifest.volume_deleted).toBe(false);
+    expect(manifest.vpc_attached_node_id).toBeNull();
     expect(manifest.vpc_deleted).toBe(false);
 
     const loadedManifest = await loadSmokeManifest(manifestPath);
@@ -38,19 +46,37 @@ describe('smoke manifest helper', () => {
     await delay(5);
 
     const updatedManifest = await updateSmokeManifest(manifestPath, (draft) => {
+      draft.created_dns_domain = 'disposable.example.net';
+      draft.created_dns_domain_id = 10279;
+      draft.saved_image_id = 'img-455';
+      draft.ssh_key_attached_node_id = 100157;
+      draft.volume_attached_node_id = 100157;
       draft.volume_id = 25550;
+      draft.vpc_attached_node_id = 100157;
       draft.vpc_id = 27835;
       draft.ssh_key_id = 1001;
     });
 
+    expect(updatedManifest.created_dns_domain).toBe('disposable.example.net');
+    expect(updatedManifest.created_dns_domain_id).toBe(10279);
+    expect(updatedManifest.saved_image_id).toBe('img-455');
+    expect(updatedManifest.ssh_key_attached_node_id).toBe(100157);
+    expect(updatedManifest.volume_attached_node_id).toBe(100157);
     expect(updatedManifest.volume_id).toBe(25550);
+    expect(updatedManifest.vpc_attached_node_id).toBe(100157);
     expect(updatedManifest.vpc_id).toBe(27835);
     expect(updatedManifest.ssh_key_id).toBe(1001);
     expect(updatedManifest.updated_at).not.toBe(manifest.updated_at);
 
     const reloadedManifest = await loadSmokeManifest(manifestPath);
 
+    expect(reloadedManifest.created_dns_domain).toBe('disposable.example.net');
+    expect(reloadedManifest.created_dns_domain_id).toBe(10279);
+    expect(reloadedManifest.saved_image_id).toBe('img-455');
+    expect(reloadedManifest.ssh_key_attached_node_id).toBe(100157);
+    expect(reloadedManifest.volume_attached_node_id).toBe(100157);
     expect(reloadedManifest.volume_id).toBe(25550);
+    expect(reloadedManifest.vpc_attached_node_id).toBe(100157);
     expect(reloadedManifest.vpc_id).toBe(27835);
     expect(reloadedManifest.ssh_key_id).toBe(1001);
   });

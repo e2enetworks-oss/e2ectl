@@ -2,7 +2,12 @@ import { access } from 'node:fs/promises';
 import path from 'node:path';
 
 import { runBuiltCli } from '../../helpers/process.js';
-import { readReadOnlyEnv, type ReadOnlyEnv } from '../helpers/read-only-env.js';
+import { createConfigBackedReadOnlyHome } from '../helpers/read-only-profile.js';
+import {
+  readReadOnlyEnv,
+  toConfigBackedReadOnlyCliEnv,
+  type ReadOnlyEnv
+} from '../helpers/read-only-env.js';
 
 const runManualSuite = process.env.E2ECTL_RUN_MANUAL_E2E === '1';
 const describeManual = runManualSuite ? describe : describe.skip;
@@ -102,6 +107,33 @@ interface DnsRecordListJson extends JsonCommandResult {
   items: unknown[];
 }
 
+interface DnsVerifyNsJson extends JsonCommandResult {
+  authority: boolean;
+  domain_name: string;
+  e2e_nameservers: unknown[];
+  global_nameservers: unknown[];
+  message: string;
+  problem: number;
+  status: boolean;
+}
+
+interface DnsVerifyValidityJson extends JsonCommandResult {
+  domain_name: string;
+  expiry_date: string | null;
+  message: string;
+  problem: number;
+  status: boolean;
+  validity_ok: boolean;
+}
+
+interface DnsVerifyTtlJson extends JsonCommandResult {
+  domain_name: string;
+  low_ttl_count: number;
+  low_ttl_records: unknown[];
+  message: string;
+  status: boolean;
+}
+
 interface ReservedIpGetJson extends JsonCommandResult {
   reserved_ip: {
     ip_address: string;
@@ -141,6 +173,47 @@ describeManual('manual read-only built CLI checks', () => {
 
     await access(path.resolve(process.cwd(), 'dist', 'app', 'index.js'));
   });
+
+  it(
+    'resolves a saved default profile and context from a temp HOME without env auth/context',
+    { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
+    async () => {
+      const tempHome = await createConfigBackedReadOnlyHome(readOnlyEnv);
+
+      try {
+        const configBackedCliEnv = toConfigBackedReadOnlyCliEnv(
+          readOnlyEnv,
+          tempHome.path
+        );
+
+        const nodeList = await runJsonCommand<NodeListJson>(
+          ['node', 'list'],
+          configBackedCliEnv
+        );
+
+        expect(nodeList.action).toBe('list');
+        expect(Array.isArray(nodeList.nodes)).toBe(true);
+
+        const dnsList = await runJsonCommand<DnsListJson>(
+          ['dns', 'list'],
+          configBackedCliEnv
+        );
+
+        expect(dnsList.action).toBe('list');
+        expect(Array.isArray(dnsList.items)).toBe(true);
+
+        const volumePlans = await runJsonCommand<VolumePlansJson>(
+          ['volume', 'plans'],
+          configBackedCliEnv
+        );
+
+        expect(volumePlans.action).toBe('plans');
+        expect(Array.isArray(volumePlans.items)).toBe(true);
+      } finally {
+        await tempHome.cleanup();
+      }
+    }
+  );
 
   it(
     'covers node catalog and node list via the built CLI',
@@ -299,6 +372,58 @@ describeManual('manual read-only built CLI checks', () => {
       expect(Array.isArray(nameservers.configured_nameservers)).toBe(true);
       expect(Array.isArray(nameservers.delegated_nameservers)).toBe(true);
 
+      const verifyNs = await runJsonCommand<DnsVerifyNsJson>([
+        'dns',
+        'verify',
+        'ns',
+        dnsDomain
+      ]);
+
+      expect(verifyNs.action).toBe('verify-ns');
+      expect(verifyNs.domain_name.length).toBeGreaterThan(0);
+      expect(Array.isArray(verifyNs.e2e_nameservers)).toBe(true);
+      expect(Array.isArray(verifyNs.global_nameservers)).toBe(true);
+
+      const verifyValidity = await runBuiltCli(
+        ['--json', 'dns', 'verify', 'validity', dnsDomain],
+        {
+          env: readOnlyEnv.cliEnv,
+          timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
+        }
+      );
+
+      if (verifyValidity.exitCode === 0) {
+        const payload = parseJsonCommandResult<DnsVerifyValidityJson>(
+          ['dns', 'verify', 'validity', dnsDomain],
+          verifyValidity.stdout
+        );
+
+        expect(payload.action).toBe('verify-validity');
+        expect(payload.domain_name.length).toBeGreaterThan(0);
+        expect(typeof payload.problem).toBe('number');
+        expect(typeof payload.status).toBe('boolean');
+        expect(typeof payload.validity_ok).toBe('boolean');
+      } else {
+        expect(verifyValidity.stderr).toContain(
+          'Could not find validity for your domain.'
+        );
+        expect(verifyValidity.stderr).toContain(
+          '/e2e_dns/diagnostics/verify_validity/'
+        );
+      }
+
+      const verifyTtl = await runJsonCommand<DnsVerifyTtlJson>([
+        'dns',
+        'verify',
+        'ttl',
+        dnsDomain
+      ]);
+
+      expect(verifyTtl.action).toBe('verify-ttl');
+      expect(verifyTtl.domain_name.length).toBeGreaterThan(0);
+      expect(typeof verifyTtl.low_ttl_count).toBe('number');
+      expect(Array.isArray(verifyTtl.low_ttl_records)).toBe(true);
+
       const recordList = await runJsonCommand<DnsRecordListJson>([
         'dns',
         'record',
@@ -390,9 +515,12 @@ describeManual('manual read-only built CLI checks', () => {
   );
 });
 
-async function runJsonCommand<T>(args: string[]): Promise<T> {
+async function runJsonCommand<T>(
+  args: string[],
+  cliEnv: NodeJS.ProcessEnv = readOnlyEnv.cliEnv
+): Promise<T> {
   const result = await runBuiltCli(['--json', ...args], {
-    env: readOnlyEnv.cliEnv,
+    env: cliEnv,
     timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
   });
 
@@ -410,8 +538,12 @@ async function runJsonCommand<T>(args: string[]): Promise<T> {
     );
   }
 
+  return parseJsonCommandResult<T>(args, result.stdout);
+}
+
+function parseJsonCommandResult<T>(args: string[], stdout: string): T {
   try {
-    return JSON.parse(result.stdout) as T;
+    return JSON.parse(stdout) as T;
   } catch (error: unknown) {
     throw new Error(
       `Command returned invalid JSON for e2ectl ${args.join(' ')}: ${

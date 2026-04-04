@@ -57,6 +57,22 @@ E2E_LOCATION=... \
 npm run test:manual
 ```
 
+Required read-only env vars:
+
+- `E2ECTL_RUN_MANUAL_E2E=1`
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+
+The lane now proves both direct env-backed reads and config-backed operator usage:
+
+- it creates a temp `HOME`
+- it imports one disposable saved profile from the base env credentials
+- it saves default alias and default project/location context on that profile
+- it runs representative built-CLI read commands without `E2E_API_KEY`, `E2E_AUTH_TOKEN`, `E2E_PROJECT_ID`, or `E2E_LOCATION` in the command env
+- it still runs the existing list-safe and fixture-based detail/get checks
+
 Always-covered domains:
 
 - node
@@ -77,6 +93,12 @@ Optional fixture env vars enable detail/get checks:
 - `E2ECTL_MANUAL_SECURITY_GROUP_ID`
 - `E2ECTL_MANUAL_SSH_KEY_ID`
 
+When `E2ECTL_MANUAL_DNS_DOMAIN` is set, the DNS fixture path also runs:
+
+- `dns verify ns`
+- `dns verify validity`
+- `dns verify ttl`
+
 ### Destructive Smoke Lane
 
 Run only after `make build`.
@@ -91,6 +113,9 @@ E2E_LOCATION=... \
 E2ECTL_SMOKE_NODE_PLAN=... \
 E2ECTL_SMOKE_NODE_IMAGE=... \
 E2ECTL_SMOKE_DNS_DOMAIN=... \
+E2ECTL_SMOKE_UPGRADE_PLAN=... \
+E2ECTL_SMOKE_UPGRADE_IMAGE=... \
+E2ECTL_SMOKE_DNS_CREATE_DOMAIN=... \
 npm run test:manual:smoke
 ```
 
@@ -103,12 +128,40 @@ Required smoke env vars:
 - `E2ECTL_SMOKE_NODE_PLAN`
 - `E2ECTL_SMOKE_NODE_IMAGE`
 - `E2ECTL_SMOKE_DNS_DOMAIN`
+- `E2ECTL_SMOKE_UPGRADE_PLAN`
+- `E2ECTL_SMOKE_UPGRADE_IMAGE`
+- `E2ECTL_SMOKE_DNS_CREATE_DOMAIN`
 
 Optional smoke env vars:
 
 - `E2ECTL_SMOKE_PREFIX`
 - `E2ECTL_SMOKE_RECORD_TTL`
 - `E2ECTL_SMOKE_MANIFEST`
+
+Validation rules:
+
+- the smoke env parser fails once with one aggregated missing-env error
+- the upgrade target must differ from the create target in at least one of plan or image
+- `E2ECTL_SMOKE_DNS_CREATE_DOMAIN` must differ from `E2ECTL_SMOKE_DNS_DOMAIN`
+- `E2ECTL_SMOKE_RECORD_TTL` must be a positive integer when set
+
+Expanded destructive proof surface:
+
+- node create/delete
+- node action security-group attach/detach
+- node action volume attach/detach
+- node action vpc attach/detach
+- node action ssh-key attach
+- node action power-off
+- node action power-on
+- node action save-image
+- node upgrade
+- reserved-ip create/get/attach/detach/delete/reserve-node
+- volume create/get/delete
+- vpc create/get/delete
+- ssh-key create/get/delete
+- dns create/get/delete
+- dns record create/list/update/delete
 
 Cleanup command:
 
@@ -119,15 +172,27 @@ npm run test:manual:smoke:cleanup -- --manifest <path>
 Cleanup order:
 
 1. DNS records
-2. addon reserved IP detach
-3. node delete
-4. reserved IP delete
-5. volume delete
-6. VPC delete
-7. SSH key delete
-8. security group delete
+2. created DNS domain delete
+3. addon reserved IP detach
+4. attached volume detach
+5. attached VPC detach
+6. node delete
+7. reserved IP delete
+8. volume delete
+9. VPC delete
+10. saved image delete
+11. SSH key delete
+12. security group delete
+13. temp rules file cleanup
 
-The cleanup script tries the built CLI first and falls back to direct clients only when CLI cleanup fails.
+The cleanup script updates the manifest immediately after each create, attach, and mutate step in the smoke lane.
+
+Cleanup behavior:
+
+- cleanup still tries the built CLI first for supported delete and detach flows
+- it falls back to direct clients only when CLI cleanup fails
+- saved image cleanup uses a cleanup-only direct client path because there is no public `e2ectl` image delete command
+- already-gone cleanup responses are treated as successful so interrupted smoke runs can be replayed safely
 
 ## Promotion Checklist
 
