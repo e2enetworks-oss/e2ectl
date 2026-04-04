@@ -370,6 +370,11 @@ describe('node commands', () => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
       },
+      createReservedIpClient: vi.fn(() => {
+        throw new Error(
+          'Reserved IP client should not be created for this test.'
+        );
+      }) as unknown as CliRuntime['createReservedIpClient'],
       createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),

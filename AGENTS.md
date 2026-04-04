@@ -7,7 +7,7 @@ Keep changes small, reviewable, and aligned with the current CLI behavior.
 ## Scope
 
 - `e2ectl` is a TypeScript CLI for the E2E Networks MyAccount platform.
-- Current v1 surface includes config/auth management, node commands, volume commands, VPC commands, SSH key commands, and deterministic `--json` output for automation.
+- Current v1 surface includes config/auth management, node commands, reserved IP commands, volume commands, VPC commands, SSH key commands, and deterministic `--json` output for automation.
 - Keep edits scoped to this repository unless the user explicitly asks for cross-repo work.
 
 ## Working Style
@@ -75,6 +75,7 @@ Keep the source tree organized around these domains:
 - `src/myaccount` - transport, API envelope typing, credential validation, centralized API failure handling
 - `src/config` - alias storage, imports, default alias/context resolution
 - `src/node` - node workflows
+- `src/reserved-ip` - reserved IP workflows
 - `src/volume` - block storage workflows
 - `src/vpc` - VPC workflows
 - `src/ssh-key` - SSH key workflows

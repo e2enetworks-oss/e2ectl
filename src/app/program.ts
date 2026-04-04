@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { CLI_COMMAND_NAME, CLI_VERSION } from './metadata.js';
 import { buildConfigCommand } from '../config/index.js';
 import { buildNodeCommand } from '../node/index.js';
+import { buildReservedIpCommand } from '../reserved-ip/index.js';
 import { buildSecurityGroupCommand } from '../security-group/index.js';
 import { buildSshKeyCommand } from '../ssh-key/index.js';
 import { buildVolumeCommand } from '../volume/index.js';
@@ -22,6 +23,7 @@ export function createProgram(runtime: CliRuntime = createRuntime()): Command {
 
   program.addCommand(buildConfigCommand(runtime));
   program.addCommand(buildNodeCommand(runtime));
+  program.addCommand(buildReservedIpCommand(runtime));
   program.addCommand(buildVolumeCommand(runtime));
   program.addCommand(buildVpcCommand(runtime));
   program.addCommand(buildSecurityGroupCommand(runtime));
