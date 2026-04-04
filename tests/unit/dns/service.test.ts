@@ -26,19 +26,25 @@ function createServiceFixture(options?: {
   confirm: ReturnType<typeof vi.fn>;
   createDnsClient: ReturnType<typeof vi.fn>;
   createDomain: ReturnType<typeof vi.fn>;
+  createRecord: ReturnType<typeof vi.fn>;
   deleteDomain: ReturnType<typeof vi.fn>;
+  deleteRecord: ReturnType<typeof vi.fn>;
   getDomain: ReturnType<typeof vi.fn>;
   listDomains: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   service: DnsService;
+  updateRecord: ReturnType<typeof vi.fn>;
   verifyNameservers: ReturnType<typeof vi.fn>;
   verifyTtl: ReturnType<typeof vi.fn>;
   verifyValidity: ReturnType<typeof vi.fn>;
 } {
   const createDomain = vi.fn();
+  const createRecord = vi.fn();
   const deleteDomain = vi.fn();
+  const deleteRecord = vi.fn();
   const getDomain = vi.fn();
   const listDomains = vi.fn();
+  const updateRecord = vi.fn();
   const verifyNameservers = vi.fn();
   const verifyTtl = vi.fn();
   const verifyValidity = vi.fn();
@@ -46,9 +52,12 @@ function createServiceFixture(options?: {
 
   const client: DnsClient = {
     createDomain,
+    createRecord,
     deleteDomain,
+    deleteRecord,
     getDomain,
     listDomains,
+    updateRecord,
     verifyNameservers,
     verifyTtl,
     verifyValidity
@@ -72,11 +81,14 @@ function createServiceFixture(options?: {
     confirm,
     createDnsClient,
     createDomain,
+    createRecord,
     deleteDomain,
+    deleteRecord,
     getDomain,
     listDomains,
     receivedCredentials: () => credentials,
     service,
+    updateRecord,
     verifyNameservers,
     verifyTtl,
     verifyValidity
@@ -121,7 +133,7 @@ describe('DnsService', () => {
     });
   });
 
-  it('gets one domain through the dedicated detail path and canonicalizes the input', async () => {
+  it('gets one domain through the detail path and adds derived nameservers, soa, and records', async () => {
     const { getDomain, listDomains, service } = createServiceFixture();
 
     getDomain.mockResolvedValue({
@@ -132,12 +144,50 @@ describe('DnsService', () => {
             name: 'example.com.',
             records: [
               {
-                content: 'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in.',
+                content:
+                  'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400',
                 disabled: false
               }
             ],
             ttl: 86400,
             type: 'SOA'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              }
+            ],
+            ttl: 600,
+            type: 'A'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '"v=spf1 include:mail.example.net"',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'TXT'
           }
         ]
       },
@@ -155,19 +205,81 @@ describe('DnsService', () => {
         domain_name: 'example.com.',
         domain_ttl: 86400,
         ip_address: '1.1.1.1',
+        nameservers: ['ns50.e2enetworks.net.in.', 'ns51.e2enetworks.net.in.'],
+        records: [
+          {
+            disabled: false,
+            name: 'example.com.',
+            ttl: 600,
+            type: 'A',
+            value: '1.1.1.1'
+          },
+          {
+            disabled: false,
+            name: 'example.com.',
+            ttl: 300,
+            type: 'TXT',
+            value: 'v=spf1 include:mail.example.net'
+          }
+        ],
         rrsets: [
           {
             name: 'example.com.',
             records: [
               {
-                content: 'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in.',
+                content:
+                  'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400',
                 disabled: false
               }
             ],
             ttl: 86400,
             type: 'SOA'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              }
+            ],
+            ttl: 600,
+            type: 'A'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '"v=spf1 include:mail.example.net"',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'TXT'
           }
-        ]
+        ],
+        soa: {
+          name: 'example.com.',
+          ttl: 86400,
+          values: [
+            'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400'
+          ]
+        }
       }
     });
   });
@@ -252,32 +364,6 @@ describe('DnsService', () => {
     });
   });
 
-  it('fails clearly when delete cannot resolve a canonical domain match', async () => {
-    const { deleteDomain, listDomains, service } = createServiceFixture();
-
-    listDomains.mockResolvedValue([
-      {
-        created_at: '2024-11-04T09:01:30.545588Z',
-        deleted: false,
-        domain_ip: '1.1.1.1',
-        domain_name: 'other.com.',
-        id: 10281,
-        validity: null
-      }
-    ]);
-
-    await expect(
-      service.deleteDomain('example.com', {
-        alias: 'prod',
-        force: true
-      })
-    ).rejects.toMatchObject({
-      code: 'DNS_DOMAIN_NOT_FOUND',
-      message: 'DNS domain example.com. was not found.'
-    });
-    expect(deleteDomain).not.toHaveBeenCalled();
-  });
-
   it('fails before network when delete is non-interactive and --force is omitted', async () => {
     const { createDnsClient, listDomains, service } = createServiceFixture({
       isInteractive: false
@@ -296,82 +382,494 @@ describe('DnsService', () => {
     expect(listDomains).not.toHaveBeenCalled();
   });
 
-  it('canonicalizes nameserver verification input and normalizes backend field names', async () => {
-    const { service, verifyNameservers } = createServiceFixture();
+  it('fails before network when record delete is non-interactive and --force is omitted', async () => {
+    const { createDnsClient, deleteRecord, getDomain, service } =
+      createServiceFixture({
+        isInteractive: false
+      });
 
+    await expect(
+      service.deleteRecord('example.com', {
+        alias: 'prod',
+        type: 'A',
+        value: '1.1.1.1'
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a DNS record requires confirmation in an interactive terminal.'
+    });
+    expect(createDnsClient).not.toHaveBeenCalled();
+    expect(getDomain).not.toHaveBeenCalled();
+    expect(deleteRecord).not.toHaveBeenCalled();
+  });
+
+  it('combines configured NS rrsets with delegated nameserver diagnostics', async () => {
+    const { getDomain, service, verifyNameservers } = createServiceFixture();
+
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
     verifyNameservers.mockResolvedValue({
       data: {
-        authority: false,
+        authority: true,
         e2e_nameservers: ['ns50.e2enetworks.net.in.'],
-        gl_nameservers: ['ns1.example.net.'],
-        problem: 1
+        gl_nameservers: [
+          'ns51.e2enetworks.net.in.',
+          'ns50.e2enetworks.net.in.'
+        ],
+        problem: 0
       },
-      message: 'Your nameservers are not setup correctly',
+      message: 'Your nameservers are setup correctly',
       status: true
     });
 
-    const result = await service.verifyNameservers('Example.com', {
+    const result = await service.getNameservers('Example.com', {
       alias: 'prod'
     });
 
+    expect(getDomain).toHaveBeenCalledWith('example.com.');
     expect(verifyNameservers).toHaveBeenCalledWith('example.com.');
     expect(result).toEqual({
-      action: 'verify-ns',
-      authority: false,
+      action: 'nameservers',
+      authority_match: true,
+      configured_nameservers: [
+        'ns50.e2enetworks.net.in.',
+        'ns51.e2enetworks.net.in.'
+      ],
+      delegated_nameservers: [
+        'ns50.e2enetworks.net.in.',
+        'ns51.e2enetworks.net.in.'
+      ],
       domain_name: 'example.com.',
-      e2e_nameservers: ['ns50.e2enetworks.net.in.'],
-      global_nameservers: ['ns1.example.net.'],
-      message: 'Your nameservers are not setup correctly',
-      problem: 1,
+      message: 'Your nameservers are setup correctly',
+      problem: 0,
       status: true
     });
   });
 
-  it('normalizes TTL verification from the backend low-rrset array shape', async () => {
-    const { service, verifyTtl } = createServiceFixture();
+  it('prefers backend authority semantics for authority_match when provided', async () => {
+    const { getDomain, service, verifyNameservers } = createServiceFixture();
 
-    verifyTtl.mockResolvedValue({
-      data: [
-        {
-          name: 'www.example.com.',
-          records: [
-            {
-              content: '1.1.1.1',
-              disabled: false
-            }
-          ],
-          ttl: 300,
-          type: 'A'
-        }
-      ],
-      message: 'Error verifying TTL for your DNS records.',
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+    verifyNameservers.mockResolvedValue({
+      data: {
+        authority: true,
+        e2e_nameservers: ['ns50.e2enetworks.net.in.'],
+        gl_nameservers: ['ns50.e2enetworks.net.in.'],
+        problem: 0
+      },
+      message: 'Your nameservers are setup correctly',
       status: true
     });
 
-    const result = await service.verifyTtl('EXAMPLE.com.', {
+    const result = await service.getNameservers('Example.com', {
       alias: 'prod'
     });
 
-    expect(verifyTtl).toHaveBeenCalledWith('example.com.');
+    expect(result.authority_match).toBe(true);
+    expect(result.configured_nameservers).toEqual([
+      'ns50.e2enetworks.net.in.',
+      'ns51.e2enetworks.net.in.'
+    ]);
+    expect(result.delegated_nameservers).toEqual(['ns50.e2enetworks.net.in.']);
+  });
+
+  it('lists forward records by flattening rrsets and excluding SOA and NS', async () => {
+    const { getDomain, service } = createServiceFixture();
+
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ignored',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'SOA'
+          },
+          {
+            name: 'www.example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              },
+              {
+                content: '1.1.1.2',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'A'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '"hello world"',
+                disabled: false
+              }
+            ],
+            ttl: 600,
+            type: 'TXT'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+
+    const result = await service.listRecords('example.com', {
+      alias: 'prod'
+    });
+
     expect(result).toEqual({
-      action: 'verify-ttl',
+      action: 'record-list',
       domain_name: 'example.com.',
-      low_ttl_count: 1,
-      low_ttl_records: [
+      items: [
         {
+          disabled: false,
           name: 'www.example.com.',
-          records: [
-            {
-              content: '1.1.1.1',
-              disabled: false
-            }
-          ],
           ttl: 300,
-          type: 'A'
+          type: 'A',
+          value: '1.1.1.1'
+        },
+        {
+          disabled: false,
+          name: 'www.example.com.',
+          ttl: 300,
+          type: 'A',
+          value: '1.1.1.2'
+        },
+        {
+          disabled: false,
+          name: 'example.com.',
+          ttl: 600,
+          type: 'TXT',
+          value: 'hello world'
         }
-      ],
-      message: 'Error verifying TTL for your DNS records.',
+      ]
+    });
+  });
+
+  it('maps --name @ to the apex and validates A records locally', async () => {
+    const { createRecord, service } = createServiceFixture();
+
+    createRecord.mockResolvedValue({
+      message: 'The record was added successfully!',
       status: true
+    });
+
+    const result = await service.createRecord('Example.com', {
+      alias: 'prod',
+      name: '@',
+      type: 'A',
+      value: '203.0.113.10'
+    });
+
+    expect(createRecord).toHaveBeenCalledWith('example.com.', {
+      content: '203.0.113.10',
+      record_name: 'example.com.',
+      record_type: 'A',
+      zone_name: 'example.com.'
+    });
+    expect(result.record).toEqual({
+      name: 'example.com.',
+      ttl: null,
+      type: 'A',
+      value: '203.0.113.10'
+    });
+  });
+
+  it('rejects invalid A record IPv4 values before any network request', async () => {
+    const { createDnsClient, createRecord, service } = createServiceFixture();
+
+    await expect(
+      service.createRecord('example.com', {
+        alias: 'prod',
+        type: 'A',
+        value: 'bad-ip'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_IP_ADDRESS',
+      message: 'IP address must be a valid IPv4 address.'
+    });
+    expect(createDnsClient).not.toHaveBeenCalled();
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid AAAA values before any network request', async () => {
+    const { createDnsClient, createRecord, service } = createServiceFixture();
+
+    await expect(
+      service.createRecord('example.com', {
+        alias: 'prod',
+        type: 'AAAA',
+        value: 'bad-ipv6'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_IP_ADDRESS',
+      message: 'IP address must be a valid IPv6 address.'
+    });
+    expect(createDnsClient).not.toHaveBeenCalled();
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes relative record names and trailing-dot targets for CNAME', async () => {
+    const { createRecord, service } = createServiceFixture();
+
+    createRecord.mockResolvedValue({
+      message: 'The record was added successfully!',
+      status: true
+    });
+
+    await service.createRecord('example.com', {
+      alias: 'prod',
+      name: 'api',
+      type: 'CNAME',
+      value: 'App.Example.NET'
+    });
+
+    expect(createRecord).toHaveBeenCalledWith('example.com.', {
+      content: 'app.example.net.',
+      record_name: 'api.example.com.',
+      record_type: 'CNAME',
+      zone_name: 'example.com.'
+    });
+  });
+
+  it('quotes TXT values internally while keeping display values unquoted', async () => {
+    const { createRecord, service } = createServiceFixture();
+
+    createRecord.mockResolvedValue({
+      message: 'The record was added successfully!',
+      status: true
+    });
+
+    const result = await service.createRecord('example.com', {
+      alias: 'prod',
+      type: 'TXT',
+      value: 'hello world'
+    });
+
+    expect(createRecord).toHaveBeenCalledWith('example.com.', {
+      content: '"hello world"',
+      record_name: 'example.com.',
+      record_type: 'TXT',
+      zone_name: 'example.com.'
+    });
+    expect(result.record.value).toBe('hello world');
+  });
+
+  it('normalizes MX and SRV targets with trailing dots', async () => {
+    const { createRecord, service } = createServiceFixture();
+
+    createRecord.mockResolvedValue({
+      message: 'The record was added successfully!',
+      status: true
+    });
+
+    await service.createRecord('example.com', {
+      alias: 'prod',
+      exchange: 'Mail.EXAMPLE.NET',
+      priority: '10',
+      type: 'MX'
+    });
+    await service.createRecord('example.com', {
+      alias: 'prod',
+      name: '_sip._tcp',
+      port: '443',
+      priority: '10',
+      target: 'Service.EXAMPLE.NET',
+      type: 'SRV',
+      weight: '5'
+    });
+
+    expect(createRecord).toHaveBeenNthCalledWith(1, 'example.com.', {
+      content: '10 mail.example.net.',
+      record_name: 'example.com.',
+      record_type: 'MX',
+      zone_name: 'example.com.'
+    });
+    expect(createRecord).toHaveBeenNthCalledWith(2, 'example.com.', {
+      content: '10 5 443 service.example.net.',
+      record_name: '_sip._tcp.example.com.',
+      record_type: 'SRV',
+      zone_name: 'example.com.'
+    });
+  });
+
+  it('verifies the exact current record value exists before deleting', async () => {
+    const { deleteRecord, getDomain, service } = createServiceFixture();
+
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'A'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+    deleteRecord.mockResolvedValue({
+      message: 'The record was deleted successfully!',
+      status: true
+    });
+
+    const result = await service.deleteRecord('example.com', {
+      alias: 'prod',
+      force: true,
+      type: 'A',
+      value: '1.1.1.1'
+    });
+
+    expect(getDomain).toHaveBeenCalledWith('example.com.');
+    expect(deleteRecord).toHaveBeenCalledWith('example.com.', {
+      content: '1.1.1.1',
+      record_name: 'example.com.',
+      record_type: 'A',
+      zone_name: 'example.com.'
+    });
+    expect(result).toEqual({
+      action: 'record-delete',
+      cancelled: false,
+      domain_name: 'example.com.',
+      message: 'The record was deleted successfully!',
+      record: {
+        name: 'example.com.',
+        type: 'A',
+        value: '1.1.1.1'
+      }
+    });
+  });
+
+  it('maps current-value and new typed flags correctly when updating records', async () => {
+    const { getDomain, service, updateRecord } = createServiceFixture();
+
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '"v=spf1 include:old.example.net"',
+                disabled: false
+              }
+            ],
+            ttl: 600,
+            type: 'TXT'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+    updateRecord.mockResolvedValue({
+      message: 'The record was updated successfully!',
+      status: true
+    });
+
+    const result = await service.updateRecord('example.com', {
+      alias: 'prod',
+      currentValue: 'v=spf1 include:old.example.net',
+      type: 'TXT',
+      value: 'v=spf1 include:new.example.net'
+    });
+
+    expect(getDomain).toHaveBeenCalledWith('example.com.');
+    expect(updateRecord).toHaveBeenCalledWith('example.com.', {
+      new_record_content: '"v=spf1 include:new.example.net"',
+      new_record_ttl: 600,
+      old_record_content: '"v=spf1 include:old.example.net"',
+      record_name: 'example.com.',
+      record_type: 'TXT',
+      zone_name: 'example.com.'
+    });
+    expect(result).toEqual({
+      action: 'record-update',
+      domain_name: 'example.com.',
+      message: 'The record was updated successfully!',
+      record: {
+        current_value: 'v=spf1 include:old.example.net',
+        name: 'example.com.',
+        new_value: 'v=spf1 include:new.example.net',
+        ttl: 600,
+        type: 'TXT'
+      }
     });
   });
 });

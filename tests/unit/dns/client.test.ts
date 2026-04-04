@@ -4,7 +4,12 @@ import type {
   MyAccountTransport
 } from '../../../src/myaccount/index.js';
 import { DnsApiClient } from '../../../src/dns/client.js';
-import type { DnsCreateRequest } from '../../../src/dns/index.js';
+import type {
+  DnsCreateRequest,
+  DnsRecordCreateRequest,
+  DnsRecordDeleteRequest,
+  DnsRecordUpdateRequest
+} from '../../../src/dns/index.js';
 
 class StubTransport implements MyAccountTransport {
   readonly deleteMock = vi.fn();
@@ -65,6 +70,38 @@ describe('DnsApiClient', () => {
     expect(result).toEqual({
       id: 10279,
       message: 'The domain was created successfully!',
+      status: true
+    });
+  });
+
+  it('creates forward records through the detail path', async () => {
+    const transport = new StubTransport();
+    const client = new DnsApiClient(transport);
+    const request: DnsRecordCreateRequest = {
+      content: '10 mail.example.net.',
+      record_name: 'example.com.',
+      record_type: 'MX',
+      record_ttl: 600,
+      zone_name: 'example.com.'
+    };
+
+    transport.postMock.mockResolvedValue(
+      envelope({
+        message: 'The record was added successfully!',
+        status: true
+      })
+    );
+
+    const result = await client.createRecord('example.com.', request);
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/e2e_dns/forward/example.com./',
+      {
+        body: request
+      }
+    );
+    expect(result).toEqual({
+      message: 'The record was added successfully!',
       status: true
     });
   });
@@ -139,6 +176,69 @@ describe('DnsApiClient', () => {
     });
     expect(result).toEqual({
       message: 'The domain was deleted successfully',
+      status: true
+    });
+  });
+
+  it('deletes forward records through the detail path with a request body', async () => {
+    const transport = new StubTransport();
+    const client = new DnsApiClient(transport);
+    const request: DnsRecordDeleteRequest = {
+      content: '1.1.1.1',
+      record_name: 'example.com.',
+      record_type: 'A',
+      zone_name: 'example.com.'
+    };
+
+    transport.deleteMock.mockResolvedValue(
+      envelope({
+        message: 'The record was deleted successfully!',
+        status: true
+      })
+    );
+
+    const result = await client.deleteRecord('example.com.', request);
+
+    expect(transport.deleteMock).toHaveBeenCalledWith(
+      '/e2e_dns/forward/example.com./',
+      {
+        body: request
+      }
+    );
+    expect(result).toEqual({
+      message: 'The record was deleted successfully!',
+      status: true
+    });
+  });
+
+  it('updates forward records through the detail path with PUT', async () => {
+    const transport = new StubTransport();
+    const client = new DnsApiClient(transport);
+    const request: DnsRecordUpdateRequest = {
+      new_record_content: '203.0.113.10',
+      new_record_ttl: 600,
+      old_record_content: '1.1.1.1',
+      record_name: 'example.com.',
+      record_type: 'A',
+      zone_name: 'example.com.'
+    };
+
+    transport.requestMock.mockResolvedValue(
+      envelope({
+        message: 'The record was updated successfully!',
+        status: true
+      })
+    );
+
+    const result = await client.updateRecord('example.com.', request);
+
+    expect(transport.requestMock).toHaveBeenCalledWith({
+      body: request,
+      method: 'PUT',
+      path: '/e2e_dns/forward/example.com./'
+    });
+    expect(result).toEqual({
+      message: 'The record was updated successfully!',
       status: true
     });
   });

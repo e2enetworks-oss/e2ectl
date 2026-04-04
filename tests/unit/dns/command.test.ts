@@ -19,9 +19,21 @@ function createDnsClientStub() {
       status: true
     })
   );
+  const createRecord = vi.fn(() =>
+    Promise.resolve({
+      message: 'The record was added successfully!',
+      status: true
+    })
+  );
   const deleteDomain = vi.fn(() =>
     Promise.resolve({
       message: 'The domain was deleted successfully',
+      status: true
+    })
+  );
+  const deleteRecord = vi.fn(() =>
+    Promise.resolve({
+      message: 'The record was deleted successfully!',
       status: true
     })
   );
@@ -34,12 +46,50 @@ function createDnsClientStub() {
             name: 'example.com.',
             records: [
               {
-                content: '1.1.1.1',
+                content:
+                  'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400',
                 disabled: false
               }
             ],
             ttl: 86400,
+            type: 'SOA'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              }
+            ],
+            ttl: 600,
             type: 'A'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '"old text"',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'TXT'
           }
         ]
       },
@@ -58,6 +108,12 @@ function createDnsClientStub() {
         validity: null
       }
     ])
+  );
+  const updateRecord = vi.fn(() =>
+    Promise.resolve({
+      message: 'The record was updated successfully!',
+      status: true
+    })
   );
   const verifyNameservers = vi.fn(() =>
     Promise.resolve({
@@ -107,9 +163,12 @@ function createDnsClientStub() {
 
   const stub: DnsClient = {
     createDomain,
+    createRecord,
     deleteDomain,
+    deleteRecord,
     getDomain,
     listDomains,
+    updateRecord,
     verifyNameservers,
     verifyTtl,
     verifyValidity
@@ -117,10 +176,13 @@ function createDnsClientStub() {
 
   return {
     createDomain,
+    createRecord,
     deleteDomain,
+    deleteRecord,
     getDomain,
     listDomains,
     stub,
+    updateRecord,
     verifyNameservers,
     verifyTtl,
     verifyValidity
@@ -232,7 +294,7 @@ describe('dns commands', () => {
     );
   });
 
-  it('renders create output in deterministic json mode', async () => {
+  it('renders get output in deterministic json mode with additive derived fields', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -242,41 +304,7 @@ describe('dns commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dns',
-      'create',
-      'Example.COM',
-      '--ip',
-      '1.1.1.1',
-      '--alias',
-      'prod'
-    ]);
-
-    expect(stdout.buffer).toBe(
-      `${stableStringify({
-        action: 'create',
-        domain: {
-          id: 10279
-        },
-        message: 'The domain was created successfully!',
-        requested: {
-          domain_name: 'Example.COM',
-          ip_address: '1.1.1.1'
-        }
-      })}\n`
-    );
-  });
-
-  it('renders TTL verification in deterministic json mode', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'dns',
-      'verify',
-      'ttl',
+      'get',
       'EXAMPLE.com',
       '--alias',
       'prod'
@@ -284,24 +312,211 @@ describe('dns commands', () => {
 
     expect(stdout.buffer).toBe(
       `${stableStringify({
-        action: 'verify-ttl',
-        domain_name: 'example.com.',
-        low_ttl_count: 1,
-        low_ttl_records: [
-          {
-            name: 'www.example.com.',
-            records: [
-              {
-                content: '1.1.1.1',
-                disabled: false
-              }
-            ],
-            ttl: 300,
-            type: 'A'
+        action: 'get',
+        domain: {
+          domain_name: 'example.com.',
+          domain_ttl: 86400,
+          ip_address: '1.1.1.1',
+          nameservers: ['ns50.e2enetworks.net.in.', 'ns51.e2enetworks.net.in.'],
+          records: [
+            {
+              disabled: false,
+              name: 'example.com.',
+              ttl: 600,
+              type: 'A',
+              value: '1.1.1.1'
+            },
+            {
+              disabled: false,
+              name: 'example.com.',
+              ttl: 300,
+              type: 'TXT',
+              value: 'old text'
+            }
+          ],
+          rrsets: [
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content:
+                    'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400',
+                  disabled: false
+                }
+              ],
+              ttl: 86400,
+              type: 'SOA'
+            },
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: 'ns50.e2enetworks.net.in.',
+                  disabled: false
+                },
+                {
+                  content: 'ns51.e2enetworks.net.in.',
+                  disabled: false
+                }
+              ],
+              ttl: 86400,
+              type: 'NS'
+            },
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: '1.1.1.1',
+                  disabled: false
+                }
+              ],
+              ttl: 600,
+              type: 'A'
+            },
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: '"old text"',
+                  disabled: false
+                }
+              ],
+              ttl: 300,
+              type: 'TXT'
+            }
+          ],
+          soa: {
+            name: 'example.com.',
+            ttl: 86400,
+            values: [
+              'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400'
+            ]
           }
+        }
+      })}\n`
+    );
+  });
+
+  it('renders nameserver aggregation in deterministic json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dns',
+      'nameservers',
+      'EXAMPLE.com',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'nameservers',
+        authority_match: false,
+        configured_nameservers: [
+          'ns50.e2enetworks.net.in.',
+          'ns51.e2enetworks.net.in.'
         ],
-        message: 'Error verifying TTL for your DNS records.',
+        delegated_nameservers: ['ns1.example.net.', 'ns2.example.net.'],
+        domain_name: 'example.com.',
+        message: 'Your nameservers are not setup correctly',
+        problem: 1,
         status: true
+      })}\n`
+    );
+  });
+
+  it('creates record commands with the reviewed dns record surface', async () => {
+    const { dnsStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dns',
+      'record',
+      'create',
+      'Example.com',
+      '--type',
+      'CNAME',
+      '--name',
+      'api',
+      '--value',
+      'App.Example.NET',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(dnsStub.createRecord).toHaveBeenCalledWith('example.com.', {
+      content: 'app.example.net.',
+      record_name: 'api.example.com.',
+      record_type: 'CNAME',
+      zone_name: 'example.com.'
+    });
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'record-create',
+        domain_name: 'example.com.',
+        message: 'The record was added successfully!',
+        record: {
+          name: 'api.example.com.',
+          ttl: null,
+          type: 'CNAME',
+          value: 'app.example.net.'
+        }
+      })}\n`
+    );
+  });
+
+  it('updates records in deterministic json mode using exact current-value targeting', async () => {
+    const { dnsStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dns',
+      'record',
+      'update',
+      'Example.com',
+      '--type',
+      'TXT',
+      '--current-value',
+      'old text',
+      '--value',
+      'new text',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(dnsStub.updateRecord).toHaveBeenCalledWith('example.com.', {
+      new_record_content: '"new text"',
+      new_record_ttl: 300,
+      old_record_content: '"old text"',
+      record_name: 'example.com.',
+      record_type: 'TXT',
+      zone_name: 'example.com.'
+    });
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'record-update',
+        domain_name: 'example.com.',
+        message: 'The record was updated successfully!',
+        record: {
+          current_value: 'old text',
+          name: 'example.com.',
+          new_value: 'new text',
+          ttl: 300,
+          type: 'TXT'
+        }
       })}\n`
     );
   });

@@ -31,12 +31,38 @@ describe('dns get/delete against a fake MyAccount API', () => {
                   name: 'example.com.',
                   records: [
                     {
+                      content: 'ns50.e2enetworks.net.in.',
+                      disabled: false
+                    },
+                    {
+                      content: 'ns51.e2enetworks.net.in.',
+                      disabled: false
+                    }
+                  ],
+                  ttl: 86400,
+                  type: 'NS'
+                },
+                {
+                  name: 'example.com.',
+                  records: [
+                    {
                       content: '1.1.1.1',
                       disabled: false
                     }
                   ],
                   ttl: 86400,
                   type: 'A'
+                },
+                {
+                  name: 'example.com.',
+                  records: [
+                    {
+                      content: '"hello world"',
+                      disabled: false
+                    }
+                  ],
+                  ttl: 300,
+                  type: 'TXT'
                 }
               ]
             },
@@ -72,6 +98,26 @@ describe('dns get/delete against a fake MyAccount API', () => {
             domain_name: 'example.com.',
             domain_ttl: 86400,
             ip_address: '1.1.1.1',
+            nameservers: [
+              'ns50.e2enetworks.net.in.',
+              'ns51.e2enetworks.net.in.'
+            ],
+            records: [
+              {
+                disabled: false,
+                name: 'example.com.',
+                ttl: 86400,
+                type: 'A',
+                value: '1.1.1.1'
+              },
+              {
+                disabled: false,
+                name: 'example.com.',
+                ttl: 300,
+                type: 'TXT',
+                value: 'hello world'
+              }
+            ],
             rrsets: [
               {
                 name: 'example.com.',
@@ -89,14 +135,47 @@ describe('dns get/delete against a fake MyAccount API', () => {
                 name: 'example.com.',
                 records: [
                   {
+                    content: 'ns50.e2enetworks.net.in.',
+                    disabled: false
+                  },
+                  {
+                    content: 'ns51.e2enetworks.net.in.',
+                    disabled: false
+                  }
+                ],
+                ttl: 86400,
+                type: 'NS'
+              },
+              {
+                name: 'example.com.',
+                records: [
+                  {
                     content: '1.1.1.1',
                     disabled: false
                   }
                 ],
                 ttl: 86400,
                 type: 'A'
+              },
+              {
+                name: 'example.com.',
+                records: [
+                  {
+                    content: '"hello world"',
+                    disabled: false
+                  }
+                ],
+                ttl: 300,
+                type: 'TXT'
               }
-            ]
+            ],
+            soa: {
+              name: 'example.com.',
+              ttl: 86400,
+              values: [
+                'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400'
+              ]
+            }
           }
         })}\n`
       );

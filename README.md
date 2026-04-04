@@ -171,12 +171,32 @@ e2ectl dns create <domain-name> --ip <ipv4>
 e2ectl dns delete <domain-name>
 
 # Diagnostics
+e2ectl dns nameservers <domain-name>
 e2ectl dns verify ns <domain-name>
 e2ectl dns verify validity <domain-name>
 e2ectl dns verify ttl <domain-name>
+
+# Forward records
+e2ectl dns record list <domain-name>
+e2ectl dns record create <domain-name> --type <type> [--name <host>] [type-specific value flags] [--ttl <seconds>]
+e2ectl dns record update <domain-name> --type <type> [--name <host>] --current-value <value> [type-specific value flags] [--ttl <seconds>]
+e2ectl dns record delete <domain-name> --type <type> [--name <host>] --value <value> [--force]
 ```
 
-`dns get`, `dns delete`, and all `dns verify` commands accept domain names with or without a trailing dot. The CLI canonicalizes lookups to lowercase FQDN form internally.
+`dns get`, `dns delete`, `dns nameservers`, `dns record ...`, and all `dns verify` commands accept domain names with or without a trailing dot. The CLI canonicalizes domain and record names to lowercase FQDN form internally.
+
+Record command rules:
+
+- `--name` defaults to `@`, which means the zone apex.
+- Relative names such as `api` become `api.<domain>.`; fully-qualified names are accepted as input.
+- `A`, `AAAA`, `CNAME`, and `TXT` records use `--value`.
+- `MX` records use `--exchange <host>` plus `--priority <number>`.
+- `SRV` records use `--target <host> --priority <number> --weight <number> --port <number>`.
+- `TXT` values are quoted internally for the backend, but `dns record list` shows the unquoted value.
+- `CNAME`, `MX`, and `SRV` targets are normalized to trailing-dot form.
+- `dns record delete` and `dns record update` target the exact current record value shown by `dns record list`.
+
+`dns get` keeps the raw `domain.rrsets` JSON while also adding derived `domain.nameservers`, `domain.soa`, and flattened `domain.records` fields for scripting.
 
 ### VPCs
 

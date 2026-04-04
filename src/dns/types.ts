@@ -25,6 +25,35 @@ export interface DnsDeleteResponse {
   status: boolean;
 }
 
+export interface DnsRecordCreateRequest {
+  content: string;
+  record_name: string;
+  record_type: string;
+  record_ttl?: number;
+  zone_name: string;
+}
+
+export interface DnsRecordDeleteRequest {
+  content: string;
+  record_name: string;
+  record_type: string;
+  zone_name: string;
+}
+
+export interface DnsRecordUpdateRequest {
+  new_record_content: string;
+  new_record_ttl: number;
+  old_record_content: string;
+  record_name: string;
+  record_type: string;
+  zone_name: string;
+}
+
+export interface DnsRecordMutationResponse {
+  message: string;
+  status: boolean;
+}
+
 export interface DnsZoneRecord {
   content?: string;
   disabled?: boolean;

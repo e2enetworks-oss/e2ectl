@@ -1,6 +1,7 @@
 import { formatCliCommand } from '../../../src/app/metadata.js';
 import {
   formatDnsListTable,
+  formatDnsRecordTable,
   formatDnsRrsetsTable,
   renderDnsResult
 } from '../../../src/dns/formatter.js';
@@ -22,7 +23,23 @@ describe('dns formatter', () => {
     expect(table).toContain('1.1.1.1');
   });
 
-  it('renders rrset tables for zone and TTL views', () => {
+  it('renders flattened record tables for record list and get output', () => {
+    const table = formatDnsRecordTable([
+      {
+        disabled: false,
+        name: 'www.example.com.',
+        ttl: 300,
+        type: 'A',
+        value: '1.1.1.1'
+      }
+    ]);
+
+    expect(table).toContain('www.example.com.');
+    expect(table).toContain('300');
+    expect(table).toContain('1.1.1.1');
+  });
+
+  it('renders rrset tables for raw zone and TTL views', () => {
     const table = formatDnsRrsetsTable([
       {
         name: 'www.example.com.',
@@ -63,33 +80,87 @@ describe('dns formatter', () => {
     expect(output).toContain(formatCliCommand('dns get Example.COM'));
   });
 
-  it('renders TTL verification output from the backend rrset array shape', () => {
+  it('renders get json with raw rrsets plus derived nameservers, soa, and records', () => {
     const output = renderDnsResult(
       {
-        action: 'verify-ttl',
-        domain_name: 'example.com.',
-        low_ttl_count: 1,
-        low_ttl_records: [
-          {
-            name: 'www.example.com.',
-            records: [
-              {
-                content: '1.1.1.1',
-                disabled: false
-              }
-            ],
-            ttl: 300,
-            type: 'A'
+        action: 'get',
+        domain: {
+          domain_name: 'example.com.',
+          domain_ttl: 86400,
+          ip_address: '1.1.1.1',
+          nameservers: ['ns50.e2enetworks.net.in.', 'ns51.e2enetworks.net.in.'],
+          records: [
+            {
+              disabled: false,
+              name: 'www.example.com.',
+              ttl: 300,
+              type: 'A',
+              value: '1.1.1.1'
+            }
+          ],
+          rrsets: [
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: 'ns50.e2enetworks.net.in.',
+                  disabled: false
+                }
+              ],
+              ttl: 86400,
+              type: 'NS'
+            }
+          ],
+          soa: {
+            name: 'example.com.',
+            ttl: 86400,
+            values: ['ns50.e2enetworks.net.in. abuse.example.com. 1 2 3 4 5']
           }
-        ],
-        message: 'Error verifying TTL for your DNS records.',
+        }
+      },
+      true
+    );
+    const parsed = JSON.parse(output) as {
+      action: string;
+      domain: {
+        nameservers: string[];
+        records: Array<{ value: string }>;
+        rrsets: Array<{ name: string }>;
+        soa: { values: string[] };
+      };
+    };
+
+    expect(parsed.action).toBe('get');
+    expect(parsed.domain.rrsets[0]?.name).toBe('example.com.');
+    expect(parsed.domain.nameservers).toEqual([
+      'ns50.e2enetworks.net.in.',
+      'ns51.e2enetworks.net.in.'
+    ]);
+    expect(parsed.domain.soa.values).toEqual([
+      'ns50.e2enetworks.net.in. abuse.example.com. 1 2 3 4 5'
+    ]);
+    expect(parsed.domain.records[0]?.value).toBe('1.1.1.1');
+  });
+
+  it('renders nameserver aggregation output for humans', () => {
+    const output = renderDnsResult(
+      {
+        action: 'nameservers',
+        authority_match: false,
+        configured_nameservers: ['ns50.e2enetworks.net.in.'],
+        delegated_nameservers: ['ns1.example.net.'],
+        domain_name: 'example.com.',
+        message: 'Your nameservers are not setup correctly',
+        problem: 1,
         status: true
       },
       false
     );
 
-    expect(output).toContain('Low TTL RRsets: 1');
-    expect(output).toContain('www.example.com.');
-    expect(output).toContain('1.1.1.1');
+    expect(output).toContain('Authority Match: no');
+    expect(output).toContain(
+      'Configured Nameservers: ns50.e2enetworks.net.in.'
+    );
+    expect(output).toContain('Delegated Nameservers: ns1.example.net.');
   });
 });
