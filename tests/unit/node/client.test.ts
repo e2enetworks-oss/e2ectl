@@ -334,6 +334,30 @@ describe('NodeApiClient', () => {
       message: 'Deleted successfully'
     });
   });
+
+  it('adds reserve_ip_required only when node delete requests public IP reservation', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope(
+        {},
+        {
+          message: 'Deleted successfully'
+        }
+      )
+    );
+
+    await client.deleteNode('101', {
+      reserve_ip_required: 'true'
+    });
+
+    expect(transport.deleteMock).toHaveBeenCalledWith('/nodes/101/', {
+      query: {
+        reserve_ip_required: 'true'
+      }
+    });
+  });
 });
 
 function envelope<TData>(

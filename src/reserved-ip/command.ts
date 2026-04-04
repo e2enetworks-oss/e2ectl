@@ -5,6 +5,7 @@ import type { CliRuntime } from '../app/index.js';
 import { renderReservedIpResult } from './formatter.js';
 import {
   ReservedIpService,
+  type ReservedIpCreateOptions,
   type ReservedIpContextOptions,
   type ReservedIpDeleteOptions,
   type ReservedIpNodeActionOptions
@@ -64,9 +65,15 @@ export function buildReservedIpCommand(runtime: CliRuntime): Command {
   );
 
   addContextOptions(
-    command.command('create').description('Reserve a new IP.')
+    command
+      .command('create')
+      .description('Reserve a new IP.')
+      .option(
+        '--from-node <nodeId>',
+        'Reserve the current public IP from the given e2ectl node id.'
+      )
   ).action(
-    async (options: ReservedIpContextOptions, commandInstance: Command) => {
+    async (options: ReservedIpCreateOptions, commandInstance: Command) => {
       const result = await service.createReservedIp(options);
       runtime.stdout.write(
         renderReservedIpResult(

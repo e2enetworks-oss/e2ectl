@@ -25,6 +25,10 @@ export interface ReservedIpDeleteOptions extends ReservedIpContextOptions {
   force?: boolean;
 }
 
+export interface ReservedIpCreateOptions extends ReservedIpContextOptions {
+  fromNode?: string;
+}
+
 export interface ReservedIpNodeActionOptions extends ReservedIpContextOptions {
   nodeId: string;
 }
@@ -136,13 +140,31 @@ export class ReservedIpService {
   }
 
   async createReservedIp(
-    options: ReservedIpContextOptions
+    options: ReservedIpCreateOptions
   ): Promise<ReservedIpCreateCommandResult> {
-    const client = await this.createClient(options);
+    if (options.fromNode === undefined) {
+      const client = await this.createClient(options);
+
+      return {
+        action: 'create',
+        reserved_ip: normalizeReservedIpItem(await client.createReservedIp())
+      };
+    }
+
+    const normalizedNodeId = assertNodeId(options.fromNode, '--from-node');
+    const credentials = await this.resolveContext(options);
+    const reservedIpClient =
+      this.dependencies.createReservedIpClient(credentials);
+    const nodeClient = this.dependencies.createNodeClient(credentials);
+    const nodeVmId = await resolveNodeVmId(nodeClient, normalizedNodeId);
 
     return {
       action: 'create',
-      reserved_ip: normalizeReservedIpItem(await client.createReservedIp())
+      reserved_ip: normalizeReservedIpItem(
+        await reservedIpClient.createReservedIp({
+          vm_id: String(nodeVmId)
+        })
+      )
     };
   }
 
@@ -320,12 +342,12 @@ function assertCanDelete(isInteractive: boolean): void {
   );
 }
 
-function assertNodeId(nodeId: string): number {
+function assertNodeId(nodeId: string, flagName = '--node-id'): number {
   if (!/^\d+$/.test(nodeId)) {
     throw new CliError('Node ID must be numeric.', {
       code: 'INVALID_NODE_ID',
       exitCode: EXIT_CODES.usage,
-      suggestion: 'Pass the numeric e2ectl node id with --node-id.'
+      suggestion: `Pass the numeric e2ectl node id with ${flagName}.`
     });
   }
 

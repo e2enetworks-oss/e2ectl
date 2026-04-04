@@ -18,12 +18,14 @@ interface ReservedIpNodeActionApiResult {
 
 const RESERVED_IPS_PATH = '/reserve_ips/';
 
+export type ReservedIpCreateQuery = Record<'vm_id', string>;
+
 export interface ReservedIpClient {
   attachReservedIpToNode(
     ipAddress: string,
     body: ReservedIpNodeActionRequest
   ): Promise<ReservedIpNodeActionResult>;
-  createReservedIp(): Promise<ReservedIpSummary>;
+  createReservedIp(query?: ReservedIpCreateQuery): Promise<ReservedIpSummary>;
   deleteReservedIp(ipAddress: string): Promise<ReservedIpDeleteResult>;
   detachReservedIpFromNode(
     ipAddress: string,
@@ -48,11 +50,13 @@ export class ReservedIpApiClient implements ReservedIpClient {
     return mapReservedIpNodeActionResponse(response, ipAddress);
   }
 
-  async createReservedIp(): Promise<ReservedIpSummary> {
-    const response =
-      await this.transport.post<ApiEnvelope<ReservedIpSummary>>(
-        RESERVED_IPS_PATH
-      );
+  async createReservedIp(
+    query?: ReservedIpCreateQuery
+  ): Promise<ReservedIpSummary> {
+    const response = await this.transport.post<ApiEnvelope<ReservedIpSummary>>(
+      RESERVED_IPS_PATH,
+      query === undefined ? undefined : { query }
+    );
 
     return response.data;
   }

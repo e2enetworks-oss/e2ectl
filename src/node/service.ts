@@ -56,6 +56,7 @@ export interface NodeCreateOptions extends NodeContextOptions {
 
 export interface NodeDeleteOptions extends NodeContextOptions {
   force?: boolean;
+  reservePublicIp?: boolean;
 }
 
 export interface NodeCatalogPlansOptions extends NodeContextOptions {
@@ -130,6 +131,7 @@ export interface NodeDeleteCommandResult {
   cancelled: boolean;
   message?: string;
   node_id: number;
+  reserve_public_ip_requested: boolean;
 }
 
 export interface NodeCatalogOsCommandResult {
@@ -485,6 +487,7 @@ export class NodeService {
     options: NodeDeleteOptions
   ): Promise<NodeDeleteCommandResult> {
     const normalizedNodeId = assertNodeId(nodeId);
+    const reservePublicIp = options.reservePublicIp ?? false;
 
     if (!(options.force ?? false)) {
       assertCanDelete(this.dependencies.isInteractive);
@@ -496,19 +499,24 @@ export class NodeService {
         return {
           action: 'delete',
           cancelled: true,
-          node_id: normalizedNodeId
+          node_id: normalizedNodeId,
+          reserve_public_ip_requested: reservePublicIp
         };
       }
     }
 
     const client = await this.createNodeClient(options);
-    const result = await client.deleteNode(String(normalizedNodeId));
+    const result = await client.deleteNode(
+      String(normalizedNodeId),
+      reservePublicIp ? { reserve_ip_required: 'true' } : undefined
+    );
 
     return {
       action: 'delete',
       cancelled: false,
       message: result.message,
-      node_id: normalizedNodeId
+      node_id: normalizedNodeId,
+      reserve_public_ip_requested: reservePublicIp
     };
   }
 

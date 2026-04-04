@@ -18,7 +18,7 @@ function createReservedIpClientStub() {
       vm_name: 'node-a'
     })
   );
-  const createReservedIp = vi.fn(() =>
+  const createReservedIp = vi.fn<ReservedIpClient['createReservedIp']>(() =>
     Promise.resolve({
       appliance_type: 'NODE',
       bought_at: '04-11-2024 10:37',
@@ -79,6 +79,7 @@ function createReservedIpClientStub() {
 
 describe('reserved-ip commands', () => {
   function createRuntimeFixture(): {
+    getNode: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     reservedIpStub: ReturnType<typeof createReservedIpClientStub>;
     runtime: CliRuntime;
@@ -89,20 +90,21 @@ describe('reserved-ip commands', () => {
     const stdout = new MemoryWriter();
     const reservedIpStub = createReservedIpClientStub();
     let credentials: ResolvedCredentials | undefined;
+    const getNode = vi.fn(() =>
+      Promise.resolve({
+        id: 101,
+        name: 'node-a',
+        plan: 'C3.8GB',
+        status: 'Running',
+        vm_id: 100157
+      })
+    );
 
     const nodeClient: NodeClient = {
       attachSshKeys: vi.fn(),
       createNode: vi.fn(),
       deleteNode: vi.fn(),
-      getNode: vi.fn(() =>
-        Promise.resolve({
-          id: 101,
-          name: 'node-a',
-          plan: 'C3.8GB',
-          status: 'Running',
-          vm_id: 100157
-        })
-      ),
+      getNode,
       listNodeCatalogOs: vi.fn(),
       listNodeCatalogPlans: vi.fn(),
       listNodes: vi.fn(),
@@ -146,6 +148,7 @@ describe('reserved-ip commands', () => {
     };
 
     return {
+      getNode,
       receivedCredentials: () => credentials,
       reservedIpStub,
       runtime,
@@ -204,7 +207,7 @@ describe('reserved-ip commands', () => {
   });
 
   it('creates reserved IPs in deterministic json mode', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
+    const { reservedIpStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
@@ -232,6 +235,60 @@ describe('reserved-ip commands', () => {
           status: 'Reserved',
           vm_id: null,
           vm_name: '--'
+        }
+      })}\n`
+    );
+    expect(reservedIpStub.createReservedIp).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates reserved IPs from a node by wiring --from-node to the internal vm_id lookup', async () => {
+    const { getNode, reservedIpStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    reservedIpStub.createReservedIp.mockResolvedValueOnce({
+      appliance_type: 'NODE',
+      bought_at: '04-11-2024 10:37',
+      floating_ip_attached_nodes: [],
+      ip_address: '164.52.198.54',
+      project_name: 'default-project',
+      reserve_id: 12662,
+      reserved_type: 'AddonIP',
+      status: 'Assigned',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    } as Awaited<ReturnType<ReservedIpClient['createReservedIp']>>);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'reserved-ip',
+      'create',
+      '--from-node',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(getNode).toHaveBeenCalledWith('101');
+    expect(reservedIpStub.createReservedIp).toHaveBeenCalledWith({
+      vm_id: '100157'
+    });
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'create',
+        reserved_ip: {
+          appliance_type: 'NODE',
+          bought_at: '04-11-2024 10:37',
+          floating_ip_attached_nodes: [],
+          ip_address: '164.52.198.54',
+          project_name: 'default-project',
+          reserve_id: 12662,
+          reserved_type: 'AddonIP',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
         }
       })}\n`
     );

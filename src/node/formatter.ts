@@ -346,9 +346,7 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .join('\n') + '\n'
       );
     case 'delete':
-      return result.cancelled
-        ? 'Deletion cancelled.\n'
-        : `Deleted node ${result.node_id}.\n`;
+      return formatNodeDeleteResult(result);
     case 'get':
       return `${formatNodeDetails(result.node)}\n`;
     case 'list':
@@ -521,13 +519,15 @@ function renderNodeJson(result: NodeCommandResult): string {
           ? {
               action: 'delete',
               cancelled: true,
-              node_id: result.node_id
+              node_id: result.node_id,
+              reserve_public_ip_requested: result.reserve_public_ip_requested
             }
           : {
               action: 'delete',
               cancelled: false,
               message: result.message ?? '',
-              node_id: result.node_id
+              node_id: result.node_id,
+              reserve_public_ip_requested: result.reserve_public_ip_requested
             }
       );
     case 'get':
@@ -648,6 +648,20 @@ function renderNodeJson(result: NodeCommandResult): string {
 
 function renderJson(value: unknown): string {
   return `${stableStringify(value as JsonValue)}\n`;
+}
+
+function formatNodeDeleteResult(
+  result: Extract<NodeCommandResult, { action: 'delete' }>
+): string {
+  const lines = [
+    result.cancelled ? 'Deletion cancelled.' : `Deleted node ${result.node_id}.`
+  ];
+
+  if (result.reserve_public_ip_requested) {
+    lines.push('Reserved Public IP: requested.');
+  }
+
+  return `${lines.join('\n')}\n`;
 }
 
 function sortNodeSummariesById(nodes: NodeSummary[]): NodeSummary[] {

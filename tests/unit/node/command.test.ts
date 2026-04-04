@@ -1252,7 +1252,8 @@ describe('node commands', () => {
       toJsonOutput({
         action: 'delete',
         cancelled: true,
-        node_id: 101
+        node_id: 101,
+        reserve_public_ip_requested: false
       })
     );
   });
@@ -1298,13 +1299,49 @@ describe('node commands', () => {
     ]);
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101');
+    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101', undefined);
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'delete',
         cancelled: false,
         message: 'Success',
-        node_id: 101
+        node_id: 101,
+        reserve_public_ip_requested: false
+      })
+    );
+  });
+
+  it('deletes a node while requesting public IP reservation when --reserve-public-ip is supplied', async () => {
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture({
+      isInteractive: false
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'delete',
+      '101',
+      '--alias',
+      'prod',
+      '--reserve-public-ip',
+      '--force'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101', {
+      reserve_ip_required: 'true'
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'delete',
+        cancelled: false,
+        message: 'Success',
+        node_id: 101,
+        reserve_public_ip_requested: true
       })
     );
   });

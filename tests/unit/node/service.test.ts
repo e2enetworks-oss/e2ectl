@@ -23,7 +23,10 @@ function createConfig(): ConfigFile {
   };
 }
 
-function createServiceFixture(): {
+function createServiceFixture(options?: {
+  confirmResult?: boolean;
+  isInteractive?: boolean;
+}): {
   attachNodeVpc: ReturnType<typeof vi.fn>;
   attachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   attachSshKeys: ReturnType<typeof vi.fn>;
@@ -34,6 +37,7 @@ function createServiceFixture(): {
   createSshKeyClient: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
   createVpcClient: ReturnType<typeof vi.fn>;
+  deleteNode: ReturnType<typeof vi.fn>;
   detachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   detachNodeVpc: ReturnType<typeof vi.fn>;
   detachVolumeFromNode: ReturnType<typeof vi.fn>;
@@ -105,11 +109,16 @@ function createServiceFixture(): {
       total_number_of_node_requested: 1
     })
   );
+  const deleteNode = vi.fn(() =>
+    Promise.resolve({
+      message: 'Success'
+    })
+  );
   const listNodeCatalogPlans = vi.fn(() => Promise.resolve([]));
   const nodeClient: NodeClient = {
     attachSshKeys,
     createNode,
-    deleteNode: vi.fn(),
+    deleteNode,
     getNode,
     listNodeCatalogOs: vi.fn(),
     listNodeCatalogPlans,
@@ -224,13 +233,13 @@ function createServiceFixture(): {
   const createSecurityGroupClient = vi.fn(() => securityGroupClient);
   const readConfig = vi.fn(() => Promise.resolve(createConfig()));
   const service = new NodeService({
-    confirm: vi.fn(() => Promise.resolve(true)),
+    confirm: vi.fn(() => Promise.resolve(options?.confirmResult ?? true)),
     createNodeClient,
     createSecurityGroupClient,
     createSshKeyClient,
     createVolumeClient,
     createVpcClient,
-    isInteractive: true,
+    isInteractive: options?.isInteractive ?? true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
       read: readConfig
@@ -248,6 +257,7 @@ function createServiceFixture(): {
     createSshKeyClient,
     createVolumeClient,
     createVpcClient,
+    deleteNode,
     detachNodeSecurityGroups,
     detachNodeVpc,
     detachVolumeFromNode,
@@ -634,6 +644,85 @@ describe('NodeService', () => {
       committed_plan_id: 2711,
       post_commit_behavior: 'auto_renew'
     });
+  });
+
+  it('omits reserve_ip_required when delete does not request public IP reservation', async () => {
+    const { deleteNode, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    const result = await service.deleteNode('101', {
+      alias: 'prod',
+      force: true
+    });
+
+    expect(deleteNode).toHaveBeenCalledWith('101', undefined);
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      message: 'Success',
+      node_id: 101,
+      reserve_public_ip_requested: false
+    });
+  });
+
+  it('sends reserve_ip_required=true when delete requests public IP reservation', async () => {
+    const { deleteNode, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    const result = await service.deleteNode('101', {
+      alias: 'prod',
+      force: true,
+      reservePublicIp: true
+    });
+
+    expect(deleteNode).toHaveBeenCalledWith('101', {
+      reserve_ip_required: 'true'
+    });
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      message: 'Success',
+      node_id: 101,
+      reserve_public_ip_requested: true
+    });
+  });
+
+  it('returns a cancelled delete result before network when confirmation is declined', async () => {
+    const { deleteNode, service } = createServiceFixture({
+      confirmResult: false,
+      isInteractive: true
+    });
+
+    const result = await service.deleteNode('101', {
+      alias: 'prod',
+      reservePublicIp: true
+    });
+
+    expect(deleteNode).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: true,
+      node_id: 101,
+      reserve_public_ip_requested: true
+    });
+  });
+
+  it('fails before network in non-interactive mode when delete omits --force', async () => {
+    const { deleteNode, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.deleteNode('101', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a node requires confirmation in an interactive terminal.'
+    });
+
+    expect(deleteNode).not.toHaveBeenCalled();
   });
 
   it('validates committed node create flags locally', async () => {
