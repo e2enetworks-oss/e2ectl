@@ -665,6 +665,72 @@ describe('NodeService', () => {
     });
   });
 
+  it('includes disk in the create payload when provided', async () => {
+    const { createNode, service } = createServiceFixture();
+
+    await service.createNode({
+      alias: 'prod',
+      disk: '150',
+      image: 'Ubuntu-24.04-Distro',
+      name: 'demo-node',
+      plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi'
+    });
+
+    expect(createNode).toHaveBeenCalledWith({
+      backups: false,
+      default_public_ip: false,
+      disk: 150,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: false,
+      label: 'default',
+      name: 'demo-node',
+      number_of_instances: 1,
+      plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+      ssh_keys: [],
+      start_scripts: []
+    });
+  });
+
+  it('requires disk for E1 and E1WC plans', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size is required for E1 and E1WC plans.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
+  it('rejects disk for non-E1 plans', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        disk: '150',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size can only be used with E1 or E1WC plans.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
   it('fails before createNode when a requested create ssh key id does not resolve', async () => {
     const { createNode, createNodeClient, listSshKeys, service } =
       createServiceFixture();
@@ -711,6 +777,55 @@ describe('NodeService', () => {
     expect(readConfig).not.toHaveBeenCalled();
     expect(createSshKeyClient).not.toHaveBeenCalled();
     expect(listSshKeys).not.toHaveBeenCalled();
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid disk sizes before resolving context or ssh keys', async () => {
+    const {
+      createNode,
+      createNodeClient,
+      createSshKeyClient,
+      listSshKeys,
+      readConfig,
+      service
+    } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        disk: '0',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        sshKeyIds: ['12']
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size must be in the range 75 GB to 2400 GB.'
+    });
+
+    expect(readConfig).not.toHaveBeenCalled();
+    expect(createSshKeyClient).not.toHaveBeenCalled();
+    expect(listSshKeys).not.toHaveBeenCalled();
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
+  it('rejects E1 disk sizes that do not match platform increments', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        disk: '175',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size at or above 150 GB must be a multiple of 50 GB.'
+    });
+
     expect(createNodeClient).not.toHaveBeenCalled();
     expect(createNode).not.toHaveBeenCalled();
   });

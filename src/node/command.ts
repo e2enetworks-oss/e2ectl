@@ -30,6 +30,7 @@ interface NodeSecurityGroupActionCommandOptions extends NodeContextOptions {
 interface NodeCreateCommandOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
+  disk?: string;
   image: string;
   name: string;
   plan: string;
@@ -85,7 +86,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`.`
+        `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
@@ -103,6 +104,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         `Committed plan id returned by \`${formatCliCommand('node catalog plans')}\`.`
       )
       .option(
+        '--disk <disk>',
+        'Root disk size in GB. Required for E1/E1WC plans and rejected for other plans.'
+      )
+      .option(
         '--ssh-key-id <sshKeyId>',
         'Saved SSH key id to attach during node creation. Repeat to attach multiple keys.',
         collectOptionValue
@@ -117,6 +122,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         ...(options.committedPlanId === undefined
           ? {}
           : { committedPlanId: options.committedPlanId }),
+        ...(options.disk === undefined ? {} : { disk: options.disk }),
         ...(options.location === undefined
           ? {}
           : {

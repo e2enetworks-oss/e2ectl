@@ -574,6 +574,61 @@ describe('node formatter', () => {
     expect(committedTable).toContain('2 vCPU / 6 GB / N/A');
   });
 
+  it('shows E1 create examples with disk guidance and the default storage example', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [
+          {
+            available_inventory: true,
+            committed_options: [
+              {
+                days: 90,
+                id: 2711,
+                name: '90 Days Committed , Rs. 6026.0',
+                total_price: 6026
+              }
+            ],
+            config: {
+              disk_gb: 0,
+              family: 'General Purpose',
+              ram: '6.00',
+              series: 'E1',
+              vcpu: 2
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 2.25,
+              price_per_month: 1642.5
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+            row: 1,
+            sku: 'E1.6GB'
+          }
+        ],
+        query: {
+          billing_type: 'all',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      formatCliCommand(
+        'node create --name <name> --plan E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi --image Ubuntu-24.04-Distro --disk 150'
+      )
+    );
+    expect(output).toContain(
+      'E1/E1WC configs also require --disk <size-gb>. Allowed sizes: 75-2400 GB; 25 GB steps below 150 GB; 50 GB steps at or above 150 GB.'
+    );
+  });
+
   it('renders a family-specific no-match message when the family filter excludes all configs', () => {
     const output = renderNodeResult(
       {

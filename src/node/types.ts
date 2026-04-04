@@ -158,6 +158,7 @@ export interface NodeCreateRequest {
   cn_id?: number;
   cn_status?: NodeCommittedCreateStatus;
   default_public_ip: boolean;
+  disk?: number;
   disable_password: boolean;
   enable_bitninja: boolean;
   image: string;

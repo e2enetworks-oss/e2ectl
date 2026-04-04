@@ -2,6 +2,11 @@ import Table from 'cli-table3';
 
 import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
+import {
+  CUSTOM_STORAGE_DEFAULT_DISK_GB,
+  formatCustomStorageDiskHint,
+  isCustomStorageSeries
+} from './custom-storage.js';
 import type {
   NodeCatalogBillingType,
   NodeCatalogOsData,
@@ -814,6 +819,13 @@ function formatNodeCatalogCreateExamples(
     buildHourlyCreateExample(hourlyExampleItem)
   ];
 
+  if (items.some((item) => isCustomStorageSeries(item.config.series))) {
+    exampleLines.push(
+      '',
+      `E1/E1WC configs also require --disk <size-gb>. ${formatCustomStorageDiskHint()}`
+    );
+  }
+
   if (billingType !== 'hourly') {
     if (committedExample === undefined) {
       exampleLines.push(
@@ -852,9 +864,7 @@ function findCommittedCreateExample(items: NodeCatalogPlanItem[]):
 }
 
 function buildHourlyCreateExample(item: NodeCatalogPlanItem): string {
-  return formatCliCommand(
-    `node create --name <name> --plan ${item.plan} --image ${item.image}`
-  );
+  return formatCliCommand(buildNodeCreateExample(item));
 }
 
 function buildCommittedCreateExample(
@@ -862,9 +872,25 @@ function buildCommittedCreateExample(
   committedPlanId: number
 ): string {
   return (
-    `${formatCliCommand(`node create --name <name> --plan ${item.plan} --image ${item.image}`)} ` +
+    `${formatCliCommand(buildNodeCreateExample(item))} ` +
     `--billing-type committed --committed-plan-id ${committedPlanId}`
   );
+}
+
+function buildNodeCreateExample(item: NodeCatalogPlanItem): string {
+  return [
+    'node',
+    'create',
+    '--name',
+    '<name>',
+    '--plan',
+    item.plan,
+    '--image',
+    item.image,
+    ...(isCustomStorageSeries(item.config.series)
+      ? ['--disk', String(CUSTOM_STORAGE_DEFAULT_DISK_GB)]
+      : [])
+  ].join(' ');
 }
 
 function formatQuantity(value: number | string | null, unit: string): string {
@@ -882,10 +908,6 @@ function trimNumericString(value: string | null): string | null {
 
   const normalizedValue = Number.parseFloat(value);
   return Number.isFinite(normalizedValue) ? normalizedValue.toString() : value;
-}
-
-function isCustomStorageSeries(series: string | null | undefined): boolean {
-  return series === 'E1' || series === 'E1WC';
 }
 
 function collectVisibleFamiliesFromItems(

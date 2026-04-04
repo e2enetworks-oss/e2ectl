@@ -661,6 +661,43 @@ describe('node commands', () => {
     }
   });
 
+  it('maps --disk into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'new-node',
+        '--plan',
+        'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--disk',
+        '150',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        disk: '150',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'new-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        sshKeyIds: []
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
   it('attaches security groups after resolving the node vm id', async () => {
     const { runtime, stdout, securityGroupStub } = createRuntimeFixture();
     await seedProfile(runtime);

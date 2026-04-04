@@ -17,6 +17,16 @@ import {
   summarizeNodeCatalogPlans
 } from './catalog.js';
 import type { NodeClient } from './client.js';
+import {
+  CUSTOM_STORAGE_DEFAULT_DISK_GB,
+  CUSTOM_STORAGE_DOWNSIZE_STEP_GB,
+  CUSTOM_STORAGE_MAX_DISK_GB,
+  CUSTOM_STORAGE_MIN_DISK_GB,
+  CUSTOM_STORAGE_UPSIZE_STEP_GB,
+  formatCustomStorageDiskHint,
+  isCustomStorageDiskSizeAllowed,
+  isCustomStoragePlan
+} from './custom-storage.js';
 import { buildDefaultNodeCreateRequest } from './defaults.js';
 import {
   normalizeBillingType,
@@ -49,6 +59,7 @@ export interface NodeContextOptions {
 export interface NodeCreateOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
+  disk?: string;
   image: string;
   name: string;
   plan: string;
@@ -343,6 +354,7 @@ interface NormalizedNodeCreateBilling {
 
 interface NodeCreatePayloadInput {
   committedPlanId: number | null;
+  disk: number | null;
   image: string;
   name: string;
   plan: string;
@@ -983,11 +995,17 @@ function normalizeNodeCreatePayloadInput(
   options: NodeCreateOptions,
   committedPlanId: number | null
 ): NodeCreatePayloadInput {
+  const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
+  const disk = normalizeOptionalNodeDiskSize(options.disk);
+
+  assertNodeCreateDiskCompatibility(plan, disk);
+
   return {
     committedPlanId,
+    disk,
     image: normalizeRequiredString(options.image, 'Image', '--image'),
     name: normalizeRequiredString(options.name, 'Name', '--name'),
-    plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
+    plan
   };
 }
 
@@ -1027,6 +1045,92 @@ function normalizeCommittedPlanId(
   }
 
   return null;
+}
+
+function normalizeOptionalNodeDiskSize(
+  value: string | undefined
+): number | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  const normalizedValue = normalizeRequiredString(value, 'Disk size', '--disk');
+
+  if (!/^\d+$/.test(normalizedValue)) {
+    throw new CliError('Disk size must be a whole number of GB.', {
+      code: 'INVALID_DISK_SIZE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass a positive integer with --disk, for example --disk 100.'
+    });
+  }
+
+  const parsedValue = Number(normalizedValue);
+  if (!Number.isSafeInteger(parsedValue)) {
+    throw new CliError('Disk size is too large to represent safely.', {
+      code: 'INVALID_DISK_SIZE',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Pass a smaller positive integer with --disk, for example --disk 100.'
+    });
+  }
+
+  if (!isCustomStorageDiskSizeAllowed(parsedValue)) {
+    throw new CliError(buildInvalidCustomStorageDiskMessage(parsedValue), {
+      code: 'INVALID_DISK_SIZE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass --disk with an allowed size. ${formatCustomStorageDiskHint()}`
+    });
+  }
+
+  return parsedValue;
+}
+
+function assertNodeCreateDiskCompatibility(
+  plan: string,
+  disk: number | null
+): void {
+  const usesCustomStorage = isCustomStoragePlan(plan);
+
+  if (!usesCustomStorage && disk !== null) {
+    throw new CliError('Disk size can only be used with E1 or E1WC plans.', {
+      code: 'UNEXPECTED_DISK_SIZE',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Remove --disk, or retry with an E1 or E1WC plan from node catalog plans.'
+    });
+  }
+
+  if (usesCustomStorage && disk === null) {
+    throw new CliError('Disk size is required for E1 and E1WC plans.', {
+      code: 'MISSING_DISK_SIZE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run ${formatCliCommand('node catalog plans')} first, then retry with --disk <size-gb>. ${formatCustomStorageDiskHint()}`
+    });
+  }
+}
+
+function buildInvalidCustomStorageDiskMessage(value: number): string {
+  if (
+    value < CUSTOM_STORAGE_MIN_DISK_GB ||
+    value > CUSTOM_STORAGE_MAX_DISK_GB
+  ) {
+    return (
+      `Disk size must be in the range ${CUSTOM_STORAGE_MIN_DISK_GB} GB ` +
+      `to ${CUSTOM_STORAGE_MAX_DISK_GB} GB.`
+    );
+  }
+
+  if (value < CUSTOM_STORAGE_DEFAULT_DISK_GB) {
+    return (
+      `Disk size below ${CUSTOM_STORAGE_DEFAULT_DISK_GB} GB must be a multiple of ` +
+      `${CUSTOM_STORAGE_DOWNSIZE_STEP_GB} GB.`
+    );
+  }
+
+  return (
+    `Disk size at or above ${CUSTOM_STORAGE_DEFAULT_DISK_GB} GB must be a multiple of ` +
+    `${CUSTOM_STORAGE_UPSIZE_STEP_GB} GB.`
+  );
 }
 
 function normalizeDistinctNumericIds(
@@ -1083,6 +1187,7 @@ function buildNodeCreatePayload(
       name: input.name,
       plan: input.plan
     }),
+    ...(input.disk === null ? {} : { disk: input.disk }),
     ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
   };
 }

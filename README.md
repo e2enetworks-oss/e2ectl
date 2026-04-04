@@ -76,6 +76,7 @@ e2ectl node create \
 ```
 
 For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values from `node catalog plans`.
+For `E1` and `E1WC` plans, also pass `--disk <size-gb>`. Allowed sizes are `75..2400 GB`, in `25 GB` steps below `150 GB` and `50 GB` steps at or above `150 GB`.
 
 ## Common Commands
 
@@ -96,6 +97,7 @@ e2ectl node delete <node-id> --reserve-public-ip
 ```
 
 Node actions also include VPC, volume, security-group, and SSH-key attach or detach flows. Use `e2ectl node action --help` to explore the full action surface.
+For `E1` and `E1WC` creates, add `--disk <size-gb>` after selecting the exact plan from `node catalog plans`.
 
 ### DNS
 

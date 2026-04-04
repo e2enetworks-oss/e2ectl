@@ -317,4 +317,62 @@ describe('node create against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('passes disk through for custom-storage node creation', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/nodes/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'node',
+          'create',
+          '--name',
+          'demo-node',
+          '--plan',
+          'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+          '--image',
+          'Ubuntu-24.04-Distro',
+          '--disk',
+          '150'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(server.requests).toHaveLength(1);
+      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+        backups: false,
+        default_public_ip: false,
+        disk: 150,
+        disable_password: true,
+        enable_bitninja: false,
+        image: 'Ubuntu-24.04-Distro',
+        is_ipv6_availed: false,
+        is_saved_image: false,
+        label: 'default',
+        name: 'demo-node',
+        number_of_instances: 1,
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        ssh_keys: [],
+        start_scripts: []
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });
