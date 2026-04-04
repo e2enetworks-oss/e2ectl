@@ -4,7 +4,7 @@
 
 Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-Create and manage nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
+Create and manage nodes, forward DNS zones, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
 
 ## Requirements
 
@@ -157,6 +157,25 @@ e2ectl reserved-ip detach node <ip-address> --node-id <node-id>
 e2ectl reserved-ip delete <ip-address>
 ```
 
+### DNS
+
+```bash
+e2ectl dns list
+e2ectl dns get <domain-name>
+e2ectl dns create <domain-name> --ip <ipv4>
+
+# Delete resolves the backend domain_id internally from the public domain name.
+# Prompts for confirmation unless --force is passed.
+e2ectl dns delete <domain-name>
+
+# Diagnostics
+e2ectl dns verify ns <domain-name>
+e2ectl dns verify validity <domain-name>
+e2ectl dns verify ttl <domain-name>
+```
+
+`dns get`, `dns delete`, and all `dns verify` commands accept domain names with or without a trailing dot. The CLI canonicalizes lookups to lowercase FQDN form internally.
+
 ### VPCs
 
 ```bash
@@ -277,13 +296,14 @@ e2ectl config import \
   --no-input
 ```
 
-The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
+The safest automation entry points are discovery and list commands: `config list`, `dns list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Help
 
 ```bash
 e2ectl --help
 e2ectl config --help
+e2ectl dns --help
 e2ectl node --help
 e2ectl node catalog plans --help
 e2ectl volume --help
