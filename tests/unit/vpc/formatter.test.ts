@@ -15,6 +15,7 @@ describe('vpc formatter', () => {
         cidr_source: 'e2e',
         created_at: '2026-03-13T08:00:00Z',
         gateway_ip: '10.20.0.1',
+        id: 27835,
         location: 'Delhi',
         name: 'prod-vpc',
         network_id: 27835,
@@ -149,6 +150,7 @@ describe('vpc formatter', () => {
         },
         credit_sufficient: true,
         vpc: {
+          id: 27835,
           name: 'prod-vpc',
           network_id: 27835,
           project_id: '46429',
@@ -159,7 +161,9 @@ describe('vpc formatter', () => {
     );
 
     expect(output).toContain('Created VPC request: prod-vpc');
+    expect(output).toContain('VPC ID: 27835');
+    expect(output).toContain('Backend Record ID: 3956');
     expect(output).toContain('Billing: committed');
-    expect(output).toContain(formatCliCommand('vpc list'));
+    expect(output).toContain(formatCliCommand('vpc get 27835'));
   });
 });

@@ -215,6 +215,7 @@ describe('security-group commands', () => {
         message: 'Security Group created successfully.',
         security_group: {
           description: '',
+          id: 57358,
           is_default: true,
           label_id: null,
           name: 'web-sg',

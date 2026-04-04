@@ -73,6 +73,7 @@ export interface SecurityGroupCreateCommandResult {
   message: string;
   security_group: {
     description: string;
+    id: number;
     is_default: boolean;
     label_id: string | null;
     name: string;
@@ -150,12 +151,18 @@ export class SecurityGroupService {
     const result = await client.createSecurityGroup(
       buildCreateRequest(input, options.default ?? false)
     );
+    const securityGroupId = await resolveCreatedSecurityGroupId(
+      client,
+      input.name,
+      result.result.id
+    );
 
     return {
       action: 'create',
       message: result.message,
       security_group: {
         description: input.description,
+        id: securityGroupId,
         is_default: options.default ?? false,
         label_id: result.result.label_id ?? null,
         name: input.name,
@@ -487,6 +494,35 @@ function summarizeSecurityGroupRule(
     rule_type: rule.rule_type ?? '',
     vpc_id: rule.vpc_id ?? null
   };
+}
+
+async function resolveCreatedSecurityGroupId(
+  client: SecurityGroupClient,
+  securityGroupName: string,
+  returnedId: number | null | undefined
+): Promise<number> {
+  if (typeof returnedId === 'number' && Number.isSafeInteger(returnedId)) {
+    return returnedId;
+  }
+
+  const matches = (await client.listSecurityGroups()).filter(
+    (item) => item.name === securityGroupName
+  );
+
+  if (matches.length === 1) {
+    return matches[0]!.id;
+  }
+
+  throw new CliError(
+    `Security group "${securityGroupName}" was created, but the CLI could not determine its id safely.`,
+    {
+      code: 'SECURITY_GROUP_ID_LOOKUP_FAILED',
+      details: [`Matching security groups found: ${matches.length}`],
+      exitCode: EXIT_CODES.network,
+      suggestion:
+        'Run `e2ectl security-group list` and use the exact name to inspect the new security-group id.'
+    }
+  );
 }
 
 function wrapRulesParseError(error: unknown): CliError {

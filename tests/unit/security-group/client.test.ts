@@ -107,6 +107,7 @@ describe('SecurityGroupApiClient', () => {
     transport.postMock.mockResolvedValue(
       envelope(
         {
+          id: 57358,
           label_id: null,
           resource_type: null
         },
@@ -124,6 +125,7 @@ describe('SecurityGroupApiClient', () => {
     expect(result).toEqual({
       message: 'Security Group created successfully.',
       result: {
+        id: 57358,
         label_id: null,
         resource_type: null
       }

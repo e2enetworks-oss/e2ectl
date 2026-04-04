@@ -144,7 +144,7 @@ describe('SecurityGroupService', () => {
   });
 
   it('reads rules files locally before creating security groups', async () => {
-    const { createSecurityGroup, readRulesFile, service } =
+    const { createSecurityGroup, listSecurityGroups, readRulesFile, service } =
       createServiceFixture();
 
     const result = await service.createSecurityGroup({
@@ -161,14 +161,51 @@ describe('SecurityGroupService', () => {
       name: 'web-sg',
       rules: sampleRules()
     });
+    expect(listSecurityGroups).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       action: 'create',
       message: 'Security Group created successfully.',
       security_group: {
         description: '',
+        id: 57358,
         is_default: true,
         label_id: null,
         name: 'web-sg',
+        resource_type: null,
+        rule_count: 2
+      }
+    });
+  });
+
+  it('uses the backend-returned id directly when create already returns one', async () => {
+    const { createSecurityGroup, listSecurityGroups, service } =
+      createServiceFixture();
+
+    createSecurityGroup.mockResolvedValue({
+      message: 'Security Group created successfully.',
+      result: {
+        id: 57360,
+        label_id: null,
+        resource_type: null
+      }
+    });
+
+    const result = await service.createSecurityGroup({
+      alias: 'prod',
+      name: 'api-sg',
+      rulesFile: '/tmp/rules.json'
+    });
+
+    expect(listSecurityGroups).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'create',
+      message: 'Security Group created successfully.',
+      security_group: {
+        description: '',
+        id: 57360,
+        is_default: false,
+        label_id: null,
+        name: 'api-sg',
         resource_type: null,
         rule_count: 2
       }

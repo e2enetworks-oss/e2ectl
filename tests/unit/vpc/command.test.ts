@@ -190,6 +190,7 @@ describe('vpc commands', () => {
             cidr_source: 'e2e',
             created_at: '2026-03-13T08:00:00Z',
             gateway_ip: null,
+            id: 27835,
             location: null,
             name: 'prod-vpc',
             network_id: 27835,
@@ -270,6 +271,7 @@ describe('vpc commands', () => {
         },
         credit_sufficient: true,
         vpc: {
+          id: 27835,
           name: 'prod-vpc',
           network_id: 27835,
           project_id: '12345',
@@ -305,6 +307,7 @@ describe('vpc commands', () => {
           cidr_source: 'e2e',
           created_at: '2026-03-13T08:00:00Z',
           gateway_ip: null,
+          id: 27835,
           location: null,
           name: 'prod-vpc',
           network_id: 27835,

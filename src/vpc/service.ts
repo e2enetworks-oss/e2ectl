@@ -50,6 +50,7 @@ export interface VpcListItem {
   cidr_source: VpcCidrSource;
   created_at: string | null;
   gateway_ip: string | null;
+  id: number;
   location: string | null;
   name: string;
   network_id: number;
@@ -115,6 +116,7 @@ export interface VpcCreateCommandResult {
   };
   credit_sufficient: boolean;
   vpc: {
+    id: number;
     name: string;
     network_id: number;
     project_id: string | null;
@@ -211,7 +213,7 @@ export class VpcService {
     const client = await this.createClient(options);
     const response = await client.deleteVpc(normalizedVpcId);
 
-    return summarizeVpcDeleteResult(response);
+    return summarizeVpcDeleteResult(normalizedVpcId, response);
   }
 
   async getVpc(
@@ -408,6 +410,7 @@ function summarizeVpcCreateResult(
     },
     credit_sufficient: result.is_credit_sufficient,
     vpc: {
+      id: result.network_id,
       name: result.vpc_name,
       network_id: result.network_id,
       project_id: result.project_id ?? null,
@@ -430,16 +433,19 @@ function summarizeCancelledVpcDeleteResult(
   };
 }
 
-function summarizeVpcDeleteResult(response: {
-  message: string;
-  result: VpcDeleteResult;
-}): VpcDeleteCommandResult {
+function summarizeVpcDeleteResult(
+  requestedVpcId: number,
+  response: {
+    message: string;
+    result: VpcDeleteResult;
+  }
+): VpcDeleteCommandResult {
   return {
     action: 'delete',
     cancelled: false,
     message: response.message,
     vpc: {
-      id: response.result.vpc_id,
+      id: requestedVpcId,
       name: response.result.vpc_name,
       project_id: response.result.project_id ?? null
     }
@@ -510,6 +516,7 @@ function summarizeVpcListItem(item: VpcSummary): VpcListItem {
     cidr_source: item.is_e2e_vpc ? 'e2e' : 'custom',
     created_at: item.created_at ?? null,
     gateway_ip: item.gateway_ip ?? null,
+    id: item.network_id,
     location: item.location ?? null,
     name: item.name,
     network_id: item.network_id,
@@ -770,7 +777,8 @@ function assertVpcId(vpcId: string): number {
     throw new CliError('VPC ID must be numeric.', {
       code: 'INVALID_VPC_ID',
       exitCode: EXIT_CODES.usage,
-      suggestion: 'Pass the numeric VPC id as the first argument.'
+      suggestion:
+        'Pass the canonical numeric VPC ID (the network_id shown by vpc create/get/list) as the first argument.'
     });
   }
 

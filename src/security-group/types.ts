@@ -39,6 +39,7 @@ export interface SecurityGroupCreateRequest {
 }
 
 export interface SecurityGroupCreateResult {
+  id?: number | null;
   label_id?: string | null;
   resource_type?: string | null;
 }

@@ -52,6 +52,7 @@ describe('vpc get/delete against a fake MyAccount API', () => {
             cidr_source: 'e2e',
             created_at: '2026-03-13T08:00:00Z',
             gateway_ip: '10.20.0.1',
+            id: 27835,
             location: 'Delhi',
             name: 'prod-vpc',
             network_id: 27835,

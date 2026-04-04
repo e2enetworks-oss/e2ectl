@@ -8,6 +8,23 @@ import { createTempHome } from '../../helpers/temp-home.js';
 describe('security-group create/update against a fake MyAccount API', () => {
   it('creates security groups from a rules file', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/security_group/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              description: '',
+              id: 57358,
+              is_all_traffic_rule: false,
+              is_default: true,
+              name: 'web-sg',
+              rules: []
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
+      }),
       'POST /myaccount/api/v1/security_group/': () => ({
         body: {
           code: 200,
@@ -56,6 +73,7 @@ describe('security-group create/update against a fake MyAccount API', () => {
           message: 'Security Group created successfully.',
           security_group: {
             description: '',
+            id: 57358,
             is_default: true,
             label_id: null,
             name: 'web-sg',
@@ -64,6 +82,7 @@ describe('security-group create/update against a fake MyAccount API', () => {
           }
         })}\n`
       );
+      expect(server.requests).toHaveLength(2);
       expect(JSON.parse(server.requests[0]!.body)).toEqual({
         default: true,
         description: '',

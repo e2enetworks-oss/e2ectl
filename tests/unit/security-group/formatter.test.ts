@@ -51,6 +51,7 @@ describe('security-group formatter', () => {
         message: 'Security Group created successfully.',
         security_group: {
           description: '',
+          id: 57358,
           is_default: true,
           label_id: null,
           name: 'web-sg',
@@ -62,6 +63,7 @@ describe('security-group formatter', () => {
     );
 
     expect(output).toContain('Created security group: web-sg');
+    expect(output).toContain('ID: 57358');
     expect(output).toContain('Rules: 2');
     expect(output).toContain(formatCliCommand('security-group list'));
   });

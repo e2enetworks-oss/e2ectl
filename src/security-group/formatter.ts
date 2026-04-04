@@ -97,6 +97,7 @@ function normalizeSecurityGroupJson(
         message: result.message,
         security_group: {
           description: result.security_group.description,
+          id: result.security_group.id,
           is_default: result.security_group.is_default,
           label_id: result.security_group.label_id,
           name: result.security_group.name,
@@ -183,6 +184,7 @@ function renderSecurityGroupHuman(result: SecurityGroupCommandResult): string {
     case 'create':
       return (
         `Created security group: ${result.security_group.name}\n` +
+        `ID: ${result.security_group.id}\n` +
         `Default: ${result.security_group.is_default ? 'yes' : 'no'}\n` +
         `Rules: ${result.security_group.rule_count}\n` +
         `Message: ${result.message}\n` +

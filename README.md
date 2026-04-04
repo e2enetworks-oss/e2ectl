@@ -91,6 +91,7 @@ e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>
 
 # Attach resources
+# Use the VPC ID shown by `e2ectl vpc create`, `e2ectl vpc get`, or `e2ectl vpc list`
 e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
 e2ectl node action volume attach <node-id> --volume-id <volume-id>
 e2ectl node action security-group attach <node-id> --security-group-id <security-group-id>
@@ -151,6 +152,7 @@ e2ectl vpc create \
   --cidr-source custom \
   --cidr <custom-cidr>
 
+# Follow-up commands use the VPC ID shown in CLI output. This is the backend `network_id`.
 e2ectl vpc get <vpc-id>
 e2ectl vpc delete <vpc-id>
 e2ectl vpc list

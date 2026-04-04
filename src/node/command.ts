@@ -496,7 +496,10 @@ function buildNodeActionVpcCommand(
     command
       .command('attach <nodeId>')
       .description('Attach a VPC to a node.')
-      .requiredOption('--vpc-id <vpcId>', 'VPC id to attach.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'Canonical VPC ID (the network_id shown by vpc create/get/list) to attach.'
+      )
       .option('--subnet-id <subnetId>', 'Optional VPC subnet id to use.')
       .option('--private-ip <privateIp>', 'Optional private IP to request.')
   ).action(
@@ -519,7 +522,10 @@ function buildNodeActionVpcCommand(
     command
       .command('detach <nodeId>')
       .description('Detach a VPC from a node.')
-      .requiredOption('--vpc-id <vpcId>', 'VPC id to detach.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'Canonical VPC ID (the network_id shown by vpc create/get/list) to detach.'
+      )
       .option('--subnet-id <subnetId>', 'Optional VPC subnet id to detach.')
       .option('--private-ip <privateIp>', 'Optional private IP to detach.')
   ).action(

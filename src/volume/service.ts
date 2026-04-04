@@ -4,7 +4,7 @@ import {
   type ResolvedCredentials
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
-import { CliError, EXIT_CODES } from '../core/errors.js';
+import { CliError, EXIT_CODES, isAppError } from '../core/errors.js';
 import type { VolumeClient } from './client.js';
 import type {
   VolumeCommittedPlan,
@@ -221,14 +221,35 @@ export class VolumeService {
     }
 
     const client = await this.createClient(options);
-    const result = await client.deleteVolume(normalizedVolumeId);
 
-    return {
-      action: 'delete',
-      cancelled: false,
-      message: result.message,
-      volume_id: normalizedVolumeId
-    };
+    try {
+      const result = await client.deleteVolume(normalizedVolumeId);
+
+      return {
+        action: 'delete',
+        cancelled: false,
+        message: result.message,
+        volume_id: normalizedVolumeId
+      };
+    } catch (error: unknown) {
+      if (isVolumeDeleteTimeout(error)) {
+        try {
+          if (!(await volumeStillExists(client, normalizedVolumeId))) {
+            return {
+              action: 'delete',
+              cancelled: false,
+              message: 'Block Storage Deleted',
+              volume_id: normalizedVolumeId
+            };
+          }
+        } catch {
+          // Fall through to preserve the original delete timeout when
+          // reconciliation cannot determine the final state.
+        }
+      }
+
+      throw error;
+    }
   }
 
   async getVolume(
@@ -563,6 +584,42 @@ function normalizeVolumeDetailItem(item: VolumeSummary): VolumeDetailItem {
     exporting_to_eos: item.is_block_storage_exporting_to_eos ?? false,
     snapshot_exists: item.snapshot_exist ?? false
   };
+}
+
+async function volumeStillExists(
+  client: VolumeClient,
+  volumeId: number
+): Promise<boolean> {
+  let currentPage = 1;
+  let totalPageNumber = 1;
+
+  do {
+    const page = await client.listVolumes(currentPage, VOLUME_LIST_PAGE_SIZE);
+    if (page.items.some((item) => item.block_id === volumeId)) {
+      return true;
+    }
+
+    totalPageNumber = page.total_page_number ?? 1;
+    currentPage += 1;
+
+    if (currentPage > VOLUME_LIST_MAX_PAGES) {
+      throw new CliError(
+        `Volume list exceeded the maximum page limit (${VOLUME_LIST_MAX_PAGES}).`,
+        {
+          code: 'PAGINATION_LIMIT_EXCEEDED',
+          exitCode: EXIT_CODES.network,
+          suggestion:
+            'The API returned an unexpectedly large result set. Retry the command or contact support.'
+        }
+      );
+    }
+  } while (currentPage <= totalPageNumber);
+
+  return false;
+}
+
+function isVolumeDeleteTimeout(error: unknown): boolean {
+  return isAppError(error) && error.code === 'API_TIMEOUT';
 }
 
 function normalizeAttachment(
