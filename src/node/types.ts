@@ -180,6 +180,19 @@ export interface NodeDeleteResult {
   message: string;
 }
 
+export interface NodeUpgradeRequest {
+  image: string;
+  plan: string;
+}
+
+export interface NodeUpgradeResult {
+  location?: string | null;
+  message: string;
+  new_node_image_id?: number | null;
+  old_node_image_id?: number | null;
+  vm_id?: number | null;
+}
+
 export type NodeActionType =
   | 'add_ssh_keys'
   | 'power_off'

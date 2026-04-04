@@ -164,6 +164,15 @@ function createNodeClientStub() {
       status: 'In Progress'
     })
   );
+  const upgradeNode = vi.fn(() =>
+    Promise.resolve({
+      location: 'Delhi',
+      message: 'Node upgrade initiated',
+      new_node_image_id: 8802,
+      old_node_image_id: 8801,
+      vm_id: 100157
+    })
+  );
 
   const stub: NodeClient = {
     attachSshKeys,
@@ -175,7 +184,8 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
-    saveNodeImage
+    saveNodeImage,
+    upgradeNode
   };
 
   return {
@@ -189,6 +199,7 @@ function createNodeClientStub() {
     powerOffNode,
     powerOnNode,
     saveNodeImage,
+    upgradeNode,
     stub
   };
 }
@@ -1038,6 +1049,52 @@ describe('node commands', () => {
           created_at: '2026-03-14T08:10:00Z',
           image_id: null,
           status: 'In Progress'
+        }
+      })
+    );
+  });
+
+  it('requests node upgrade through the top-level lifecycle command', async () => {
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'upgrade',
+      '101',
+      '--plan',
+      'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+      '--image',
+      'Ubuntu-24.04-Distro',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Upgrade node 101 to plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi with image Ubuntu-24.04-Distro? This is disruptive.'
+    );
+    expect(nodeStub.upgradeNode).toHaveBeenCalledWith('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node upgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
         }
       })
     );

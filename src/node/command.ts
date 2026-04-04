@@ -10,6 +10,7 @@ import {
   type NodeContextOptions,
   type NodeDeleteOptions,
   type NodeSaveImageOptions,
+  type NodeUpgradeOptions,
   type NodeVolumeActionOptions,
   type NodeVpcActionOptions
 } from './service.js';
@@ -34,6 +35,8 @@ interface NodeCreateCommandOptions extends NodeContextOptions {
   plan: string;
   sshKeyId?: string[] | string;
 }
+
+type NodeUpgradeCommandOptions = NodeUpgradeOptions;
 
 const NODE_CATALOG_BILLING_TYPE_CHOICES = [
   'hourly',
@@ -147,6 +150,44 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       commandInstance: Command
     ) => {
       const result = await service.getNode(nodeId, options);
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('upgrade <nodeId>')
+      .description('Request a node plan and image change.')
+      .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
+      .requiredOption('--image <image>', 'MyAccount image identifier.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeUpgradeCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.upgradeNode(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.force === undefined ? {} : { force: options.force }),
+        image: options.image,
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        plan: options.plan,
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            })
+      });
       runtime.stdout.write(
         renderNodeResult(
           result,

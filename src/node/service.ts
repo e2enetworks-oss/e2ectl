@@ -36,7 +36,8 @@ import type {
   NodeCreateResult,
   NodeDetails,
   NodeListResult,
-  NodeCommittedCreateStatus
+  NodeCommittedCreateStatus,
+  NodeUpgradeResult
 } from './types.js';
 
 export interface NodeContextOptions {
@@ -57,6 +58,12 @@ export interface NodeCreateOptions extends NodeContextOptions {
 export interface NodeDeleteOptions extends NodeContextOptions {
   force?: boolean;
   reservePublicIp?: boolean;
+}
+
+export interface NodeUpgradeOptions extends NodeContextOptions {
+  force?: boolean;
+  image: string;
+  plan: string;
 }
 
 export interface NodeCatalogPlansOptions extends NodeContextOptions {
@@ -133,6 +140,37 @@ export interface NodeDeleteCommandResult {
   node_id: number;
   reserve_public_ip_requested: boolean;
 }
+
+export interface NodeUpgradeRequestSummary {
+  image: string;
+  plan: string;
+}
+
+export interface NodeUpgradeDetailsSummary {
+  location: string | null;
+  new_node_image_id: number | null;
+  old_node_image_id: number | null;
+  vm_id: number | null;
+}
+
+export interface NodeUpgradeCancelledCommandResult {
+  action: 'upgrade';
+  cancelled: true;
+  node_id: number;
+  requested: NodeUpgradeRequestSummary;
+}
+
+export interface NodeUpgradeCompletedCommandResult {
+  action: 'upgrade';
+  details: NodeUpgradeDetailsSummary;
+  message: string;
+  node_id: number;
+  requested: NodeUpgradeRequestSummary;
+}
+
+export type NodeUpgradeCommandResult =
+  | NodeUpgradeCancelledCommandResult
+  | NodeUpgradeCompletedCommandResult;
 
 export interface NodeCatalogOsCommandResult {
   action: 'catalog-os';
@@ -268,6 +306,7 @@ export type NodeCommandResult =
   | NodeSecurityGroupAttachCommandResult
   | NodeSecurityGroupDetachCommandResult
   | NodeSshKeyAttachCommandResult
+  | NodeUpgradeCommandResult
   | NodeVolumeAttachCommandResult
   | NodeVolumeDetachCommandResult
   | NodeVpcAttachCommandResult
@@ -731,6 +770,47 @@ export class NodeService {
     };
   }
 
+  async upgradeNode(
+    nodeId: string,
+    options: NodeUpgradeOptions
+  ): Promise<NodeUpgradeCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const requested = {
+      image: normalizeRequiredString(options.image, 'Image', '--image'),
+      plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
+    };
+
+    if (!(options.force ?? false)) {
+      assertCanUpgrade(this.dependencies.isInteractive);
+      const confirmed = await this.dependencies.confirm(
+        `Upgrade node ${normalizedNodeId} to plan ${requested.plan} with image ${requested.image}? This is disruptive.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'upgrade',
+          cancelled: true,
+          node_id: normalizedNodeId,
+          requested
+        };
+      }
+    }
+
+    const client = await this.createNodeClient(options);
+    const result = await client.upgradeNode(
+      String(normalizedNodeId),
+      requested
+    );
+
+    return {
+      action: 'upgrade',
+      details: summarizeNodeUpgradeDetails(result),
+      message: result.message,
+      node_id: normalizedNodeId,
+      requested
+    };
+  }
+
   private async createNodeClient(
     options: NodeContextOptions
   ): Promise<NodeClient> {
@@ -782,18 +862,32 @@ export class NodeService {
 }
 
 function assertCanDelete(isInteractive: boolean): void {
+  assertConfirmationAllowed(
+    isInteractive,
+    'Deleting a node requires confirmation in an interactive terminal.'
+  );
+}
+
+function assertCanUpgrade(isInteractive: boolean): void {
+  assertConfirmationAllowed(
+    isInteractive,
+    'Upgrading a node requires confirmation in an interactive terminal.'
+  );
+}
+
+function assertConfirmationAllowed(
+  isInteractive: boolean,
+  message: string
+): void {
   if (isInteractive) {
     return;
   }
 
-  throw new CliError(
-    'Deleting a node requires confirmation in an interactive terminal.',
-    {
-      code: 'CONFIRMATION_REQUIRED',
-      exitCode: EXIT_CODES.usage,
-      suggestion: 'Re-run the command with --force to skip the prompt.'
-    }
-  );
+  throw new CliError(message, {
+    code: 'CONFIRMATION_REQUIRED',
+    exitCode: EXIT_CODES.usage,
+    suggestion: 'Re-run the command with --force to skip the prompt.'
+  });
 }
 
 function assertNodeId(nodeId: string): number {
@@ -908,6 +1002,17 @@ function normalizeDistinctNumericIds(
   }
 
   return normalizedValues;
+}
+
+function summarizeNodeUpgradeDetails(
+  result: NodeUpgradeResult
+): NodeUpgradeDetailsSummary {
+  return {
+    location: result.location ?? null,
+    new_node_image_id: result.new_node_image_id ?? null,
+    old_node_image_id: result.old_node_image_id ?? null,
+    vm_id: result.vm_id ?? null
+  };
 }
 
 function buildNodeCreatePayload(

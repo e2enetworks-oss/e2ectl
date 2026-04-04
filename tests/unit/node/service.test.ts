@@ -31,6 +31,7 @@ function createServiceFixture(options?: {
   attachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   attachSshKeys: ReturnType<typeof vi.fn>;
   attachVolumeToNode: ReturnType<typeof vi.fn>;
+  confirm: ReturnType<typeof vi.fn>;
   createNode: ReturnType<typeof vi.fn>;
   createNodeClient: ReturnType<typeof vi.fn>;
   createSecurityGroupClient: ReturnType<typeof vi.fn>;
@@ -53,6 +54,7 @@ function createServiceFixture(options?: {
   service: NodeService;
   listSshKeys: ReturnType<typeof vi.fn>;
   sshKeyClient: SshKeyClient;
+  upgradeNode: ReturnType<typeof vi.fn>;
   volumeClient: VolumeClient;
   vpcClient: VpcClient;
 } {
@@ -102,6 +104,15 @@ function createServiceFixture(options?: {
       status: 'In Progress'
     })
   );
+  const upgradeNode = vi.fn(() =>
+    Promise.resolve({
+      location: 'Delhi',
+      message: 'Node upgrade initiated',
+      new_node_image_id: 8802,
+      old_node_image_id: 8801,
+      vm_id: 100157
+    })
+  );
   const createNode = vi.fn(() =>
     Promise.resolve({
       node_create_response: [],
@@ -125,7 +136,8 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode,
     powerOnNode,
-    saveNodeImage
+    saveNodeImage,
+    upgradeNode
   };
   const listSshKeys = vi.fn(() =>
     Promise.resolve([
@@ -232,8 +244,9 @@ function createServiceFixture(options?: {
   const createVpcClient = vi.fn(() => vpcClient);
   const createSecurityGroupClient = vi.fn(() => securityGroupClient);
   const readConfig = vi.fn(() => Promise.resolve(createConfig()));
+  const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   const service = new NodeService({
-    confirm: vi.fn(() => Promise.resolve(options?.confirmResult ?? true)),
+    confirm,
     createNodeClient,
     createSecurityGroupClient,
     createSshKeyClient,
@@ -251,6 +264,7 @@ function createServiceFixture(options?: {
     attachNodeSecurityGroups,
     attachSshKeys,
     attachVolumeToNode,
+    confirm,
     createNode,
     createNodeClient,
     createSecurityGroupClient,
@@ -273,6 +287,7 @@ function createServiceFixture(options?: {
     service,
     listSshKeys,
     sshKeyClient,
+    upgradeNode,
     volumeClient,
     vpcClient
   };
@@ -333,6 +348,68 @@ describe('NodeService', () => {
         created_at: '2026-03-14T08:20:00Z',
         image_id: 'img-455',
         status: 'In Progress'
+      }
+    });
+  });
+
+  it('confirms disruptive node upgrades and preserves the backend message verbatim', async () => {
+    const { confirm, service, upgradeNode } = createServiceFixture({
+      isInteractive: true
+    });
+
+    const result = await service.upgradeNode('101', {
+      alias: 'prod',
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Upgrade node 101 to plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi with image Ubuntu-24.04-Distro? This is disruptive.'
+    );
+    expect(upgradeNode).toHaveBeenCalledWith('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+    expect(upgradeNode.mock.calls[0]?.[1]).not.toHaveProperty('vm_id');
+    expect(upgradeNode.mock.calls[0]?.[1]).not.toHaveProperty('committed_id');
+    expect(result).toEqual({
+      action: 'upgrade',
+      details: {
+        location: 'Delhi',
+        new_node_image_id: 8802,
+        old_node_image_id: 8801,
+        vm_id: 100157
+      },
+      message: 'Node upgrade initiated',
+      node_id: 101,
+      requested: {
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+      }
+    });
+  });
+
+  it('returns a cancelled upgrade result before network when confirmation is declined', async () => {
+    const { confirm, service, upgradeNode } = createServiceFixture({
+      confirmResult: false,
+      isInteractive: true
+    });
+
+    const result = await service.upgradeNode('101', {
+      alias: 'prod',
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(upgradeNode).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'upgrade',
+      cancelled: true,
+      node_id: 101,
+      requested: {
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
       }
     });
   });
@@ -723,6 +800,26 @@ describe('NodeService', () => {
     });
 
     expect(deleteNode).not.toHaveBeenCalled();
+  });
+
+  it('fails before network in non-interactive mode when upgrade omits --force', async () => {
+    const { service, upgradeNode } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.upgradeNode('101', {
+        alias: 'prod',
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Upgrading a node requires confirmation in an interactive terminal.'
+    });
+
+    expect(upgradeNode).not.toHaveBeenCalled();
   });
 
   it('validates committed node create flags locally', async () => {

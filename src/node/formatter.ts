@@ -373,6 +373,8 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .concat(formatNodeActionSummary(result.result))
           .join('\n') + '\n'
       );
+    case 'upgrade':
+      return formatNodeUpgradeResult(result);
     case 'security-group-attach':
       return (
         [
@@ -561,6 +563,34 @@ function renderNodeJson(result: NodeCommandResult): string {
         node_id: result.node_id,
         result: normalizeNodeActionJson(result.result)
       });
+    case 'upgrade':
+      return renderJson(
+        'cancelled' in result
+          ? {
+              action: 'upgrade',
+              cancelled: true,
+              node_id: result.node_id,
+              requested: {
+                image: result.requested.image,
+                plan: result.requested.plan
+              }
+            }
+          : {
+              action: 'upgrade',
+              details: {
+                location: result.details.location,
+                new_node_image_id: result.details.new_node_image_id,
+                old_node_image_id: result.details.old_node_image_id,
+                vm_id: result.details.vm_id
+              },
+              message: result.message,
+              node_id: result.node_id,
+              requested: {
+                image: result.requested.image,
+                plan: result.requested.plan
+              }
+            }
+      );
     case 'security-group-attach':
       return renderJson({
         action: 'security-group-attach',
@@ -659,6 +689,46 @@ function formatNodeDeleteResult(
 
   if (result.reserve_public_ip_requested) {
     lines.push('Reserved Public IP: requested.');
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function formatNodeUpgradeResult(
+  result: Extract<NodeCommandResult, { action: 'upgrade' }>
+): string {
+  if ('cancelled' in result) {
+    return (
+      [
+        'Node upgrade cancelled.',
+        `Node ID: ${result.node_id}`,
+        `Target Plan: ${result.requested.plan}`,
+        `Target Image: ${result.requested.image}`
+      ].join('\n') + '\n'
+    );
+  }
+
+  const lines = [
+    `Requested node upgrade for node ${result.node_id}.`,
+    `Target Plan: ${result.requested.plan}`,
+    `Target Image: ${result.requested.image}`,
+    `Message: ${result.message}`
+  ];
+
+  if (result.details.vm_id !== null) {
+    lines.push(`VM ID: ${result.details.vm_id}`);
+  }
+
+  if (result.details.location !== null) {
+    lines.push(`Location: ${result.details.location}`);
+  }
+
+  if (result.details.old_node_image_id !== null) {
+    lines.push(`Old Node Image ID: ${result.details.old_node_image_id}`);
+  }
+
+  if (result.details.new_node_image_id !== null) {
+    lines.push(`New Node Image ID: ${result.details.new_node_image_id}`);
   }
 
   return `${lines.join('\n')}\n`;

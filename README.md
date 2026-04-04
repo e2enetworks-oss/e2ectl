@@ -90,6 +90,9 @@ e2ectl node action power-on <node-id>
 # Save a node as a reusable image
 e2ectl node action save-image <node-id> --name <image-name>
 
+# Upgrade a node plan/image pair using exact values from `e2ectl node catalog plans`
+e2ectl node upgrade <node-id> --plan <plan> --image <image>
+
 # Attach resources
 # Use the VPC ID shown by `e2ectl vpc create`, `e2ectl vpc get`, or `e2ectl vpc list`
 e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
