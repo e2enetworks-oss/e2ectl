@@ -31,13 +31,18 @@ const NODES_PATH = '/nodes/';
 const NODE_CATALOG_OS_PATH = '/images/os-category/';
 const NODE_CATALOG_PLANS_PATH = '/images/';
 
+export type NodeDeleteQuery = Record<'reserve_ip_required', 'true'>;
+
 export interface NodeClient {
   attachSshKeys(
     nodeId: string,
     sshKeys: NodeActionSshKey[]
   ): Promise<NodeActionResult>;
   createNode(body: NodeCreateRequest): Promise<NodeCreateResult>;
-  deleteNode(nodeId: string): Promise<NodeDeleteResult>;
+  deleteNode(
+    nodeId: string,
+    query?: NodeDeleteQuery
+  ): Promise<NodeDeleteResult>;
   getNode(nodeId: string): Promise<NodeDetails>;
   listNodeCatalogOs(): Promise<NodeCatalogOsData>;
   listNodeCatalogPlans(query: NodeCatalogQuery): Promise<NodeCatalogPlan[]>;
@@ -71,10 +76,13 @@ export class NodeApiClient implements NodeClient {
     return response.data;
   }
 
-  async deleteNode(nodeId: string): Promise<NodeDeleteResult> {
+  async deleteNode(
+    nodeId: string,
+    query?: NodeDeleteQuery
+  ): Promise<NodeDeleteResult> {
     const response = await this.transport.delete<
       ApiEnvelope<Record<string, never>>
-    >(buildNodePath(nodeId));
+    >(buildNodePath(nodeId), query === undefined ? undefined : { query });
 
     return mapNodeDeleteResponse(response);
   }

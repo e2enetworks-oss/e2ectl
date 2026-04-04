@@ -160,6 +160,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     command
       .command('delete <nodeId>')
       .description('Delete a node.')
+      .option(
+        '--reserve-public-ip',
+        'Reserve the node public IP during deletion.'
+      )
       .option('--force', 'Skip the interactive confirmation prompt.')
   ).action(
     async (

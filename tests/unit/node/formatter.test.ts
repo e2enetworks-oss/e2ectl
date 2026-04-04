@@ -169,6 +169,40 @@ describe('node formatter', () => {
     );
   });
 
+  it('renders delete output with explicit reserve-public-ip state when requested', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        message: 'Success',
+        node_id: 101,
+        reserve_public_ip_requested: true
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        node_id: 101,
+        reserve_public_ip_requested: false
+      },
+      true
+    );
+
+    expect(humanOutput).toBe(
+      'Deleted node 101.\nReserved Public IP: requested.\n'
+    );
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: true,
+        node_id: 101,
+        reserve_public_ip_requested: false
+      })}\n`
+    );
+  });
+
   it('flattens OS catalog rows into command-ready entries', () => {
     const entries = summarizeNodeCatalogOs({
       category_list: [

@@ -102,6 +102,9 @@ e2ectl node action security-group detach <node-id> --security-group-id <security
 
 # Delete (prompts for confirmation unless --force is passed)
 e2ectl node delete <node-id>
+
+# Preserve the current public IP during delete
+e2ectl node delete <node-id> --reserve-public-ip
 ```
 
 ### Volumes
@@ -138,6 +141,10 @@ e2ectl volume list
 e2ectl reserved-ip list
 e2ectl reserved-ip get <ip-address>
 e2ectl reserved-ip create
+
+# Reserve the current public IP from an existing node.
+# Pass the normal e2ectl node id; the CLI resolves backend vm_id internally.
+e2ectl reserved-ip create --from-node <node-id>
 
 # Attach or detach using the normal e2ectl node id.
 e2ectl reserved-ip attach node <ip-address> --node-id <node-id>

@@ -105,6 +105,37 @@ describe('ReservedIpApiClient', () => {
     expect(result.ip_address).toBe('164.52.198.54');
   });
 
+  it('creates reserved IPs from a node public network through the vm_id query', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope({
+        appliance_type: 'NODE',
+        bought_at: '04-11-2024 10:37',
+        floating_ip_attached_nodes: [],
+        ip_address: '164.52.198.54',
+        project_name: 'default-project',
+        reserve_id: 12662,
+        reserved_type: 'AddonIP',
+        status: 'Assigned',
+        vm_id: 100157,
+        vm_name: 'node-a'
+      })
+    );
+
+    const result = await client.createReservedIp({
+      vm_id: '100157'
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith('/reserve_ips/', {
+      query: {
+        vm_id: '100157'
+      }
+    });
+    expect(result.vm_id).toBe(100157);
+  });
+
   it('attaches reserved IPs to nodes through the reserve_ips action path', async () => {
     const transport = new StubTransport();
     const client = new ReservedIpApiClient(transport);
