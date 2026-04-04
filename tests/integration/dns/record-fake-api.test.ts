@@ -446,7 +446,7 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
         body: {
           code: 200,
           data: {
-            message: 'The record was deleted successfully!',
+            message: 'The custom Reverse DNS record was deleted successfully!',
             status: true
           },
           errors: {},

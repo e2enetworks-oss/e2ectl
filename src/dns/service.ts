@@ -428,12 +428,13 @@ export class DnsService {
       record_type: record.type,
       zone_name: canonicalDomainName
     });
+    const message = normalizeRecordDeleteMessage(result.message);
 
     return {
       action: 'record-delete',
       cancelled: false,
       domain_name: canonicalDomainName,
-      message: result.message,
+      ...(message === undefined ? {} : { message }),
       record: {
         name: record.name,
         type: record.type,
@@ -1313,6 +1314,18 @@ function toUpdateOldRecordContent(
   value: string
 ): string {
   return recordType === 'TXT' ? quoteTxtValue(value) : value;
+}
+
+function normalizeRecordDeleteMessage(
+  message: string | undefined
+): string | undefined {
+  if (message === undefined) {
+    return undefined;
+  }
+
+  return /reverse dns/i.test(message)
+    ? 'The record was deleted successfully!'
+    : message;
 }
 
 function parseOptionalPositiveInteger(

@@ -815,6 +815,54 @@ describe('DnsService', () => {
     });
   });
 
+  it('normalizes the known bad reverse-dns delete copy from the backend', async () => {
+    const { deleteRecord, getDomain, service } = createServiceFixture();
+
+    getDomain.mockResolvedValue({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '1.1.1.1',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'A'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+    deleteRecord.mockResolvedValue({
+      message: 'The custom Reverse DNS record was deleted successfully!',
+      status: true
+    });
+
+    const result = await service.deleteRecord('example.com', {
+      alias: 'prod',
+      force: true,
+      type: 'A',
+      value: '1.1.1.1'
+    });
+
+    expect(result).toEqual({
+      action: 'record-delete',
+      cancelled: false,
+      domain_name: 'example.com.',
+      message: 'The record was deleted successfully!',
+      record: {
+        name: 'example.com.',
+        type: 'A',
+        value: '1.1.1.1'
+      }
+    });
+  });
+
   it('maps current-value and new typed flags correctly when updating records', async () => {
     const { getDomain, service, updateRecord } = createServiceFixture();
 
