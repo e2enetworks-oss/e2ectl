@@ -203,7 +203,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       .description('Delete a node.')
       .option(
         '--reserve-public-ip',
-        'Reserve the node public IP during deletion.'
+        "Preserve the node's current public IP as a reserved IP during deletion."
       )
       .option('--force', 'Skip the interactive confirmation prompt.')
   ).action(

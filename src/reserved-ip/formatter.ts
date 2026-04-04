@@ -58,7 +58,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
   switch (result.action) {
     case 'attach-node':
       return (
-        `Attached reserved IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
+        `Attached reserved addon IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
         `Status: ${result.reserved_ip.status ?? '--'}\n` +
         `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
         `Message: ${result.message}\n`
@@ -66,6 +66,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
     case 'create':
       return (
         `Created reserved IP: ${result.reserved_ip.ip_address}\n` +
+        'Source: default-network\n' +
         `Status: ${result.reserved_ip.status ?? '--'}\n` +
         `Type: ${formatReservedIpType(result.reserved_ip)}\n` +
         `Project: ${result.reserved_ip.project_name ?? '--'}\n` +
@@ -79,7 +80,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
         : `Deleted reserved IP ${result.ip_address}.\nMessage: ${result.message ?? ''}\n`;
     case 'detach-node':
       return (
-        `Detached reserved IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
+        `Detached reserved addon IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
         `Status: ${result.reserved_ip.status ?? '--'}\n` +
         `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
         `Message: ${result.message}\n`
@@ -105,6 +106,12 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
       return result.items.length === 0
         ? 'No reserved IPs found.\n'
         : `${formatReservedIpListTable(result.items)}\n`;
+    case 'reserve-node':
+      return (
+        `Reserved current public IP ${result.ip_address} from node ${result.node_id}.\n` +
+        `Status: ${result.status ?? '--'}\n` +
+        `Message: ${result.message}\n`
+      );
   }
 }
 
@@ -124,6 +131,7 @@ function normalizeReservedIpJson(result: ReservedIpCommandResult): JsonValue {
     case 'create':
       return {
         action: 'create',
+        source: result.source,
         reserved_ip: normalizeReservedIpItemJson(result.reserved_ip)
       };
     case 'delete':
@@ -157,6 +165,14 @@ function normalizeReservedIpJson(result: ReservedIpCommandResult): JsonValue {
         items: sortReservedIpItems(result.items).map((item) =>
           normalizeReservedIpItemJson(item)
         )
+      };
+    case 'reserve-node':
+      return {
+        action: 'reserve-node',
+        ip_address: result.ip_address,
+        message: result.message,
+        node_id: result.node_id,
+        status: result.status
       };
   }
 }

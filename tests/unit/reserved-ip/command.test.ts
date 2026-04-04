@@ -1,4 +1,5 @@
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
+import { runCli } from '../../../src/app/index.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import { stableStringify } from '../../../src/core/json.js';
@@ -48,6 +49,15 @@ function createReservedIpClientStub() {
       }
     ])
   );
+  const reserveNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '164.52.198.55',
+      message: 'IP reserved successfully.',
+      status: 'Live Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    })
+  );
 
   const stub: ReservedIpClient = {
     attachReservedIpToNode,
@@ -66,19 +76,22 @@ function createReservedIpClientStub() {
         vm_name: 'node-a'
       })
     ),
-    listReservedIps
+    listReservedIps,
+    reserveNodePublicIp
   };
 
   return {
     attachReservedIpToNode,
     createReservedIp,
     listReservedIps,
+    reserveNodePublicIp,
     stub
   };
 }
 
 describe('reserved-ip commands', () => {
   function createRuntimeFixture(): {
+    stderr: MemoryWriter;
     getNode: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     reservedIpStub: ReturnType<typeof createReservedIpClientStub>;
@@ -87,6 +100,7 @@ describe('reserved-ip commands', () => {
   } {
     const configPath = createTestConfigPath('reserved-ip-test');
     const store = new ConfigStore({ configPath });
+    const stderr = new MemoryWriter();
     const stdout = new MemoryWriter();
     const reservedIpStub = createReservedIpClientStub();
     let credentials: ResolvedCredentials | undefined;
@@ -95,6 +109,7 @@ describe('reserved-ip commands', () => {
         id: 101,
         name: 'node-a',
         plan: 'C3.8GB',
+        public_ip_address: '164.52.198.55',
         status: 'Running',
         vm_id: 100157
       })
@@ -146,12 +161,13 @@ describe('reserved-ip commands', () => {
       },
       isInteractive: true,
       prompt: vi.fn(() => Promise.resolve('')),
-      stderr: new MemoryWriter(),
+      stderr,
       stdout,
       store
     };
 
     return {
+      stderr,
       getNode,
       receivedCredentials: () => credentials,
       reservedIpStub,
@@ -210,7 +226,7 @@ describe('reserved-ip commands', () => {
     );
   });
 
-  it('creates reserved IPs in deterministic json mode', async () => {
+  it('creates reserved IPs in deterministic json mode for the default network flow', async () => {
     const { reservedIpStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -239,61 +255,46 @@ describe('reserved-ip commands', () => {
           status: 'Reserved',
           vm_id: null,
           vm_name: '--'
-        }
+        },
+        source: 'default-network'
       })}\n`
     );
     expect(reservedIpStub.createReservedIp).toHaveBeenCalledTimes(1);
+    expect(reservedIpStub.createReservedIp).toHaveBeenCalledWith();
   });
 
-  it('creates reserved IPs from a node by wiring --from-node to the internal vm_id lookup', async () => {
+  it('reserves a node current public IP through reserve node', async () => {
     const { getNode, reservedIpStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
-
-    reservedIpStub.createReservedIp.mockResolvedValueOnce({
-      appliance_type: 'NODE',
-      bought_at: '04-11-2024 10:37',
-      floating_ip_attached_nodes: [],
-      ip_address: '164.52.198.54',
-      project_name: 'default-project',
-      reserve_id: 12662,
-      reserved_type: 'AddonIP',
-      status: 'Assigned',
-      vm_id: 100157,
-      vm_name: 'node-a'
-    } as Awaited<ReturnType<ReservedIpClient['createReservedIp']>>);
 
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
       '--json',
       'reserved-ip',
-      'create',
-      '--from-node',
+      'reserve',
+      'node',
       '101',
       '--alias',
       'prod'
     ]);
 
     expect(getNode).toHaveBeenCalledWith('101');
-    expect(reservedIpStub.createReservedIp).toHaveBeenCalledWith({
-      vm_id: '100157'
-    });
+    expect(reservedIpStub.reserveNodePublicIp).toHaveBeenCalledWith(
+      '164.52.198.55',
+      {
+        type: 'live-reserve',
+        vm_id: 100157
+      }
+    );
     expect(stdout.buffer).toBe(
       `${stableStringify({
-        action: 'create',
-        reserved_ip: {
-          appliance_type: 'NODE',
-          bought_at: '04-11-2024 10:37',
-          floating_ip_attached_nodes: [],
-          ip_address: '164.52.198.54',
-          project_name: 'default-project',
-          reserve_id: 12662,
-          reserved_type: 'AddonIP',
-          status: 'Assigned',
-          vm_id: 100157,
-          vm_name: 'node-a'
-        }
+        action: 'reserve-node',
+        ip_address: '164.52.198.55',
+        message: 'IP reserved successfully.',
+        node_id: 101,
+        status: 'Live Reserved'
       })}\n`
     );
   });
@@ -337,5 +338,28 @@ describe('reserved-ip commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('rejects the removed --from-node flag', async () => {
+    const { runtime, stderr } = createRuntimeFixture();
+    await seedProfile(runtime);
+
+    const exitCode = await runCli(
+      [
+        'node',
+        CLI_COMMAND_NAME,
+        'reserved-ip',
+        'create',
+        '--from-node',
+        '101',
+        '--alias',
+        'prod'
+      ],
+      runtime,
+      stderr
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stderr.buffer).toContain("Error: unknown option '--from-node'");
   });
 });
