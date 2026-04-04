@@ -73,6 +73,11 @@ describe('ssh-key commands', () => {
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
+      createReservedIpClient: vi.fn(() => {
+        throw new Error(
+          'Reserved IP client should not be created for this test.'
+        );
+      }) as unknown as CliRuntime['createReservedIpClient'],
       createSecurityGroupClient: vi.fn(() => {
         throw new Error(
           'Security group client should not be created for this test.'

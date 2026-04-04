@@ -4,7 +4,7 @@
 
 Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-Create and manage nodes, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
+Create and manage nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
 
 ## Requirements
 
@@ -132,6 +132,21 @@ e2ectl volume create \
 e2ectl volume list
 ```
 
+### Reserved IPs
+
+```bash
+e2ectl reserved-ip list
+e2ectl reserved-ip get <ip-address>
+e2ectl reserved-ip create
+
+# Attach or detach using the normal e2ectl node id.
+e2ectl reserved-ip attach node <ip-address> --node-id <node-id>
+e2ectl reserved-ip detach node <ip-address> --node-id <node-id>
+
+# Delete (prompts for confirmation unless --force is passed)
+e2ectl reserved-ip delete <ip-address>
+```
+
 ### VPCs
 
 ```bash
@@ -252,7 +267,7 @@ e2ectl config import \
   --no-input
 ```
 
-The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
+The safest automation entry points are discovery and list commands: `config list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Help
 

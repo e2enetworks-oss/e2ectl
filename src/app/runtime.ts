@@ -9,6 +9,10 @@ import {
 import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import {
+  ReservedIpApiClient,
+  type ReservedIpClient
+} from '../reserved-ip/index.js';
+import {
   SecurityGroupApiClient,
   type SecurityGroupClient
 } from '../security-group/index.js';
@@ -23,6 +27,7 @@ export interface OutputWriter {
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
   createSecurityGroupClient(
     credentials: ResolvedCredentials
   ): SecurityGroupClient;
@@ -47,6 +52,10 @@ export function createRuntime(): CliRuntime {
     confirm: promptForConfirmation,
     createNodeClient: (credentials) =>
       new NodeApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createReservedIpClient: (credentials) =>
+      new ReservedIpApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     createSecurityGroupClient: (credentials) =>
