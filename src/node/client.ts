@@ -16,7 +16,9 @@ import type {
   NodeDeleteResult,
   NodeDetails,
   NodeListResult,
-  NodeSummary
+  NodeSummary,
+  NodeUpgradeRequest,
+  NodeUpgradeResult
 } from './types.js';
 
 type NodeListApiResponse = ApiResponse<
@@ -50,6 +52,10 @@ export interface NodeClient {
   powerOffNode(nodeId: string): Promise<NodeActionResult>;
   powerOnNode(nodeId: string): Promise<NodeActionResult>;
   saveNodeImage(nodeId: string, name: string): Promise<NodeActionResult>;
+  upgradeNode(
+    nodeId: string,
+    body: NodeUpgradeRequest
+  ): Promise<NodeUpgradeResult>;
 }
 
 export class NodeApiClient implements NodeClient {
@@ -142,6 +148,21 @@ export class NodeApiClient implements NodeClient {
     });
   }
 
+  async upgradeNode(
+    nodeId: string,
+    body: NodeUpgradeRequest
+  ): Promise<NodeUpgradeResult> {
+    const response = await this.transport.request<
+      ApiEnvelope<Omit<NodeUpgradeResult, 'message'>>
+    >({
+      body,
+      method: 'PUT',
+      path: buildNodeUpgradePath(nodeId)
+    });
+
+    return mapNodeUpgradeResponse(response);
+  }
+
   private async runNodeAction(
     nodeId: string,
     body: NodeActionRequest
@@ -166,11 +187,27 @@ function buildNodeActionPath(nodeId: string): string {
   return `${buildNodePath(nodeId)}actions/`;
 }
 
+function buildNodeUpgradePath(nodeId: string): string {
+  return `${NODES_PATH}upgrade/${nodeId}`;
+}
+
 function mapNodeDeleteResponse(
   response: ApiEnvelope<Record<string, never>>
 ): NodeDeleteResult {
   return {
     message: response.message
+  };
+}
+
+function mapNodeUpgradeResponse(
+  response: ApiEnvelope<Omit<NodeUpgradeResult, 'message'>>
+): NodeUpgradeResult {
+  return {
+    location: response.data.location ?? null,
+    message: response.message,
+    new_node_image_id: response.data.new_node_image_id ?? null,
+    old_node_image_id: response.data.old_node_image_id ?? null,
+    vm_id: response.data.vm_id ?? null
   };
 }
 

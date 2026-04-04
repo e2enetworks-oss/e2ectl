@@ -28,5 +28,7 @@ export type {
   NodeDetails,
   NodeListResult,
   NodeOsInfo,
-  NodeSummary
+  NodeSummary,
+  NodeUpgradeRequest,
+  NodeUpgradeResult
 } from './types.js';

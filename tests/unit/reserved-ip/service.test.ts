@@ -86,7 +86,8 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode: vi.fn(),
     powerOnNode: vi.fn(),
-    saveNodeImage: vi.fn()
+    saveNodeImage: vi.fn(),
+    upgradeNode: vi.fn()
   };
   const createReservedIpClient = vi.fn(
     (resolvedCredentials: ResolvedCredentials) => {

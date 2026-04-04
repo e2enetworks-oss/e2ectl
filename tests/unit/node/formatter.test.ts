@@ -680,6 +680,36 @@ describe('node formatter', () => {
     expect(sshKeyOutput).toContain('Status: Done');
   });
 
+  it('renders clean human summaries for node upgrade results', () => {
+    const output = renderNodeResult(
+      {
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node upgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Requested node upgrade for node 101.');
+    expect(output).toContain(
+      'Target Plan: C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    );
+    expect(output).toContain('Target Image: Ubuntu-24.04-Distro');
+    expect(output).toContain('Message: Node upgrade initiated');
+    expect(output).toContain('VM ID: 100157');
+    expect(output).toContain('Location: Delhi');
+  });
+
   it('renders deterministic json for the new node action results', () => {
     const output = renderNodeResult(
       {
@@ -718,6 +748,45 @@ describe('node formatter', () => {
         null,
         2
       ) + '\n'
+    );
+  });
+
+  it('preserves backend downgrade wording in deterministic node upgrade json', () => {
+    const output = renderNodeResult(
+      {
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node downgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-2vCPU-4RAM-100DISK-C3.4GB-Ubuntu-24.04-Delhi'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node downgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-2vCPU-4RAM-100DISK-C3.4GB-Ubuntu-24.04-Delhi'
+        }
+      })}\n`
     );
   });
 
