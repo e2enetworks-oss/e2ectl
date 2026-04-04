@@ -377,6 +377,9 @@ describe('node commands', () => {
 
     const runtime: CliRuntime = {
       confirm,
+      createDnsClient: vi.fn(() => {
+        throw new Error('DNS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDnsClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;

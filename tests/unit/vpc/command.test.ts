@@ -115,6 +115,9 @@ describe('vpc commands', () => {
 
     const runtime: CliRuntime = {
       confirm: vi.fn(() => Promise.resolve(true)),
+      createDnsClient: vi.fn(() => {
+        throw new Error('DNS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDnsClient'],
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
