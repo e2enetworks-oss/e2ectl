@@ -41,5 +41,19 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off'
     }
   },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node
+      },
+      parserOptions: {
+        ...tseslint.configs.disableTypeChecked.languageOptions.parserOptions
+      }
+    },
+    rules: {
+      ...tseslint.configs.disableTypeChecked.rules
+    }
+  },
   eslintConfigPrettier
 );

@@ -118,6 +118,9 @@ export interface ReservedIpServiceDependencies {
   store: ReservedIpStore;
 }
 
+const RESERVED_IP_POLL_ATTEMPTS = 8;
+const RESERVED_IP_POLL_INTERVAL_MS = 1_500;
+
 export class ReservedIpService {
   constructor(private readonly dependencies: ReservedIpServiceDependencies) {}
 
@@ -151,10 +154,28 @@ export class ReservedIpService {
     options: ReservedIpContextOptions
   ): Promise<ReservedIpCreateCommandResult> {
     const client = await this.createClient(options);
+    const createdReservedIp = normalizeReservedIpItem(
+      await client.createReservedIp()
+    );
+    const reservedIp = await findReservedIpInInventoryWithRetry(
+      client,
+      createdReservedIp.ip_address
+    );
+
+    if (reservedIp === undefined) {
+      throw new CliError(
+        `Reserved IP ${createdReservedIp.ip_address} did not appear in inventory after the create request succeeded.`,
+        {
+          code: 'RESERVED_IP_INVENTORY_TIMEOUT',
+          exitCode: EXIT_CODES.network,
+          suggestion: `Run ${formatCliCommand('reserved-ip list')} to confirm the latest inventory, then retry if needed.`
+        }
+      );
+    }
 
     return {
       action: 'create',
-      reserved_ip: normalizeReservedIpItem(await client.createReservedIp()),
+      reserved_ip: reservedIp,
       source: 'default-network'
     };
   }
@@ -247,17 +268,14 @@ export class ReservedIpService {
     options: ReservedIpContextOptions
   ): Promise<ReservedIpGetCommandResult> {
     const normalizedIpAddress = assertReservedIpAddress(ipAddress);
-    const listResult = await this.listReservedIps(options);
-    const item = listResult.items.find(
-      (candidate) => candidate.ip_address === normalizedIpAddress
+    const client = await this.createClient(options);
+    const item = await findReservedIpInInventoryWithRetry(
+      client,
+      normalizedIpAddress
     );
 
     if (item === undefined) {
-      throw new CliError(`Reserved IP ${normalizedIpAddress} was not found.`, {
-        code: 'RESERVED_IP_NOT_FOUND',
-        exitCode: EXIT_CODES.network,
-        suggestion: `Run ${formatCliCommand('reserved-ip list')} to inspect available reserved IPs, then retry with an exact ip_address.`
-      });
+      throw buildReservedIpNotFoundError(normalizedIpAddress);
     }
 
     return {
@@ -387,6 +405,44 @@ function assertReservedIpAddress(ipAddress: string): string {
   });
 }
 
+function buildReservedIpNotFoundError(ipAddress: string): CliError {
+  return new CliError(`Reserved IP ${ipAddress} was not found.`, {
+    code: 'RESERVED_IP_NOT_FOUND',
+    exitCode: EXIT_CODES.network,
+    suggestion: `Run ${formatCliCommand('reserved-ip list')} to inspect available reserved IPs, then retry with an exact ip_address.`
+  });
+}
+
+async function findReservedIpInInventoryWithRetry(
+  client: ReservedIpClient,
+  ipAddress: string
+): Promise<ReservedIpItem | undefined> {
+  for (let attempt = 1; attempt <= RESERVED_IP_POLL_ATTEMPTS; attempt += 1) {
+    const item = await findReservedIpInInventory(client, ipAddress);
+
+    if (item !== undefined) {
+      return item;
+    }
+
+    if (attempt < RESERVED_IP_POLL_ATTEMPTS) {
+      await wait(RESERVED_IP_POLL_INTERVAL_MS);
+    }
+  }
+
+  return undefined;
+}
+
+async function findReservedIpInInventory(
+  client: ReservedIpClient,
+  ipAddress: string
+): Promise<ReservedIpItem | undefined> {
+  const items = (await client.listReservedIps()).map((item) =>
+    normalizeReservedIpItem(item)
+  );
+
+  return items.find((candidate) => candidate.ip_address === ipAddress);
+}
+
 async function resolveNodeVmId(
   nodeClient: NodeClient,
   nodeId: number
@@ -453,4 +509,10 @@ function normalizeOptionalString(
   }
 
   return value;
+}
+
+async function wait(durationMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }

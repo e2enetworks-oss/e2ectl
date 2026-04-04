@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['tests/manual/**/*.test.ts']
+    include: ['tests/manual/read-only/**/*.test.ts']
   }
 });

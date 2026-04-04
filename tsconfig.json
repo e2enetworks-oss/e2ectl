@@ -21,7 +21,8 @@
     "tests/**/*.ts",
     "vitest.config.ts",
     "vitest.integration.config.ts",
-    "vitest.manual.config.ts"
+    "vitest.manual.config.ts",
+    "vitest.manual-smoke.config.ts"
   ],
   "exclude": ["dist", "coverage", "node_modules"]
 }

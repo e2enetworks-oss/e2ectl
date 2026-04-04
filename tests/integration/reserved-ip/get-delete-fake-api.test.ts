@@ -124,11 +124,12 @@ describe('reserved-ip get/delete against a fake MyAccount API', () => {
       expect(result.stderr).toBe(
         'Error: Reserved IP 164.52.198.54 was not found.\n\nNext step: Run e2ectl reserved-ip list to inspect available reserved IPs, then retry with an exact ip_address.\n'
       );
+      expect(server.requests).toHaveLength(8);
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
-  });
+  }, 15_000);
 
   it('deletes one reserved IP with --force and emits deterministic json', async () => {
     const server = await startTestHttpServer({

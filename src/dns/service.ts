@@ -27,6 +27,8 @@ const SUPPORTED_RECORD_TYPES = [
   'TXT',
   'SRV'
 ] as const;
+const DNS_RECORD_POLL_ATTEMPTS = 8;
+const DNS_RECORD_POLL_INTERVAL_MS = 1_500;
 
 type SupportedDnsRecordType = (typeof SUPPORTED_RECORD_TYPES)[number];
 
@@ -318,6 +320,13 @@ export class DnsService {
       record_type: recordType,
       zone_name: canonicalDomainName
     });
+    await waitForDnsRecordPresence(
+      client,
+      canonicalDomainName,
+      recordName,
+      recordType,
+      recordValue.displayValue
+    );
 
     return {
       action: 'record-create',
@@ -394,7 +403,7 @@ export class DnsService {
       'Pass the exact value shown by e2ectl dns record list with --value.'
     );
     const client = await this.createClient(options);
-    const { record } = await resolveExactRecordMatch(
+    const { record } = await resolveExactRecordMatchWithRetry(
       client,
       canonicalDomainName,
       recordName,
@@ -428,6 +437,13 @@ export class DnsService {
       record_type: record.type,
       zone_name: canonicalDomainName
     });
+    await waitForDnsRecordAbsence(
+      client,
+      canonicalDomainName,
+      record.name,
+      record.type,
+      record.value
+    );
     const message = normalizeRecordDeleteMessage(result.message);
 
     return {
@@ -1248,14 +1264,12 @@ async function resolveExactRecordMatch(
   domain: DnsDomainDetailsItem;
   record: DnsFlattenedRecordItem;
 }> {
-  const domain = normalizeDomainDetails(
-    await client.getDomain(canonicalDomainName)
-  );
-  const record = domain.records.find(
-    (candidate) =>
-      candidate.name === recordName &&
-      candidate.type === recordType &&
-      candidate.value === recordValue
+  const domain = await getNormalizedDomainDetails(client, canonicalDomainName);
+  const record = findExactRecordMatch(
+    domain,
+    recordName,
+    recordType,
+    recordValue
   );
 
   if (record !== undefined) {
@@ -1273,6 +1287,153 @@ async function resolveExactRecordMatch(
       suggestion: `Run ${formatCliCommand(`dns record list ${canonicalDomainName}`)} and retry with the exact current value via ${flagName}.`
     }
   );
+}
+
+async function resolveExactRecordMatchWithRetry(
+  client: DnsClient,
+  canonicalDomainName: string,
+  recordName: string,
+  recordType: SupportedDnsRecordType,
+  recordValue: string,
+  flagName: '--current-value' | '--value'
+): Promise<{
+  domain: DnsDomainDetailsItem;
+  record: DnsFlattenedRecordItem;
+}> {
+  let lastError: CliError | undefined;
+
+  for (let attempt = 1; attempt <= DNS_RECORD_POLL_ATTEMPTS; attempt += 1) {
+    try {
+      return await resolveExactRecordMatch(
+        client,
+        canonicalDomainName,
+        recordName,
+        recordType,
+        recordValue,
+        flagName
+      );
+    } catch (error: unknown) {
+      if (
+        !(error instanceof CliError) ||
+        error.code !== 'DNS_RECORD_NOT_FOUND'
+      ) {
+        throw error;
+      }
+
+      lastError = error;
+
+      if (attempt < DNS_RECORD_POLL_ATTEMPTS) {
+        await wait(DNS_RECORD_POLL_INTERVAL_MS);
+      }
+    }
+  }
+
+  if (lastError !== undefined) {
+    throw lastError;
+  }
+
+  throw new Error(
+    'Expected a DNS record lookup error after exhausting retries.'
+  );
+}
+
+async function waitForDnsRecordPresence(
+  client: DnsClient,
+  canonicalDomainName: string,
+  recordName: string,
+  recordType: SupportedDnsRecordType,
+  recordValue: string
+): Promise<void> {
+  for (let attempt = 1; attempt <= DNS_RECORD_POLL_ATTEMPTS; attempt += 1) {
+    const domain = await getNormalizedDomainDetails(
+      client,
+      canonicalDomainName
+    );
+
+    if (
+      findExactRecordMatch(domain, recordName, recordType, recordValue) !==
+      undefined
+    ) {
+      return;
+    }
+
+    if (attempt < DNS_RECORD_POLL_ATTEMPTS) {
+      await wait(DNS_RECORD_POLL_INTERVAL_MS);
+    }
+  }
+
+  throw new CliError(
+    `The DNS record ${recordType} ${recordName} did not become visible in ${canonicalDomainName} after the create request succeeded.`,
+    {
+      code: 'DNS_RECORD_SYNC_TIMEOUT',
+      details: [`Value: ${recordValue}`],
+      exitCode: EXIT_CODES.network,
+      suggestion: `Run ${formatCliCommand(`dns record list ${canonicalDomainName}`)} to confirm the latest zone state, then retry if needed.`
+    }
+  );
+}
+
+async function waitForDnsRecordAbsence(
+  client: DnsClient,
+  canonicalDomainName: string,
+  recordName: string,
+  recordType: string,
+  recordValue: string
+): Promise<void> {
+  for (let attempt = 1; attempt <= DNS_RECORD_POLL_ATTEMPTS; attempt += 1) {
+    const domain = await getNormalizedDomainDetails(
+      client,
+      canonicalDomainName
+    );
+
+    if (
+      findExactRecordMatch(domain, recordName, recordType, recordValue) ===
+      undefined
+    ) {
+      return;
+    }
+
+    if (attempt < DNS_RECORD_POLL_ATTEMPTS) {
+      await wait(DNS_RECORD_POLL_INTERVAL_MS);
+    }
+  }
+
+  throw new CliError(
+    `The DNS record ${recordType} ${recordName} still appears in ${canonicalDomainName} after the delete request succeeded.`,
+    {
+      code: 'DNS_RECORD_SYNC_TIMEOUT',
+      details: [`Value: ${recordValue}`],
+      exitCode: EXIT_CODES.network,
+      suggestion: `Run ${formatCliCommand(`dns record list ${canonicalDomainName}`)} to confirm the latest zone state, then retry if needed.`
+    }
+  );
+}
+
+async function getNormalizedDomainDetails(
+  client: DnsClient,
+  canonicalDomainName: string
+): Promise<DnsDomainDetailsItem> {
+  return normalizeDomainDetails(await client.getDomain(canonicalDomainName));
+}
+
+function findExactRecordMatch(
+  domain: DnsDomainDetailsItem,
+  recordName: string,
+  recordType: string,
+  recordValue: string
+): DnsFlattenedRecordItem | undefined {
+  return domain.records.find(
+    (candidate) =>
+      candidate.name === recordName &&
+      candidate.type === recordType &&
+      candidate.value === recordValue
+  );
+}
+
+async function wait(durationMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 function sortDnsRecordItems(

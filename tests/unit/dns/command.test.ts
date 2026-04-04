@@ -435,6 +435,54 @@ describe('dns commands', () => {
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
+    dnsStub.getDomain.mockResolvedValueOnce({
+      DOMAIN_TTL: 86400,
+      domain: {
+        rrsets: [
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content:
+                  'ns50.e2enetworks.net.in. abuse.e2enetworks.net.in. 2024110404 10800 3600 604800 86400',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'SOA'
+          },
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: 'ns50.e2enetworks.net.in.',
+                disabled: false
+              },
+              {
+                content: 'ns51.e2enetworks.net.in.',
+                disabled: false
+              }
+            ],
+            ttl: 86400,
+            type: 'NS'
+          },
+          {
+            name: 'api.example.com.',
+            records: [
+              {
+                content: 'app.example.net.',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'CNAME'
+          }
+        ]
+      },
+      domain_ip: '1.1.1.1',
+      domain_name: 'example.com.'
+    });
+
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,

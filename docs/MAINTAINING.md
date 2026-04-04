@@ -1,6 +1,6 @@
 # Maintaining e2ectl
 
-This document is for maintainers responsible for branch policy, CI health, release readiness, and documentation quality.
+This document is for maintainers who own branch policy, CI health, release readiness, and documentation quality.
 
 For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release execution, use [docs/RELEASING.md](./RELEASING.md).
 
@@ -14,7 +14,9 @@ For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release
 
 ## Promotion Gate
 
-A `develop` commit is ready for promotion only when the full gate is green:
+The reference contract is [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
+
+A `develop` commit is ready for promotion only when this full gate is green:
 
 ```bash
 make lint
@@ -29,12 +31,11 @@ Operational notes:
 - Public runtime support starts at Node.js 24.
 - `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI.
 - `make coverage` remains optional when you also want the integration coverage report.
-- `npm run test:manual` is opt-in live verification and never a required CI lane.
+- `npm run test:manual` is the opt-in read-only live check lane and is never a required CI lane.
+- `npm run test:manual:smoke` is the opt-in destructive live smoke lane and is never a required CI lane.
 - If `npm pack --dry-run` fails locally because of npm cache permissions, rerun with `env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run`.
 
 ## CI Contract
-
-### Verify gate
 
 Runs on:
 
@@ -57,7 +58,9 @@ Steps:
 5. `npm run test:integration`
 6. `npm pack --dry-run`
 
-The verify lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
+The verify workflow uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
+
+`release-please.yml` now reruns the same publish-time verification, including `npm run test:integration`, before npm publish.
 
 ## Release Readiness Checks
 
@@ -69,7 +72,52 @@ Before opening a promotion PR from `develop` to `main`, confirm:
 - any changed `--json` output has been reviewed as a machine-facing contract
 - automated fake-API coverage still covers the affected create, list, get, delete, catalog, and attachment flows
 
-If a release needs additional confidence against live credentials, run the opt-in manual lane separately. Today that lane covers read-only node checks (`node catalog os`, `node catalog plans`, `node list`, and optional `node get`) only.
+If a release needs additional confidence against live credentials, run one of the opt-in manual lanes separately. Use the read-only lane for safe spot checks, or the destructive smoke lane for disposable end-to-end release validation.
+
+## Manual Live Verification
+
+Two opt-in live lanes exist:
+
+- `npm run test:manual` stays read-only and safe. It only runs when `E2ECTL_RUN_MANUAL_E2E=1` is set, and it covers node catalog/list/get checks.
+- `npm run test:manual:smoke` is destructive. It uses the built CLI against live credentials to create and clean up disposable resources.
+
+Run smoke only after `make build`.
+
+Smoke requires these environment variables:
+
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+- `E2ECTL_SMOKE_NODE_PLAN`
+- `E2ECTL_SMOKE_NODE_IMAGE`
+- `E2ECTL_SMOKE_DNS_DOMAIN`
+
+Optional smoke variables:
+
+- `E2ECTL_SMOKE_PREFIX`
+- `E2ECTL_SMOKE_RECORD_TTL`
+- `E2ECTL_SMOKE_MANIFEST`
+
+Smoke writes a persistent manifest under `.tmp/` by default. If `E2ECTL_SMOKE_MANIFEST` is set, that path is used instead. The test updates the manifest after each successful create or mutate step, and prints the manifest path clearly on failure.
+
+If a smoke run is interrupted or partial cleanup fails, resume cleanup with:
+
+```bash
+npm run test:manual:smoke:cleanup -- --manifest <path>
+```
+
+Cleanup order is:
+
+1. DNS records
+2. addon reserved IP detach when needed
+3. node delete
+4. reserved IP delete
+5. security group delete
+
+The cleanup command tries the built CLI first and falls back to direct clients only when CLI cleanup fails.
+
+Destructive smoke remains strongly recommended for the first public release and future release candidates, but it is not a mandatory CI or branch-protection gate.
 
 ## Documentation Discipline
 

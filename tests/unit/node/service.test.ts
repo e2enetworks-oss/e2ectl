@@ -72,6 +72,7 @@ function createServiceFixture(options?: {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      security_group_count: 2,
       status: 'Running',
       vm_id: 100157
     })
@@ -534,6 +535,33 @@ describe('NodeService', () => {
       },
       security_group_ids: [45]
     });
+  });
+
+  it('blocks detaching the last remaining security group before calling the backend', async () => {
+    const { detachNodeSecurityGroups, getNode, service } =
+      createServiceFixture();
+
+    getNode.mockResolvedValue({
+      id: 101,
+      name: 'node-a',
+      plan: 'C3.8GB',
+      security_group_count: 1,
+      status: 'Running',
+      vm_id: 100157
+    });
+
+    await expect(
+      service.detachSecurityGroups('101', {
+        alias: 'prod',
+        securityGroupIds: ['45']
+      })
+    ).rejects.toMatchObject({
+      code: 'LAST_SECURITY_GROUP_DETACH_BLOCKED',
+      message: 'Node 101 must keep at least one attached security group.'
+    });
+
+    expect(getNode).toHaveBeenCalledWith('101');
+    expect(detachNodeSecurityGroups).not.toHaveBeenCalled();
   });
 
   it('resolves ssh key ids, deduplicates repeats, and sends backend ssh key payloads', async () => {

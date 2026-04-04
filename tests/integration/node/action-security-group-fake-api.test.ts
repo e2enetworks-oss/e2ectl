@@ -15,6 +15,7 @@ describe('node security-group actions against a fake MyAccount API', () => {
             id: 101,
             name: 'node-a',
             plan: 'C3.8GB',
+            security_group_count: 2,
             status: 'Running',
             vm_id: 100157
           },
@@ -94,6 +95,7 @@ describe('node security-group actions against a fake MyAccount API', () => {
             id: 101,
             name: 'node-a',
             plan: 'C3.8GB',
+            security_group_count: 2,
             status: 'Running',
             vm_id: 100157
           },
@@ -149,6 +151,68 @@ describe('node security-group actions against a fake MyAccount API', () => {
       expect(JSON.parse(server.requests[1]!.body)).toEqual({
         security_group_ids: [45]
       });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('blocks detaching the last remaining security group before calling the detach endpoint', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/nodes/101/': () => ({
+        body: {
+          code: 200,
+          data: {
+            id: 101,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            security_group_count: 1,
+            status: 'Running',
+            vm_id: 100157
+          },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'POST /myaccount/api/v1/security_group/100157/detach/': () => ({
+        body: {
+          code: 200,
+          data: {},
+          errors: {},
+          message: 'Security Groups Detached Successfully'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'node',
+          'action',
+          'security-group',
+          'detach',
+          '101',
+          '--security-group-id',
+          '45'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(
+        'Error: Node 101 must keep at least one attached security group.\n\nDetails:\n- Attached security groups: 1\n- Requested detach count: 1\n\nNext step: Detach fewer security groups, or attach another security group before retrying.\n'
+      );
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]?.method).toBe('GET');
     } finally {
       await server.close();
       await tempHome.cleanup();

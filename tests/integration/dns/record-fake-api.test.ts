@@ -238,6 +238,33 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
           errors: {},
           message: 'Success'
         }
+      }),
+      'GET /myaccount/api/v1/e2e_dns/forward/example.com./': () => ({
+        body: {
+          code: 200,
+          data: {
+            DOMAIN_TTL: 86400,
+            domain: {
+              rrsets: [
+                {
+                  name: '_sip._tcp.example.com.',
+                  records: [
+                    {
+                      content: '10 5 443 service.example.net.',
+                      disabled: false
+                    }
+                  ],
+                  ttl: 300,
+                  type: 'SRV'
+                }
+              ]
+            },
+            domain_ip: '1.1.1.1',
+            domain_name: 'example.com.'
+          },
+          errors: {},
+          message: 'Success'
+        }
       })
     });
     const tempHome = await createTempHome();
@@ -289,7 +316,7 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
         })}\n`
       );
 
-      expect(server.requests).toHaveLength(1);
+      expect(server.requests).toHaveLength(2);
       expect(server.requests[0]).toMatchObject({
         method: 'POST',
         pathname: '/myaccount/api/v1/e2e_dns/forward/example.com./',
@@ -304,6 +331,10 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
         record_name: '_sip._tcp.example.com.',
         record_type: 'SRV',
         zone_name: 'example.com.'
+      });
+      expect(server.requests[1]).toMatchObject({
+        method: 'GET',
+        pathname: '/myaccount/api/v1/e2e_dns/forward/example.com./'
       });
     } finally {
       await server.close();
@@ -414,6 +445,7 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
   });
 
   it('verifies exact record existence before deleting and sends the detail delete body only after the precheck', async () => {
+    let recordLookupCount = 0;
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/e2e_dns/forward/example.com./': () => ({
         body: {
@@ -421,19 +453,22 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
           data: {
             DOMAIN_TTL: 86400,
             domain: {
-              rrsets: [
-                {
-                  name: 'example.com.',
-                  records: [
-                    {
-                      content: '1.1.1.1',
-                      disabled: false
-                    }
-                  ],
-                  ttl: 300,
-                  type: 'A'
-                }
-              ]
+              rrsets:
+                recordLookupCount++ === 0
+                  ? [
+                      {
+                        name: 'example.com.',
+                        records: [
+                          {
+                            content: '1.1.1.1',
+                            disabled: false
+                          }
+                        ],
+                        ttl: 300,
+                        type: 'A'
+                      }
+                    ]
+                  : []
             },
             domain_ip: '1.1.1.1',
             domain_name: 'example.com.'
@@ -496,9 +531,10 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
         })}\n`
       );
 
-      expect(server.requests).toHaveLength(2);
+      expect(server.requests).toHaveLength(3);
       expect(server.requests[0]?.method).toBe('GET');
       expect(server.requests[1]?.method).toBe('DELETE');
+      expect(server.requests[2]?.method).toBe('GET');
       expect(JSON.parse(server.requests[1]!.body)).toEqual({
         content: '1.1.1.1',
         record_name: 'example.com.',
@@ -582,11 +618,11 @@ describe('dns record and nameserver flows against a fake MyAccount API', () => {
       expect(result.stderr).toBe(
         'Error: DNS record A example.com. with value 2.2.2.2 was not found in example.com..\n\nNext step: Run e2ectl dns record list example.com. and retry with the exact current value via --value.\n'
       );
-      expect(server.requests).toHaveLength(1);
+      expect(server.requests).toHaveLength(8);
       expect(server.requests[0]?.method).toBe('GET');
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
-  });
+  }, 15_000);
 });

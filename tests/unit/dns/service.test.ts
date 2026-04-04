@@ -95,6 +95,27 @@ function createServiceFixture(options?: {
   };
 }
 
+function buildDomainDetailsResponse(
+  rrsets: Array<{
+    name: string;
+    records: Array<{
+      content: string;
+      disabled: boolean;
+    }>;
+    ttl: number;
+    type: string;
+  }>
+) {
+  return {
+    DOMAIN_TTL: 86400,
+    domain: {
+      rrsets
+    },
+    domain_ip: '1.1.1.1',
+    domain_name: 'example.com.'
+  };
+}
+
 describe('DnsService', () => {
   it('lists domains and resolves saved defaults', async () => {
     const { listDomains, receivedCredentials, service } =
@@ -614,12 +635,27 @@ describe('DnsService', () => {
   });
 
   it('maps --name @ to the apex and validates A records locally', async () => {
-    const { createRecord, service } = createServiceFixture();
+    const { createRecord, getDomain, service } = createServiceFixture();
 
     createRecord.mockResolvedValue({
       message: 'The record was added successfully!',
       status: true
     });
+    getDomain.mockResolvedValue(
+      buildDomainDetailsResponse([
+        {
+          name: 'example.com.',
+          records: [
+            {
+              content: '203.0.113.10',
+              disabled: false
+            }
+          ],
+          ttl: 300,
+          type: 'A'
+        }
+      ])
+    );
 
     const result = await service.createRecord('Example.com', {
       alias: 'prod',
@@ -677,12 +713,27 @@ describe('DnsService', () => {
   });
 
   it('canonicalizes relative record names and trailing-dot targets for CNAME', async () => {
-    const { createRecord, service } = createServiceFixture();
+    const { createRecord, getDomain, service } = createServiceFixture();
 
     createRecord.mockResolvedValue({
       message: 'The record was added successfully!',
       status: true
     });
+    getDomain.mockResolvedValue(
+      buildDomainDetailsResponse([
+        {
+          name: 'api.example.com.',
+          records: [
+            {
+              content: 'app.example.net.',
+              disabled: false
+            }
+          ],
+          ttl: 300,
+          type: 'CNAME'
+        }
+      ])
+    );
 
     await service.createRecord('example.com', {
       alias: 'prod',
@@ -700,12 +751,27 @@ describe('DnsService', () => {
   });
 
   it('quotes TXT values internally while keeping display values unquoted', async () => {
-    const { createRecord, service } = createServiceFixture();
+    const { createRecord, getDomain, service } = createServiceFixture();
 
     createRecord.mockResolvedValue({
       message: 'The record was added successfully!',
       status: true
     });
+    getDomain.mockResolvedValue(
+      buildDomainDetailsResponse([
+        {
+          name: 'example.com.',
+          records: [
+            {
+              content: '"hello world"',
+              disabled: false
+            }
+          ],
+          ttl: 300,
+          type: 'TXT'
+        }
+      ])
+    );
 
     const result = await service.createRecord('example.com', {
       alias: 'prod',
@@ -723,12 +789,43 @@ describe('DnsService', () => {
   });
 
   it('normalizes MX and SRV targets with trailing dots', async () => {
-    const { createRecord, service } = createServiceFixture();
+    const { createRecord, getDomain, service } = createServiceFixture();
 
     createRecord.mockResolvedValue({
       message: 'The record was added successfully!',
       status: true
     });
+    getDomain
+      .mockResolvedValueOnce(
+        buildDomainDetailsResponse([
+          {
+            name: 'example.com.',
+            records: [
+              {
+                content: '10 mail.example.net.',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'MX'
+          }
+        ])
+      )
+      .mockResolvedValueOnce(
+        buildDomainDetailsResponse([
+          {
+            name: '_sip._tcp.example.com.',
+            records: [
+              {
+                content: '10 5 443 service.example.net.',
+                disabled: false
+              }
+            ],
+            ttl: 300,
+            type: 'SRV'
+          }
+        ])
+      );
 
     await service.createRecord('example.com', {
       alias: 'prod',
@@ -760,13 +857,62 @@ describe('DnsService', () => {
     });
   });
 
+  it('waits for created records to become visible before returning', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { createRecord, getDomain, service } = createServiceFixture();
+
+      createRecord.mockResolvedValue({
+        message: 'The record was added successfully!',
+        status: true
+      });
+      getDomain
+        .mockResolvedValueOnce(buildDomainDetailsResponse([]))
+        .mockResolvedValueOnce(
+          buildDomainDetailsResponse([
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: '203.0.113.10',
+                  disabled: false
+                }
+              ],
+              ttl: 300,
+              type: 'A'
+            }
+          ])
+        );
+
+      const resultPromise = service.createRecord('example.com', {
+        alias: 'prod',
+        type: 'A',
+        value: '203.0.113.10'
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        action: 'record-create',
+        record: {
+          name: 'example.com.',
+          type: 'A',
+          value: '203.0.113.10'
+        }
+      });
+      expect(getDomain).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('verifies the exact current record value exists before deleting', async () => {
     const { deleteRecord, getDomain, service } = createServiceFixture();
 
-    getDomain.mockResolvedValue({
-      DOMAIN_TTL: 86400,
-      domain: {
-        rrsets: [
+    getDomain
+      .mockResolvedValueOnce(
+        buildDomainDetailsResponse([
           {
             name: 'example.com.',
             records: [
@@ -778,11 +924,9 @@ describe('DnsService', () => {
             ttl: 300,
             type: 'A'
           }
-        ]
-      },
-      domain_ip: '1.1.1.1',
-      domain_name: 'example.com.'
-    });
+        ])
+      )
+      .mockResolvedValueOnce(buildDomainDetailsResponse([]));
     deleteRecord.mockResolvedValue({
       message: 'The record was deleted successfully!',
       status: true
@@ -795,7 +939,9 @@ describe('DnsService', () => {
       value: '1.1.1.1'
     });
 
-    expect(getDomain).toHaveBeenCalledWith('example.com.');
+    expect(getDomain).toHaveBeenCalledTimes(2);
+    expect(getDomain).toHaveBeenNthCalledWith(1, 'example.com.');
+    expect(getDomain).toHaveBeenNthCalledWith(2, 'example.com.');
     expect(deleteRecord).toHaveBeenCalledWith('example.com.', {
       content: '1.1.1.1',
       record_name: 'example.com.',
@@ -818,10 +964,9 @@ describe('DnsService', () => {
   it('normalizes the known bad reverse-dns delete copy from the backend', async () => {
     const { deleteRecord, getDomain, service } = createServiceFixture();
 
-    getDomain.mockResolvedValue({
-      DOMAIN_TTL: 86400,
-      domain: {
-        rrsets: [
+    getDomain
+      .mockResolvedValueOnce(
+        buildDomainDetailsResponse([
           {
             name: 'example.com.',
             records: [
@@ -833,11 +978,9 @@ describe('DnsService', () => {
             ttl: 300,
             type: 'A'
           }
-        ]
-      },
-      domain_ip: '1.1.1.1',
-      domain_name: 'example.com.'
-    });
+        ])
+      )
+      .mockResolvedValueOnce(buildDomainDetailsResponse([]));
     deleteRecord.mockResolvedValue({
       message: 'The custom Reverse DNS record was deleted successfully!',
       status: true
@@ -861,6 +1004,59 @@ describe('DnsService', () => {
         value: '1.1.1.1'
       }
     });
+  });
+
+  it('retries the exact-match delete lookup before failing', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { deleteRecord, getDomain, service } = createServiceFixture();
+
+      getDomain
+        .mockResolvedValueOnce(buildDomainDetailsResponse([]))
+        .mockResolvedValueOnce(
+          buildDomainDetailsResponse([
+            {
+              name: 'example.com.',
+              records: [
+                {
+                  content: '1.1.1.1',
+                  disabled: false
+                }
+              ],
+              ttl: 300,
+              type: 'A'
+            }
+          ])
+        )
+        .mockResolvedValueOnce(buildDomainDetailsResponse([]));
+      deleteRecord.mockResolvedValue({
+        message: 'The record was deleted successfully!',
+        status: true
+      });
+
+      const resultPromise = service.deleteRecord('example.com', {
+        alias: 'prod',
+        force: true,
+        type: 'A',
+        value: '1.1.1.1'
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        action: 'record-delete',
+        record: {
+          name: 'example.com.',
+          type: 'A',
+          value: '1.1.1.1'
+        }
+      });
+      expect(getDomain).toHaveBeenCalledTimes(3);
+      expect(deleteRecord).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('maps current-value and new typed flags correctly when updating records', async () => {

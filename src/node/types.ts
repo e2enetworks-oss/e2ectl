@@ -23,6 +23,7 @@ export interface NodeDetails extends NodeSummary {
   memory?: string;
   os_info?: NodeOsInfo;
   price?: string;
+  security_group_count?: number;
   vm_id?: number;
   vcpus?: string;
 }

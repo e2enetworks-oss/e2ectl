@@ -1,5 +1,5 @@
-import { MyAccountApiTransport } from '../../src/myaccount/index.js';
-import { NodeApiClient } from '../../src/node/index.js';
+import { MyAccountApiTransport } from '../../../src/myaccount/index.js';
+import { NodeApiClient } from '../../../src/node/index.js';
 
 const runManualSuite = process.env.E2ECTL_RUN_MANUAL_E2E === '1';
 const describeManual = runManualSuite ? describe : describe.skip;

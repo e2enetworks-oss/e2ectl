@@ -252,15 +252,16 @@ describe('reserved-ip commands', () => {
           project_name: 'default-project',
           reserve_id: 12662,
           reserved_type: 'AddonIP',
-          status: 'Reserved',
-          vm_id: null,
-          vm_name: '--'
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
         },
         source: 'default-network'
       })}\n`
     );
     expect(reservedIpStub.createReservedIp).toHaveBeenCalledTimes(1);
     expect(reservedIpStub.createReservedIp).toHaveBeenCalledWith();
+    expect(reservedIpStub.listReservedIps).toHaveBeenCalledTimes(1);
   });
 
   it('reserves a node current public IP through reserve node', async () => {

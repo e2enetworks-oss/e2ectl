@@ -183,6 +183,40 @@ describe('ReservedIpService', () => {
     });
   });
 
+  it('retries the inventory lookup for get until the reserved IP appears', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { listReservedIps, service } = createServiceFixture();
+
+      listReservedIps
+        .mockResolvedValueOnce([
+          {
+            ...sampleReservedIpSummary(),
+            ip_address: '164.52.198.55'
+          }
+        ])
+        .mockResolvedValueOnce([sampleReservedIpSummary()]);
+
+      const resultPromise = service.getReservedIp('164.52.198.54', {
+        alias: 'prod'
+      });
+      void resultPromise.catch(() => undefined);
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        action: 'get',
+        reserved_ip: {
+          ip_address: '164.52.198.54'
+        }
+      });
+      expect(listReservedIps).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fails locally when get receives an invalid IPv4 address', async () => {
     const { createReservedIpClient, listReservedIps, service } =
       createServiceFixture();
@@ -247,25 +281,39 @@ describe('ReservedIpService', () => {
   });
 
   it('returns a clear not-found error when no reserved IP matches exactly', async () => {
-    const { listReservedIps, service } = createServiceFixture();
+    vi.useFakeTimers();
 
-    listReservedIps.mockResolvedValue([
-      {
-        ...sampleReservedIpSummary(),
-        ip_address: '164.52.198.55'
-      }
-    ]);
+    try {
+      const { listReservedIps, service } = createServiceFixture();
 
-    await expect(
-      service.getReservedIp('164.52.198.54', { alias: 'prod' })
-    ).rejects.toMatchObject({
-      code: 'RESERVED_IP_NOT_FOUND',
-      message: 'Reserved IP 164.52.198.54 was not found.'
-    });
+      listReservedIps.mockResolvedValue([
+        {
+          ...sampleReservedIpSummary(),
+          ip_address: '164.52.198.55'
+        }
+      ]);
+
+      const resultPromise = service
+        .getReservedIp('164.52.198.54', {
+          alias: 'prod'
+        })
+        .catch((error: unknown) => error);
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        code: 'RESERVED_IP_NOT_FOUND',
+        message: 'Reserved IP 164.52.198.54 was not found.'
+      });
+      expect(listReservedIps).toHaveBeenCalledTimes(8);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('creates reserved IPs from the default network without resolving node details', async () => {
-    const { createReservedIp, getNode, service } = createServiceFixture();
+    const { createReservedIp, getNode, listReservedIps, service } =
+      createServiceFixture();
 
     createReservedIp.mockResolvedValue({
       ...sampleReservedIpSummary(),
@@ -273,6 +321,14 @@ describe('ReservedIpService', () => {
       vm_id: null,
       vm_name: '--'
     });
+    listReservedIps.mockResolvedValue([
+      {
+        ...sampleReservedIpSummary(),
+        status: 'Reserved',
+        vm_id: null,
+        vm_name: '--'
+      }
+    ]);
 
     const result = await service.createReservedIp({ alias: 'prod' });
 
@@ -305,6 +361,45 @@ describe('ReservedIpService', () => {
     expect(createReservedIp).toHaveBeenCalledTimes(1);
     expect(createReservedIp).toHaveBeenCalledWith();
     expect(getNode).not.toHaveBeenCalled();
+  });
+
+  it('waits for created reserved IPs to show up in inventory before returning', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { createReservedIp, listReservedIps, service } =
+        createServiceFixture();
+
+      createReservedIp.mockResolvedValue({
+        ...sampleReservedIpSummary(),
+        status: 'Reserved',
+        vm_id: null,
+        vm_name: '--'
+      });
+      listReservedIps.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        {
+          ...sampleReservedIpSummary(),
+          status: 'Reserved',
+          vm_id: null,
+          vm_name: '--'
+        }
+      ]);
+
+      const resultPromise = service.createReservedIp({ alias: 'prod' });
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        action: 'create',
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: 'Reserved'
+        }
+      });
+      expect(listReservedIps).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reserves the current node public IP through the live-reserve action path', async () => {

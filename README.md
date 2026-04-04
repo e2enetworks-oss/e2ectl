@@ -2,9 +2,9 @@
 
 [![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/main/graph/badge.svg)](https://codecov.io/gh/e2enetworks-oss/e2ectl) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](https://github.com/e2enetworks-oss/e2ectl/tree/main/docs) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-Command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
+`e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-Create and manage nodes, forward DNS zones, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, per-alias defaults, and deterministic `--json` output for scripts and automation.
+It covers nodes, DNS zones and records, reserved IPs, volumes, VPCs, security groups, and SSH keys. The CLI is designed for both operators and automation, with saved profiles, default project/location context, and deterministic `--json` output.
 
 ## Requirements
 
@@ -26,31 +26,27 @@ npm install -g @e2enetworks-oss/e2ectl@next
 
 ## Quickstart
 
-### 1. Import credentials and save a default profile
+### 1. Import credentials
 
 ```bash
 e2ectl config import --file ~/Downloads/config.json
 ```
 
-In an interactive terminal, `e2ectl` can walk you through setting a default alias and shared default project/location values (`Delhi` or `Chennai`).
+In an interactive terminal, `e2ectl` can also help you choose a default alias plus shared default project and location values.
 
-For profile onboarding, credentials are imported from file.
-
-### 2. Confirm the saved profile
+### 2. Confirm the active profile
 
 ```bash
 e2ectl config list
 ```
 
-Once a default alias and default project/location values are saved, you can omit `--alias`, `--project-id`, and `--location` from subsequent commands. The examples below assume that default context is already active.
+Once a default alias and default project/location are saved, most commands can omit `--alias`, `--project-id`, and `--location`.
 
 ### 3. Discover valid plans, images, and billing options
 
 ```bash
-# List available operating systems
 e2ectl node catalog os
 
-# Get exact plan, image, and billing values
 e2ectl node catalog plans \
   --display-category "Linux Virtual Node" \
   --category Ubuntu \
@@ -59,7 +55,7 @@ e2ectl node catalog plans \
   --billing-type all
 ```
 
-Always use `node catalog` before creating a node. It returns the exact `plan`, `image`, and committed plan identifiers you need.
+Use `node catalog` before `node create`. It returns the exact `plan`, `image`, and committed plan identifiers the API expects.
 
 ### 4. Create a node
 
@@ -75,66 +71,54 @@ Repeat `--ssh-key-id <ssh-key-id>` to attach one or more saved SSH keys during n
 
 For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>` using values from `node catalog plans`.
 
+### 5. Explore the installed help
+
+```bash
+e2ectl --help
+e2ectl node --help
+e2ectl dns --help
+e2ectl reserved-ip --help
+```
+
 ## Common Workflows
 
 ### Nodes
 
 ```bash
+e2ectl node catalog os
+e2ectl node catalog plans
 e2ectl node list
 e2ectl node get <node-id>
-
-# Power management
 e2ectl node action power-off <node-id>
 e2ectl node action power-on <node-id>
-
-# Save a node as a reusable image
 e2ectl node action save-image <node-id> --name <image-name>
-
-# Upgrade a node plan/image pair using exact values from `e2ectl node catalog plans`
 e2ectl node upgrade <node-id> --plan <plan> --image <image>
-
-# Attach resources
-# Use the VPC ID shown by `e2ectl vpc create`, `e2ectl vpc get`, or `e2ectl vpc list`
 e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
 e2ectl node action volume attach <node-id> --volume-id <volume-id>
 e2ectl node action security-group attach <node-id> --security-group-id <security-group-id>
 e2ectl node action ssh-key attach <node-id> --ssh-key-id <ssh-key-id>
-
-# Detach security groups
 e2ectl node action security-group detach <node-id> --security-group-id <security-group-id>
-
-# Delete (prompts for confirmation unless --force is passed)
 e2ectl node delete <node-id>
-
-# Preserve the current public IP as a reserved IP during delete
 e2ectl node delete <node-id> --reserve-public-ip
 ```
 
 ### Volumes
 
 ```bash
-# Discover volume plans (optionally filter by size)
 e2ectl volume plans
 e2ectl volume plans --size <size-gb>
-
-# Inspect or delete one volume
 e2ectl volume get <volume-id>
 e2ectl volume delete <volume-id>
-
-# Create with hourly billing
 e2ectl volume create \
   --name <volume-name> \
   --size <size-gb> \
   --billing-type hourly
-
-# Create with committed billing
 e2ectl volume create \
   --name <volume-name> \
   --size <size-gb> \
   --billing-type committed \
   --committed-plan-id <committed-plan-id> \
   --post-commit-behavior auto-renew
-
 e2ectl volume list
 ```
 
@@ -143,19 +127,10 @@ e2ectl volume list
 ```bash
 e2ectl reserved-ip list
 e2ectl reserved-ip get <ip-address>
-
-# Allocate a new reserved IP from the default network.
 e2ectl reserved-ip create
-
-# Preserve a node's current public IP as a reserved IP.
-# Pass the normal e2ectl node id; the CLI resolves backend vm_id and public IP internally.
 e2ectl reserved-ip reserve node <node-id>
-
-# Attach or detach an existing reserved addon IP using the normal e2ectl node id.
 e2ectl reserved-ip attach node <ip-address> --node-id <node-id>
 e2ectl reserved-ip detach node <ip-address> --node-id <node-id>
-
-# Delete (prompts for confirmation unless --force is passed)
 e2ectl reserved-ip delete <ip-address>
 ```
 
@@ -165,18 +140,11 @@ e2ectl reserved-ip delete <ip-address>
 e2ectl dns list
 e2ectl dns get <domain-name>
 e2ectl dns create <domain-name> --ip <ipv4>
-
-# Delete resolves the backend domain_id internally from the public domain name.
-# Prompts for confirmation unless --force is passed.
 e2ectl dns delete <domain-name>
-
-# Diagnostics
 e2ectl dns nameservers <domain-name>
 e2ectl dns verify ns <domain-name>
 e2ectl dns verify validity <domain-name>
 e2ectl dns verify ttl <domain-name>
-
-# Forward records
 e2ectl dns record list <domain-name>
 e2ectl dns record create <domain-name> --type <type> [--name <host>] [type-specific value flags] [--ttl <seconds>]
 e2ectl dns record update <domain-name> --type <type> [--name <host>] --current-value <value> [type-specific value flags] [--ttl <seconds>]
@@ -185,14 +153,12 @@ e2ectl dns record delete <domain-name> --type <type> [--name <host>] --value <va
 
 `dns get`, `dns delete`, `dns nameservers`, `dns record ...`, and all `dns verify` commands accept domain names with or without a trailing dot. The CLI canonicalizes domain and record names to lowercase FQDN form internally.
 
-Record command rules:
-
 - `--name` defaults to `@`, which means the zone apex.
 - Relative names such as `api` become `api.<domain>.`; fully-qualified names are accepted as input.
 - `A`, `AAAA`, `CNAME`, and `TXT` records use `--value`.
 - `MX` records use `--exchange <host>` plus `--priority <number>`.
 - `SRV` records use `--target <host> --priority <number> --weight <number> --port <number>`.
-- `TXT` values are quoted internally for the backend, but `dns record list` shows the unquoted value.
+- `TXT` values are quoted for the backend, but `dns record list` shows the unquoted value.
 - `CNAME`, `MX`, and `SRV` targets are normalized to trailing-dot form.
 - `dns record delete` and `dns record update` target the exact current record value shown by `dns record list`.
 
@@ -203,13 +169,10 @@ Record command rules:
 ```bash
 e2ectl vpc plans
 
-# Create with E2E-assigned CIDR
 e2ectl vpc create \
   --name <vpc-name> \
   --billing-type hourly \
   --cidr-source e2e
-
-# Create with custom CIDR and committed billing
 e2ectl vpc create \
   --name <vpc-name> \
   --billing-type committed \
@@ -217,8 +180,6 @@ e2ectl vpc create \
   --post-commit-behavior auto-renew \
   --cidr-source custom \
   --cidr <custom-cidr>
-
-# Follow-up commands use the VPC ID shown in CLI output. This is the backend `network_id`.
 e2ectl vpc get <vpc-id>
 e2ectl vpc delete <vpc-id>
 e2ectl vpc list
@@ -230,15 +191,11 @@ e2ectl vpc list
 e2ectl security-group list
 e2ectl security-group get <security-group-id>
 e2ectl security-group delete <security-group-id>
-
-# Create from a backend-compatible JSON rules file
 e2ectl security-group create \
   --name <security-group-name> \
   --rules-file ./rules.json \
   [--description <text>] \
   [--default]
-
-# Update with the full desired rule set
 e2ectl security-group update <security-group-id> \
   --name <security-group-name> \
   --rules-file ./rules.json \
@@ -272,13 +229,9 @@ Example `rules.json`:
 e2ectl ssh-key list
 e2ectl ssh-key get <ssh-key-id>
 e2ectl ssh-key delete <ssh-key-id>
-
-# From file
 e2ectl ssh-key create \
   --label <key-label> \
   --public-key-file ~/.ssh/id_ed25519.pub
-
-# From stdin
 cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
   --label <key-label> \
   --public-key-file -
@@ -299,9 +252,9 @@ Profiles are stored in `~/.e2e/config.json`.
 
 ### Precedence
 
-**Authentication** resolves in this order: environment variables (`E2E_API_KEY` + `E2E_AUTH_TOKEN`) -> `--alias` flag -> default saved alias.
+Authentication resolves in this order: environment variables (`E2E_API_KEY` + `E2E_AUTH_TOKEN`) -> `--alias` -> default saved alias.
 
-**Project context** resolves in this order: `--project-id` / `--location` flags -> environment variables -> `--alias` flag -> default saved alias.
+Project context resolves in this order: `--project-id` / `--location` -> environment variables -> `--alias` -> default saved alias.
 
 ## JSON and Automation
 
@@ -320,22 +273,8 @@ e2ectl config import \
 
 The safest automation entry points are discovery and list commands: `config list`, `dns list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
-## Help
-
-```bash
-e2ectl --help
-e2ectl config --help
-e2ectl dns --help
-e2ectl node --help
-e2ectl node catalog plans --help
-e2ectl volume --help
-e2ectl vpc --help
-e2ectl security-group --help
-e2ectl ssh-key --help
-```
-
 ## Documentation
 
-- [Contributing](./CONTRIBUTING.md) — development setup, conventions, releasing, and PR process
-- [Maintaining](./docs/MAINTAINING.md) — triage, review, and merge guidelines
-- [Releasing](./docs/RELEASING.md) — maintainer release runbook and npm publish setup
+- [Contributing](./CONTRIBUTING.md) — contributor setup, repo structure, tests, and PR expectations
+- [Maintaining](./docs/MAINTAINING.md) — CI policy, branch policy, and promotion readiness
+- [Releasing](./docs/RELEASING.md) — release flow, publish checks, and manual release verification

@@ -26,6 +26,27 @@ describe('reserved-ip create against a fake MyAccount API', () => {
           errors: {},
           message: 'Success'
         }
+      }),
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              appliance_type: 'NODE',
+              bought_at: '04-11-2024 10:37',
+              floating_ip_attached_nodes: [],
+              ip_address: '164.52.198.54',
+              project_name: 'default-project',
+              reserve_id: 12662,
+              reserved_type: 'AddonIP',
+              status: 'Reserved',
+              vm_id: null,
+              vm_name: '--'
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
       })
     });
     const tempHome = await createTempHome();
@@ -60,7 +81,7 @@ describe('reserved-ip create against a fake MyAccount API', () => {
           source: 'default-network'
         })}\n`
       );
-      expect(server.requests).toHaveLength(1);
+      expect(server.requests).toHaveLength(2);
       expect(server.requests[0]).toMatchObject({
         method: 'POST',
         pathname: '/myaccount/api/v1/reserve_ips/',
@@ -71,6 +92,10 @@ describe('reserved-ip create against a fake MyAccount API', () => {
         }
       });
       expect(server.requests[0]?.body).toBe('');
+      expect(server.requests[1]).toMatchObject({
+        method: 'GET',
+        pathname: '/myaccount/api/v1/reserve_ips/'
+      });
     } finally {
       await server.close();
       await tempHome.cleanup();

@@ -4,7 +4,7 @@ This is the steady-state release runbook for `e2ectl`.
 
 For CI ownership and promotion readiness, use [docs/MAINTAINING.md](./MAINTAINING.md). For day-to-day contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Prerequisites
+## Before You Start
 
 Before running the release flow, confirm the repository is already set up for automated publishing:
 
@@ -13,9 +13,9 @@ Before running the release flow, confirm the repository is already set up for au
 - npm trusted publishing is configured for this repository and the workflow file `release-please.yml`
 - maintainers can merge to `main` and approve release PRs under the current repository rules
 
-This release path does not use a personal PAT, `RELEASE_PLEASE_TOKEN`, or a long-lived npm publish token. Release Please runs with GitHub's built-in `GITHUB_TOKEN`, and npm publishing is handled by npm trusted publishing over OIDC.
+This release path does not use a personal PAT, `RELEASE_PLEASE_TOKEN`, or a long-lived npm publish token. Release Please runs with GitHub's built-in `GITHUB_TOKEN`, and npm publishing uses npm trusted publishing over OIDC.
 
-One consequence of using `GITHUB_TOKEN` is that GitHub does not trigger additional workflows from the release PR or release objects created by Release Please. The authoritative release-time verification therefore runs inside the same `release-please.yml` workflow before the publish step. Keep branch protection and maintainer expectations aligned with that behavior.
+Because `GITHUB_TOKEN` does not trigger extra workflows from release PR and release events, the authoritative publish-time verification lives inside `release-please.yml` before the publish step.
 
 ## Normal Release Flow
 
@@ -54,16 +54,52 @@ Operational notes:
 - `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI and release-time verification.
 - npm trusted publishing currently requires npm CLI `11.5.1+`, which the release workflow installs explicitly.
 
-When Release Please creates a release in CI, the workflow reruns release-time verification on the tagged commit:
+When Release Please publishes from CI, the workflow reruns the same release-time verification on the tagged commit:
 
 ```bash
 make lint
 npm run coverage:unit
 make build
+npm run test:integration
 npm pack --dry-run
 ```
 
-If the release needs live API confidence beyond the automated gate, run the opt-in manual node read checks before promotion.
+This now matches the real release gate, including integration tests, before npm publish.
+
+## Optional Live Smoke
+
+If the release needs live API confidence beyond the automated gate, use one of the opt-in manual lanes before promotion:
+
+- `npm run test:manual` stays read-only and safe.
+- `npm run test:manual:smoke` is destructive and exercises disposable create/update/delete flows through the built CLI.
+
+Smoke is strongly recommended before the first public release and future release candidates, but it is not a mandatory policy gate.
+
+Run smoke only after `make build`.
+
+Required smoke environment variables:
+
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+- `E2ECTL_SMOKE_NODE_PLAN`
+- `E2ECTL_SMOKE_NODE_IMAGE`
+- `E2ECTL_SMOKE_DNS_DOMAIN`
+
+Optional smoke environment variables:
+
+- `E2ECTL_SMOKE_PREFIX`
+- `E2ECTL_SMOKE_RECORD_TTL`
+- `E2ECTL_SMOKE_MANIFEST`
+
+If smoke fails, keep the printed manifest path. Resume cleanup with:
+
+```bash
+npm run test:manual:smoke:cleanup -- --manifest <path>
+```
+
+The cleanup script deletes DNS records first, then detaches addon reserved IPs, deletes the node, deletes reserved IPs, and finally deletes the security group. It tries the CLI first and falls back to direct clients only if CLI cleanup fails.
 
 ## Maintainer Checklist
 
@@ -71,6 +107,7 @@ Before merging the promotion PR:
 
 - confirm the exact `develop` commit is green on the promotion gate
 - confirm docs and command examples are current
+- strongly consider a destructive smoke run for first-release and release-candidate promotions
 - confirm any release automation or dist-tag changes were documented in this file
 
 Before merging the Release Please PR:

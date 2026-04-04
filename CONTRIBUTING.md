@@ -1,8 +1,8 @@
 # Contributing
 
-This document is for contributors changing the `e2ectl` codebase.
+This document is for people changing the `e2ectl` codebase.
 
-If you are using the CLI, start with [README.md](./README.md). If you are maintaining CI or the promotion gate, use [docs/MAINTAINING.md](./docs/MAINTAINING.md). If you are executing releases, use [docs/RELEASING.md](./docs/RELEASING.md).
+If you are using the CLI, start with [README.md](./README.md). If you own CI or promotion readiness, use [docs/MAINTAINING.md](./docs/MAINTAINING.md). If you are cutting a release, use [docs/RELEASING.md](./docs/RELEASING.md).
 
 ## Requirements
 
@@ -28,6 +28,7 @@ node dist/app/index.js --help
 npm run coverage:unit
 npm run coverage:integration
 npm run test:manual
+npm run test:manual:smoke
 npm pack --dry-run
 ```
 
@@ -37,7 +38,7 @@ npm pack --dry-run
 - `main` is the release branch.
 - Target `develop` for normal feature work unless the maintainers asked for a release-only change.
 
-## Architecture Contract
+## Repository Shape
 
 The maintained v1 source tree is:
 
@@ -47,7 +48,10 @@ src/
   core/
   myaccount/
   config/
+  dns/
   node/
+  reserved-ip/
+  security-group/
   volume/
   vpc/
   ssh-key/
@@ -59,7 +63,10 @@ Domain ownership:
 - `src/core/` contains low-level shared helpers such as errors, deterministic JSON helpers, and masking.
 - `src/myaccount/` owns shared API transport, credential validation, request/response typing, and centralized API failure handling.
 - `src/config/` owns profile persistence, import parsing, alias/default-context behavior, and auth/context resolution.
+- `src/dns/` owns DNS zone and record workflows plus DNS verification output.
 - `src/node/` owns node discovery, create/delete flows, actions, and output shaping.
+- `src/reserved-ip/` owns reserved IP inventory, attach/detach, reserve-on-delete, and output shaping.
+- `src/security-group/` owns security group CRUD flows and rules-file handling.
 - `src/volume/` owns volume list/get/delete, plans, create flows, and output shaping.
 - `src/vpc/` owns VPC list/get/delete, plans, create flows, and output shaping.
 - `src/ssh-key/` owns SSH key list/get/delete, create flows, and output shaping.
@@ -105,15 +112,10 @@ The maintainer-owned CI policy and promotion gate live in [docs/MAINTAINING.md](
 - Put integration tests under `tests/integration/<domain>/`.
 - Add or update tests in the domain you touched instead of broad unrelated changes.
 - Treat `--json` output as a contract whenever command behavior or formatters change.
-- Coverage remains explicit locally:
-
-```bash
-make coverage
-```
-
 - Unit and integration coverage reports are written under `coverage/unit/` and `coverage/integration/`.
+- Run `make coverage` when you want both reports locally.
 - `npm run coverage:integration` rebuilds `dist/` first and measures the spawned CLI process, not just the Vitest runner.
-- Manual live checks are opt-in, read-only node checks only:
+- Manual live checks stay opt-in:
 
 ```bash
 E2ECTL_RUN_MANUAL_E2E=1 \
@@ -123,6 +125,16 @@ E2E_PROJECT_ID=<project-id> \
 E2E_LOCATION=<location> \
 npm run test:manual
 ```
+
+- Destructive smoke is a separate lane. Run it only when you explicitly need live create/update/delete coverage and have already built the CLI:
+
+```bash
+make build
+npm run test:manual:smoke
+```
+
+- The smoke env contract and cleanup flow live in [README.md](./README.md), [docs/MAINTAINING.md](./docs/MAINTAINING.md), and [docs/RELEASING.md](./docs/RELEASING.md).
+- Do not run the destructive lane automatically in normal feature work.
 
 ## Documentation Expectations
 
@@ -139,7 +151,7 @@ Update docs by audience:
 - [docs/MAINTAINING.md](./docs/MAINTAINING.md) for CI, branch, and readiness policy
 - [docs/RELEASING.md](./docs/RELEASING.md) for maintainer release mechanics
 
-Do not leave stale command examples behind after behavior changes.
+Keep one clear home for each repeated fact instead of pasting the same explanation into every doc. Do not leave stale command examples behind after behavior changes.
 
 ## Conventional Commits And Release Please
 

@@ -572,7 +572,15 @@ export class NodeService {
     const credentials = await this.resolveContext(options);
     const nodeClient = this.dependencies.createNodeClient(credentials);
     const client = this.dependencies.createSecurityGroupClient(credentials);
-    const nodeVmId = await this.resolveNodeVmId(nodeClient, normalizedNodeId);
+    const nodeDetails = await this.getNodeDetails(nodeClient, normalizedNodeId);
+
+    assertCanDetachSecurityGroups(
+      nodeDetails,
+      normalizedNodeId,
+      securityGroupIds.length
+    );
+
+    const nodeVmId = assertNodeVmId(nodeDetails, normalizedNodeId);
     const result = await client.detachNodeSecurityGroups(nodeVmId, {
       security_group_ids: securityGroupIds
     });
@@ -841,23 +849,17 @@ export class NodeService {
     nodeClient: NodeClient,
     nodeId: number
   ): Promise<number> {
-    const node = await nodeClient.getNode(String(nodeId));
-    const vmId = node.vm_id;
-
-    if (vmId !== undefined && Number.isInteger(vmId) && vmId > 0) {
-      return vmId;
-    }
-
-    throw new CliError(
-      'The MyAccount API did not return a VM ID for this node.',
-      {
-        code: 'INVALID_NODE_DETAILS',
-        details: [`Node ID: ${nodeId}`],
-        exitCode: EXIT_CODES.network,
-        suggestion:
-          'Retry the command. If the problem persists, inspect the node details response.'
-      }
+    return assertNodeVmId(
+      await this.getNodeDetails(nodeClient, nodeId),
+      nodeId
     );
+  }
+
+  private async getNodeDetails(
+    nodeClient: NodeClient,
+    nodeId: number
+  ): Promise<NodeDetails> {
+    return await nodeClient.getNode(String(nodeId));
   }
 }
 
@@ -900,6 +902,56 @@ function assertNodeId(nodeId: string): number {
   }
 
   return Number(nodeId);
+}
+
+function assertCanDetachSecurityGroups(
+  node: NodeDetails,
+  nodeId: number,
+  requestedDetachCount: number
+): void {
+  const securityGroupCount = node.security_group_count;
+
+  if (
+    securityGroupCount === undefined ||
+    !Number.isInteger(securityGroupCount) ||
+    securityGroupCount <= 0 ||
+    requestedDetachCount < securityGroupCount
+  ) {
+    return;
+  }
+
+  throw new CliError(
+    `Node ${nodeId} must keep at least one attached security group.`,
+    {
+      code: 'LAST_SECURITY_GROUP_DETACH_BLOCKED',
+      details: [
+        `Attached security groups: ${securityGroupCount}`,
+        `Requested detach count: ${requestedDetachCount}`
+      ],
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Detach fewer security groups, or attach another security group before retrying.'
+    }
+  );
+}
+
+function assertNodeVmId(node: NodeDetails, nodeId: number): number {
+  const vmId = node.vm_id;
+
+  if (vmId !== undefined && Number.isInteger(vmId) && vmId > 0) {
+    return vmId;
+  }
+
+  throw new CliError(
+    'The MyAccount API did not return a VM ID for this node.',
+    {
+      code: 'INVALID_NODE_DETAILS',
+      details: [`Node ID: ${nodeId}`],
+      exitCode: EXIT_CODES.network,
+      suggestion:
+        'Retry the command. If the problem persists, inspect the node details response.'
+    }
+  );
 }
 
 function normalizeNodeCreateBillingType(

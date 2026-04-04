@@ -1,7 +1,7 @@
 {
   "name": "@e2enetworks-oss/e2ectl",
   "version": "0.2.0",
-  "description": "CLI for E2E Networks.",
+  "description": "CLI for managing E2E Networks MyAccount resources.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {
     "url": "https://github.com/e2enetworks-oss/e2ectl/issues"
@@ -33,11 +33,13 @@
     "dev": "node --import tsx ./src/app/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint src tests vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts",
+    "lint": "eslint src tests scripts/manual-smoke-cleanup.mjs vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts vitest.manual-smoke.config.ts",
     "prepack": "npm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:manual": "vitest run --config vitest.manual.config.ts",
+    "test:manual:smoke": "vitest run --config vitest.manual-smoke.config.ts",
+    "test:manual:smoke:cleanup": "node ./scripts/manual-smoke-cleanup.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
