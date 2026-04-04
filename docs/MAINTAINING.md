@@ -169,6 +169,8 @@ Cleanup command:
 npm run test:manual:smoke:cleanup -- --manifest <path>
 ```
 
+By default, destructive-smoke manifests are written under `.manual-smoke/` in the repo root so a routine `make build` does not erase the recovery file before cleanup can replay.
+
 Cleanup order:
 
 1. DNS records

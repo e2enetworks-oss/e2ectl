@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -79,5 +79,33 @@ describe('smoke manifest helper', () => {
     expect(reloadedManifest.vpc_attached_node_id).toBe(100157);
     expect(reloadedManifest.vpc_id).toBe(27835);
     expect(reloadedManifest.ssh_key_id).toBe(1001);
+  });
+
+  it('stores default smoke manifests outside .tmp so make build cleanup does not erase them', async () => {
+    const originalCwd = process.cwd();
+    const tempDirectory = await mkdtemp(
+      path.join(os.tmpdir(), 'e2ectl-smoke-manifest-cwd-')
+    );
+
+    try {
+      process.chdir(tempDirectory);
+
+      const { path: manifestPath } = await createSmokeManifest({
+        dnsDomain: 'release.example.com',
+        prefix: 'release-smoke'
+      });
+
+      expect(path.basename(path.dirname(manifestPath))).toBe('.manual-smoke');
+      expect(path.basename(manifestPath)).toMatch(
+        /^release-smoke-[a-z0-9]+-manifest\.json$/
+      );
+      expect(manifestPath).not.toContain(`${path.sep}.tmp${path.sep}`);
+    } finally {
+      process.chdir(originalCwd);
+      await rm(tempDirectory, {
+        force: true,
+        recursive: true
+      });
+    }
   });
 });

@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+const DEFAULT_SMOKE_MANIFEST_DIRECTORY_NAME = '.manual-smoke';
+
 export async function createSmokeManifest(options) {
   const manifestPath = await resolveSmokeManifestPath(
     options.manifestPath,
@@ -72,7 +74,7 @@ async function resolveSmokeManifestPath(manifestPath, prefix) {
     manifestPath === undefined
       ? path.resolve(
           process.cwd(),
-          '.tmp',
+          DEFAULT_SMOKE_MANIFEST_DIRECTORY_NAME,
           `${prefix}-${Date.now().toString(36)}-manifest.json`
         )
       : path.resolve(manifestPath);
