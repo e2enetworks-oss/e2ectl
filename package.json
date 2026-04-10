@@ -1,6 +1,6 @@
 {
   "name": "@e2enetworks-oss/e2ectl",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI for E2E Networks.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {
