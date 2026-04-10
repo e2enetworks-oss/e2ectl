@@ -5,11 +5,14 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   writeFile
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isNonEmptyString } from '../core/guards.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 
@@ -33,8 +36,9 @@ export class ConfigStore {
 
   async read(): Promise<ConfigFile> {
     try {
+      await assertSecureConfigFilePermissions(this.configPath);
       const content = await readFile(this.configPath, 'utf8');
-      return normalizeConfig(JSON.parse(content) as ConfigFile);
+      return parseStoredConfig(content, this.configPath);
     } catch (error: unknown) {
       if (isFileNotFound(error)) {
         return createEmptyConfig();
@@ -153,6 +157,29 @@ export function normalizeConfig(config: ConfigFile): ConfigFile {
       };
 }
 
+function parseStoredConfig(content: string, configPath: string): ConfigFile {
+  const displayPath = formatConfigPathForDisplay(configPath);
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(content) as unknown;
+  } catch (error: unknown) {
+    throw new CliError(
+      `Configuration file "${displayPath}" contains invalid JSON.`,
+      {
+        cause: error,
+        code: 'CONFIG_PARSE_ERROR',
+        details: [`Path: ${displayPath}`],
+        exitCode: EXIT_CODES.config,
+        suggestion:
+          'Repair or replace the config file with valid JSON, then retry.'
+      }
+    );
+  }
+
+  return normalizeConfig(validateConfigShape(parsed, configPath));
+}
+
 function normalizeProfile(profile: ProfileConfig): ProfileConfig {
   const normalizedProfile: ProfileConfig = {
     api_key: profile.api_key.trim(),
@@ -180,8 +207,34 @@ function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
-function isNonEmptyString(value: string | undefined): value is string {
-  return value !== undefined && value.trim().length > 0;
+async function assertSecureConfigFilePermissions(
+  configPath: string
+): Promise<void> {
+  if (process.platform === 'win32') {
+    return;
+  }
+
+  const fileStats = await stat(configPath);
+  const fileMode = fileStats.mode & 0o777;
+
+  if ((fileMode & 0o077) === 0) {
+    return;
+  }
+
+  const displayPath = formatConfigPathForDisplay(configPath);
+  throw new CliError(
+    `Configuration file "${displayPath}" has insecure permissions.`,
+    {
+      code: 'CONFIG_INSECURE_PERMISSIONS',
+      details: [
+        `Path: ${displayPath}`,
+        `Mode: ${formatMode(fileMode)}`,
+        'Required: 0600 or stricter on POSIX systems.'
+      ],
+      exitCode: EXIT_CODES.config,
+      suggestion: `Run \`chmod 600 ${displayPath}\` and retry.`
+    }
+  );
 }
 
 async function ensureSecureDirectory(directoryPath: string): Promise<void> {
@@ -207,10 +260,171 @@ async function writeSecureConfigFile(
       flag: 'wx',
       mode: CONFIG_FILE_MODE
     });
+    // chmod before rename: rename(2) preserves file mode on POSIX, so this
+    // single chmod is sufficient. A second chmod after rename would create a
+    // TOCTOU window and would leave the file stranded if it threw on NFS.
     await chmod(tempPath, CONFIG_FILE_MODE);
     await rename(tempPath, configPath);
-    await chmod(configPath, CONFIG_FILE_MODE);
   } finally {
+    // Force-remove the temp file in case writeFile or chmod failed before
+    // rename. After a successful rename tempPath no longer exists, so this
+    // is a safe no-op (force: true suppresses ENOENT).
     await rm(tempPath, { force: true });
   }
+}
+
+function validateConfigShape(value: unknown, configPath: string): ConfigFile {
+  if (!isObjectRecord(value)) {
+    throw invalidConfigShapeError(
+      configPath,
+      'Top-level config must be an object.'
+    );
+  }
+
+  if (!isObjectRecord(value.profiles)) {
+    throw invalidConfigShapeError(
+      configPath,
+      '"profiles" must be an object keyed by alias.'
+    );
+  }
+
+  if (value.default !== undefined && typeof value.default !== 'string') {
+    throw invalidConfigShapeError(
+      configPath,
+      '"default" must be a string when present.'
+    );
+  }
+
+  const profiles: Record<string, ProfileConfig> = {};
+  for (const [alias, rawProfile] of Object.entries(value.profiles)) {
+    profiles[alias] = validateProfileShape(alias, rawProfile, configPath);
+  }
+
+  return value.default === undefined
+    ? {
+        profiles
+      }
+    : {
+        profiles,
+        default: value.default
+      };
+}
+
+function validateProfileShape(
+  alias: string,
+  value: unknown,
+  configPath: string
+): ProfileConfig {
+  if (!isObjectRecord(value)) {
+    throw invalidConfigShapeError(
+      configPath,
+      `Profile "${alias}" must be an object.`
+    );
+  }
+
+  const apiKey = readRequiredProfileField(
+    alias,
+    'api_key',
+    value.api_key,
+    configPath
+  );
+  const authToken = readRequiredProfileField(
+    alias,
+    'auth_token',
+    value.auth_token,
+    configPath
+  );
+  const profile: ProfileConfig = {
+    api_key: apiKey,
+    auth_token: authToken
+  };
+
+  if (value.default_project_id !== undefined) {
+    profile.default_project_id = readOptionalProfileField(
+      alias,
+      'default_project_id',
+      value.default_project_id,
+      configPath
+    );
+  }
+
+  if (value.default_location !== undefined) {
+    profile.default_location = readOptionalProfileField(
+      alias,
+      'default_location',
+      value.default_location,
+      configPath
+    );
+  }
+
+  return profile;
+}
+
+function readRequiredProfileField(
+  alias: string,
+  field: 'api_key' | 'auth_token',
+  value: unknown,
+  configPath: string
+): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw invalidConfigShapeError(
+      configPath,
+      `Profile "${alias}" field "${field}" must be a non-empty string.`
+    );
+  }
+
+  return value.trim();
+}
+
+function readOptionalProfileField(
+  alias: string,
+  field: 'default_project_id' | 'default_location',
+  value: unknown,
+  configPath: string
+): string {
+  if (typeof value !== 'string') {
+    throw invalidConfigShapeError(
+      configPath,
+      `Profile "${alias}" field "${field}" must be a string when present.`
+    );
+  }
+
+  return value.trim();
+}
+
+function invalidConfigShapeError(configPath: string, reason: string): CliError {
+  const displayPath = formatConfigPathForDisplay(configPath);
+  return new CliError(
+    `Configuration file "${displayPath}" is not a valid e2ectl config.`,
+    {
+      code: 'CONFIG_INVALID_SHAPE',
+      details: [`Path: ${displayPath}`, `Problem: ${reason}`],
+      exitCode: EXIT_CODES.config,
+      suggestion:
+        'Restore a valid config file or re-import your credentials, then retry.'
+    }
+  );
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function formatConfigPathForDisplay(configPath: string): string {
+  const homePath = os.homedir();
+  const relativeToHome = path.relative(homePath, configPath);
+
+  if (relativeToHome === '') {
+    return '~';
+  }
+
+  if (!relativeToHome.startsWith('..') && !path.isAbsolute(relativeToHome)) {
+    return `~/${relativeToHome}`;
+  }
+
+  return configPath;
+}
+
+function formatMode(mode: number): string {
+  return `0${mode.toString(8).padStart(3, '0')}`;
 }

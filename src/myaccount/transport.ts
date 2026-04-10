@@ -1,4 +1,6 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isNonEmptyString, isRecord } from '../core/guards.js';
+import { sanitizeUrl } from '../core/url.js';
 
 import type {
   ApiClientCredentials,
@@ -12,6 +14,8 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
 const DEFAULT_TIMEOUT_MS = 10_000;
+const GET_RETRY_BACKOFF_MS = 250;
+const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 
 export interface MyAccountTransport {
   delete<TResponse = ApiEnvelope<unknown>>(
@@ -83,14 +87,53 @@ export class MyAccountApiTransport implements MyAccountTransport {
   async request<TResponse = ApiEnvelope<unknown>>(
     options: ApiRequestOptions<TResponse>
   ): Promise<TResponse> {
+    const method = options.method ?? 'GET';
+    const maxAttempts = method === 'GET' ? 2 : 1;
+    let attempt = 0;
+
+    while (attempt < maxAttempts) {
+      try {
+        return await this.requestOnce<TResponse>({
+          ...options,
+          method
+        });
+      } catch (error: unknown) {
+        if (
+          error instanceof RetryableRequestError &&
+          attempt < maxAttempts - 1
+        ) {
+          attempt += 1;
+          await wait(GET_RETRY_BACKOFF_MS);
+          continue;
+        }
+
+        if (error instanceof RetryableRequestError) {
+          throw error.original;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error('Unreachable transport retry state.');
+  }
+
+  private async requestOnce<TResponse = ApiEnvelope<unknown>>(
+    options: ApiRequestOptions<TResponse> & {
+      method: 'DELETE' | 'GET' | 'POST' | 'PUT';
+    }
+  ): Promise<TResponse> {
     const controller = new AbortController();
+    const method = options.method;
+    let requestUrl: string | undefined;
     const timeout = setTimeout(() => {
       controller.abort();
     }, this.timeoutMs);
 
     try {
-      const response = await this.fetchFn(this.buildUrl(options), {
-        method: options.method ?? 'GET',
+      requestUrl = this.buildUrl(options);
+      const response = await this.fetchFn(requestUrl, {
+        method,
         headers: this.buildHeaders(options.body),
         ...(options.body === undefined
           ? {}
@@ -106,11 +149,21 @@ export class MyAccountApiTransport implements MyAccountTransport {
         path: options.path,
         payload,
         response,
+        ...(requestUrl === undefined
+          ? {}
+          : { request_url: sanitizeUrl(requestUrl) }),
         ...(parseError === undefined ? {} : { parseError }),
         ...(preview === undefined ? {} : { preview })
       };
       const fallbackApiError = buildFallbackApiError(parsedResponse);
       if (fallbackApiError !== undefined) {
+        if (
+          method === 'GET' &&
+          RETRYABLE_GET_STATUS_CODES.has(response.status)
+        ) {
+          throw new RetryableRequestError(fallbackApiError);
+        }
+
         throw fallbackApiError;
       }
 
@@ -136,35 +189,58 @@ export class MyAccountApiTransport implements MyAccountTransport {
 
       return payload as TResponse;
     } catch (error: unknown) {
+      if (error instanceof RetryableRequestError) {
+        throw error;
+      }
+
       if (error instanceof CliError) {
         throw error;
       }
 
       if (isAbortError(error)) {
-        throw new CliError('The MyAccount API request timed out.', {
+        const cliError = new CliError('The MyAccount API request timed out.', {
           code: 'API_TIMEOUT',
           details: [
             `Timed out after ${this.timeoutMs}ms`,
-            `Base URL: ${this.baseUrl}`
+            requestUrl === undefined
+              ? `Base URL: ${this.baseUrl}`
+              : `Request URL: ${sanitizeUrl(requestUrl)}`
           ],
           exitCode: EXIT_CODES.network,
           suggestion:
             'Retry the command. If the timeout persists, check network connectivity or raise the timeout in a future revision.'
         });
+
+        if (method === 'GET') {
+          throw new RetryableRequestError(cliError);
+        }
+
+        throw cliError;
       }
 
       if (error instanceof Error) {
-        throw new CliError(
+        const cliError = new CliError(
           'The MyAccount API request could not be completed.',
           {
             code: 'API_NETWORK_ERROR',
             cause: error,
-            details: [`Reason: ${error.message}`, `Base URL: ${this.baseUrl}`],
+            details: [
+              `Reason: ${error.message}`,
+              requestUrl === undefined
+                ? `Base URL: ${this.baseUrl}`
+                : `Request URL: ${sanitizeUrl(requestUrl)}`
+            ],
             exitCode: EXIT_CODES.network,
             suggestion:
               'Check network access and API availability, then retry the command.'
           }
         );
+
+        if (method === 'GET') {
+          throw new RetryableRequestError(cliError);
+        }
+
+        throw cliError;
       }
 
       throw error;
@@ -223,8 +299,23 @@ function normalizePath(path: string): string {
   return path.startsWith('/') ? path.slice(1) : path;
 }
 
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
+}
+
+class RetryableRequestError extends Error {
+  readonly original: CliError;
+
+  constructor(original: CliError) {
+    super(original.message);
+    this.original = original;
+  }
 }
 
 interface ParsedResponseBody {
@@ -235,11 +326,8 @@ interface ParsedResponseBody {
 
 interface FallbackApiErrorInput extends ParsedResponseBody {
   path: string;
+  request_url?: string;
   response: FetchLikeResponse;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
@@ -333,6 +421,9 @@ function buildFallbackApiError(
   const details = [
     `HTTP status: ${response.status} ${response.statusText}`,
     `Path: ${path}`,
+    ...(input.request_url === undefined
+      ? []
+      : [`Request URL: ${input.request_url}`]),
     ...extractFallbackApiDetails(payload),
     ...(preview === undefined || isRecord(payload)
       ? []
@@ -356,7 +447,10 @@ function buildFallbackApiError(
 function buildInvalidResponseDetails(input: FallbackApiErrorInput): string[] {
   const details = [
     `HTTP status: ${input.response.status} ${input.response.statusText}`,
-    `Path: ${input.path}`
+    `Path: ${input.path}`,
+    ...(input.request_url === undefined
+      ? []
+      : [`Request URL: ${input.request_url}`])
   ];
 
   if (input.parseError instanceof Error) {
@@ -426,10 +520,6 @@ function hasDetailMessage(payload: Record<string, unknown>): boolean {
 
 function hasStatusCodeFailure(payload: Record<string, unknown>): boolean {
   return typeof payload.status_code === 'number' && payload.status_code >= 400;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function summarizeResponseBody(value: string): string | undefined {

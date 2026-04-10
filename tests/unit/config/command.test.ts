@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import type {
@@ -13,6 +14,9 @@ import {
 } from '../../../src/myaccount/credential-validator.js';
 import { MyAccountApiTransport } from '../../../src/myaccount/index.js';
 import { NodeApiClient } from '../../../src/node/index.js';
+import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
+import { VolumeApiClient } from '../../../src/volume/index.js';
+import { VpcApiClient } from '../../../src/vpc/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -60,6 +64,12 @@ describe('config commands', () => {
         confirm,
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
+        createSshKeyClient: (credentials: ResolvedCredentials) =>
+          new SshKeyApiClient(new MyAccountApiTransport(credentials)),
+        createVolumeClient: (credentials: ResolvedCredentials) =>
+          new VolumeApiClient(new MyAccountApiTransport(credentials)),
+        createVpcClient: (credentials: ResolvedCredentials) =>
+          new VpcApiClient(new MyAccountApiTransport(credentials)),
         credentialValidator: validator,
         isInteractive: true,
         prompt,
@@ -84,54 +94,6 @@ describe('config commands', () => {
     return filePath;
   }
 
-  it('adds a profile with optional default context and prints masked json output', async () => {
-    const { runtime, stdout, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      'e2ectl',
-      '--json',
-      'config',
-      'add',
-      '--alias',
-      'prod',
-      '--api-key',
-      'api-123456',
-      '--auth-token',
-      'auth-654321',
-      '--default-project-id',
-      '12345',
-      '--default-location',
-      'Delhi'
-    ]);
-
-    expect(validator.calls).toEqual([
-      {
-        api_key: 'api-123456',
-        auth_token: 'auth-654321',
-        default_project_id: '12345',
-        default_location: 'Delhi'
-      }
-    ]);
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'saved',
-        default: 'prod',
-        profiles: [
-          {
-            alias: 'prod',
-            api_key: '****3456',
-            auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '12345',
-            isDefault: true
-          }
-        ]
-      })
-    );
-  });
-
   it('lists profiles with masked table output and default context columns', async () => {
     const { runtime, stdout, store } = createRuntimeFixture();
     const program = createProgram(runtime);
@@ -143,7 +105,7 @@ describe('config commands', () => {
       default_location: 'Delhi'
     });
 
-    await program.parseAsync(['node', 'e2ectl', 'config', 'list']);
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'config', 'list']);
 
     expect(stdout.buffer).toContain('prod');
     expect(stdout.buffer).toContain('****3456');
@@ -167,7 +129,13 @@ describe('config commands', () => {
       auth_token: 'auth-888888'
     });
 
-    await program.parseAsync(['node', 'e2ectl', '--json', 'config', 'list']);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'config',
+      'list'
+    ]);
 
     expect(stdout.buffer).toBe(
       toJsonOutput({
@@ -214,7 +182,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'set-default',
@@ -259,7 +227,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'set-context',
@@ -302,7 +270,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'remove',
@@ -317,54 +285,6 @@ describe('config commands', () => {
         profiles: []
       })
     );
-  });
-
-  it('rejects unsupported default locations before validation', async () => {
-    const { runtime, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        'e2ectl',
-        'config',
-        'add',
-        '--alias',
-        'prod',
-        '--api-key',
-        'api-123456',
-        '--auth-token',
-        'auth-654321',
-        '--default-location',
-        'Noida'
-      ])
-    ).rejects.toThrow(/Unsupported default location/i);
-    expect(validator.calls).toHaveLength(0);
-  });
-
-  it('rejects blank aliases before validation and does not persist config', async () => {
-    const { runtime, store, validator } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        'e2ectl',
-        'config',
-        'add',
-        '--alias',
-        '   ',
-        '--api-key',
-        'api-123456',
-        '--auth-token',
-        'auth-654321'
-      ])
-    ).rejects.toThrow(/Profile alias cannot be empty/i);
-
-    expect(validator.calls).toHaveLength(0);
-    await expect(store.read()).resolves.toEqual({
-      profiles: {}
-    });
   });
 
   it('imports aliases, prompts for shared default context, and offers a default alias', async () => {
@@ -390,7 +310,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'config',
       'import',
       '--file',
@@ -442,7 +362,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       '--json',
       'config',
       'import',
@@ -511,7 +431,7 @@ describe('config commands', () => {
 
     await program.parseAsync([
       'node',
-      'e2ectl',
+      CLI_COMMAND_NAME,
       'config',
       'import',
       '--file',
@@ -530,6 +450,117 @@ describe('config commands', () => {
     });
     expect(stdout.buffer).toContain('Imported 1 profile');
     expect(stdout.buffer).toContain('No default profile was set.');
+  });
+
+  it('preserves saved per-alias defaults when an import overwrites an existing alias', async () => {
+    const { confirm, prompt, runtime, store, validator } =
+      createRuntimeFixture();
+    const program = createProgram({
+      ...runtime,
+      isInteractive: false
+    });
+    const filePath = await createImportFile({
+      prod: {
+        api_auth_token: 'auth-imported',
+        api_key: 'api-imported'
+      }
+    });
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-existing',
+      auth_token: 'auth-existing',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'config',
+      'import',
+      '--file',
+      filePath,
+      '--force',
+      '--no-input'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(prompt).not.toHaveBeenCalled();
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-imported',
+        auth_token: 'auth-imported',
+        default_project_id: '46429',
+        default_location: 'Delhi'
+      }
+    ]);
+    await expect(store.read()).resolves.toEqual({
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-imported',
+          auth_token: 'auth-imported',
+          default_project_id: '46429',
+          default_location: 'Delhi'
+        }
+      }
+    });
+  });
+
+  it('replaces saved per-alias defaults when import defaults are explicitly provided', async () => {
+    const { runtime, store, validator } = createRuntimeFixture();
+    const program = createProgram({
+      ...runtime,
+      isInteractive: false
+    });
+    const filePath = await createImportFile({
+      prod: {
+        api_auth_token: 'auth-imported',
+        api_key: 'api-imported'
+      }
+    });
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-existing',
+      auth_token: 'auth-existing',
+      default_project_id: '46429',
+      default_location: 'Delhi'
+    });
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'config',
+      'import',
+      '--file',
+      filePath,
+      '--force',
+      '--default-project-id',
+      '99999',
+      '--default-location',
+      'Chennai',
+      '--no-input'
+    ]);
+
+    expect(validator.calls).toEqual([
+      {
+        api_key: 'api-imported',
+        auth_token: 'auth-imported',
+        default_project_id: '46429',
+        default_location: 'Delhi'
+      }
+    ]);
+    await expect(store.read()).resolves.toEqual({
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-imported',
+          auth_token: 'auth-imported',
+          default_project_id: '99999',
+          default_location: 'Chennai'
+        }
+      }
+    });
   });
 
   it('leaves the saved config unchanged when the requested default alias is blank', async () => {
@@ -553,7 +584,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'import',
         '--file',
@@ -603,7 +634,7 @@ describe('config commands', () => {
     await expect(
       program.parseAsync([
         'node',
-        'e2ectl',
+        CLI_COMMAND_NAME,
         'config',
         'import',
         '--file',

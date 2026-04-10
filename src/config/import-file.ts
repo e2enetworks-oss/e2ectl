@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isRecord } from '../core/guards.js';
 
 export interface ImportedProfileSecrets {
   api_key: string;
@@ -144,10 +145,6 @@ function requireNonEmptyString(
       suggestion: `Each alias must include a non-empty ${fieldName} field.`
     }
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isFileNotFound(error: unknown): error is NodeJS.ErrnoException {

@@ -30,4 +30,30 @@ describe('ApiCredentialValidator', () => {
       message: 'Credentials validated successfully against /iam/multi-crn/.'
     });
   });
+
+  it('returns a friendly invalid result for auth failures', async () => {
+    const validator = new ApiCredentialValidator({
+      fetchFn: () =>
+        Promise.resolve({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          json: () =>
+            Promise.resolve({
+              detail: 'Authentication credentials were not provided.'
+            })
+        })
+    });
+
+    await expect(
+      validator.validate({
+        api_key: 'api-key',
+        auth_token: 'auth-token'
+      })
+    ).resolves.toEqual({
+      message:
+        'MyAccount API request failed: Authentication credentials were not provided.',
+      valid: false
+    });
+  });
 });

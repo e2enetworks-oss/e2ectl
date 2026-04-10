@@ -13,6 +13,7 @@ import {
   VALID_LOCATIONS
 } from './types.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { isNonEmptyString } from '../core/guards.js';
 
 export interface ResolveCredentialsOptions {
   alias?: string;
@@ -25,6 +26,11 @@ export interface ResolveCredentialsOptions {
 
 type PartialAuth = Partial<Record<AuthField, string>>;
 type PartialContext = Partial<Record<ContextField, string>>;
+
+export interface CredentialResolutionStore {
+  readonly configPath: string;
+  read(): Promise<ConfigFile>;
+}
 
 export function readAuthFromEnv(
   env: NodeJS.ProcessEnv = process.env
@@ -62,13 +68,85 @@ export function resolveCredentials(
   const envAuth = readAuthFromEnv(options.env);
   const envContext = readContextFromEnv(options.env);
   const flagContext = readContextFromFlags(options);
-  const profileAlias = options.alias ?? options.config.default;
-  const profile = resolveProfile(
-    options.config,
-    profileAlias,
-    options.configPath,
-    options.alias
+  if (options.alias !== undefined) {
+    const profile = resolveProfile(
+      options.config,
+      options.alias,
+      options.configPath,
+      options.alias
+    );
+
+    return buildResolvedCredentials(
+      options,
+      options.alias,
+      profile,
+      envAuth,
+      envContext,
+      flagContext
+    );
+  }
+
+  const defaultAlias = options.config.default;
+  if (defaultAlias !== undefined) {
+    const defaultProfile = options.config.profiles[defaultAlias];
+    if (defaultProfile !== undefined) {
+      return buildResolvedCredentials(
+        options,
+        defaultAlias,
+        defaultProfile,
+        envAuth,
+        envContext,
+        flagContext
+      );
+    }
+
+    const missingAuthFields = getMissingFields(REQUIRED_AUTH_FIELDS, envAuth);
+    const missingContextFields = getMissingFields(REQUIRED_CONTEXT_FIELDS, {
+      ...envContext,
+      ...flagContext
+    });
+
+    if (missingAuthFields.length > 0 || missingContextFields.length > 0) {
+      throwInvalidDefaultProfileError(
+        options,
+        defaultAlias,
+        missingAuthFields,
+        missingContextFields
+      );
+    }
+  }
+
+  return buildResolvedCredentials(
+    options,
+    undefined,
+    undefined,
+    envAuth,
+    envContext,
+    flagContext
   );
+}
+
+export async function resolveStoredCredentials(
+  store: CredentialResolutionStore,
+  options: Omit<ResolveCredentialsOptions, 'config' | 'configPath'>
+): Promise<ResolvedCredentials> {
+  const config = await store.read();
+
+  return resolveCredentials({
+    ...options,
+    config,
+    configPath: store.configPath
+  });
+}
+
+function buildResolvedCredentials(
+  options: ResolveCredentialsOptions,
+  profileAlias: string | undefined,
+  profile: ProfileConfig | undefined,
+  envAuth: PartialAuth,
+  envContext: PartialContext,
+  flagContext: PartialContext
+): ResolvedCredentials {
   const mergedAuth: PartialAuth = {
     ...(profile === undefined
       ? {}
@@ -84,18 +162,15 @@ export function resolveCredentials(
     ...flagContext
   };
 
-  const missingAuthFields = REQUIRED_AUTH_FIELDS.filter((field) => {
-    const value = mergedAuth[field];
-    return !isNonEmptyString(value);
-  });
+  const missingAuthFields = getMissingFields(REQUIRED_AUTH_FIELDS, mergedAuth);
   if (missingAuthFields.length > 0) {
     throwMissingAuthError(options, profileAlias, missingAuthFields);
   }
 
-  const missingContextFields = REQUIRED_CONTEXT_FIELDS.filter((field) => {
-    const value = mergedContext[field];
-    return !isNonEmptyString(value);
-  });
+  const missingContextFields = getMissingFields(
+    REQUIRED_CONTEXT_FIELDS,
+    mergedContext
+  );
   if (missingContextFields.length > 0) {
     throwMissingContextError(options, profileAlias, missingContextFields);
   }
@@ -119,6 +194,16 @@ export function resolveCredentials(
         ...resolvedCredentials,
         alias: profileAlias
       };
+}
+
+function getMissingFields<TField extends string>(
+  requiredFields: readonly TField[],
+  values: Partial<Record<TField, string>>
+): TField[] {
+  return requiredFields.filter((field) => {
+    const value = values[field];
+    return !isNonEmptyString(value);
+  });
 }
 
 function readContextFromFlags(
@@ -185,6 +270,55 @@ function resolveProfile(
       explicitAlias === undefined
         ? 'Create a default profile or set E2E_API_KEY and E2E_AUTH_TOKEN.'
         : 'Choose an existing profile alias or set E2E_API_KEY and E2E_AUTH_TOKEN.'
+  });
+}
+
+function throwInvalidDefaultProfileError(
+  options: ResolveCredentialsOptions,
+  alias: string,
+  missingAuthFields: AuthField[],
+  missingContextFields: ContextField[]
+): never {
+  const details = [`Unknown saved default alias: ${alias}`];
+
+  if (missingAuthFields.length > 0) {
+    details.push(
+      `Missing required auth values without a valid default profile: ${missingAuthFields.join(', ')}`
+    );
+    details.push(
+      `Expected environment variables: ${missingAuthFields
+        .map((field) => AUTH_ENV_VAR_BY_FIELD[field])
+        .join(', ')}`
+    );
+  }
+
+  if (missingContextFields.length > 0) {
+    details.push(
+      `Missing required context values without a valid default profile: ${missingContextFields.join(', ')}`
+    );
+    details.push(
+      `Expected environment variables: ${missingContextFields
+        .map((field) => CONTEXT_ENV_VAR_BY_FIELD[field])
+        .join(', ')}`
+    );
+  }
+
+  if (options.projectId !== undefined || options.location !== undefined) {
+    details.push(
+      `Command flags: --project-id ${options.projectId ?? '<unset>'}, --location ${options.location ?? '<unset>'}`
+    );
+  }
+
+  if (options.configPath !== undefined) {
+    details.push(`Config path: ${options.configPath}`);
+  }
+
+  throw new CliError(`Default profile "${alias}" is invalid.`, {
+    code: 'INVALID_DEFAULT_PROFILE',
+    details,
+    exitCode: EXIT_CODES.config,
+    suggestion:
+      'Fix the saved default profile or provide E2E_API_KEY, E2E_AUTH_TOKEN, and either E2E_PROJECT_ID/E2E_LOCATION or --project-id/--location.'
   });
 }
 
@@ -294,8 +428,4 @@ function inferCredentialSource(
   }
 
   return 'env';
-}
-
-function isNonEmptyString(value: string | undefined): value is string {
-  return value !== undefined && value.trim().length > 0;
 }

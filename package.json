@@ -1,7 +1,15 @@
 {
-  "name": "e2ectl",
-  "version": "0.1.0",
-  "description": "OSS CLI for E2E Networks MyAccount.",
+  "name": "@e2enetworks-oss/e2ectl",
+  "version": "0.2.0",
+  "description": "CLI for E2E Networks.",
+  "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
+  "bugs": {
+    "url": "https://github.com/e2enetworks-oss/e2ectl/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/e2enetworks-oss/e2ectl.git"
+  },
   "type": "module",
   "bin": {
     "e2ectl": "dist/app/index.js"
@@ -9,17 +17,26 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node ./scripts/clean.mjs dist .tmp && tsc -p tsconfig.build.json",
     "clean": "node ./scripts/clean.mjs",
+    "coverage": "npm run coverage:unit && npm run coverage:integration",
+    "coverage:integration": "npm run build && c8 --all --src src --exclude-after-remap --exclude \"tests/**\" --exclude \"dist/**\" --exclude \"scripts/**\" --reporter text --reporter html --reporter lcov --report-dir coverage/integration node ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "coverage:unit": "vitest run --coverage",
     "dev": "node --import tsx ./src/app/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint src tests vitest.config.ts vitest.manual.config.ts",
+    "lint": "eslint src tests vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts",
+    "prepack": "npm run build",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:manual": "vitest run --config vitest.manual.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -34,6 +51,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "c8": "^11.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.4.0",

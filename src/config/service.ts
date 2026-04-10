@@ -1,15 +1,8 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
-
-export interface AddProfileInput {
-  alias: string;
-  apiKey: string;
-  authToken: string;
-  defaultLocation?: string;
-  defaultProjectId?: string;
-}
 
 export interface ImportProfilesInput {
   default?: string;
@@ -36,12 +29,6 @@ export interface SetDefaultInput {
 
 export interface ConfigListCommandResult {
   action: 'list';
-  config: ConfigFile;
-}
-
-export interface ConfigSavedCommandResult {
-  action: 'saved';
-  alias: string;
   config: ConfigFile;
 }
 
@@ -78,12 +65,14 @@ export type ConfigCommandResult =
   | ConfigImportedCommandResult
   | ConfigListCommandResult
   | ConfigRemovedCommandResult
-  | ConfigSavedCommandResult
   | ConfigSetContextCommandResult
   | ConfigSetDefaultCommandResult;
 
 interface ProfileValidator {
-  validate(profile: ProfileConfig): Promise<unknown>;
+  validate(profile: ProfileConfig): Promise<{
+    message?: string;
+    valid: boolean;
+  }>;
 }
 
 interface ConfigStoreLike {
@@ -96,7 +85,6 @@ interface ConfigStoreLike {
     alias: string,
     patch: Partial<ProfileConfig>
   ): Promise<ConfigFile>;
-  upsertProfile(alias: string, profile: ProfileConfig): Promise<ConfigFile>;
   write(config: ConfigFile): Promise<void>;
 }
 
@@ -110,31 +98,6 @@ export interface ConfigServiceDependencies {
 
 export class ConfigService {
   constructor(private readonly dependencies: ConfigServiceDependencies) {}
-
-  async addProfile(
-    options: AddProfileInput
-  ): Promise<ConfigSavedCommandResult> {
-    validateOptionalContextDefaults(
-      options.defaultProjectId,
-      options.defaultLocation
-    );
-
-    const alias = normalizeRequiredAlias(
-      options.alias,
-      'Profile alias',
-      '--alias'
-    );
-    const profile = buildProfileFromOptions(options);
-
-    await this.dependencies.credentialValidator.validate(profile);
-    const config = await this.dependencies.store.upsertProfile(alias, profile);
-
-    return {
-      action: 'saved',
-      alias,
-      config
-    };
-  }
 
   async importProfiles(
     options: ImportProfilesInput
@@ -174,15 +137,34 @@ export class ConfigService {
       }
 
       importedProfiles[alias] = {
+        ...preserveExistingProfileContext(currentConfig.profiles[alias]),
         api_key: importedProfile.api_key,
         auth_token: importedProfile.auth_token
       };
     }
 
     for (const alias of importedAliases) {
-      await this.dependencies.credentialValidator.validate(
+      const validation = await this.dependencies.credentialValidator.validate(
         getProfile(importedProfiles, alias)
       );
+
+      if (!validation.valid) {
+        const details: string[] = [];
+        if (validation.message !== undefined) {
+          details.push(validation.message);
+        }
+
+        throw new CliError(
+          `Imported credentials for alias "${alias}" are invalid.`,
+          {
+            code: 'INVALID_IMPORTED_CREDENTIALS',
+            details,
+            exitCode: EXIT_CODES.auth,
+            suggestion:
+              'Verify the API key and auth token for that alias, then re-import the credentials.'
+          }
+        );
+      }
     }
 
     const importedDefaults = await this.resolveImportedDefaults(
@@ -300,7 +282,7 @@ export class ConfigService {
       throw new CliError(`Profile "${alias}" was not found.`, {
         code: 'PROFILE_NOT_FOUND',
         exitCode: EXIT_CODES.config,
-        suggestion: 'Run `e2ectl config list` to inspect the saved aliases.'
+        suggestion: `Run \`${formatCliCommand('config list')}\` to inspect the saved aliases.`
       });
     }
   }
@@ -501,6 +483,27 @@ function applyImportedDefaults(
   );
 }
 
+function preserveExistingProfileContext(
+  profile: ProfileConfig | undefined
+): Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>> {
+  if (profile === undefined) {
+    return {};
+  }
+
+  return {
+    ...(profile.default_project_id === undefined
+      ? {}
+      : {
+          default_project_id: profile.default_project_id
+        }),
+    ...(profile.default_location === undefined
+      ? {}
+      : {
+          default_location: profile.default_location
+        })
+  };
+}
+
 function assertHasAtLeastOneContextValue(options: SetContextInput): void {
   if (
     normalizeOptionalString(options.defaultProjectId) !== undefined ||
@@ -516,25 +519,6 @@ function assertHasAtLeastOneContextValue(options: SetContextInput): void {
   });
 }
 
-function buildProfileFromOptions(options: AddProfileInput): ProfileConfig {
-  const defaultProjectId = normalizeOptionalString(options.defaultProjectId);
-  const defaultLocation = normalizeOptionalString(options.defaultLocation);
-  const profile: ProfileConfig = {
-    api_key: options.apiKey.trim(),
-    auth_token: options.authToken.trim()
-  };
-
-  if (defaultProjectId !== undefined) {
-    profile.default_project_id = defaultProjectId;
-  }
-
-  if (defaultLocation !== undefined) {
-    profile.default_location = defaultLocation;
-  }
-
-  return profile;
-}
-
 function getProfile(
   profiles: Record<string, ProfileConfig>,
   alias: string
@@ -544,8 +528,7 @@ function getProfile(
     throw new CliError(`Profile "${alias}" could not be resolved.`, {
       code: 'PROFILE_NOT_FOUND',
       exitCode: EXIT_CODES.config,
-      suggestion:
-        'Retry the command or inspect the saved aliases with `e2ectl config list`.'
+      suggestion: `Retry the command or inspect the saved aliases with \`${formatCliCommand('config list')}\`.`
     });
   }
 

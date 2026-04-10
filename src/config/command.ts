@@ -1,10 +1,10 @@
 import { Command } from 'commander';
 
+import { CLI_COMMAND_NAME } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderConfigResult } from './formatter.js';
 import {
   ConfigService,
-  type AddProfileInput,
   type ImportProfilesInput,
   type RemoveProfileInput,
   type SetContextInput,
@@ -24,39 +24,10 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
     store: runtime.store
   });
   const command = new Command('config').description(
-    'Manage local e2ectl profiles and per-alias defaults.'
+    `Manage local ${CLI_COMMAND_NAME} profiles and per-alias defaults.`
   );
 
   command.helpCommand('help [command]', 'Show help for a config command');
-
-  command
-    .command('add')
-    .description(
-      'Add or update a saved auth profile after validating the API key and token.'
-    )
-    .requiredOption('--alias <alias>', 'Profile alias to save.')
-    .requiredOption('--api-key <apiKey>', 'MyAccount API key for the profile.')
-    .requiredOption(
-      '--auth-token <authToken>',
-      'MyAccount bearer token for the profile.'
-    )
-    .option(
-      '--default-project-id <projectId>',
-      'Optional default project id to use when commands omit --project-id.'
-    )
-    .option(
-      '--default-location <location>',
-      'Optional default location (Delhi or Chennai) to use when commands omit --location.'
-    )
-    .action(async (options: AddProfileInput, commandInstance: Command) => {
-      const result = await service.addProfile(options);
-      runtime.stdout.write(
-        renderConfigResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    });
 
   command
     .command('import')

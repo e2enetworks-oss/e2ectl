@@ -15,6 +15,7 @@ help:
 	@printf "  make down     No-op for this repository\n"
 	@printf "  make lint     Run format check, ESLint, and typecheck\n"
 	@printf "  make test     Run unit tests\n"
+	@printf "  make coverage Run unit and integration coverage reports\n"
 	@printf "  make build    Build the CLI\n"
 	@printf "  make _clean   Remove generated artefacts\n"
 	@printf "  make push     Placeholder for package publish flow\n"
@@ -31,4 +32,3 @@ down:
 
 _clean:
 	node ./scripts/clean.mjs
-

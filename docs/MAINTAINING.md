@@ -1,86 +1,89 @@
 # Maintaining e2ectl
 
-## Repository Gates
+This document is for maintainers responsible for branch policy, CI health, release readiness, and documentation quality.
 
-Before pushing or merging:
+For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release execution, use [docs/RELEASING.md](./RELEASING.md).
+
+## Branch Policy
+
+- `develop` is the staging branch for feature integration and hardening.
+- `main` is the release branch.
+- Land normal feature work in `develop` first.
+- Promote only a green `develop` tip to `main`.
+- Keep `main` protected behind pull request checks and merge queue policy where configured.
+
+## Promotion Gate
+
+A `develop` commit is ready for promotion only when the full gate is green:
 
 ```bash
 make lint
-make test
+npm run coverage:unit
 make build
+npm run test:integration
+npm pack --dry-run
 ```
 
-Optional live verification:
+Operational notes:
 
-```bash
-npm run test:manual
-```
-
-For pre-release smoke checks, also verify a clean-room first-user flow with a temporary `HOME`: import a credential file, save defaults, run `config list`, and exercise read-only node commands against live credentials.
-
-## Source Layout
-
-The maintained v1 tree is:
-
-```text
-src/
-  app/
-  core/
-  myaccount/
-  config/
-  node/
-```
-
-Detailed architecture rules live in [CONTRIBUTING.md](../CONTRIBUTING.md). Keep `app/` bootstrap-only, keep commands thin, and keep formatter-owned JSON output deterministic.
-Keep generic API failure handling centralized in `src/myaccount/transport.ts`, and keep node-specific endpoint parsing in `src/node/client.ts`. Cross-domain imports should go through each domain `index.ts`.
-Keep config persistence secure and atomic during normal writes, and keep Commander usage-error normalization centralized at the CLI entrypoint.
+- Public runtime support starts at Node.js 24.
+- `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI.
+- `make coverage` remains optional when you also want the integration coverage report.
+- `npm run test:manual` is opt-in live verification and never a required CI lane.
+- If `npm pack --dry-run` fails locally because of npm cache permissions, rerun with `env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run`.
 
 ## CI Contract
 
-GitHub Actions verifies:
+### Verify gate
 
-- pushes to `main`
-- every pull request
+Runs on:
 
-Matrix:
+- pushes to `develop`
+- pull requests to `develop`
+- pull requests to `main`
+- merge queue checks for `main`
 
-- Node 18
-- Node 20
-- Node 22
+Configuration:
 
-Each job runs:
+- Ubuntu runners
+- Node.js 24 only
+
+Steps:
 
 1. `npm ci`
 2. `make lint`
-3. `make test`
+3. `npm run coverage:unit`
 4. `make build`
+5. `npm run test:integration`
+6. `npm pack --dry-run`
 
-The manual live API suite is intentionally not part of CI.
+The verify lane uses the internal `E2ECTL_MYACCOUNT_BASE_URL` override so the built CLI can talk to a fake MyAccount API, and it also exercises install-from-tarball smoke coverage.
 
-## Release Smoke Check
+## Release Readiness Checks
 
-Before calling a branch production-ready, verify:
+Before opening a promotion PR from `develop` to `main`, confirm:
 
-1. clean install from source: `npm install`, `make build`, `npm link`
-2. first-time setup from a clean temp `HOME`
-3. `config import` and `config list` behavior
-4. read-only live API calls such as `node catalog os`, `node catalog plans`, and `node list`
-5. normal repo gates: `make lint`, `make test`, `make build`
+- the promotion gate above is green on the exact `develop` commit being promoted
+- docs are updated for any operator, contributor, CI, or release-flow changes
+- command examples still match the built CLI help surface
+- any changed `--json` output has been reviewed as a machine-facing contract
+- automated fake-API coverage still covers the affected create, list, get, delete, catalog, and attachment flows
 
-## Documentation Duties
+If a release needs additional confidence against live credentials, run the opt-in manual lane separately. Today that lane covers read-only node checks (`node catalog os`, `node catalog plans`, `node list`, and optional `node get`) only.
 
-Update these when behavior changes:
+## Documentation Discipline
 
-- [README.md](../README.md) for operator-facing usage
-- [CONTRIBUTING.md](../CONTRIBUTING.md) for contributor workflow
-- [docs/MAINTAINING.md](./MAINTAINING.md) for CI and maintenance policy
-- [CHANGELOG.md](../CHANGELOG.md) for user-visible release notes
+Each maintained doc has one audience:
 
-Any user-visible behavior change must also update unit tests, docs, and the deterministic `--json` output review. The manual live API suite remains opt-in and is never part of normal CI.
+- [README.md](../README.md): operators and automation users
+- [CONTRIBUTING.md](../CONTRIBUTING.md): code contributors
+- [docs/MAINTAINING.md](./MAINTAINING.md): maintainers and CI owners
+- [docs/RELEASING.md](./RELEASING.md): maintainers executing releases
 
-## Release Notes
+Documentation rules:
 
-- Keep [CHANGELOG.md](../CHANGELOG.md) current for user-visible changes.
-- Do not bump the package version unless a release is being prepared.
-- Prefer Conventional Commits for history clarity.
-- Keep the doc set small: avoid reintroducing milestone-by-milestone implementation history once it is absorbed into the maintained docs above.
+- Keep one clear home for each recurring fact and link instead of duplicating full explanations.
+- Update user-facing docs whenever command behavior, examples, environment precedence, or safety guidance changes.
+- Update maintainer docs whenever CI policy, branch policy, or release readiness rules change.
+- Update release docs whenever versioning, dist-tag policy, or publish automation changes.
+- Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates. Do not hand-edit them in normal maintenance work.

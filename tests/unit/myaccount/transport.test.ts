@@ -190,6 +190,86 @@ describe('MyAccountApiTransport', () => {
     ).rejects.toThrow(/unexpected response shape/i);
   });
 
+  it('retries GET once on retryable 5xx responses and succeeds', async () => {
+    vi.useFakeTimers();
+
+    const fetchFn = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        createFetchResponse(undefined, {
+          ok: false,
+          status: 503,
+          statusText: 'Service Unavailable',
+          json: () =>
+            Promise.resolve({
+              message: 'Temporary upstream issue'
+            })
+        })
+      )
+      .mockResolvedValueOnce(
+        createFetchResponse(
+          envelope({
+            ok: true
+          })
+        )
+      );
+
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    const request = transport.get<ApiEnvelope<{ ok: boolean }>>(
+      '/iam/multi-crn/',
+      {
+        includeProjectContext: false
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(request).resolves.toEqual(
+      envelope({
+        ok: true
+      })
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries GET once on network failures and succeeds', async () => {
+    vi.useFakeTimers();
+
+    const fetchFn = vi
+      .fn<FetchLike>()
+      .mockRejectedValueOnce(new Error('dns failure'))
+      .mockResolvedValueOnce(
+        createFetchResponse(
+          envelope({
+            ok: true
+          })
+        )
+      );
+
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    const request = transport.get<ApiEnvelope<{ ok: boolean }>>(
+      '/iam/multi-crn/',
+      {
+        includeProjectContext: false
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(request).resolves.toEqual(
+      envelope({
+        ok: true
+      })
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it('extracts a DRF-style detail message from failed API responses', async () => {
     const transport = new MyAccountApiTransport(credentials, {
       fetchFn: () =>
@@ -212,6 +292,36 @@ describe('MyAccountApiTransport', () => {
       })
     ).rejects.toThrow(/Authentication credentials were not provided/i);
   });
+
+  it.each([401, 403])(
+    'does not retry GET requests on %s auth failures',
+    async (status) => {
+      const fetchFn = vi.fn<FetchLike>(() =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            ok: false,
+            status,
+            statusText: status === 401 ? 'Unauthorized' : 'Forbidden',
+            json: () =>
+              Promise.resolve({
+                detail: 'Authentication credentials were not provided.'
+              })
+          })
+        )
+      );
+
+      const transport = new MyAccountApiTransport(credentials, {
+        fetchFn
+      });
+
+      await expect(
+        transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
+          includeProjectContext: false
+        })
+      ).rejects.toThrow(/Authentication credentials were not provided/i);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('extracts message and status_code from non-envelope API failures', async () => {
     const transport = new MyAccountApiTransport(credentials, {
@@ -258,6 +368,58 @@ describe('MyAccountApiTransport', () => {
     ).rejects.toThrow(/Validation failed/i);
   });
 
+  it('does not retry POST requests on retryable 5xx responses', async () => {
+    const fetchFn = vi.fn<FetchLike>(() =>
+      Promise.resolve(
+        createFetchResponse(undefined, {
+          ok: false,
+          status: 503,
+          statusText: 'Service Unavailable',
+          json: () =>
+            Promise.resolve({
+              message: 'Temporary upstream issue'
+            })
+        })
+      )
+    );
+
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    await expect(
+      transport.post<ApiEnvelope<Record<string, never>>>('/nodes/', {
+        body: {
+          name: 'node-a'
+        }
+      })
+    ).rejects.toThrow(/Temporary upstream issue/i);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('redacts apikey values from request-url error details', async () => {
+    vi.useFakeTimers();
+
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () => Promise.reject(new Error('socket hang up'))
+    });
+
+    const request =
+      transport.get<ApiEnvelope<Record<string, never>>>('/nodes/');
+    const errorPromise = request.catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    const error = await errorPromise;
+
+    expect(error).toBeInstanceOf(CliError);
+    const cliError = error as CliError;
+
+    expect(cliError.details.join('\n')).toContain('Request URL: ');
+    expect(cliError.details.join('\n')).toContain('apikey=%5BREDACTED%5D');
+    expect(cliError.details.join('\n')).not.toContain('apikey=api-key');
+  });
+
   it('uses a short response preview for non-json failed responses', async () => {
     const transport = new MyAccountApiTransport(credentials, {
       fetchFn: () =>
@@ -289,15 +451,25 @@ describe('MyAccountApiTransport', () => {
   });
 
   it('wraps network failures in an actionable CLI error', async () => {
+    vi.useFakeTimers();
+
     const transport = new MyAccountApiTransport(credentials, {
       fetchFn: () => Promise.reject(new Error('dns failure'))
     });
 
-    await expect(
-      transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
+    const request = transport.get<ApiEnvelope<Record<string, never>>>(
+      '/iam/multi-crn/',
+      {
         includeProjectContext: false
-      })
-    ).rejects.toThrow(/could not be completed/i);
+      }
+    );
+    const assertion = expect(request).rejects.toThrow(
+      /could not be completed/i
+    );
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    await assertion;
   });
 
   it('supports endpoint-specific success parsing for future non-envelope domains', async () => {
@@ -334,6 +506,10 @@ describe('MyAccountApiTransport', () => {
         name: 'primary-volume'
       }
     ]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 });
 

@@ -1,5 +1,6 @@
 import { resolveCredentials } from '../../../src/config/resolver.js';
 import type { ConfigFile } from '../../../src/config/index.js';
+import { CliError, EXIT_CODES } from '../../../src/core/errors.js';
 
 describe('resolveCredentials', () => {
   const config: ConfigFile = {
@@ -99,14 +100,23 @@ describe('resolveCredentials', () => {
   });
 
   it('throws when the requested alias does not exist', () => {
-    expect(() =>
+    const error = captureCliError(() =>
       resolveCredentials({
         alias: 'missing',
         config,
         configPath: '/tmp/config.json',
-        env: {}
+        env: {
+          E2E_API_KEY: 'api-env',
+          E2E_AUTH_TOKEN: 'auth-env',
+          E2E_LOCATION: 'Delhi',
+          E2E_PROJECT_ID: '46429'
+        }
       })
-    ).toThrowError(/Profile "missing" was not found/);
+    );
+
+    expect(error.message).toBe('Profile "missing" was not found.');
+    expect(error.code).toBe('PROFILE_NOT_FOUND');
+    expect(error.exitCode).toBe(EXIT_CODES.config);
   });
 
   it('prefers environment auth over the saved default profile auth', () => {
@@ -129,4 +139,90 @@ describe('resolveCredentials', () => {
       source: 'mixed'
     });
   });
+
+  it('ignores a stale default alias when env auth and env context are complete', () => {
+    const result = resolveCredentials({
+      config: {
+        profiles: {},
+        default: 'missing'
+      },
+      configPath: '/tmp/config.json',
+      env: {
+        E2E_API_KEY: 'api-env',
+        E2E_AUTH_TOKEN: 'auth-env',
+        E2E_LOCATION: 'Delhi',
+        E2E_PROJECT_ID: '46429'
+      }
+    });
+
+    expect(result).toEqual({
+      api_key: 'api-env',
+      auth_token: 'auth-env',
+      project_id: '46429',
+      location: 'Delhi',
+      source: 'env'
+    });
+  });
+
+  it('ignores a stale default alias when env auth and flag context are complete', () => {
+    const result = resolveCredentials({
+      config: {
+        profiles: {},
+        default: 'missing'
+      },
+      configPath: '/tmp/config.json',
+      env: {
+        E2E_API_KEY: 'api-env',
+        E2E_AUTH_TOKEN: 'auth-env'
+      },
+      location: 'Chennai',
+      projectId: '789'
+    });
+
+    expect(result).toEqual({
+      api_key: 'api-env',
+      auth_token: 'auth-env',
+      project_id: '789',
+      location: 'Chennai',
+      source: 'env'
+    });
+  });
+
+  it('throws a targeted config error when a stale default alias cannot be bypassed', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        config: {
+          profiles: {},
+          default: 'missing'
+        },
+        configPath: '/tmp/config.json',
+        env: {
+          E2E_API_KEY: 'api-env',
+          E2E_AUTH_TOKEN: 'auth-env'
+        }
+      })
+    );
+
+    expect(error.message).toBe('Default profile "missing" is invalid.');
+    expect(error.code).toBe('INVALID_DEFAULT_PROFILE');
+    expect(error.exitCode).toBe(EXIT_CODES.config);
+    expect(error.details).toEqual([
+      'Unknown saved default alias: missing',
+      'Missing required context values without a valid default profile: project_id, location',
+      'Expected environment variables: E2E_PROJECT_ID, E2E_LOCATION',
+      'Config path: /tmp/config.json'
+    ]);
+    expect(error.suggestion).toContain('Fix the saved default profile');
+  });
 });
+
+function captureCliError(callback: () => unknown): CliError {
+  try {
+    callback();
+  } catch (error: unknown) {
+    expect(error).toBeInstanceOf(CliError);
+    return error as CliError;
+  }
+
+  throw new Error('Expected a CliError to be thrown.');
+}

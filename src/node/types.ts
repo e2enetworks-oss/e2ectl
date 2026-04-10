@@ -60,10 +60,19 @@ export interface NodeCatalogOsEntry {
   software_version: string;
 }
 
+export type NodeCatalogBillingType = 'all' | 'committed' | 'hourly';
+export type NodeCreateBillingType = Exclude<NodeCatalogBillingType, 'all'>;
+export type NodeCommittedCreateStatus = 'auto_renew';
+
 export type NodeCatalogQuery = Record<
   'category' | 'display_category' | 'os' | 'osversion',
   string
 >;
+
+export interface NodeCatalogPlansQuery extends NodeCatalogQuery {
+  billing_type: NodeCatalogBillingType;
+  family?: string;
+}
 
 export interface NodeCatalogPlanOsInfo {
   category?: string;
@@ -110,8 +119,43 @@ export interface NodeCatalogPlan {
   specs?: NodeCatalogPlanSpecs;
 }
 
+export interface NodeCatalogConfigSummary {
+  disk_gb: number | null;
+  family: string | null;
+  ram: string | null;
+  series: string | null;
+  vcpu: number | null;
+}
+
+export interface NodeCatalogHourlySummary {
+  minimum_billing_amount: number | null;
+  price_per_hour: number | null;
+  price_per_month: number | null;
+}
+
+export interface NodeCatalogCommittedOptionSummary {
+  days: number | null;
+  id: number;
+  name: string;
+  total_price: number | null;
+}
+
+export interface NodeCatalogPlanItem {
+  available_inventory: boolean;
+  committed_options: NodeCatalogCommittedOptionSummary[];
+  config: NodeCatalogConfigSummary;
+  currency: string | null;
+  hourly: NodeCatalogHourlySummary;
+  image: string;
+  plan: string;
+  row: number;
+  sku: string;
+}
+
 export interface NodeCreateRequest {
   backups: boolean;
+  cn_id?: number;
+  cn_status?: NodeCommittedCreateStatus;
   default_public_ip: boolean;
   disable_password: boolean;
   enable_bitninja: boolean;
@@ -134,4 +178,40 @@ export interface NodeCreateResult {
 
 export interface NodeDeleteResult {
   message: string;
+}
+
+export type NodeActionType =
+  | 'add_ssh_keys'
+  | 'power_off'
+  | 'power_on'
+  | 'save_images';
+
+export interface NodeActionSshKey {
+  label: string;
+  ssh_key: string;
+}
+
+export type NodeActionRequest =
+  | {
+      type: 'power_on';
+    }
+  | {
+      type: 'power_off';
+    }
+  | {
+      name: string;
+      type: 'save_images';
+    }
+  | {
+      ssh_keys: NodeActionSshKey[];
+      type: 'add_ssh_keys';
+    };
+
+export interface NodeActionResult {
+  action_type: string;
+  created_at: string;
+  id: number;
+  image_id?: string;
+  resource_id: string;
+  status: string;
 }
