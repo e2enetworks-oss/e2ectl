@@ -64,6 +64,11 @@ describe('config commands', () => {
         confirm,
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
+        createProjectClient: vi.fn(() => {
+          throw new Error(
+            'Project client should not be created for this test.'
+          );
+        }) as unknown as CliRuntime['createProjectClient'],
         createReservedIpClient: (credentials: ResolvedCredentials) =>
           new ReservedIpApiClient(new MyAccountApiTransport(credentials)),
         createSecurityGroupClient: (credentials: ResolvedCredentials) =>

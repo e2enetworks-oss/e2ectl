@@ -135,6 +135,9 @@ describe('reserved-ip commands', () => {
         credentials = resolvedCredentials;
         return nodeClient;
       },
+      createProjectClient: vi.fn(() => {
+        throw new Error('Project client should not be created for this test.');
+      }) as unknown as CliRuntime['createProjectClient'],
       createReservedIpClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return reservedIpStub.stub;

@@ -58,7 +58,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
   switch (result.action) {
     case 'attach-node':
       return (
-        `Attached reserved addon IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
+        `Attached reserved IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
         `Status: ${result.reserved_ip.status ?? '--'}\n` +
         `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
         `Message: ${result.message}\n`
@@ -80,7 +80,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
         : `Deleted reserved IP ${result.ip_address}.\nMessage: ${result.message ?? ''}\n`;
     case 'detach-node':
       return (
-        `Detached reserved addon IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
+        `Detached reserved IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
         `Status: ${result.reserved_ip.status ?? '--'}\n` +
         `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
         `Message: ${result.message}\n`

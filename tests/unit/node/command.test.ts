@@ -381,6 +381,9 @@ describe('node commands', () => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
       },
+      createProjectClient: vi.fn(() => {
+        throw new Error('Project client should not be created for this test.');
+      }) as unknown as CliRuntime['createProjectClient'],
       createReservedIpClient: vi.fn(() => {
         throw new Error(
           'Reserved IP client should not be created for this test.'

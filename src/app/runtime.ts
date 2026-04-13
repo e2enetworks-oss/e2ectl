@@ -6,8 +6,13 @@ import {
   type CredentialValidator,
   MyAccountApiTransport
 } from '../myaccount/index.js';
-import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
+import {
+  ConfigStore,
+  type ResolvedAccountCredentials,
+  type ResolvedCredentials
+} from '../config/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
+import { ProjectApiClient, type ProjectClient } from '../project/index.js';
 import {
   ReservedIpApiClient,
   type ReservedIpClient
@@ -27,6 +32,7 @@ export interface OutputWriter {
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
   createSecurityGroupClient(
     credentials: ResolvedCredentials
@@ -52,6 +58,10 @@ export function createRuntime(): CliRuntime {
     confirm: promptForConfirmation,
     createNodeClient: (credentials) =>
       new NodeApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createProjectClient: (credentials) =>
+      new ProjectApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     createReservedIpClient: (credentials) =>

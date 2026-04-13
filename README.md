@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing E2E Networks MyAccount resources from the terminal.
 
-It supports nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys. The CLI is designed for both operators and automation, with saved profiles, default project/location context, and deterministic `--json` output.
+It supports projects, nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys. The CLI is designed for both operators and automation, with saved profiles, default project/location context, and deterministic `--json` output.
 
 ## Requirements
 
@@ -49,6 +49,12 @@ e2ectl config list
 ```
 
 Once a default alias and default project/location are saved, most commands can omit `--alias`, `--project-id`, and `--location`.
+
+If you need to inspect which projects are available to the current account before picking a default, run:
+
+```bash
+e2ectl project list
+```
 
 ### 3. Discover valid plans and images
 
@@ -102,6 +108,8 @@ For `E1` and `E1WC` creates, add `--disk <size-gb>` after selecting the exact pl
 ### Networking, Storage, And Access
 
 ```bash
+e2ectl project list
+
 e2ectl reserved-ip list
 e2ectl reserved-ip get <ip-address>
 e2ectl reserved-ip create
@@ -134,6 +142,10 @@ e2ectl ssh-key create --label <label> --public-key-file ~/.ssh/id_ed25519.pub
 e2ectl ssh-key delete <ssh-key-id>
 ```
 
+`e2ectl project list` is account-scoped. It only needs authentication and does not require `--project-id` or `--location`.
+
+`e2ectl reserved-ip attach node` uses the backend attach flow. When the target node already has a public NIC, the reserved IP can attach as an add-on IP. When the target node has no current public IP, the same backend flow can promote the reserved IP as the node's primary public IP.
+
 ## Configuration
 
 Profiles are stored in `~/.e2e/config.json`.
@@ -155,6 +167,8 @@ environment variables (`E2E_API_KEY` + `E2E_AUTH_TOKEN`) -> `--alias` -> default
 Project context resolves in this order:
 `--project-id` / `--location` -> environment variables -> `--alias` -> default saved alias.
 
+Saved aliases represent account-scoped credentials plus optional default project/location context for project-scoped commands. Account-scoped commands such as `project list` use the same auth path but do not require project context.
+
 ## JSON And Automation
 
 Human-readable output is the default. Add `--json` to any command for deterministic machine-readable output.
@@ -171,7 +185,7 @@ e2ectl config import \
 ```
 
 Good automation entry points include:
-`config list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
+`config list`, `project list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Documentation
 

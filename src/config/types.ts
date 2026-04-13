@@ -21,6 +21,15 @@ export interface ResolvedCredentials {
   source: 'env' | 'profile' | 'mixed';
 }
 
+export interface ResolvedAccountCredentials {
+  api_key: string;
+  auth_token: string;
+  alias?: string;
+  location?: string;
+  project_id?: string;
+  source: 'env' | 'profile' | 'mixed';
+}
+
 export interface ProfileSummary {
   alias: string;
   isDefault: boolean;

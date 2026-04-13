@@ -27,6 +27,11 @@ describe('runCli', () => {
         createNodeClient: vi.fn(() => {
           throw new Error('Node client should not be created for this test.');
         }),
+        createProjectClient: vi.fn(() => {
+          throw new Error(
+            'Project client should not be created for this test.'
+          );
+        }),
         createReservedIpClient: vi.fn(() => {
           throw new Error(
             'Reserved IP client should not be created for this test.'

@@ -184,7 +184,7 @@ function buildReservedIpAttachCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('attach').description(
-    'Attach a reserved addon IP to a supported target.'
+    'Attach a reserved IP to a supported target.'
   );
 
   command.helpCommand(
@@ -195,7 +195,7 @@ function buildReservedIpAttachCommand(
   addContextOptions(
     command
       .command('node <ipAddress>')
-      .description('Attach a reserved addon IP to a node.')
+      .description('Attach a reserved IP to a node.')
       .requiredOption(
         '--node-id <nodeId>',
         'Node id shown by e2ectl node list/get.'
@@ -228,7 +228,7 @@ function buildReservedIpDetachCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('detach').description(
-    'Detach a reserved addon IP from a supported target.'
+    'Detach a reserved IP from a supported target.'
   );
 
   command.helpCommand(
@@ -239,7 +239,7 @@ function buildReservedIpDetachCommand(
   addContextOptions(
     command
       .command('node <ipAddress>')
-      .description('Detach a reserved addon IP from a node.')
+      .description('Detach a reserved IP from a node.')
       .requiredOption(
         '--node-id <nodeId>',
         'Node id shown by e2ectl node list/get.'

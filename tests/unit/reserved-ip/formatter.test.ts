@@ -111,7 +111,7 @@ describe('reserved-ip formatter', () => {
     );
 
     expect(humanOutput).toContain(
-      'Attached reserved addon IP 164.52.198.54 to node 101.'
+      'Attached reserved IP 164.52.198.54 to node 101.'
     );
     expect(jsonOutput).toBe(
       `${stableStringify({
