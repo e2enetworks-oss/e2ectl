@@ -26,8 +26,6 @@ describe('manual smoke cleanup orchestration', () => {
 
     expect(result.hadFailures).toBe(false);
     expect(events).toEqual([
-      'cli:dns record delete release.example.com --type A --name release-smoke --value 203.0.113.11 --force',
-      'cli:dns delete disposable.example.net --force',
       'cli:reserved-ip detach node 203.0.113.20 --node-id 101',
       'cli:node action volume detach 101 --volume-id 8801',
       'cli:node action vpc detach 101 --vpc-id 23082',
@@ -41,8 +39,6 @@ describe('manual smoke cleanup orchestration', () => {
       'cli:security-group delete 88 --force',
       'file:/tmp/release-smoke-rules.json'
     ]);
-    expect(manifest.dns_records[0]?.deleted).toBe(true);
-    expect(manifest.created_dns_domain_deleted).toBe(true);
     expect(manifest.addon_reserved_ip_attached_node_id).toBeNull();
     expect(manifest.volume_attached_node_id).toBeNull();
     expect(manifest.vpc_attached_node_id).toBeNull();
@@ -78,7 +74,6 @@ describe('manual smoke cleanup orchestration', () => {
     );
 
     expect(result.hadFailures).toBe(false);
-    expect(manifest.created_dns_domain_deleted).toBe(true);
     expect(manifest.node_deleted).toBe(true);
     expect(manifest.saved_image_deleted).toBe(true);
     expect(manifest.ssh_key_deleted).toBe(true);
@@ -88,10 +83,6 @@ describe('manual smoke cleanup orchestration', () => {
   it('falls back to direct clients for cleanup-only branches when CLI cleanup is retryable', async () => {
     const manifest = createManifestFixture();
     const clients = {
-      dns: {
-        deleteDomain: vi.fn(() => Promise.resolve()),
-        deleteRecord: vi.fn(() => Promise.resolve())
-      },
       node: {
         deleteNode: vi.fn(() => Promise.resolve()),
         getNode: vi.fn(() =>
@@ -150,8 +141,6 @@ describe('manual smoke cleanup orchestration', () => {
     );
 
     expect(result.hadFailures).toBe(false);
-    expect(clients.dns.deleteRecord).toHaveBeenCalled();
-    expect(clients.dns.deleteDomain).toHaveBeenCalledWith(10279);
     expect(clients.reservedIp.detachReservedIpFromNode).toHaveBeenCalled();
     expect(clients.node.deleteNode).toHaveBeenCalledWith('101');
     expect(clients.volume.detachVolumeFromNode).toHaveBeenCalledWith(8801, {
@@ -213,20 +202,7 @@ function createManifestFixture() {
     addon_reserved_ip: '203.0.113.20',
     addon_reserved_ip_attached_node_id: 101,
     addon_reserved_ip_deleted: false,
-    created_dns_domain: 'disposable.example.net',
-    created_dns_domain_deleted: false,
-    created_dns_domain_id: 10279,
     created_at: '2026-04-05T00:00:00.000Z',
-    dns_domain: 'release.example.com',
-    dns_records: [
-      {
-        current_value: '203.0.113.11',
-        deleted: false,
-        domain_name: 'release.example.com',
-        name: 'release-smoke',
-        type: 'A'
-      }
-    ],
     node_deleted: false,
     node_id: 101,
     prefix: 'release-smoke',

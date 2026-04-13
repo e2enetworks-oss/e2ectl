@@ -14,7 +14,6 @@ describe('read-only env parsing', () => {
 
   it('returns trimmed CLI env and optional fixtures', () => {
     const result = readReadOnlyEnv({
-      E2ECTL_MANUAL_DNS_DOMAIN: ' example.com ',
       E2ECTL_MANUAL_NODE_ID: ' 101 ',
       E2ECTL_MANUAL_RESERVED_IP: ' 203.0.113.20 ',
       E2ECTL_MANUAL_SECURITY_GROUP_ID: ' 57358 ',
@@ -43,7 +42,6 @@ describe('read-only env parsing', () => {
       defaultProjectId: '46429'
     });
     expect(result.fixtures).toEqual({
-      dnsDomain: 'example.com',
       nodeId: '101',
       reservedIp: '203.0.113.20',
       securityGroupId: '57358',

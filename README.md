@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing E2E Networks MyAccount resources from the terminal.
 
-It supports nodes, DNS, reserved IPs, volumes, VPCs, security groups, and SSH keys. The CLI is designed for both operators and automation, with saved profiles, default project/location context, and deterministic `--json` output.
+It supports nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys. The CLI is designed for both operators and automation, with saved profiles, default project/location context, and deterministic `--json` output.
 
 ## Requirements
 
@@ -99,32 +99,6 @@ e2ectl node delete <node-id> --reserve-public-ip
 Node actions also include VPC, volume, security-group, and SSH-key attach or detach flows. Use `e2ectl node action --help` to explore the full action surface.
 For `E1` and `E1WC` creates, add `--disk <size-gb>` after selecting the exact plan from `node catalog plans`.
 
-### DNS
-
-```bash
-e2ectl dns list
-e2ectl dns get <domain-name>
-e2ectl dns create <domain-name> --ip <ipv4>
-e2ectl dns delete <domain-name>
-e2ectl dns nameservers <domain-name>
-e2ectl dns verify ns <domain-name>
-e2ectl dns verify validity <domain-name>
-e2ectl dns verify ttl <domain-name>
-e2ectl dns record list <domain-name>
-e2ectl dns record create <domain-name> --type <type> [--name <host>] [type-specific value flags]
-e2ectl dns record update <domain-name> --type <type> [--name <host>] --current-value <value> [type-specific value flags]
-e2ectl dns record delete <domain-name> --type <type> [--name <host>] --value <value> [--force]
-```
-
-Notes:
-
-- `dns get`, `dns delete`, `dns nameservers`, `dns record ...`, and `dns verify ...` accept domain names with or without a trailing dot.
-- `--name` defaults to `@`, which means the zone apex.
-- `A`, `AAAA`, `CNAME`, and `TXT` records use `--value`.
-- `MX` records use `--exchange <host>` plus `--priority <number>`.
-- `SRV` records use `--target <host> --priority <number> --weight <number> --port <number>`.
-- `dns record delete` and `dns record update` target the exact current value returned by `dns record list`.
-
 ### Networking, Storage, And Access
 
 ```bash
@@ -197,7 +171,7 @@ e2ectl config import \
 ```
 
 Good automation entry points include:
-`config list`, `dns list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
+`config list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Documentation
 

@@ -24,9 +24,6 @@ describe('runCli', () => {
     return {
       runtime: {
         confirm: vi.fn(() => Promise.resolve(false)),
-        createDnsClient: vi.fn(() => {
-          throw new Error('DNS client should not be created for this test.');
-        }),
         createNodeClient: vi.fn(() => {
           throw new Error('Node client should not be created for this test.');
         }),

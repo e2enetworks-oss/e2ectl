@@ -44,7 +44,6 @@ src/
   core/
   myaccount/
   config/
-  dns/
   node/
   reserved-ip/
   security-group/

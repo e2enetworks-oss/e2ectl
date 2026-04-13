@@ -16,7 +16,6 @@ const MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS = 60 * 1000;
 const MANUAL_READ_ONLY_TEST_TIMEOUT_MS = 10 * 60 * 1000;
 
 const itWithNodeId = process.env.E2ECTL_MANUAL_NODE_ID ? it : it.skip;
-const itWithDnsDomain = process.env.E2ECTL_MANUAL_DNS_DOMAIN ? it : it.skip;
 const itWithReservedIp = process.env.E2ECTL_MANUAL_RESERVED_IP ? it : it.skip;
 const itWithVolumeId = process.env.E2ECTL_MANUAL_VOLUME_ID ? it : it.skip;
 const itWithVpcId = process.env.E2ECTL_MANUAL_VPC_ID ? it : it.skip;
@@ -44,10 +43,6 @@ interface NodeCatalogPlansJson extends JsonCommandResult {
 
 interface NodeListJson extends JsonCommandResult {
   nodes: unknown[];
-}
-
-interface DnsListJson extends JsonCommandResult {
-  items: unknown[];
 }
 
 interface ReservedIpListJson extends JsonCommandResult {
@@ -87,51 +82,6 @@ interface NodeGetJson extends JsonCommandResult {
   node: {
     id: number | string;
   };
-}
-
-interface DnsGetJson extends JsonCommandResult {
-  domain: {
-    domain_name: string;
-    records: unknown[];
-  };
-}
-
-interface DnsNameserversJson extends JsonCommandResult {
-  configured_nameservers: unknown[];
-  delegated_nameservers: unknown[];
-  domain_name: string;
-}
-
-interface DnsRecordListJson extends JsonCommandResult {
-  domain_name: string;
-  items: unknown[];
-}
-
-interface DnsVerifyNsJson extends JsonCommandResult {
-  authority: boolean;
-  domain_name: string;
-  e2e_nameservers: unknown[];
-  global_nameservers: unknown[];
-  message: string;
-  problem: number;
-  status: boolean;
-}
-
-interface DnsVerifyValidityJson extends JsonCommandResult {
-  domain_name: string;
-  expiry_date: string | null;
-  message: string;
-  problem: number;
-  status: boolean;
-  validity_ok: boolean;
-}
-
-interface DnsVerifyTtlJson extends JsonCommandResult {
-  domain_name: string;
-  low_ttl_count: number;
-  low_ttl_records: unknown[];
-  message: string;
-  status: boolean;
 }
 
 interface ReservedIpGetJson extends JsonCommandResult {
@@ -194,14 +144,6 @@ describeManual('manual read-only built CLI checks', () => {
         expect(nodeList.action).toBe('list');
         expect(Array.isArray(nodeList.nodes)).toBe(true);
 
-        const dnsList = await runJsonCommand<DnsListJson>(
-          ['dns', 'list'],
-          configBackedCliEnv
-        );
-
-        expect(dnsList.action).toBe('list');
-        expect(Array.isArray(dnsList.items)).toBe(true);
-
         const volumePlans = await runJsonCommand<VolumePlansJson>(
           ['volume', 'plans'],
           configBackedCliEnv
@@ -257,14 +199,9 @@ describeManual('manual read-only built CLI checks', () => {
   );
 
   it(
-    'covers dns and reserved-ip list-safe flows via the built CLI',
+    'covers reserved-ip list-safe flows via the built CLI',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const dnsList = await runJsonCommand<DnsListJson>(['dns', 'list']);
-
-      expect(dnsList.action).toBe('list');
-      expect(Array.isArray(dnsList.items)).toBe(true);
-
       const reservedIpList = await runJsonCommand<ReservedIpListJson>([
         'reserved-ip',
         'list'
@@ -343,97 +280,6 @@ describeManual('manual read-only built CLI checks', () => {
 
       expect(response.action).toBe('get');
       expect(String(response.node.id)).toBe(nodeId);
-    }
-  );
-
-  itWithDnsDomain(
-    'reads domain detail flows when E2ECTL_MANUAL_DNS_DOMAIN is provided',
-    { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
-    async () => {
-      const dnsDomain = readOnlyEnv.fixtures.dnsDomain!;
-      const domain = await runJsonCommand<DnsGetJson>([
-        'dns',
-        'get',
-        dnsDomain
-      ]);
-
-      expect(domain.action).toBe('get');
-      expect(domain.domain.domain_name.length).toBeGreaterThan(0);
-      expect(Array.isArray(domain.domain.records)).toBe(true);
-
-      const nameservers = await runJsonCommand<DnsNameserversJson>([
-        'dns',
-        'nameservers',
-        dnsDomain
-      ]);
-
-      expect(nameservers.action).toBe('nameservers');
-      expect(nameservers.domain_name.length).toBeGreaterThan(0);
-      expect(Array.isArray(nameservers.configured_nameservers)).toBe(true);
-      expect(Array.isArray(nameservers.delegated_nameservers)).toBe(true);
-
-      const verifyNs = await runJsonCommand<DnsVerifyNsJson>([
-        'dns',
-        'verify',
-        'ns',
-        dnsDomain
-      ]);
-
-      expect(verifyNs.action).toBe('verify-ns');
-      expect(verifyNs.domain_name.length).toBeGreaterThan(0);
-      expect(Array.isArray(verifyNs.e2e_nameservers)).toBe(true);
-      expect(Array.isArray(verifyNs.global_nameservers)).toBe(true);
-
-      const verifyValidity = await runBuiltCli(
-        ['--json', 'dns', 'verify', 'validity', dnsDomain],
-        {
-          env: readOnlyEnv.cliEnv,
-          timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
-        }
-      );
-
-      if (verifyValidity.exitCode === 0) {
-        const payload = parseJsonCommandResult<DnsVerifyValidityJson>(
-          ['dns', 'verify', 'validity', dnsDomain],
-          verifyValidity.stdout
-        );
-
-        expect(payload.action).toBe('verify-validity');
-        expect(payload.domain_name.length).toBeGreaterThan(0);
-        expect(typeof payload.problem).toBe('number');
-        expect(typeof payload.status).toBe('boolean');
-        expect(typeof payload.validity_ok).toBe('boolean');
-      } else {
-        expect(verifyValidity.stderr).toContain(
-          'Could not find validity for your domain.'
-        );
-        expect(verifyValidity.stderr).toContain(
-          '/e2e_dns/diagnostics/verify_validity/'
-        );
-      }
-
-      const verifyTtl = await runJsonCommand<DnsVerifyTtlJson>([
-        'dns',
-        'verify',
-        'ttl',
-        dnsDomain
-      ]);
-
-      expect(verifyTtl.action).toBe('verify-ttl');
-      expect(verifyTtl.domain_name.length).toBeGreaterThan(0);
-      expect(typeof verifyTtl.low_ttl_count).toBe('number');
-      expect(Array.isArray(verifyTtl.low_ttl_records)).toBe(true);
-
-      const recordList = await runJsonCommand<DnsRecordListJson>([
-        'dns',
-        'record',
-        'list',
-        dnsDomain
-      ]);
-
-      expect(recordList.action).toBe('record-list');
-      expect(recordList.domain_name.length).toBeGreaterThan(0);
-      expect(Array.isArray(recordList.items)).toBe(true);
     }
   );
 

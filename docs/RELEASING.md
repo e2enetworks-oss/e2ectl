@@ -59,9 +59,9 @@ If you want live API confidence beyond CI:
 - `npm run test:manual` is the safe read-only lane
 - `npm run test:manual:smoke` is the destructive disposable-resource lane
 
-The safe read-only lane now covers both env-backed reads and config-backed saved-profile resolution from a temp `HOME`, including DNS diagnostics when a DNS fixture domain is provided.
+The safe read-only lane now covers both env-backed reads and config-backed saved-profile resolution from a temp `HOME`.
 
-The destructive smoke lane now covers the accepted first-release proof surface, including node volume/VPC/SSH-key attach flows, node power and upgrade actions, saved-image capture, and DNS zone create/get/delete in addition to the existing disposable resource lifecycle checks.
+The destructive smoke lane now covers the accepted first-release proof surface, including node volume/VPC/SSH-key attach flows, node power and upgrade actions, saved-image capture, and the existing disposable resource lifecycle checks.
 
 For exact commands, env vars, and cleanup behavior, use [docs/MAINTAINING.md](./MAINTAINING.md).
 

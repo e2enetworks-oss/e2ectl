@@ -10,7 +10,6 @@ describe('createProgram', () => {
       program.commands.map((command: { name(): string }) => command.name())
     ).toEqual([
       'config',
-      'dns',
       'node',
       'reserved-ip',
       'volume',

@@ -7,7 +7,6 @@ import {
   MyAccountApiTransport
 } from '../myaccount/index.js';
 import { ConfigStore, type ResolvedCredentials } from '../config/index.js';
-import { DnsApiClient, type DnsClient } from '../dns/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import {
   ReservedIpApiClient,
@@ -27,7 +26,6 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
-  createDnsClient(credentials: ResolvedCredentials): DnsClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
   createSecurityGroupClient(
@@ -52,10 +50,6 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
-    createDnsClient: (credentials) =>
-      new DnsApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
-      ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)

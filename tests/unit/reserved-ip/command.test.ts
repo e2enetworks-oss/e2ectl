@@ -131,9 +131,6 @@ describe('reserved-ip commands', () => {
 
     const runtime: CliRuntime = {
       confirm: vi.fn(() => Promise.resolve(true)),
-      createDnsClient: vi.fn(() => {
-        throw new Error('DNS client should not be created for this test.');
-      }) as unknown as CliRuntime['createDnsClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeClient;

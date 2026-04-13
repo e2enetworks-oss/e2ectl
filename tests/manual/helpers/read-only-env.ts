@@ -8,7 +8,6 @@ import {
 } from './manual-env.js';
 
 export const OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS = {
-  dnsDomain: 'E2ECTL_MANUAL_DNS_DOMAIN',
   nodeId: 'E2ECTL_MANUAL_NODE_ID',
   reservedIp: 'E2ECTL_MANUAL_RESERVED_IP',
   securityGroupId: 'E2ECTL_MANUAL_SECURITY_GROUP_ID',
@@ -27,7 +26,6 @@ export interface ReadOnlyEnv {
     defaultProjectId: string;
   };
   fixtures: {
-    dnsDomain?: string;
     nodeId?: string;
     reservedIp?: string;
     securityGroupId?: string;
@@ -45,9 +43,6 @@ export function readReadOnlyEnv(
     purpose: 'Manual read-only checks',
     requiredVars: REQUIRED_MANUAL_BASE_ENV_VARS
   });
-  const dnsDomain = normalizeOptionalEnvValue(
-    env[OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS.dnsDomain]
-  );
   const nodeId = normalizeOptionalEnvValue(
     env[OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS.nodeId]
   );
@@ -81,7 +76,6 @@ export function readReadOnlyEnv(
       defaultProjectId
     },
     fixtures: {
-      ...(dnsDomain === undefined ? {} : { dnsDomain }),
       ...(nodeId === undefined ? {} : { nodeId }),
       ...(reservedIp === undefined ? {} : { reservedIp }),
       ...(securityGroupId === undefined ? {} : { securityGroupId }),

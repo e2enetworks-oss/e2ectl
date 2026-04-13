@@ -62,9 +62,6 @@ describe('config commands', () => {
       prompt,
       runtime: {
         confirm,
-        createDnsClient: vi.fn(() => {
-          throw new Error('DNS client should not be created for this test.');
-        }) as unknown as CliRuntime['createDnsClient'],
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
         createReservedIpClient: (credentials: ResolvedCredentials) =>

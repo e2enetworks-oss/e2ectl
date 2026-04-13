@@ -125,7 +125,6 @@ async function getFallbackClients() {
 
 async function createFallbackClients() {
   const [
-    { DnsApiClient },
     { MyAccountApiTransport },
     { NodeApiClient },
     { ReservedIpApiClient },
@@ -134,7 +133,6 @@ async function createFallbackClients() {
     { VolumeApiClient },
     { VpcApiClient }
   ] = await Promise.all([
-    import('../dist/dns/index.js'),
     import('../dist/myaccount/index.js'),
     import('../dist/node/index.js'),
     import('../dist/reserved-ip/index.js'),
@@ -160,7 +158,6 @@ async function createFallbackClients() {
   );
 
   return {
-    dns: new DnsApiClient(transport),
     node: new NodeApiClient(transport),
     reservedIp: new ReservedIpApiClient(transport),
     securityGroup: new SecurityGroupApiClient(transport),

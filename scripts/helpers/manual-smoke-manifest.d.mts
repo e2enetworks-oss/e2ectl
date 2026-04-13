@@ -1,21 +1,8 @@
-export interface SmokeManifestDnsRecord {
-  current_value: string;
-  deleted: boolean;
-  domain_name: string;
-  name: string;
-  type: string;
-}
-
 export interface SmokeManifest {
   addon_reserved_ip: string | null;
   addon_reserved_ip_attached_node_id: number | null;
   addon_reserved_ip_deleted: boolean;
-  created_dns_domain: string | null;
-  created_dns_domain_deleted: boolean;
-  created_dns_domain_id: number | null;
   created_at: string;
-  dns_domain: string;
-  dns_records: SmokeManifestDnsRecord[];
   node_deleted: boolean;
   node_id: number | null;
   prefix: string;
@@ -41,7 +28,6 @@ export interface SmokeManifest {
 }
 
 export interface CreateSmokeManifestOptions {
-  dnsDomain: string;
   manifestPath?: string;
   prefix: string;
   tempRulesFilePath?: string;

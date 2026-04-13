@@ -29,5 +29,3 @@ export function formatError(error: unknown): string;
 export function isAlreadyGoneMessage(message: string): boolean;
 
 export function isMissingFileError(error: unknown): boolean;
-
-export function toDnsDeleteContent(recordType: string, value: string): string;

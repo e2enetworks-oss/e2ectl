@@ -76,7 +76,6 @@ The lane now proves both direct env-backed reads and config-backed operator usag
 Always-covered domains:
 
 - node
-- dns
 - reserved-ip
 - volume
 - vpc
@@ -86,18 +85,11 @@ Always-covered domains:
 Optional fixture env vars enable detail/get checks:
 
 - `E2ECTL_MANUAL_NODE_ID`
-- `E2ECTL_MANUAL_DNS_DOMAIN`
 - `E2ECTL_MANUAL_RESERVED_IP`
 - `E2ECTL_MANUAL_VOLUME_ID`
 - `E2ECTL_MANUAL_VPC_ID`
 - `E2ECTL_MANUAL_SECURITY_GROUP_ID`
 - `E2ECTL_MANUAL_SSH_KEY_ID`
-
-When `E2ECTL_MANUAL_DNS_DOMAIN` is set, the DNS fixture path also runs:
-
-- `dns verify ns`
-- `dns verify validity`
-- `dns verify ttl`
 
 ### Destructive Smoke Lane
 
@@ -112,10 +104,8 @@ E2E_PROJECT_ID=... \
 E2E_LOCATION=... \
 E2ECTL_SMOKE_NODE_PLAN=... \
 E2ECTL_SMOKE_NODE_IMAGE=... \
-E2ECTL_SMOKE_DNS_DOMAIN=... \
 E2ECTL_SMOKE_UPGRADE_PLAN=... \
 E2ECTL_SMOKE_UPGRADE_IMAGE=... \
-E2ECTL_SMOKE_DNS_CREATE_DOMAIN=... \
 npm run test:manual:smoke
 ```
 
@@ -127,23 +117,18 @@ Required smoke env vars:
 - `E2E_LOCATION`
 - `E2ECTL_SMOKE_NODE_PLAN`
 - `E2ECTL_SMOKE_NODE_IMAGE`
-- `E2ECTL_SMOKE_DNS_DOMAIN`
 - `E2ECTL_SMOKE_UPGRADE_PLAN`
 - `E2ECTL_SMOKE_UPGRADE_IMAGE`
-- `E2ECTL_SMOKE_DNS_CREATE_DOMAIN`
 
 Optional smoke env vars:
 
 - `E2ECTL_SMOKE_PREFIX`
-- `E2ECTL_SMOKE_RECORD_TTL`
 - `E2ECTL_SMOKE_MANIFEST`
 
 Validation rules:
 
 - the smoke env parser fails once with one aggregated missing-env error
 - the upgrade target must differ from the create target in at least one of plan or image
-- `E2ECTL_SMOKE_DNS_CREATE_DOMAIN` must differ from `E2ECTL_SMOKE_DNS_DOMAIN`
-- `E2ECTL_SMOKE_RECORD_TTL` must be a positive integer when set
 
 Expanded destructive proof surface:
 
@@ -160,8 +145,6 @@ Expanded destructive proof surface:
 - volume create/get/delete
 - vpc create/get/delete
 - ssh-key create/get/delete
-- dns create/get/delete
-- dns record create/list/update/delete
 
 Cleanup command:
 
@@ -173,19 +156,17 @@ By default, destructive-smoke manifests are written under `.manual-smoke/` in th
 
 Cleanup order:
 
-1. DNS records
-2. created DNS domain delete
-3. addon reserved IP detach
-4. attached volume detach
-5. attached VPC detach
-6. node delete
-7. reserved IP delete
-8. volume delete
-9. VPC delete
-10. saved image delete
-11. SSH key delete
-12. security group delete
-13. temp rules file cleanup
+1. addon reserved IP detach
+2. attached volume detach
+3. attached VPC detach
+4. node delete
+5. reserved IP delete
+6. volume delete
+7. VPC delete
+8. saved image delete
+9. SSH key delete
+10. security group delete
+11. temp rules file cleanup
 
 The cleanup script updates the manifest immediately after each create, attach, and mutate step in the smoke lane.
 

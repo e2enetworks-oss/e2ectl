@@ -8,7 +8,6 @@ import {
   buildSecurityGroupRules,
   createNodeStep,
   runAddonReservedIpSteps,
-  runDnsSteps,
   runNodeDeleteSteps,
   runNodeLifecycleActionSteps,
   runSecurityGroupSteps,
@@ -67,16 +66,9 @@ describe('manual release smoke workflow', () => {
           nodeId,
           sshKeyLabel: `${runPrefix}-ssh`
         });
-        const { publicIp } = await runNodeLifecycleActionSteps(context, {
+        await runNodeLifecycleActionSteps(context, {
           nodeId,
           saveImageName: `${runPrefix}-image`
-        });
-
-        await runDnsSteps(context, {
-          createIpAddress: publicIp,
-          dnsRecordHost: runPrefix,
-          initialRecordValue: '203.0.113.10',
-          updatedRecordValue: '203.0.113.11'
         });
         await runNodeDeleteSteps(context, {
           nodeId
@@ -144,7 +136,6 @@ async function prepareSmokeContext(
   );
 
   const { path: manifestPath } = await createSmokeManifest({
-    dnsDomain: smokeEnv.dnsDomain,
     prefix: runPrefix,
     ...(smokeEnv.manifestPath === undefined
       ? {}

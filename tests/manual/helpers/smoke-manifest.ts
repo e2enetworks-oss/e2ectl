@@ -4,7 +4,4 @@ export {
   updateSmokeManifest
 } from '../../../scripts/helpers/manual-smoke-manifest.mjs';
 
-export type {
-  SmokeManifest,
-  SmokeManifestDnsRecord
-} from '../../../scripts/helpers/manual-smoke-manifest.mjs';
+export type { SmokeManifest } from '../../../scripts/helpers/manual-smoke-manifest.mjs';

@@ -12,8 +12,6 @@ export async function runSmokeCleanup(context) {
     context.logError(message);
   };
 
-  await cleanupDnsRecords(context, fail);
-  await cleanupCreatedDnsDomain(context, fail);
   await cleanupAddonReservedIpAttachment(context, fail);
   await cleanupVolumeAttachment(context, fail);
   await cleanupVpcAttachment(context, fail);
@@ -69,130 +67,6 @@ export function isMissingFileError(error) {
     typeof error.code === 'string' &&
     error.code === 'ENOENT'
   );
-}
-
-export function toDnsDeleteContent(recordType, value) {
-  return recordType === 'TXT' ? stripEnclosingDoubleQuotes(value) : value;
-}
-
-async function cleanupDnsRecords(context, fail) {
-  const manifest = await context.loadManifest();
-
-  for (const record of manifest.dns_records ?? []) {
-    if (record.deleted) {
-      continue;
-    }
-
-    const cliResult = await context.runCliCleanup([
-      'dns',
-      'record',
-      'delete',
-      record.domain_name,
-      '--type',
-      record.type,
-      '--name',
-      record.name,
-      '--value',
-      record.current_value,
-      '--force'
-    ]);
-
-    if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
-      await markDnsRecordDeleted(context, record);
-      context.logInfo(
-        `Cleaned DNS record ${record.type} ${record.name} ${record.current_value}.`
-      );
-      continue;
-    }
-
-    try {
-      const clients = await context.getFallbackClients();
-
-      await clients.dns.deleteRecord(record.domain_name, {
-        content: toDnsDeleteContent(record.type, record.current_value),
-        record_name: record.name,
-        record_type: record.type,
-        zone_name: record.domain_name
-      });
-
-      await markDnsRecordDeleted(context, record);
-      context.logInfo(
-        `Fallback-cleaned DNS record ${record.type} ${record.name} ${record.current_value}.`
-      );
-    } catch (error) {
-      if (classifyCleanupError(error) === 'already-gone') {
-        await markDnsRecordDeleted(context, record);
-        context.logInfo(
-          `DNS record ${record.type} ${record.name} ${record.current_value} was already gone.`
-        );
-        continue;
-      }
-
-      fail(
-        `Failed to clean DNS record ${record.type} ${record.name}: ${formatError(error)}`
-      );
-    }
-  }
-}
-
-async function cleanupCreatedDnsDomain(context, fail) {
-  const manifest = await context.loadManifest();
-
-  if (
-    manifest.created_dns_domain === null ||
-    manifest.created_dns_domain_deleted === true
-  ) {
-    return;
-  }
-
-  const cliResult = await context.runCliCleanup([
-    'dns',
-    'delete',
-    manifest.created_dns_domain,
-    '--force'
-  ]);
-
-  if (cliResult.status === 'ok' || cliResult.status === 'already-gone') {
-    await context.updateManifest((draft) => {
-      draft.created_dns_domain_deleted = true;
-    });
-    context.logInfo(`Deleted DNS domain ${manifest.created_dns_domain}.`);
-    return;
-  }
-
-  if (manifest.created_dns_domain_id === null) {
-    fail(
-      `Failed to delete DNS domain ${manifest.created_dns_domain}: missing created_dns_domain_id for cleanup fallback.`
-    );
-    return;
-  }
-
-  try {
-    const clients = await context.getFallbackClients();
-
-    await clients.dns.deleteDomain(manifest.created_dns_domain_id);
-
-    await context.updateManifest((draft) => {
-      draft.created_dns_domain_deleted = true;
-    });
-    context.logInfo(
-      `Fallback-deleted DNS domain ${manifest.created_dns_domain}.`
-    );
-  } catch (error) {
-    if (classifyCleanupError(error) === 'already-gone') {
-      await context.updateManifest((draft) => {
-        draft.created_dns_domain_deleted = true;
-      });
-      context.logInfo(
-        `DNS domain ${manifest.created_dns_domain} was already gone.`
-      );
-      return;
-    }
-
-    fail(
-      `Failed to delete DNS domain ${manifest.created_dns_domain}: ${formatError(error)}`
-    );
-  }
 }
 
 async function cleanupAddonReservedIpAttachment(context, fail) {
@@ -804,21 +678,6 @@ async function findReservedIp(clients, ipAddress) {
   return items.find((candidate) => candidate.ip_address === ipAddress);
 }
 
-async function markDnsRecordDeleted(context, record) {
-  await context.updateManifest((draft) => {
-    const target = draft.dns_records.find(
-      (candidate) =>
-        candidate.domain_name === record.domain_name &&
-        candidate.name === record.name &&
-        candidate.type === record.type
-    );
-
-    if (target !== undefined) {
-      target.deleted = true;
-    }
-  });
-}
-
 async function markNodeDeleted(context) {
   await context.updateManifest((draft) => {
     draft.addon_reserved_ip_attached_node_id = null;
@@ -836,14 +695,6 @@ function assertNodeVmId(vmId, nodeId) {
   }
 
   return vmId;
-}
-
-function stripEnclosingDoubleQuotes(value) {
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1);
-  }
-
-  return value;
 }
 
 function normalizeLifecycleStatus(status) {

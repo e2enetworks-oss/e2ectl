@@ -240,7 +240,7 @@ describe('MyAccountApiTransport', () => {
 
     const fetchFn = vi
       .fn<FetchLike>()
-      .mockRejectedValueOnce(new Error('dns failure'))
+      .mockRejectedValueOnce(new Error('network failure'))
       .mockResolvedValueOnce(
         createFetchResponse(
           envelope({
@@ -454,7 +454,7 @@ describe('MyAccountApiTransport', () => {
     vi.useFakeTimers();
 
     const transport = new MyAccountApiTransport(credentials, {
-      fetchFn: () => Promise.reject(new Error('dns failure'))
+      fetchFn: () => Promise.reject(new Error('network failure'))
     });
 
     const request = transport.get<ApiEnvelope<Record<string, never>>>(

@@ -17,17 +17,12 @@ describe('smoke manifest helper', () => {
     const manifestPath = path.join(tempDirectory, 'manual-smoke.json');
 
     const { manifest } = await createSmokeManifest({
-      dnsDomain: 'release.example.com',
       manifestPath,
       prefix: 'release-smoke',
       tempRulesFilePath: '/tmp/release-smoke-rules.json'
     });
 
     expect(manifest.addon_reserved_ip).toBeNull();
-    expect(manifest.created_dns_domain).toBeNull();
-    expect(manifest.created_dns_domain_deleted).toBe(false);
-    expect(manifest.created_dns_domain_id).toBeNull();
-    expect(manifest.dns_domain).toBe('release.example.com');
     expect(manifest.saved_image_deleted).toBe(false);
     expect(manifest.saved_image_id).toBeNull();
     expect(manifest.security_group_id).toBeNull();
@@ -46,8 +41,6 @@ describe('smoke manifest helper', () => {
     await delay(5);
 
     const updatedManifest = await updateSmokeManifest(manifestPath, (draft) => {
-      draft.created_dns_domain = 'disposable.example.net';
-      draft.created_dns_domain_id = 10279;
       draft.saved_image_id = 'img-455';
       draft.ssh_key_attached_node_id = 100157;
       draft.volume_attached_node_id = 100157;
@@ -57,8 +50,6 @@ describe('smoke manifest helper', () => {
       draft.ssh_key_id = 1001;
     });
 
-    expect(updatedManifest.created_dns_domain).toBe('disposable.example.net');
-    expect(updatedManifest.created_dns_domain_id).toBe(10279);
     expect(updatedManifest.saved_image_id).toBe('img-455');
     expect(updatedManifest.ssh_key_attached_node_id).toBe(100157);
     expect(updatedManifest.volume_attached_node_id).toBe(100157);
@@ -70,8 +61,6 @@ describe('smoke manifest helper', () => {
 
     const reloadedManifest = await loadSmokeManifest(manifestPath);
 
-    expect(reloadedManifest.created_dns_domain).toBe('disposable.example.net');
-    expect(reloadedManifest.created_dns_domain_id).toBe(10279);
     expect(reloadedManifest.saved_image_id).toBe('img-455');
     expect(reloadedManifest.ssh_key_attached_node_id).toBe(100157);
     expect(reloadedManifest.volume_attached_node_id).toBe(100157);
@@ -91,7 +80,6 @@ describe('smoke manifest helper', () => {
       process.chdir(tempDirectory);
 
       const { path: manifestPath } = await createSmokeManifest({
-        dnsDomain: 'release.example.com',
         prefix: 'release-smoke'
       });
 

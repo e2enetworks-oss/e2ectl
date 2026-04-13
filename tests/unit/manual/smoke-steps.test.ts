@@ -1,6 +1,5 @@
 import {
   createNodeStep,
-  runDnsSteps,
   runNodeDeleteSteps,
   runNodeLifecycleActionSteps,
   runSecurityGroupSteps,
@@ -674,92 +673,6 @@ describe('manual smoke step helpers', () => {
     expect(manifest.ssh_key_attached_node_id).toBeNull();
   });
 
-  it('creates and deletes a disposable DNS zone while tracking record mutations for cleanup replay', async () => {
-    const { context, manifest } = createFixture();
-
-    runJsonCommandMock
-      .mockResolvedValueOnce({
-        action: 'create',
-        domain: {
-          id: 10279
-        },
-        message: 'created',
-        requested: {
-          domain_name: 'disposable.example.net',
-          ip_address: '203.0.113.12'
-        }
-      })
-      .mockResolvedValueOnce({
-        action: 'get',
-        domain: {
-          domain_name: 'disposable.example.net.',
-          records: []
-        }
-      })
-      .mockResolvedValueOnce({
-        action: 'delete',
-        cancelled: false,
-        domain_name: 'disposable.example.net.',
-        message: 'deleted'
-      })
-      .mockResolvedValueOnce({
-        action: 'record-create',
-        domain_name: 'release.example.com',
-        record: {
-          name: 'release-smoke',
-          type: 'A',
-          value: '203.0.113.10'
-        }
-      })
-      .mockResolvedValueOnce({
-        action: 'record-list',
-        items: [
-          {
-            name: 'release-smoke',
-            type: 'A',
-            value: '203.0.113.10'
-          }
-        ]
-      })
-      .mockResolvedValueOnce({
-        action: 'record-update',
-        record: {
-          current_value: '203.0.113.10',
-          name: 'release-smoke',
-          new_value: '203.0.113.11',
-          type: 'A'
-        }
-      })
-      .mockResolvedValueOnce({
-        action: 'record-delete',
-        cancelled: false
-      });
-    updateSmokeManifestMock.mockImplementation((_path, mutate) => {
-      mutate(manifest);
-      return Promise.resolve(manifest);
-    });
-
-    await runDnsSteps(context, {
-      createIpAddress: '203.0.113.12',
-      dnsRecordHost: 'release-smoke',
-      initialRecordValue: '203.0.113.10',
-      updatedRecordValue: '203.0.113.11'
-    });
-
-    expect(manifest.created_dns_domain).toBe('disposable.example.net');
-    expect(manifest.created_dns_domain_deleted).toBe(true);
-    expect(manifest.created_dns_domain_id).toBe(10279);
-    expect(manifest.dns_records).toEqual([
-      {
-        current_value: '203.0.113.11',
-        deleted: true,
-        domain_name: 'release.example.com',
-        name: 'release-smoke',
-        type: 'A'
-      }
-    ]);
-  });
-
   it('deletes an SSH key and clears the attached node id in the manifest', async () => {
     const { context, manifest } = createFixture();
 
@@ -792,12 +705,7 @@ function createFixture() {
     addon_reserved_ip: null,
     addon_reserved_ip_attached_node_id: null,
     addon_reserved_ip_deleted: false,
-    created_dns_domain: null,
-    created_dns_domain_deleted: false,
-    created_dns_domain_id: null,
     created_at: '2026-04-05T00:00:00.000Z',
-    dns_domain: 'release.example.com',
-    dns_records: [],
     node_deleted: false,
     node_id: 101,
     prefix: 'release-smoke',
@@ -827,14 +735,11 @@ function createFixture() {
       apiKey: 'smoke-api-key',
       authToken: 'smoke-auth-token',
       cliEnv: {},
-      dnsCreateDomain: 'disposable.example.net',
-      dnsDomain: 'release.example.com',
       location: 'Delhi',
       nodeImage: 'Ubuntu-24.04-Distro',
       nodePlan: 'C3.8GB',
       prefix: 'release-smoke',
       projectId: '46429',
-      recordTtl: '300',
       upgradeImage: 'Ubuntu-24.04-Distro',
       upgradePlan: 'C3.16GB'
     }
