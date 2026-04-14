@@ -50,6 +50,7 @@ jobs:
           slug: e2enetworks-oss/e2ectl
           files: coverage/unit/lcov.info
           flags: unit
+          disable_search: true
           fail_ci_if_error: false
 
       - name: Integration coverage and tests
@@ -62,6 +63,7 @@ jobs:
           slug: e2enetworks-oss/e2ectl
           files: coverage/integration/lcov.info
           flags: integration
+          disable_search: true
           fail_ci_if_error: false
 
       - name: Package dry run
