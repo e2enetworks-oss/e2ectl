@@ -493,6 +493,25 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human node list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('node-a');
+    expect(stdout.buffer).toContain('1.1.1.1');
+  });
+
   it('applies per-command project and location overrides', async () => {
     const { receivedCredentials, runtime } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -645,6 +664,32 @@ describe('node commands', () => {
         requested: 1
       })
     );
+  });
+
+  it('renders human node create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'create',
+      '--name',
+      'new-node',
+      '--plan',
+      'plan-123',
+      '--image',
+      'Ubuntu-24.04-Distro',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Billing Type: hourly');
+    expect(stdout.buffer).toContain('Requested: 1');
+    expect(stdout.buffer).toContain('Created: 1');
+    expect(stdout.buffer).toContain('new-node');
   });
 
   it('maps repeated --ssh-key-id flags into node create service options', async () => {
@@ -1176,6 +1221,26 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human power-on output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'power-on',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested power on for node 101.');
+    expect(stdout.buffer).toContain('Action ID: 701');
+  });
+
   it('requests node upgrade through the top-level lifecycle command', async () => {
     const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -1257,6 +1322,30 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human save-image output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'save-image',
+      '101',
+      '--name',
+      'node-a-image',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain(
+      'Requested save image for node 101 as node-a-image.'
+    );
+    expect(stdout.buffer).toContain('Image ID: img-455');
+  });
+
   it('routes VPC attach through the dedicated VPC client', async () => {
     const { runtime, stdout, vpcStub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -1306,6 +1395,34 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human VPC attach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'vpc',
+      'attach',
+      '101',
+      '--vpc-id',
+      '23082',
+      '--subnet-id',
+      '991',
+      '--private-ip',
+      '10.0.0.25',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested VPC attach for node 101.');
+    expect(stdout.buffer).toContain('VPC ID: 23082');
+    expect(stdout.buffer).toContain('Private IP: 10.0.0.25');
+  });
+
   it('resolves node vm ids before detaching volumes', async () => {
     const { nodeStub, runtime, stdout, volumeStub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -1342,6 +1459,32 @@ describe('node commands', () => {
           id: 8801
         }
       })
+    );
+  });
+
+  it('renders human volume detach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'volume',
+      'detach',
+      '101',
+      '--volume-id',
+      '8801',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested volume detach for node 101.');
+    expect(stdout.buffer).toContain('Volume ID: 8801');
+    expect(stdout.buffer).toContain(
+      'Message: Block Storage Detach Process is Started.'
     );
   });
 
@@ -1465,6 +1608,34 @@ describe('node commands', () => {
         node_id: 101,
         public_ip: '1.1.1.1'
       })
+    );
+  });
+
+  it('renders human public-ip detach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested public IP detach for node 101.');
+    expect(stdout.buffer).toContain('Public IP: 1.1.1.1');
+    expect(stdout.buffer).toContain(
+      'Message: Public IP detached successfully.'
+    );
+    expect(stdout.buffer).toContain(
+      'Warning: This node may no longer be publicly reachable.'
     );
   });
 

@@ -98,6 +98,16 @@ describe('project list against a fake MyAccount API', () => {
           data: [
             {
               associated_members: [],
+              associated_policies: [],
+              current_user_role: 'Admin',
+              is_active_project: false,
+              is_default: false,
+              is_starred: true,
+              name: 'zeta-project',
+              project_id: 50001
+            },
+            {
+              associated_members: [],
               associated_policies: [
                 {
                   id: 11,
@@ -142,7 +152,51 @@ describe('project list against a fake MyAccount API', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('CLI Default');
       expect(result.stdout).toContain('default-project');
+      expect(result.stdout).toContain('zeta-project');
+      expect(result.stdout.indexOf('default-project')).toBeLessThan(
+        result.stdout.indexOf('zeta-project')
+      );
       expect(result.stdout).toContain('Owner');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('renders a clear empty-state message for project list', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/pbac/project/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await tempHome.writeConfig({
+        default: 'prod',
+        profiles: {
+          prod: {
+            api_key: 'prod-api-key',
+            auth_token: 'prod-auth-token'
+          }
+        }
+      });
+
+      const result = await runBuiltCli(['project', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe('No projects found.\n');
     } finally {
       await server.close();
       await tempHome.cleanup();

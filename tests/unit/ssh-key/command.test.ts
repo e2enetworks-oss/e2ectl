@@ -1,5 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
@@ -123,6 +125,48 @@ describe('ssh-key commands', () => {
     });
   }
 
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
+  }
+
   it('lists SSH keys in deterministic json mode using alias defaults', async () => {
     const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -160,6 +204,25 @@ describe('ssh-key commands', () => {
         ]
       })}\n`
     );
+  });
+
+  it('renders human list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'ssh-key',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('demo');
+    expect(stdout.buffer).toContain('ED25519');
   });
 
   it('creates SSH keys from files in deterministic json mode', async () => {
@@ -208,6 +271,35 @@ describe('ssh-key commands', () => {
     );
   });
 
+  it('renders human create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const publicKeyPath = createTestConfigPath('ssh-key-public-human');
+    await writeFile(
+      publicKeyPath,
+      'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop\n',
+      'utf8'
+    );
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'ssh-key',
+      'create',
+      '--alias',
+      'prod',
+      '--label',
+      'demo',
+      '--public-key-file',
+      publicKeyPath
+    ]);
+
+    expect(stdout.buffer).toContain('Added SSH key: demo');
+    expect(stdout.buffer).toContain('ID: 15398');
+    expect(stdout.buffer).toContain('Type: ED25519');
+  });
+
   it('gets one SSH key in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -242,6 +334,27 @@ describe('ssh-key commands', () => {
     );
   });
 
+  it('renders human detail output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'ssh-key',
+      'get',
+      '15398',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID: 15398');
+    expect(stdout.buffer).toContain('Label: demo');
+    expect(stdout.buffer).toContain('Project: default-project');
+    expect(stdout.buffer).toContain('Public Key: ssh-ed25519');
+  });
+
   it('deletes one SSH key in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -268,5 +381,70 @@ describe('ssh-key commands', () => {
         message: 'SSH Key has been deleted successfully.'
       })}\n`
     );
+  });
+
+  it('renders human delete output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'ssh-key',
+      'delete',
+      '15398',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Deleted SSH key 15398.');
+    expect(stdout.buffer).toContain(
+      'Message: SSH Key has been deleted successfully.'
+    );
+  });
+
+  it('renders cancelled delete output when confirmation is declined', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    runtime.confirm = vi.fn(() => Promise.resolve(false));
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'ssh-key',
+      'delete',
+      '15398',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toBe('Deletion cancelled.\n');
+  });
+
+  it('shows root help for ssh-key commands', async () => {
+    const help = await renderHelp(['ssh-key']);
+
+    expect(help).toContain('Manage MyAccount SSH public keys.');
+    expect(help).toContain('Show help for an ssh-key command');
+  });
+
+  it('shows help for ssh-key create', async () => {
+    const help = await renderHelp(['ssh-key', 'create', '--help']);
+
+    expect(help).toContain(
+      'Create an SSH key from a public key file or stdin.'
+    );
+    expect(help).toContain('--public-key-file <path>');
+    expect(help).toContain('--label <label>');
+  });
+
+  it('shows help for ssh-key delete', async () => {
+    const help = await renderHelp(['ssh-key', 'delete', '--help']);
+
+    expect(help).toContain('Delete a saved SSH key.');
+    expect(help).toContain('--force');
   });
 });

@@ -117,6 +117,41 @@ describe('node formatter', () => {
     );
   });
 
+  it('sorts human node list output by id for deterministic operator output', () => {
+    const output = renderNodeResult(
+      {
+        action: 'list',
+        nodes: [
+          {
+            id: 205,
+            is_locked: false,
+            name: 'node-b',
+            plan: 'C3.16GB',
+            private_ip_address: '10.0.0.2',
+            public_ip_address: '1.1.1.2',
+            status: 'Running'
+          },
+          {
+            id: 101,
+            is_locked: false,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.1',
+            public_ip_address: '1.1.1.1',
+            status: 'Running'
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      },
+      false
+    );
+
+    expect(output.indexOf('node-a')).toBeLessThan(output.indexOf('node-b'));
+    expect(output).toContain('101');
+    expect(output).toContain('205');
+  });
+
   it('renders billing metadata for node create results', () => {
     const output = renderNodeResult(
       {
@@ -1004,5 +1039,244 @@ describe('node formatter', () => {
         2
       ) + '\n'
     );
+  });
+
+  it('renders the empty catalog-os branch clearly', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-os',
+        catalog: {
+          category_list: []
+        }
+      },
+      false
+    );
+
+    expect(output).toBe('No OS catalog rows found.\n');
+  });
+
+  it('renders the no-family-match catalog-plans branch clearly', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'GPU',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: ['C3', 'M3'],
+          empty_reason: 'no_family_match'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Filters: OS=Ubuntu 24.04, Billing=hourly, Family=GPU'
+    );
+    expect(output).toContain('Available Families: C3, M3');
+    expect(output).toContain('No configs were found for family GPU.');
+  });
+
+  it('renders power-off output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested power off for node 101.');
+    expect(humanOutput).toContain('Action ID: 702');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })}\n`
+    );
+  });
+
+  it('renders save-image output for humans', () => {
+    const output = renderNodeResult(
+      {
+        action: 'save-image',
+        image_name: 'node-a-image',
+        node_id: 101,
+        result: {
+          action_id: 703,
+          created_at: '2026-03-14T08:20:00Z',
+          image_id: 'img-455',
+          status: 'In Progress'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Requested save image for node 101 as node-a-image.'
+    );
+    expect(output).toContain('Image ID: img-455');
+  });
+
+  it('renders security-group action output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'security-group-detach',
+        node_id: 101,
+        result: {
+          message: 'Security Groups Detached Successfully'
+        },
+        security_group_ids: [44, 45]
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      },
+      true
+    );
+
+    expect(humanOutput).toContain(
+      'Requested security-group detach for node 101.'
+    );
+    expect(humanOutput).toContain('Security Group IDs: 44, 45');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      })}\n`
+    );
+  });
+
+  it('renders volume action output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'volume-attach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage is Attached to VM.'
+        },
+        volume: {
+          id: 8801
+        }
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'volume-detach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage Detach Process is Started.'
+        },
+        volume: {
+          id: 8801
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested volume attach for node 101.');
+    expect(humanOutput).toContain('Volume ID: 8801');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'volume-detach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage Detach Process is Started.'
+        },
+        volume: {
+          id: 8801
+        }
+      })}\n`
+    );
+  });
+
+  it('renders VPC action output for both subnet-free and subnet-aware branches', () => {
+    const attachOutput = renderNodeResult(
+      {
+        action: 'vpc-attach',
+        node_id: 101,
+        result: {
+          message: 'VPC attached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      },
+      false
+    );
+    const detachOutput = renderNodeResult(
+      {
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'VPC detached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: '10.0.0.25',
+          subnet_id: 991
+        }
+      },
+      false
+    );
+
+    expect(attachOutput).toContain('Requested VPC attach for node 101.');
+    expect(attachOutput).not.toContain('Subnet ID:');
+    expect(attachOutput).not.toContain('Private IP:');
+    expect(detachOutput).toContain('Requested VPC detach for node 101.');
+    expect(detachOutput).toContain('Subnet ID: 991');
+    expect(detachOutput).toContain('Private IP: 10.0.0.25');
   });
 });

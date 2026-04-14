@@ -301,4 +301,169 @@ describe('vpc formatter', () => {
       })}\n`
     );
   });
+
+  it('renders hourly VPC create output with an E2E-provided CIDR summary', () => {
+    const output = renderVpcResult(
+      {
+        action: 'create',
+        billing: {
+          committed_plan_id: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        cidr: {
+          source: 'e2e',
+          value: null
+        },
+        credit_sufficient: true,
+        vpc: {
+          id: 27836,
+          name: 'hourly-vpc',
+          network_id: 27836,
+          project_id: '46429',
+          vpc_id: 3957
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Created VPC request: hourly-vpc');
+    expect(output).toContain('Billing: hourly');
+    expect(output).toContain('CIDR: E2E-provided');
+  });
+
+  it('renders deterministic json for a deleted VPC', () => {
+    const output = renderVpcResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        message: 'VPC deleted successfully.',
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '46429'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: 'VPC deleted successfully.',
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '46429'
+        }
+      })}\n`
+    );
+  });
+
+  it('sorts VPC list json output deterministically', () => {
+    const output = renderVpcResult(
+      {
+        action: 'list',
+        items: [
+          {
+            attached_vm_count: 0,
+            cidr: '10.30.0.0/24',
+            cidr_source: 'custom',
+            created_at: '2026-03-13T09:00:00Z',
+            gateway_ip: '10.30.0.1',
+            id: 27836,
+            location: 'Chennai',
+            name: 'zeta-vpc',
+            network_id: 27836,
+            project_name: 'default-project',
+            state: 'Active',
+            subnet_count: 0,
+            subnets: []
+          },
+          {
+            attached_vm_count: 2,
+            cidr: '10.20.0.0/23',
+            cidr_source: 'e2e',
+            created_at: '2026-03-13T08:00:00Z',
+            gateway_ip: '10.20.0.1',
+            id: 27835,
+            location: 'Delhi',
+            name: 'alpha-vpc',
+            network_id: 27835,
+            project_name: 'default-project',
+            state: 'Active',
+            subnet_count: 0,
+            subnets: []
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      },
+      true
+    );
+
+    expect(output).toContain('"name": "alpha-vpc"');
+    expect(output.indexOf('"name": "alpha-vpc"')).toBeLessThan(
+      output.indexOf('"name": "zeta-vpc"')
+    );
+  });
+
+  it('renders VPC detail output without subnet details when no subnets exist', () => {
+    const output = renderVpcResult(
+      {
+        action: 'get',
+        vpc: {
+          attached_vm_count: 0,
+          cidr: '10.20.0.0/23',
+          cidr_source: 'custom',
+          created_at: '2026-03-13T08:00:00Z',
+          gateway_ip: null,
+          id: 27835,
+          location: null,
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_name: null,
+          state: 'Active',
+          subnet_count: 0,
+          subnets: []
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Source: Custom');
+    expect(output).toContain('Subnets: 0');
+    expect(output).not.toContain('Subnet Details:');
+  });
+
+  it('renders plans output with committed options but no hourly plans', () => {
+    const output = renderVpcResult(
+      {
+        action: 'plans',
+        committed: {
+          default_post_commit_behavior: 'auto-renew',
+          items: [
+            {
+              currency: 'INR',
+              id: 91,
+              name: '90 Days',
+              term_days: 90,
+              total_price: 7800
+            }
+          ],
+          supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+        },
+        hourly: {
+          items: []
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Hourly');
+    expect(output).toContain('No hourly plans found.');
+    expect(output).toContain('Committed');
+    expect(output).toContain('90 Days');
+  });
 });

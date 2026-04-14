@@ -137,4 +137,96 @@ describe('node list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human node list output in sorted id order', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/nodes/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              id: 205,
+              is_locked: false,
+              name: 'node-b',
+              plan: 'C3.16GB',
+              private_ip_address: '10.0.0.2',
+              public_ip_address: '1.1.1.2',
+              status: 'Running'
+            },
+            {
+              id: 101,
+              is_locked: false,
+              name: 'node-a',
+              plan: 'C3.8GB',
+              private_ip_address: '10.0.0.1',
+              public_ip_address: '1.1.1.1',
+              status: 'Running'
+            }
+          ],
+          errors: {},
+          message: 'OK',
+          total_count: 2,
+          total_page_number: 1
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['node', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('ID');
+      expect(result.stdout.indexOf('node-a')).toBeLessThan(
+        result.stdout.indexOf('node-b')
+      );
+      expect(result.stdout).toContain('101');
+      expect(result.stdout).toContain('205');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('renders a clear empty-state message for node list', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/nodes/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'OK',
+          total_count: 0,
+          total_page_number: 0
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['node', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe('No nodes found.\n');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

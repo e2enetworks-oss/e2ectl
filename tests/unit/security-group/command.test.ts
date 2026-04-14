@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
@@ -153,6 +155,48 @@ describe('security-group commands', () => {
     return filePath;
   }
 
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
+  }
+
   it('lists security groups in deterministic json mode using alias defaults', async () => {
     const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -188,6 +232,25 @@ describe('security-group commands', () => {
         ]
       })}\n`
     );
+  });
+
+  it('renders human list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('web-sg');
+    expect(stdout.buffer).toContain('web ingress');
   });
 
   it('creates security groups from rules files in deterministic json mode', async () => {
@@ -234,6 +297,33 @@ describe('security-group commands', () => {
     );
   });
 
+  it('renders human create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const rulesFilePath = await writeRulesFile(sampleRules());
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'create',
+      '--alias',
+      'prod',
+      '--name',
+      'web-sg',
+      '--rules-file',
+      rulesFilePath,
+      '--default'
+    ]);
+
+    expect(stdout.buffer).toContain('Created security group: web-sg');
+    expect(stdout.buffer).toContain('ID: 57358');
+    expect(stdout.buffer).toContain('Default: yes');
+    expect(stdout.buffer).toContain('Rules: 2');
+    expect(stdout.buffer).toContain('Next: run e2ectl security-group list');
+  });
+
   it('gets one security group in deterministic json mode', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -265,6 +355,96 @@ describe('security-group commands', () => {
     );
   });
 
+  it('renders human detail output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'get',
+      '57358',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID: 57358');
+    expect(stdout.buffer).toContain('All Traffic Rule: no');
+    expect(stdout.buffer).toContain('Rules');
+    expect(stdout.buffer).toContain('Custom_TCP');
+  });
+
+  it('updates security groups in deterministic json mode', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const rulesFilePath = await writeRulesFile(sampleRules());
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'security-group',
+      'update',
+      '57358',
+      '--alias',
+      'prod',
+      '--name',
+      'web-sg',
+      '--rules-file',
+      rulesFilePath,
+      '--description',
+      'edge ingress'
+    ]);
+
+    expect(stub.updateSecurityGroup).toHaveBeenCalledWith(57358, {
+      description: 'edge ingress',
+      name: 'web-sg',
+      rules: sampleRules()
+    });
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'update',
+        message: 'Security Group updated successfully.',
+        security_group: {
+          description: 'edge ingress',
+          id: 57358,
+          name: 'web-sg',
+          rule_count: 2
+        }
+      })}\n`
+    );
+  });
+
+  it('renders human update output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const rulesFilePath = await writeRulesFile(sampleRules());
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'update',
+      '57358',
+      '--alias',
+      'prod',
+      '--name',
+      'web-sg',
+      '--rules-file',
+      rulesFilePath,
+      '--description',
+      'edge ingress'
+    ]);
+
+    expect(stdout.buffer).toContain('Updated security group 57358.');
+    expect(stdout.buffer).toContain('Name: web-sg');
+    expect(stdout.buffer).toContain('Rules: 2');
+  });
+
   it('deletes one security group with --force in deterministic json mode', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -293,6 +473,76 @@ describe('security-group commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('renders human delete output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'delete',
+      '57358',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Deleted security group 57358.');
+    expect(stdout.buffer).toContain(
+      'Message: Security Group deleted successfully.'
+    );
+  });
+
+  it('renders cancelled delete output when confirmation is declined', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    runtime.confirm = vi.fn(() => Promise.resolve(false));
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'security-group',
+      'delete',
+      '57358',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toBe('Deletion cancelled.\n');
+  });
+
+  it('shows root help for security-group commands', async () => {
+    const help = await renderHelp(['security-group']);
+
+    expect(help).toContain('Manage MyAccount security groups.');
+    expect(help).toContain('Show help for a security-group command');
+  });
+
+  it('shows help for security-group create', async () => {
+    const help = await renderHelp(['security-group', 'create', '--help']);
+
+    expect(help).toContain('Create a security group');
+    expect(help).toContain('--rules-file <path>');
+    expect(help).toContain('--default');
+  });
+
+  it('shows help for security-group update', async () => {
+    const help = await renderHelp(['security-group', 'update', '--help']);
+
+    expect(help).toContain('Replace the full desired security-group rule set');
+    expect(help).toContain('Optional description override');
+  });
+
+  it('shows help for security-group delete', async () => {
+    const help = await renderHelp(['security-group', 'delete', '--help']);
+
+    expect(help).toContain('Delete a security group.');
+    expect(help).toContain('--force');
   });
 });
 

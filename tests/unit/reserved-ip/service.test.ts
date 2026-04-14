@@ -184,40 +184,6 @@ describe('ReservedIpService', () => {
     });
   });
 
-  it('retries the inventory lookup for get until the reserved IP appears', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const { listReservedIps, service } = createServiceFixture();
-
-      listReservedIps
-        .mockResolvedValueOnce([
-          {
-            ...sampleReservedIpSummary(),
-            ip_address: '164.52.198.55'
-          }
-        ])
-        .mockResolvedValueOnce([sampleReservedIpSummary()]);
-
-      const resultPromise = service.getReservedIp('164.52.198.54', {
-        alias: 'prod'
-      });
-      void resultPromise.catch(() => undefined);
-
-      await vi.runAllTimersAsync();
-
-      await expect(resultPromise).resolves.toMatchObject({
-        action: 'get',
-        reserved_ip: {
-          ip_address: '164.52.198.54'
-        }
-      });
-      expect(listReservedIps).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('fails locally when get receives an invalid IPv4 address', async () => {
     const { createReservedIpClient, listReservedIps, service } =
       createServiceFixture();
@@ -282,34 +248,24 @@ describe('ReservedIpService', () => {
   });
 
   it('returns a clear not-found error when no reserved IP matches exactly', async () => {
-    vi.useFakeTimers();
+    const { listReservedIps, service } = createServiceFixture();
 
-    try {
-      const { listReservedIps, service } = createServiceFixture();
+    listReservedIps.mockResolvedValue([
+      {
+        ...sampleReservedIpSummary(),
+        ip_address: '164.52.198.55'
+      }
+    ]);
 
-      listReservedIps.mockResolvedValue([
-        {
-          ...sampleReservedIpSummary(),
-          ip_address: '164.52.198.55'
-        }
-      ]);
-
-      const resultPromise = service
-        .getReservedIp('164.52.198.54', {
-          alias: 'prod'
-        })
-        .catch((error: unknown) => error);
-
-      await vi.runAllTimersAsync();
-
-      await expect(resultPromise).resolves.toMatchObject({
-        code: 'RESERVED_IP_NOT_FOUND',
-        message: 'Reserved IP 164.52.198.54 was not found.'
-      });
-      expect(listReservedIps).toHaveBeenCalledTimes(8);
-    } finally {
-      vi.useRealTimers();
-    }
+    await expect(
+      service.getReservedIp('164.52.198.54', {
+        alias: 'prod'
+      })
+    ).rejects.toMatchObject({
+      code: 'RESERVED_IP_NOT_FOUND',
+      message: 'Reserved IP 164.52.198.54 was not found.'
+    });
+    expect(listReservedIps).toHaveBeenCalledTimes(1);
   });
 
   it('creates reserved IPs from the default network without resolving node details', async () => {
@@ -403,6 +359,38 @@ describe('ReservedIpService', () => {
     }
   });
 
+  it('fails clearly when a created reserved IP never appears in inventory', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { createReservedIp, listReservedIps, service } =
+        createServiceFixture();
+
+      createReservedIp.mockResolvedValue({
+        ...sampleReservedIpSummary(),
+        status: 'Reserved',
+        vm_id: null,
+        vm_name: '--'
+      });
+      listReservedIps.mockResolvedValue([]);
+
+      const resultPromise = service
+        .createReservedIp({ alias: 'prod' })
+        .catch((error: unknown) => error);
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toMatchObject({
+        code: 'RESERVED_IP_INVENTORY_TIMEOUT',
+        message:
+          'Reserved IP 164.52.198.54 did not appear in inventory after the create request succeeded.'
+      });
+      expect(listReservedIps).toHaveBeenCalledTimes(8);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reserves the current node public IP through the live-reserve action path', async () => {
     const { getNode, reserveNodePublicIp, service } = createServiceFixture();
 
@@ -490,6 +478,23 @@ describe('ReservedIpService', () => {
     expect(reserveNodePublicIp).not.toHaveBeenCalled();
   });
 
+  it('fails locally for reserve node when the node id is not numeric', async () => {
+    const { createReservedIpClient, getNode, service } = createServiceFixture();
+
+    await expect(
+      service.reserveNodePublicIp({
+        alias: 'prod',
+        nodeId: 'node-a'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_NODE_ID',
+      message: 'Node ID must be numeric.'
+    });
+
+    expect(createReservedIpClient).not.toHaveBeenCalled();
+    expect(getNode).not.toHaveBeenCalled();
+  });
+
   it('attaches reserved IPs to nodes after resolving the backend vm_id from the CLI node id', async () => {
     const { attachReservedIpToNode, getNode, service } = createServiceFixture();
 
@@ -530,6 +535,23 @@ describe('ReservedIpService', () => {
         vm_name: 'node-a'
       }
     });
+  });
+
+  it('fails locally for attach when the node id is not numeric', async () => {
+    const { attachReservedIpToNode, getNode, service } = createServiceFixture();
+
+    await expect(
+      service.attachReservedIpToNode('164.52.198.54', {
+        alias: 'prod',
+        nodeId: 'node-a'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_NODE_ID',
+      message: 'Node ID must be numeric.'
+    });
+
+    expect(attachReservedIpToNode).not.toHaveBeenCalled();
+    expect(getNode).not.toHaveBeenCalled();
   });
 
   it('detaches reserved IPs from nodes after resolving the backend vm_id from the CLI node id', async () => {
@@ -620,6 +642,24 @@ describe('ReservedIpService', () => {
       message: 'The MyAccount API did not return a VM ID for this node.'
     });
     expect(detachReservedIpFromNode).not.toHaveBeenCalled();
+  });
+
+  it('fails locally for detach when the node id is not numeric', async () => {
+    const { detachReservedIpFromNode, getNode, service } =
+      createServiceFixture();
+
+    await expect(
+      service.detachReservedIpFromNode('164.52.198.54', {
+        alias: 'prod',
+        nodeId: 'node-a'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_NODE_ID',
+      message: 'Node ID must be numeric.'
+    });
+
+    expect(detachReservedIpFromNode).not.toHaveBeenCalled();
+    expect(getNode).not.toHaveBeenCalled();
   });
 
   it('returns a cancelled delete result when the confirmation prompt is declined', async () => {

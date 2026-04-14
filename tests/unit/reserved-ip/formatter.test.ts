@@ -140,6 +140,56 @@ describe('reserved-ip formatter', () => {
     );
   });
 
+  it('renders reserve-node output for humans', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'reserve-node',
+        ip_address: '164.52.198.55',
+        message: 'IP reserved successfully.',
+        node_id: 101,
+        status: 'Live Reserved'
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Reserved current public IP 164.52.198.55 from node 101.'
+    );
+    expect(output).toContain('Status: Live Reserved');
+    expect(output).toContain('Message: IP reserved successfully.');
+  });
+
+  it('renders attach-node output in deterministic json mode', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'attach-node',
+        message: 'IP assigned successfully.',
+        node_id: 101,
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'attach-node',
+        message: 'IP assigned successfully.',
+        node_id: 101,
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        }
+      })}\n`
+    );
+  });
+
   it('renders detach-node results for humans and deterministic json output', () => {
     const humanOutput = renderReservedIpResult(
       {
@@ -224,6 +274,209 @@ describe('reserved-ip formatter', () => {
         ip_address: '164.52.198.54',
         message: 'IP Released 164.52.198.54'
       })}\n`
+    );
+  });
+
+  it('renders cancelled delete output in deterministic json mode', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        ip_address: '164.52.198.54'
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: true,
+        ip_address: '164.52.198.54'
+      })}\n`
+    );
+  });
+
+  it('renders deterministic json for reserved-ip creation', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'create',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          floating_ip_attached_nodes: [],
+          status: 'Reserved',
+          vm_id: null,
+          vm_name: '--'
+        },
+        source: 'default-network'
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'create',
+        reserved_ip: {
+          appliance_type: 'NODE',
+          bought_at: '04-11-2024 10:37',
+          floating_ip_attached_nodes: [],
+          ip_address: '164.52.198.54',
+          project_name: 'default-project',
+          reserve_id: 12662,
+          reserved_type: 'AddonIP',
+          status: 'Reserved',
+          vm_id: null,
+          vm_name: '--'
+        },
+        source: 'default-network'
+      })}\n`
+    );
+  });
+
+  it('renders reserved-ip details with fallback attached-vm and type labels', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          appliance_type: null,
+          reserved_type: null,
+          vm_id: null,
+          vm_name: 'node-a'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Attached VM: node-a');
+    expect(output).toContain('Type: --');
+  });
+
+  it('renders reserved-ip details with a type fallback from appliance only', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          appliance_type: 'NODE',
+          reserved_type: null
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Type: NODE');
+  });
+
+  it('renders reserved-ip details with a vm-id-only attachment label', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          vm_id: 100157,
+          vm_name: null
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Attached VM: VM 100157');
+  });
+
+  it('sorts floating attachment rows by node id and vm id', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          floating_ip_attached_nodes: [
+            {
+              id: 205,
+              ip_address_private: '10.0.0.7',
+              ip_address_public: '164.52.198.99',
+              name: 'node-z',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: 100200
+            },
+            {
+              id: 101,
+              ip_address_private: '10.0.0.5',
+              ip_address_public: '164.52.198.55',
+              name: 'node-a',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: 100157
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output.indexOf('101')).toBeLessThan(output.indexOf('205'));
+  });
+
+  it('renders list rows with fallback placeholder values', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'list',
+        items: [
+          {
+            ...sampleReservedIpItem(),
+            appliance_type: null,
+            project_name: null,
+            reserved_type: null,
+            status: null,
+            vm_id: null,
+            vm_name: null
+          }
+        ]
+      },
+      false
+    );
+
+    expect(output).toContain('--');
+    expect(output).toContain('164.52.198.54');
+  });
+
+  it('renders deleted reserved-ip output for humans', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        ip_address: '164.52.198.54',
+        message: 'IP Released 164.52.198.54'
+      },
+      false
+    );
+
+    expect(output).toBe(
+      'Deleted reserved IP 164.52.198.54.\nMessage: IP Released 164.52.198.54\n'
+    );
+  });
+
+  it('sorts reserved-ip list json output by ip address and reserve id', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'list',
+        items: [
+          {
+            ...sampleReservedIpItem(),
+            ip_address: '216.48.184.202',
+            reserve_id: 12663
+          },
+          {
+            ...sampleReservedIpItem(),
+            reserve_id: 12661
+          }
+        ]
+      },
+      true
+    );
+
+    expect(output.indexOf('"ip_address": "164.52.198.54"')).toBeLessThan(
+      output.indexOf('"ip_address": "216.48.184.202"')
     );
   });
 });

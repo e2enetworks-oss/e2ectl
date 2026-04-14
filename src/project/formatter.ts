@@ -27,7 +27,7 @@ export function formatProjectListTable(items: ProjectItem[]): string {
     ]
   });
 
-  items.forEach((item) => {
+  sortProjectItems(items).forEach((item) => {
     table.push([
       String(item.project_id),
       item.name,
@@ -53,7 +53,9 @@ function renderProjectHuman(result: ProjectCommandResult): string {
 function normalizeProjectJson(result: ProjectCommandResult): JsonValue {
   return {
     action: 'list',
-    items: result.items.map((item) => normalizeProjectItem(item))
+    items: sortProjectItems(result.items).map((item) =>
+      normalizeProjectItem(item)
+    )
   };
 }
 
@@ -73,4 +75,19 @@ function normalizeProjectItem(item: ProjectItem): JsonValue {
 
 function formatYesNo(value: boolean): string {
   return value ? 'yes' : 'no';
+}
+
+function sortProjectItems(items: ProjectItem[]): ProjectItem[] {
+  return [...items].sort((left, right) => {
+    const leftKey = [
+      left.name.toLowerCase(),
+      String(left.project_id).padStart(12, '0')
+    ].join('\u0000');
+    const rightKey = [
+      right.name.toLowerCase(),
+      String(right.project_id).padStart(12, '0')
+    ].join('\u0000');
+
+    return leftKey.localeCompare(rightKey);
+  });
 }

@@ -139,4 +139,36 @@ describe('security-group list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders a clear empty-state message for security-group list', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/security_group/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['security-group', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe('No security groups found.\n');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

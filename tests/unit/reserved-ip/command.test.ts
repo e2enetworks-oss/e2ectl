@@ -1,3 +1,5 @@
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { runCli } from '../../../src/app/index.js';
 import { createProgram } from '../../../src/app/program.js';
@@ -49,6 +51,20 @@ function createReservedIpClientStub() {
       }
     ])
   );
+  const deleteReservedIp = vi.fn(() =>
+    Promise.resolve({
+      message: 'IP Released 164.52.198.54'
+    })
+  );
+  const detachReservedIpFromNode = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '164.52.198.54',
+      message: 'IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    })
+  );
   const reserveNodePublicIp = vi.fn(() =>
     Promise.resolve({
       ip_address: '164.52.198.55',
@@ -62,11 +78,7 @@ function createReservedIpClientStub() {
   const stub: ReservedIpClient = {
     attachReservedIpToNode,
     createReservedIp,
-    deleteReservedIp: vi.fn(() =>
-      Promise.resolve({
-        message: 'IP Released 164.52.198.54'
-      })
-    ),
+    deleteReservedIp,
     detachNodePublicIp: vi.fn(() =>
       Promise.resolve({
         ip_address: '164.52.198.54',
@@ -76,15 +88,7 @@ function createReservedIpClientStub() {
         vm_name: 'node-a'
       })
     ),
-    detachReservedIpFromNode: vi.fn(() =>
-      Promise.resolve({
-        ip_address: '164.52.198.54',
-        message: 'IP detached successfully.',
-        status: 'Reserved',
-        vm_id: 100157,
-        vm_name: 'node-a'
-      })
-    ),
+    detachReservedIpFromNode,
     listReservedIps,
     reserveNodePublicIp
   };
@@ -92,6 +96,8 @@ function createReservedIpClientStub() {
   return {
     attachReservedIpToNode,
     createReservedIp,
+    deleteReservedIp,
+    detachReservedIpFromNode,
     listReservedIps,
     reserveNodePublicIp,
     stub
@@ -192,6 +198,48 @@ describe('reserved-ip commands', () => {
       default_project_id: '12345',
       default_location: 'Delhi'
     });
+  }
+
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
   }
 
   it('lists reserved IPs in deterministic json mode using alias defaults', async () => {
@@ -348,6 +396,183 @@ describe('reserved-ip commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('gets one reserved IP in deterministic json mode with explicit context overrides', async () => {
+    const { receivedCredentials, reservedIpStub, runtime, stdout } =
+      createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'reserved-ip',
+      'get',
+      '164.52.198.54',
+      '--alias',
+      'prod',
+      '--location',
+      'Chennai',
+      '--project-id',
+      '67890'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      location: 'Chennai',
+      project_id: '67890'
+    });
+    expect(reservedIpStub.listReservedIps).toHaveBeenCalledTimes(1);
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'get',
+        reserved_ip: {
+          appliance_type: 'NODE',
+          bought_at: '04-11-2024 10:37',
+          floating_ip_attached_nodes: [],
+          ip_address: '164.52.198.54',
+          project_name: 'default-project',
+          reserve_id: 12662,
+          reserved_type: 'AddonIP',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        }
+      })}\n`
+    );
+  });
+
+  it('deletes reserved IPs in deterministic json mode', async () => {
+    const { runtime, stdout, reservedIpStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'reserved-ip',
+      'delete',
+      '164.52.198.54',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(reservedIpStub.deleteReservedIp).toHaveBeenCalledWith(
+      '164.52.198.54'
+    );
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        ip_address: '164.52.198.54',
+        message: 'IP Released 164.52.198.54'
+      })}\n`
+    );
+  });
+
+  it('detaches reserved IPs from nodes through the targeted command shape', async () => {
+    const { reservedIpStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'reserved-ip',
+      'detach',
+      'node',
+      '164.52.198.54',
+      '--node-id',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(reservedIpStub.detachReservedIpFromNode).toHaveBeenCalledWith(
+      '164.52.198.54',
+      {
+        type: 'detach',
+        vm_id: 100157
+      }
+    );
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'detach-node',
+        message: 'IP detached successfully.',
+        node_id: 101,
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: 'Reserved',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        }
+      })}\n`
+    );
+  });
+
+  it('renders human list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('IP Address');
+    expect(stdout.buffer).toContain('164.52.198.54');
+    expect(stdout.buffer).toContain('default-project');
+  });
+
+  it('shows root help for reserved-ip commands', async () => {
+    const output = await renderHelp(['reserved-ip', '--help']);
+
+    expect(output).toContain('Manage MyAccount reserved IP addresses.');
+    expect(output).toContain('create');
+    expect(output).toContain('detach');
+  });
+
+  it('shows help for reserved-ip reserve', async () => {
+    const output = await renderHelp(['reserved-ip', 'reserve', '--help']);
+
+    expect(output).toContain(
+      "Preserve a target resource's current public IP as a reserved IP."
+    );
+    expect(output).toContain('node [options] <nodeId>');
+  });
+
+  it('shows help for reserved-ip attach node', async () => {
+    const output = await renderHelp([
+      'reserved-ip',
+      'attach',
+      'node',
+      '--help'
+    ]);
+
+    expect(output).toContain('Attach a reserved IP to a node.');
+    expect(output).toContain('--node-id <nodeId>');
+  });
+
+  it('shows help for reserved-ip detach node', async () => {
+    const output = await renderHelp([
+      'reserved-ip',
+      'detach',
+      'node',
+      '--help'
+    ]);
+
+    expect(output).toContain('Detach a reserved IP from a node.');
+    expect(output).toContain('--node-id <nodeId>');
   });
 
   it('rejects the removed --from-node flag', async () => {

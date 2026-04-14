@@ -72,4 +72,50 @@ describe('node save-image action against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human save-image output with action details', async () => {
+    const server = await startTestHttpServer({
+      'PUT /myaccount/api/v1/nodes/101/actions/': () => ({
+        body: {
+          code: 200,
+          data: {
+            action_type: 'Save Image',
+            created_at: '2026-03-14T08:20:00Z',
+            id: 703,
+            image_id: 'img-455',
+            resource_id: '101',
+            status: 'In Progress'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['node', 'action', 'save-image', '101', '--name', 'node-a-image'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain(
+        'Requested save image for node 101 as node-a-image.'
+      );
+      expect(result.stdout).toContain('Action ID: 703');
+      expect(result.stdout).toContain('Image ID: img-455');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

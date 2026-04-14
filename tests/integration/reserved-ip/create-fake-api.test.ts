@@ -110,4 +110,70 @@ describe('reserved-ip create against a fake MyAccount API', () => {
     expect(result.stdout).not.toContain('node [options] <nodeId>');
     expect(result.stdout).not.toContain('--from-node');
   });
+
+  it('renders human reserved-IP create output with the next-step hint', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: {
+            appliance_type: 'NODE',
+            bought_at: '04-11-2024 10:37',
+            floating_ip_attached_nodes: [],
+            ip_address: '164.52.198.54',
+            project_name: 'default-project',
+            reserve_id: 12662,
+            reserved_type: 'AddonIP',
+            status: 'Reserved',
+            vm_id: null,
+            vm_name: '--'
+          },
+          errors: {},
+          message: 'Success'
+        }
+      }),
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              appliance_type: 'NODE',
+              bought_at: '04-11-2024 10:37',
+              floating_ip_attached_nodes: [],
+              ip_address: '164.52.198.54',
+              project_name: 'default-project',
+              reserve_id: 12662,
+              reserved_type: 'AddonIP',
+              status: 'Reserved',
+              vm_id: null,
+              vm_name: '--'
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['reserved-ip', 'create'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Created reserved IP: 164.52.198.54');
+      expect(result.stdout).toContain('Source: default-network');
+      expect(result.stdout).toContain('Next: run e2ectl reserved-ip list');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

@@ -118,8 +118,14 @@ export interface ReservedIpServiceDependencies {
   store: ReservedIpStore;
 }
 
-const RESERVED_IP_POLL_ATTEMPTS = 8;
-const RESERVED_IP_POLL_INTERVAL_MS = 1_500;
+const RESERVED_IP_POLL_ATTEMPTS = readPositiveIntegerEnv(
+  'E2ECTL_TEST_RESERVED_IP_POLL_ATTEMPTS',
+  8
+);
+const RESERVED_IP_POLL_INTERVAL_MS = readPositiveIntegerEnv(
+  'E2ECTL_TEST_RESERVED_IP_POLL_INTERVAL_MS',
+  1_500
+);
 
 export class ReservedIpService {
   constructor(private readonly dependencies: ReservedIpServiceDependencies) {}
@@ -269,10 +275,7 @@ export class ReservedIpService {
   ): Promise<ReservedIpGetCommandResult> {
     const normalizedIpAddress = assertReservedIpAddress(ipAddress);
     const client = await this.createClient(options);
-    const item = await findReservedIpInInventoryWithRetry(
-      client,
-      normalizedIpAddress
-    );
+    const item = await findReservedIpInInventory(client, normalizedIpAddress);
 
     if (item === undefined) {
       throw buildReservedIpNotFoundError(normalizedIpAddress);
@@ -515,4 +518,18 @@ async function wait(durationMs: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, durationMs);
   });
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+
+  if (rawValue === undefined || rawValue.length === 0) {
+    return fallback;
+  }
+
+  const parsedValue = Number(rawValue);
+
+  return Number.isInteger(parsedValue) && parsedValue > 0
+    ? parsedValue
+    : fallback;
 }

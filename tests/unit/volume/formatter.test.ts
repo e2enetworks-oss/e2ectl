@@ -340,4 +340,181 @@ describe('volume formatter', () => {
       })}\n`
     );
   });
+
+  it('renders hourly volume create output without committed-only billing lines', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'create',
+        billing: {
+          committed_plan: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        requested: {
+          name: 'data-02',
+          size_gb: 500
+        },
+        resolved_plan: {
+          available: true,
+          currency: null,
+          hourly_price: null,
+          iops: 10000,
+          size_gb: 500
+        },
+        volume: {
+          id: 25551,
+          name: 'data-02'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Created volume: data-02');
+    expect(output).toContain('Billing: hourly');
+    expect(output).not.toContain('Committed Plan:');
+    expect(output).not.toContain('Post-Commit:');
+    expect(output).not.toContain('Hourly Price Reference:');
+  });
+
+  it('renders volume details without attachment context when the volume is detached', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'get',
+        volume: {
+          attached: false,
+          attachment: null,
+          exporting_to_eos: false,
+          id: 25551,
+          name: 'data-02',
+          size_gb: 500,
+          size_label: '500 GB',
+          snapshot_exists: false,
+          status: 'Reserved'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Attached: no');
+    expect(output).toContain('Snapshot Exists: no');
+    expect(output).toContain('Exporting To EOS: no');
+    expect(output).not.toContain('Attached To:');
+  });
+
+  it('renders the single-size no-committed-options branch clearly', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'plans',
+        filters: {
+          available_only: false,
+          size_gb: 250
+        },
+        items: [
+          {
+            available: true,
+            committed_options: [],
+            currency: 'INR',
+            hourly_price: 1.71,
+            iops: 5000,
+            size_gb: 250
+          }
+        ],
+        total_count: 1
+      },
+      false
+    );
+
+    expect(output).toContain('Committed Options For 250 GB');
+    expect(output).toContain('No committed options found.');
+  });
+
+  it('renders a committed-pricing guidance branch when committed options vary by size', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'plans',
+        filters: {
+          available_only: false,
+          size_gb: null
+        },
+        items: [
+          {
+            available: true,
+            committed_options: [
+              {
+                id: 31,
+                name: '30 Days Committed',
+                savings_percent: 18.78,
+                term_days: 30,
+                total_price: 1000
+              }
+            ],
+            currency: 'INR',
+            hourly_price: 1.71,
+            iops: 5000,
+            size_gb: 250
+          },
+          {
+            available: true,
+            committed_options: [
+              {
+                id: 92,
+                name: '90 Days Committed',
+                savings_percent: 22.5,
+                term_days: 90,
+                total_price: 7800
+              }
+            ],
+            currency: 'INR',
+            hourly_price: 6.85,
+            iops: 15000,
+            size_gb: 1000
+          }
+        ],
+        total_count: 2
+      },
+      false
+    );
+
+    expect(output).toContain('Committed Pricing');
+    expect(output).toContain('Committed options vary by size.');
+    expect(output).toContain(formatCliCommand('volume plans --size <size-gb>'));
+    expect(output).not.toContain('Committed Terms');
+  });
+
+  it('omits committed guidance entirely when no committed plans are available for any size', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'plans',
+        filters: {
+          available_only: false,
+          size_gb: null
+        },
+        items: [
+          {
+            available: true,
+            committed_options: [],
+            currency: 'INR',
+            hourly_price: 1.71,
+            iops: 5000,
+            size_gb: 250
+          },
+          {
+            available: true,
+            committed_options: [],
+            currency: 'INR',
+            hourly_price: 6.85,
+            iops: 15000,
+            size_gb: 1000
+          }
+        ],
+        total_count: 2
+      },
+      false
+    );
+
+    expect(output).toContain('Base Plans (2)');
+    expect(output).toContain('Create with explicit size and billing:');
+    expect(output).not.toContain('Committed Terms');
+    expect(output).not.toContain('Committed Pricing');
+  });
 });

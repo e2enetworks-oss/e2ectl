@@ -357,7 +357,7 @@ function renderNodeHuman(result: NodeCommandResult): string {
     case 'list':
       return result.nodes.length === 0
         ? 'No nodes found.\n'
-        : `${formatNodesTable(result.nodes)}\n`;
+        : `${formatNodesTable(sortNodeSummariesById(result.nodes))}\n`;
     case 'power-off':
       return (
         [`Requested power off for node ${result.node_id}.`]

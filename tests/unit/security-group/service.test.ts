@@ -19,7 +19,11 @@ function createConfig(): ConfigFile {
   };
 }
 
-function createServiceFixture(): {
+function createServiceFixture(options?: {
+  confirmResult?: boolean;
+  isInteractive?: boolean;
+}): {
+  confirm: ReturnType<typeof vi.fn>;
   createSecurityGroup: ReturnType<typeof vi.fn>;
   createSecurityGroupClient: ReturnType<typeof vi.fn>;
   deleteSecurityGroup: ReturnType<typeof vi.fn>;
@@ -66,6 +70,7 @@ function createServiceFixture(): {
   const readRulesFromStdin = vi.fn(() =>
     Promise.resolve(JSON.stringify(sampleRules()))
   );
+  const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
   const client: SecurityGroupClient = {
@@ -84,9 +89,9 @@ function createServiceFixture(): {
     }
   );
   const service = new SecurityGroupService({
-    confirm: vi.fn(() => Promise.resolve(true)),
+    confirm,
     createSecurityGroupClient,
-    isInteractive: true,
+    isInteractive: options?.isInteractive ?? true,
     readRulesFile,
     readRulesFromStdin,
     store: {
@@ -96,6 +101,7 @@ function createServiceFixture(): {
   });
 
   return {
+    confirm,
     createSecurityGroup,
     createSecurityGroupClient,
     deleteSecurityGroup,
@@ -177,6 +183,46 @@ describe('SecurityGroupService', () => {
     });
   });
 
+  it('reads rules from stdin when --rules-file - is used during create', async () => {
+    const { createSecurityGroup, readRulesFromStdin, service } =
+      createServiceFixture();
+
+    createSecurityGroup.mockResolvedValue({
+      message: 'Security Group created successfully.',
+      result: {
+        id: 57361,
+        label_id: null,
+        resource_type: null
+      }
+    });
+
+    const result = await service.createSecurityGroup({
+      alias: 'prod',
+      name: 'stdin-sg',
+      rulesFile: '-'
+    });
+
+    expect(readRulesFromStdin).toHaveBeenCalledTimes(1);
+    expect(createSecurityGroup).toHaveBeenCalledWith({
+      description: '',
+      name: 'stdin-sg',
+      rules: sampleRules()
+    });
+    expect(result).toEqual({
+      action: 'create',
+      message: 'Security Group created successfully.',
+      security_group: {
+        description: '',
+        id: 57361,
+        is_default: false,
+        label_id: null,
+        name: 'stdin-sg',
+        resource_type: null,
+        rule_count: 2
+      }
+    });
+  });
+
   it('uses the backend-returned id directly when create already returns one', async () => {
     const { createSecurityGroup, listSecurityGroups, service } =
       createServiceFixture();
@@ -245,6 +291,58 @@ describe('SecurityGroupService', () => {
     });
   });
 
+  it('uses an explicit update description without fetching the current security group', async () => {
+    const { getSecurityGroup, service, updateSecurityGroup } =
+      createServiceFixture();
+
+    const result = await service.updateSecurityGroup('57358', {
+      alias: 'prod',
+      description: 'edge ingress',
+      name: 'edge-sg',
+      rulesFile: '/tmp/rules.json'
+    });
+
+    expect(getSecurityGroup).not.toHaveBeenCalled();
+    expect(updateSecurityGroup).toHaveBeenCalledWith(57358, {
+      description: 'edge ingress',
+      name: 'edge-sg',
+      rules: sampleRules()
+    });
+    expect(result).toEqual({
+      action: 'update',
+      message: 'Security Group updated successfully.',
+      security_group: {
+        description: 'edge ingress',
+        id: 57358,
+        name: 'edge-sg',
+        rule_count: 2
+      }
+    });
+  });
+
+  it('falls back to an empty description when the backend returns null during update', async () => {
+    const { getSecurityGroup, service, updateSecurityGroup } =
+      createServiceFixture();
+
+    getSecurityGroup.mockResolvedValue({
+      ...sampleSummary(),
+      description: null
+    });
+
+    const result = await service.updateSecurityGroup('57358', {
+      alias: 'prod',
+      name: 'web-sg',
+      rulesFile: '/tmp/rules.json'
+    });
+
+    expect(updateSecurityGroup).toHaveBeenCalledWith(57358, {
+      description: '',
+      name: 'web-sg',
+      rules: sampleRules()
+    });
+    expect(result.security_group.description).toBe('');
+  });
+
   it('rejects invalid rules JSON before creating a client', async () => {
     const { createSecurityGroupClient, readRulesFile, service } =
       createServiceFixture();
@@ -288,6 +386,127 @@ describe('SecurityGroupService', () => {
     expect(getSecurityGroup).not.toHaveBeenCalled();
   });
 
+  it('rejects blank rules-file values before creating a client', async () => {
+    const {
+      createSecurityGroupClient,
+      readRulesFile,
+      readRulesFromStdin,
+      service
+    } = createServiceFixture();
+
+    await expect(
+      service.createSecurityGroup({
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '   '
+      })
+    ).rejects.toMatchObject({
+      message: 'Rules file cannot be empty.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+    expect(readRulesFile).not.toHaveBeenCalled();
+    expect(readRulesFromStdin).not.toHaveBeenCalled();
+  });
+
+  it('rejects blank rules content before creating a client', async () => {
+    const { createSecurityGroupClient, readRulesFile, service } =
+      createServiceFixture();
+
+    readRulesFile.mockResolvedValue('   ');
+
+    await expect(
+      service.createSecurityGroup({
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '/tmp/empty-rules.json'
+      })
+    ).rejects.toMatchObject({
+      message: 'Rules content cannot be empty.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects rules content that is not a JSON array', async () => {
+    const { createSecurityGroupClient, readRulesFile, service } =
+      createServiceFixture();
+
+    readRulesFile.mockResolvedValue(
+      JSON.stringify({
+        rule_type: 'Inbound'
+      })
+    );
+
+    await expect(
+      service.createSecurityGroup({
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '/tmp/object-rules.json'
+      })
+    ).rejects.toMatchObject({
+      message: 'Rules content must be a JSON array.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects rule entries that are not backend-compatible objects', async () => {
+    const { createSecurityGroupClient, readRulesFile, service } =
+      createServiceFixture();
+
+    readRulesFile.mockResolvedValue(JSON.stringify([null]));
+
+    await expect(
+      service.createSecurityGroup({
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '/tmp/null-rule.json'
+      })
+    ).rejects.toMatchObject({
+      message:
+        'Rule 1 must be a JSON object compatible with the backend rule schema.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid security-group ids for get before client creation', async () => {
+    const { createSecurityGroupClient, getSecurityGroup, service } =
+      createServiceFixture();
+
+    await expect(
+      service.getSecurityGroup('web-sg', {
+        alias: 'prod'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SECURITY_GROUP_ID',
+      message: 'Security group ID must be numeric.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+    expect(getSecurityGroup).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid security-group ids for update before client creation', async () => {
+    const { createSecurityGroupClient, updateSecurityGroup, service } =
+      createServiceFixture();
+
+    await expect(
+      service.updateSecurityGroup('web-sg', {
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '/tmp/rules.json'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SECURITY_GROUP_ID',
+      message: 'Security group ID must be numeric.'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+    expect(updateSecurityGroup).not.toHaveBeenCalled();
+  });
+
   it('deletes one security group with an explicit force flag', async () => {
     const { deleteSecurityGroup, service } = createServiceFixture();
 
@@ -306,6 +525,47 @@ describe('SecurityGroupService', () => {
         name: 'web-sg'
       }
     });
+  });
+
+  it('returns a cancelled delete result when the confirmation prompt is declined', async () => {
+    const { confirm, deleteSecurityGroup, service } = createServiceFixture({
+      confirmResult: false
+    });
+
+    const result = await service.deleteSecurityGroup('57358', {
+      alias: 'prod'
+    });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete security group 57358? This cannot be undone.'
+    );
+    expect(deleteSecurityGroup).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: true,
+      security_group: {
+        id: 57358,
+        name: null
+      }
+    });
+  });
+
+  it('requires --force for delete in non-interactive mode', async () => {
+    const { deleteSecurityGroup, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.deleteSecurityGroup('57358', {
+        alias: 'prod'
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a security group requires confirmation in an interactive terminal.'
+    });
+
+    expect(deleteSecurityGroup).not.toHaveBeenCalled();
   });
 });
 

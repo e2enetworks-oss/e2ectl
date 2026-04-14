@@ -166,4 +166,60 @@ describe('node volume actions against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human volume action output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/nodes/101/': () => ({
+        body: {
+          code: 200,
+          data: {
+            id: 101,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            status: 'Running',
+            vm_id: 100157
+          },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'PUT /myaccount/api/v1/block_storage/8801/vm/attach/': () => ({
+        body: {
+          code: 200,
+          data: {
+            image_id: 8801,
+            vm_id: 100157
+          },
+          errors: {},
+          message: 'Block Storage is Attached to VM.'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['node', 'action', 'volume', 'attach', '101', '--volume-id', '8801'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Requested volume attach for node 101.');
+      expect(result.stdout).toContain('Volume ID: 8801');
+      expect(result.stdout).toContain(
+        'Message: Block Storage is Attached to VM.'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

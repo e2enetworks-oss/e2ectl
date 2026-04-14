@@ -1,3 +1,5 @@
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
@@ -114,6 +116,48 @@ describe('project commands', () => {
     });
   }
 
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
+  }
+
   it('lists projects in deterministic json mode using account-scoped credentials', async () => {
     const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -155,5 +199,40 @@ describe('project commands', () => {
         ]
       })}\n`
     );
+  });
+
+  it('renders human project output while keeping account-scoped credentials', async () => {
+    const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'project',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(receivedCredentials()).toEqual({
+      alias: 'prod',
+      api_key: 'api-key',
+      auth_token: 'auth-token',
+      location: 'Delhi',
+      project_id: '12345',
+      source: 'profile'
+    });
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('default-project');
+    expect(stdout.buffer).toContain('Owner');
+  });
+
+  it('shows root help for the project command', async () => {
+    const output = await renderHelp(['project', '--help']);
+
+    expect(output).toContain('Inspect account-level MyAccount project access.');
+    expect(output).toContain('list');
+    expect(output).toContain('Show help for a project command');
   });
 });

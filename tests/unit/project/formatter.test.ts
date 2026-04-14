@@ -7,6 +7,17 @@ describe('renderProjectResult', () => {
       action: 'list' as const,
       items: [
         {
+          associated_member_count: 2,
+          associated_policy_count: 1,
+          current_user_role: 'Admin',
+          is_backend_active_project: false,
+          is_cli_default_project: false,
+          is_default: false,
+          is_starred: true,
+          name: 'zeta-project',
+          project_id: 50001
+        },
+        {
           associated_member_count: 1,
           associated_policy_count: 2,
           current_user_role: 'Owner',
@@ -21,6 +32,9 @@ describe('renderProjectResult', () => {
     };
 
     expect(renderProjectResult(result, false)).toContain('default-project');
+    expect(
+      renderProjectResult(result, false).indexOf('default-project')
+    ).toBeLessThan(renderProjectResult(result, false).indexOf('zeta-project'));
     expect(renderProjectResult(result, false)).toContain('CLI Default');
     expect(renderProjectResult(result, true)).toBe(
       `${stableStringify({
@@ -36,6 +50,17 @@ describe('renderProjectResult', () => {
             is_starred: false,
             name: 'default-project',
             project_id: 46429
+          },
+          {
+            associated_member_count: 2,
+            associated_policy_count: 1,
+            current_user_role: 'Admin',
+            is_backend_active_project: false,
+            is_cli_default_project: false,
+            is_default: false,
+            is_starred: true,
+            name: 'zeta-project',
+            project_id: 50001
           }
         ]
       })}\n`
