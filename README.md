@@ -1,6 +1,6 @@
 # e2ectl
 
-[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/main/graph/badge.svg)](https://codecov.io/gh/e2enetworks-oss/e2ectl) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](https://github.com/e2enetworks-oss/e2ectl/tree/main/docs) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/develop/graph/badge.svg)](https://codecov.io/gh/e2enetworks-oss/e2ectl/tree/develop) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](https://github.com/e2enetworks-oss/e2ectl/tree/main/docs) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 `e2ectl` is the command-line interface for managing E2E Networks MyAccount resources from the terminal.
 
@@ -34,7 +34,11 @@ npm install -g @e2enetworks-oss/e2ectl@next
 
 ## Quickstart
 
-### 1. Import credentials
+### 1. Get credentials
+
+Open [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam), create an API token, and download the generated config JSON file.
+
+### 2. Import credentials and save a default profile
 
 ```bash
 e2ectl config import --file ~/Downloads/config.json
@@ -42,7 +46,7 @@ e2ectl config import --file ~/Downloads/config.json
 
 In an interactive terminal, the CLI can also help choose a default alias and shared default project/location values.
 
-### 2. Confirm the active profile
+### 3. Confirm the saved profile
 
 ```bash
 e2ectl config list
@@ -56,7 +60,7 @@ If you need to inspect which projects are available to the current account befor
 e2ectl project list
 ```
 
-### 3. Discover valid plans and images
+### 4. Discover valid plans, images, and billing options
 
 ```bash
 e2ectl node catalog os
@@ -71,7 +75,7 @@ e2ectl node catalog plans \
 
 Use `node catalog` before `node create`. It returns the exact `plan`, `image`, and committed plan identifiers the API expects.
 
-### 4. Create a node
+### 5. Create a node
 
 ```bash
 e2ectl node create \
