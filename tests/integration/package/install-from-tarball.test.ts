@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { stableStringify } from '../../../src/core/json.js';
+import { getNpmInvocation } from '../../helpers/npm.js';
 import { runCommand } from '../../helpers/process.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
@@ -13,7 +14,7 @@ describe('package install smoke from tarball', () => {
     const packDirectory = path.join(root, 'pack');
     const prefixDirectory = path.join(root, 'prefix');
     const cacheDirectory = path.join(root, 'npm-cache');
-    const npmCommand = getNpmCommand();
+    const npmInvocation = getNpmInvocation();
     const tempHome = await createTempHome();
     const homeEnv = buildHomeEnv(tempHome.path);
 
@@ -22,8 +23,8 @@ describe('package install smoke from tarball', () => {
       await mkdir(prefixDirectory, { recursive: true });
 
       const packResult = await runCommand(
-        npmCommand,
-        ['pack', '--pack-destination', packDirectory],
+        npmInvocation.command,
+        [...npmInvocation.args, 'pack', '--pack-destination', packDirectory],
         {
           env: {
             ...homeEnv,
@@ -40,8 +41,14 @@ describe('package install smoke from tarball', () => {
 
       const tarballPath = path.join(packDirectory, tarballName!);
       const installResult = await runCommand(
-        npmCommand,
-        ['install', '--prefix', prefixDirectory, tarballPath],
+        npmInvocation.command,
+        [
+          ...npmInvocation.args,
+          'install',
+          '--prefix',
+          prefixDirectory,
+          tarballPath
+        ],
         {
           env: {
             ...homeEnv,
@@ -119,8 +126,4 @@ function buildHomeEnv(homePath: string): NodeJS.ProcessEnv {
     HOME: homePath,
     USERPROFILE: homePath
   };
-}
-
-function getNpmCommand(): string {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
