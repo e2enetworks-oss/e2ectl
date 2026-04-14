@@ -13,6 +13,7 @@ describe('package install smoke from tarball', () => {
     const packDirectory = path.join(root, 'pack');
     const prefixDirectory = path.join(root, 'prefix');
     const cacheDirectory = path.join(root, 'npm-cache');
+    const npmCommand = getNpmCommand();
     const tempHome = await createTempHome();
     const homeEnv = buildHomeEnv(tempHome.path);
 
@@ -21,7 +22,7 @@ describe('package install smoke from tarball', () => {
       await mkdir(prefixDirectory, { recursive: true });
 
       const packResult = await runCommand(
-        'npm',
+        npmCommand,
         ['pack', '--pack-destination', packDirectory],
         {
           env: {
@@ -39,7 +40,7 @@ describe('package install smoke from tarball', () => {
 
       const tarballPath = path.join(packDirectory, tarballName!);
       const installResult = await runCommand(
-        'npm',
+        npmCommand,
         ['install', '--prefix', prefixDirectory, tarballPath],
         {
           env: {
@@ -118,4 +119,8 @@ function buildHomeEnv(homePath: string): NodeJS.ProcessEnv {
     HOME: homePath,
     USERPROFILE: homePath
   };
+}
+
+function getNpmCommand(): string {
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
