@@ -5,6 +5,7 @@ import {
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import type { ReservedIpClient } from '../reserved-ip/index.js';
 import type { SecurityGroupClient } from '../security-group/index.js';
 import type { SshKeyClient, SshKeySummary } from '../ssh-key/index.js';
 import type { VolumeClient } from '../volume/index.js';
@@ -75,6 +76,10 @@ export interface NodeUpgradeOptions extends NodeContextOptions {
   force?: boolean;
   image: string;
   plan: string;
+}
+
+export interface NodePublicIpDetachOptions extends NodeContextOptions {
+  force?: boolean;
 }
 
 export interface NodeCatalogPlansOptions extends NodeContextOptions {
@@ -304,6 +309,24 @@ export interface NodeSecurityGroupDetachCommandResult {
   security_group_ids: number[];
 }
 
+export interface NodePublicIpDetachCancelledCommandResult {
+  action: 'public-ip-detach';
+  cancelled: true;
+  node_id: number;
+  public_ip: string;
+}
+
+export interface NodePublicIpDetachCompletedCommandResult {
+  action: 'public-ip-detach';
+  message: string;
+  node_id: number;
+  public_ip: string;
+}
+
+export type NodePublicIpDetachCommandResult =
+  | NodePublicIpDetachCancelledCommandResult
+  | NodePublicIpDetachCompletedCommandResult;
+
 export type NodeCommandResult =
   | NodeCatalogOsCommandResult
   | NodeCatalogPlansCommandResult
@@ -313,6 +336,7 @@ export type NodeCommandResult =
   | NodeListCommandResult
   | NodePowerOffCommandResult
   | NodePowerOnCommandResult
+  | NodePublicIpDetachCommandResult
   | NodeSaveImageCommandResult
   | NodeSecurityGroupAttachCommandResult
   | NodeSecurityGroupDetachCommandResult
@@ -331,6 +355,7 @@ interface NodeStore {
 export interface NodeServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
+  createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
   createSecurityGroupClient(
     credentials: ResolvedCredentials
   ): SecurityGroupClient;
@@ -770,6 +795,52 @@ export class NodeService {
     };
   }
 
+  async detachPublicIp(
+    nodeId: string,
+    options: NodePublicIpDetachOptions
+  ): Promise<NodePublicIpDetachCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const credentials = await this.resolveContext(options);
+    const nodeClient = this.dependencies.createNodeClient(credentials);
+    const nodeDetails = await this.getNodeDetails(nodeClient, normalizedNodeId);
+    const nodeVmId = assertNodeVmId(nodeDetails, normalizedNodeId);
+    const nodePublicIp = assertNodePublicIpForDetach(
+      nodeDetails,
+      normalizedNodeId
+    );
+
+    if (!(options.force ?? false)) {
+      assertCanDetachPublicIp(this.dependencies.isInteractive);
+      const confirmed = await this.dependencies.confirm(
+        `Detach public IP ${nodePublicIp} from node ${normalizedNodeId}? The node may no longer be publicly reachable.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'public-ip-detach',
+          cancelled: true,
+          node_id: normalizedNodeId,
+          public_ip: nodePublicIp
+        };
+      }
+    }
+
+    const reservedIpClient =
+      this.dependencies.createReservedIpClient(credentials);
+    const result = await reservedIpClient.detachNodePublicIp({
+      public_ip: nodePublicIp,
+      type: 'detach',
+      vm_id: nodeVmId
+    });
+
+    return {
+      action: 'public-ip-detach',
+      message: result.message,
+      node_id: normalizedNodeId,
+      public_ip: result.ip_address
+    };
+  }
+
   async saveNodeImage(
     nodeId: string,
     options: NodeSaveImageOptions
@@ -889,6 +960,13 @@ function assertCanUpgrade(isInteractive: boolean): void {
   );
 }
 
+function assertCanDetachPublicIp(isInteractive: boolean): void {
+  assertConfirmationAllowed(
+    isInteractive,
+    'Detaching a node public IP requires confirmation in an interactive terminal.'
+  );
+}
+
 function assertConfirmationAllowed(
   isInteractive: boolean,
   message: string
@@ -964,6 +1042,25 @@ function assertNodeVmId(node: NodeDetails, nodeId: number): number {
         'Retry the command. If the problem persists, inspect the node details response.'
     }
   );
+}
+
+function assertNodePublicIpForDetach(
+  node: NodeDetails,
+  nodeId: number
+): string {
+  const publicIp = node.public_ip_address?.trim();
+
+  if (publicIp !== undefined && publicIp.length > 0) {
+    return publicIp;
+  }
+
+  throw new CliError('This node does not have a current public IP to detach.', {
+    code: 'NODE_PUBLIC_IP_UNAVAILABLE',
+    details: [`Node ID: ${nodeId}`],
+    exitCode: EXIT_CODES.network,
+    suggestion:
+      'Pick a node with an assigned public IP, then retry the public-ip detach command.'
+  });
 }
 
 function normalizeNodeCreateBillingType(

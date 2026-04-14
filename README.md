@@ -98,11 +98,13 @@ e2ectl node upgrade <node-id> --plan <plan> --image <image>
 e2ectl node action power-off <node-id>
 e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>
+e2ectl node action public-ip detach <node-id> [--force]
 e2ectl node delete <node-id>
 e2ectl node delete <node-id> --reserve-public-ip
 ```
 
-Node actions also include VPC, volume, security-group, and SSH-key attach or detach flows. Use `e2ectl node action --help` to explore the full action surface.
+Node actions also include public IP, VPC, volume, security-group, and SSH-key attach or detach flows. Use `e2ectl node action --help` to explore the full action surface.
+`e2ectl node action public-ip detach` resolves the node's current primary public IPv4 automatically, prompts before detaching it unless `--force` is supplied, and warns that the node may no longer be publicly reachable.
 For `E1` and `E1WC` creates, add `--disk <size-gb>` after selecting the exact plan from `node catalog plans`.
 
 ### Networking, Storage, And Access

@@ -67,6 +67,15 @@ function createReservedIpClientStub() {
         message: 'IP Released 164.52.198.54'
       })
     ),
+    detachNodePublicIp: vi.fn(() =>
+      Promise.resolve({
+        ip_address: '164.52.198.54',
+        message: 'Public IP detached successfully.',
+        status: 'Reserved',
+        vm_id: 100157,
+        vm_name: 'node-a'
+      })
+    ),
     detachReservedIpFromNode: vi.fn(() =>
       Promise.resolve({
         ip_address: '164.52.198.54',

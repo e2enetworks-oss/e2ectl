@@ -735,6 +735,74 @@ describe('node formatter', () => {
     expect(sshKeyOutput).toContain('Status: Done');
   });
 
+  it('renders warnings and deterministic json for public-ip detach results', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested public IP detach for node 101.');
+    expect(humanOutput).toContain('Public IP: 151.185.42.45');
+    expect(humanOutput).toContain('Message: Public IP detached successfully.');
+    expect(humanOutput).toContain(
+      'Warning: This node may no longer be publicly reachable.'
+    );
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      })}\n`
+    );
+  });
+
+  it('renders deterministic cancelled output for public-ip detach', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Cancelled public IP detach for node 101.');
+    expect(humanOutput).toContain('Public IP: 151.185.42.45');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      })}\n`
+    );
+  });
+
   it('renders clean human summaries for node upgrade results', () => {
     const output = renderNodeResult(
       {

@@ -75,6 +75,7 @@ function createServiceFixture(options?: {
     attachReservedIpToNode,
     createReservedIp,
     deleteReservedIp,
+    detachNodePublicIp: vi.fn(),
     detachReservedIpFromNode,
     listReservedIps,
     reserveNodePublicIp

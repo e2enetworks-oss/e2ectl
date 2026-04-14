@@ -4,6 +4,7 @@ import type {
 } from '../../../src/config/index.js';
 import { NodeService } from '../../../src/node/service.js';
 import type { NodeClient } from '../../../src/node/index.js';
+import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
@@ -34,11 +35,13 @@ function createServiceFixture(options?: {
   confirm: ReturnType<typeof vi.fn>;
   createNode: ReturnType<typeof vi.fn>;
   createNodeClient: ReturnType<typeof vi.fn>;
+  createReservedIpClient: ReturnType<typeof vi.fn>;
   createSecurityGroupClient: ReturnType<typeof vi.fn>;
   createSshKeyClient: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
   createVpcClient: ReturnType<typeof vi.fn>;
   deleteNode: ReturnType<typeof vi.fn>;
+  detachNodePublicIp: ReturnType<typeof vi.fn>;
   detachNodeSecurityGroups: ReturnType<typeof vi.fn>;
   detachNodeVpc: ReturnType<typeof vi.fn>;
   detachVolumeFromNode: ReturnType<typeof vi.fn>;
@@ -72,6 +75,7 @@ function createServiceFixture(options?: {
       id: 101,
       name: 'node-a',
       plan: 'C3.8GB',
+      public_ip_address: '151.185.42.45',
       security_group_count: 2,
       status: 'Running',
       vm_id: 100157
@@ -161,6 +165,24 @@ function createServiceFixture(options?: {
     deleteSshKey: vi.fn(),
     listSshKeys
   };
+  const detachNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '151.185.42.45',
+      message: 'Public IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    })
+  );
+  const reservedIpClient: ReservedIpClient = {
+    attachReservedIpToNode: vi.fn(),
+    createReservedIp: vi.fn(),
+    deleteReservedIp: vi.fn(),
+    detachNodePublicIp,
+    detachReservedIpFromNode: vi.fn(),
+    listReservedIps: vi.fn(),
+    reserveNodePublicIp: vi.fn()
+  };
   const attachNodeSecurityGroups = vi.fn(() =>
     Promise.resolve({
       message: 'Security Group Attached Successfully'
@@ -241,6 +263,7 @@ function createServiceFixture(options?: {
       return sshKeyClient;
     }
   );
+  const createReservedIpClient = vi.fn(() => reservedIpClient);
   const createVolumeClient = vi.fn(() => volumeClient);
   const createVpcClient = vi.fn(() => vpcClient);
   const createSecurityGroupClient = vi.fn(() => securityGroupClient);
@@ -249,6 +272,7 @@ function createServiceFixture(options?: {
   const service = new NodeService({
     confirm,
     createNodeClient,
+    createReservedIpClient,
     createSecurityGroupClient,
     createSshKeyClient,
     createVolumeClient,
@@ -268,11 +292,13 @@ function createServiceFixture(options?: {
     confirm,
     createNode,
     createNodeClient,
+    createReservedIpClient,
     createSecurityGroupClient,
     createSshKeyClient,
     createVolumeClient,
     createVpcClient,
     deleteNode,
+    detachNodePublicIp,
     detachNodeSecurityGroups,
     detachNodeVpc,
     detachVolumeFromNode,
@@ -329,6 +355,102 @@ describe('NodeService', () => {
         status: 'In Progress'
       }
     });
+  });
+
+  it('detaches the current node public IP after resolving node details first', async () => {
+    const {
+      confirm,
+      createReservedIpClient,
+      detachNodePublicIp,
+      getNode,
+      service
+    } = createServiceFixture({
+      isInteractive: true
+    });
+
+    const result = await service.detachPublicIp('101', { alias: 'prod' });
+
+    expect(getNode).toHaveBeenCalledWith('101');
+    expect(confirm).toHaveBeenCalledWith(
+      'Detach public IP 151.185.42.45 from node 101? The node may no longer be publicly reachable.'
+    );
+    expect(createReservedIpClient).toHaveBeenCalledTimes(1);
+    expect(detachNodePublicIp).toHaveBeenCalledWith({
+      public_ip: '151.185.42.45',
+      type: 'detach',
+      vm_id: 100157
+    });
+    expect(result).toEqual({
+      action: 'public-ip-detach',
+      message: 'Public IP detached successfully.',
+      node_id: 101,
+      public_ip: '151.185.42.45'
+    });
+  });
+
+  it('fails clearly when the node does not have a current public IP to detach', async () => {
+    const { createReservedIpClient, detachNodePublicIp, getNode, service } =
+      createServiceFixture();
+
+    getNode.mockResolvedValueOnce({
+      id: 101,
+      name: 'node-a',
+      plan: 'C3.8GB',
+      public_ip_address: null,
+      status: 'Running',
+      vm_id: 100157
+    });
+
+    await expect(
+      service.detachPublicIp('101', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toThrow('This node does not have a current public IP to detach.');
+    expect(createReservedIpClient).not.toHaveBeenCalled();
+    expect(detachNodePublicIp).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when node details do not include a vm_id for public IP detach', async () => {
+    const { createReservedIpClient, detachNodePublicIp, getNode, service } =
+      createServiceFixture();
+
+    getNode.mockResolvedValueOnce({
+      id: 101,
+      name: 'node-a',
+      plan: 'C3.8GB',
+      public_ip_address: '151.185.42.45',
+      status: 'Running'
+    });
+
+    await expect(
+      service.detachPublicIp('101', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toThrow(
+      'The MyAccount API did not return a VM ID for this node.'
+    );
+    expect(createReservedIpClient).not.toHaveBeenCalled();
+    expect(detachNodePublicIp).not.toHaveBeenCalled();
+  });
+
+  it('requires force outside an interactive terminal for public IP detach after resolving node details', async () => {
+    const { createReservedIpClient, detachNodePublicIp, getNode, service } =
+      createServiceFixture({
+        isInteractive: false
+      });
+
+    await expect(
+      service.detachPublicIp('101', {
+        alias: 'prod'
+      })
+    ).rejects.toThrow(
+      'Detaching a node public IP requires confirmation in an interactive terminal.'
+    );
+    expect(getNode).toHaveBeenCalledWith('101');
+    expect(createReservedIpClient).not.toHaveBeenCalled();
+    expect(detachNodePublicIp).not.toHaveBeenCalled();
   });
 
   it('maps save-image to the backend action payload and result summary', async () => {

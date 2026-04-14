@@ -21,20 +21,20 @@ Linux is the authoritative promotion gate:
 ```bash
 make lint
 npm run coverage:unit
-make build
-npm run test:integration
+npm run coverage:integration
 env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
 ```
 
 The CI matrix is:
 
-- Linux: full gate with lint, unit coverage, build, integration, and package dry run
+- Linux: full gate with lint, unit coverage upload, integration coverage upload, and package dry run
 - macOS: build, unit-test, integration, and package confidence
 - Windows: package install, help, and `--json` smoke
 
 Notes:
 
 - Public runtime support starts at Node.js 24.
+- Linux uploads both `coverage/unit/lcov.info` and `coverage/integration/lcov.info` to Codecov using the `unit` and `integration` flags.
 - `release-please.yml` stays smaller than `verify.yml`: release-time verification is Linux-only, while cross-platform confidence happens before promotion.
 - `E2ECTL_MYACCOUNT_BASE_URL` is used in CI to point the built CLI at the fake MyAccount API.
 

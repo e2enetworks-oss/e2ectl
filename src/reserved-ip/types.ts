@@ -26,6 +26,12 @@ export interface ReservedIpNodeActionRequest {
   vm_id: number;
 }
 
+export interface ReservedIpPublicIpDetachRequest {
+  public_ip: string;
+  type: 'detach';
+  vm_id: number;
+}
+
 export interface ReservedIpReserveNodeRequest {
   type: 'live-reserve';
   vm_id: number;

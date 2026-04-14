@@ -68,20 +68,16 @@ Run this local gate before asking for review:
 
 ```bash
 make lint
-make test
-make build
-npm run test:integration
 npm run coverage:unit
+npm run coverage:integration
 env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
 ```
 
 What each command covers:
 
 - `make lint`: Prettier check, ESLint, and TypeScript `--noEmit`
-- `make test`: unit tests
-- `make build`: production compile
-- `npm run test:integration`: built CLI process checks, fake-API coverage, and tarball install smoke
 - `npm run coverage:unit`: unit coverage gate
+- `npm run coverage:integration`: rebuilds the CLI, runs the integration suite under `c8`, and writes `coverage/integration/lcov.info`
 - `npm pack --dry-run`: publishable package preview
 
 ## Testing Expectations

@@ -4,6 +4,7 @@ import type {
   ReservedIpDeleteResult,
   ReservedIpNodeActionRequest,
   ReservedIpNodeActionResult,
+  ReservedIpPublicIpDetachRequest,
   ReservedIpReserveNodeRequest,
   ReservedIpSummary
 } from './types.js';
@@ -18,6 +19,8 @@ interface ReservedIpNodeActionApiResult {
 }
 
 const RESERVED_IPS_PATH = '/reserve_ips/';
+const PUBLIC_RESERVED_IP_ACTIONS_PATH =
+  '/reserve_ips/public_reserveip_actions/';
 
 export interface ReservedIpClient {
   attachReservedIpToNode(
@@ -26,6 +29,9 @@ export interface ReservedIpClient {
   ): Promise<ReservedIpNodeActionResult>;
   createReservedIp(): Promise<ReservedIpSummary>;
   deleteReservedIp(ipAddress: string): Promise<ReservedIpDeleteResult>;
+  detachNodePublicIp(
+    body: ReservedIpPublicIpDetachRequest
+  ): Promise<ReservedIpNodeActionResult>;
   detachReservedIpFromNode(
     ipAddress: string,
     body: ReservedIpNodeActionRequest
@@ -70,6 +76,18 @@ export class ReservedIpApiClient implements ReservedIpClient {
     return {
       message: response.data.message ?? response.message
     };
+  }
+
+  async detachNodePublicIp(
+    body: ReservedIpPublicIpDetachRequest
+  ): Promise<ReservedIpNodeActionResult> {
+    const response = await this.transport.post<
+      ApiEnvelope<ReservedIpNodeActionApiResult>
+    >(PUBLIC_RESERVED_IP_ACTIONS_PATH, {
+      body
+    });
+
+    return mapReservedIpNodeActionResponse(response, body.public_ip);
   }
 
   async detachReservedIpFromNode(

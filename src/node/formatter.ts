@@ -370,6 +370,8 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .concat(formatNodeActionSummary(result.result))
           .join('\n') + '\n'
       );
+    case 'public-ip-detach':
+      return formatNodePublicIpDetachResult(result);
     case 'save-image':
       return (
         [
@@ -561,6 +563,22 @@ function renderNodeJson(result: NodeCommandResult): string {
         node_id: result.node_id,
         result: normalizeNodeActionJson(result.result)
       });
+    case 'public-ip-detach':
+      return renderJson(
+        'cancelled' in result
+          ? {
+              action: 'public-ip-detach',
+              cancelled: true,
+              node_id: result.node_id,
+              public_ip: result.public_ip
+            }
+          : {
+              action: 'public-ip-detach',
+              message: result.message,
+              node_id: result.node_id,
+              public_ip: result.public_ip
+            }
+      );
     case 'save-image':
       return renderJson({
         action: 'save-image',
@@ -737,6 +755,28 @@ function formatNodeUpgradeResult(
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+function formatNodePublicIpDetachResult(
+  result: Extract<NodeCommandResult, { action: 'public-ip-detach' }>
+): string {
+  if ('cancelled' in result) {
+    return (
+      [
+        `Cancelled public IP detach for node ${result.node_id}.`,
+        `Public IP: ${result.public_ip}`
+      ].join('\n') + '\n'
+    );
+  }
+
+  return (
+    [
+      `Requested public IP detach for node ${result.node_id}.`,
+      `Public IP: ${result.public_ip}`,
+      `Message: ${result.message}`,
+      'Warning: This node may no longer be publicly reachable.'
+    ].join('\n') + '\n'
+  );
 }
 
 function sortNodeSummariesById(nodes: NodeSummary[]): NodeSummary[] {

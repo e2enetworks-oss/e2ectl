@@ -9,6 +9,7 @@ import {
   type NodeCatalogPlansOptions,
   type NodeContextOptions,
   type NodeDeleteOptions,
+  type NodePublicIpDetachOptions,
   type NodeSaveImageOptions,
   type NodeUpgradeOptions,
   type NodeVolumeActionOptions,
@@ -38,6 +39,7 @@ interface NodeCreateCommandOptions extends NodeContextOptions {
 }
 
 type NodeUpgradeCommandOptions = NodeUpgradeOptions;
+type NodePublicIpDetachCommandOptions = NodePublicIpDetachOptions;
 
 const NODE_CATALOG_BILLING_TYPE_CHOICES = [
   'hourly',
@@ -50,6 +52,8 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   const service = new NodeService({
     confirm: (message) => runtime.confirm(message),
     createNodeClient: (credentials) => runtime.createNodeClient(credentials),
+    createReservedIpClient: (credentials) =>
+      runtime.createReservedIpClient(credentials),
     createSecurityGroupClient: (credentials) =>
       runtime.createSecurityGroupClient(credentials),
     createSshKeyClient: (credentials) =>
@@ -240,7 +244,7 @@ function buildNodeActionCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('action').description(
-    'Run non-interactive power, image, and attachment actions on a node.'
+    'Run power, image, public-IP, and attachment actions on a node.'
   );
 
   command.helpCommand('help [command]', 'Show help for a node action command');
@@ -302,10 +306,54 @@ function buildNodeActionCommand(
     }
   );
 
+  command.addCommand(buildNodeActionPublicIpCommand(service, runtime));
   command.addCommand(buildNodeActionVpcCommand(service, runtime));
   command.addCommand(buildNodeActionVolumeCommand(service, runtime));
   command.addCommand(buildNodeActionSecurityGroupCommand(service, runtime));
   command.addCommand(buildNodeActionSshKeyCommand(service, runtime));
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildNodeActionPublicIpCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('public-ip').description(
+    'Detach the current primary public IP from a node.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node action public-ip command'
+  );
+
+  addContextOptions(
+    command
+      .command('detach <nodeId>')
+      .description(
+        "Detach the node's current primary public IPv4. The node may no longer be publicly reachable."
+      )
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodePublicIpDetachCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachPublicIp(nodeId, options);
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   command.action(() => {
     command.outputHelp();

@@ -187,6 +187,49 @@ describe('ReservedIpApiClient', () => {
     });
   });
 
+  it('detaches node primary public IPs through the public reserve-ip action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '151.185.42.45',
+          status: 'Reserved',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'Public IP detached successfully.'
+        }
+      )
+    );
+
+    const result = await client.detachNodePublicIp({
+      public_ip: '151.185.42.45',
+      type: 'detach',
+      vm_id: 100157
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/reserve_ips/public_reserveip_actions/',
+      {
+        body: {
+          public_ip: '151.185.42.45',
+          type: 'detach',
+          vm_id: 100157
+        }
+      }
+    );
+    expect(result).toEqual({
+      ip_address: '151.185.42.45',
+      message: 'Public IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    });
+  });
+
   it('reserves a node current public IP through the reserve_ips action path', async () => {
     const transport = new StubTransport();
     const client = new ReservedIpApiClient(transport);

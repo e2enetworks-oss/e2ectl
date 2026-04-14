@@ -5,6 +5,7 @@ import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
 import { NodeService } from '../../../src/node/service.js';
+import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
@@ -265,6 +266,33 @@ function createSecurityGroupClientStub() {
   };
 }
 
+function createReservedIpClientStub() {
+  const detachNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '1.1.1.1',
+      message: 'Public IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    })
+  );
+
+  const stub: ReservedIpClient = {
+    attachReservedIpToNode: vi.fn(),
+    createReservedIp: vi.fn(),
+    deleteReservedIp: vi.fn(),
+    detachNodePublicIp,
+    detachReservedIpFromNode: vi.fn(),
+    listReservedIps: vi.fn(),
+    reserveNodePublicIp: vi.fn()
+  };
+
+  return {
+    detachNodePublicIp,
+    stub
+  };
+}
+
 function createVolumeClientStub() {
   const attachVolumeToNode = vi.fn(() =>
     Promise.resolve({
@@ -354,6 +382,7 @@ describe('node commands', () => {
     nodeStub: ReturnType<typeof createNodeClientStub>;
     prompt: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
+    reservedIpStub: ReturnType<typeof createReservedIpClientStub>;
     runtime: CliRuntime;
     securityGroupStub: ReturnType<typeof createSecurityGroupClientStub>;
     sshKeyStub: ReturnType<typeof createSshKeyClientStub>;
@@ -365,6 +394,7 @@ describe('node commands', () => {
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
     const nodeStub = createNodeClientStub();
+    const reservedIpStub = createReservedIpClientStub();
     const securityGroupStub = createSecurityGroupClientStub();
     const sshKeyStub = createSshKeyClientStub();
     const volumeStub = createVolumeClientStub();
@@ -384,11 +414,7 @@ describe('node commands', () => {
       createProjectClient: vi.fn(() => {
         throw new Error('Project client should not be created for this test.');
       }) as unknown as CliRuntime['createProjectClient'],
-      createReservedIpClient: vi.fn(() => {
-        throw new Error(
-          'Reserved IP client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createReservedIpClient'],
+      createReservedIpClient: vi.fn(() => reservedIpStub.stub),
       createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),
@@ -408,6 +434,7 @@ describe('node commands', () => {
       nodeStub,
       prompt,
       receivedCredentials: () => credentials,
+      reservedIpStub,
       runtime,
       securityGroupStub,
       sshKeyStub,
@@ -774,6 +801,61 @@ describe('node commands', () => {
           message: 'Security Groups Detached Successfully'
         },
         security_group_ids: [45]
+      })
+    );
+  });
+
+  it('detaches the current public IP in deterministic json mode with context overrides', async () => {
+    const {
+      confirm,
+      nodeStub,
+      receivedCredentials,
+      reservedIpStub,
+      runtime,
+      stdout
+    } = createRuntimeFixture({
+      isInteractive: true
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--project-id',
+      '46429',
+      '--location',
+      'Chennai'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      location: 'Chennai',
+      project_id: '46429'
+    });
+    expect(nodeStub.getNode).toHaveBeenCalledWith('101');
+    expect(confirm).toHaveBeenCalledWith(
+      'Detach public IP 1.1.1.1 from node 101? The node may no longer be publicly reachable.'
+    );
+    expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
+      public_ip: '1.1.1.1',
+      type: 'detach',
+      vm_id: 100157
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '1.1.1.1'
       })
     );
   });
@@ -1318,6 +1400,70 @@ describe('node commands', () => {
             label: 'deploy'
           }
         ]
+      })
+    );
+  });
+
+  it('requires force outside an interactive terminal for public-ip detach after resolving node details', async () => {
+    const { confirm, nodeStub, reservedIpStub, runtime } = createRuntimeFixture(
+      {
+        isInteractive: false
+      }
+    );
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'action',
+        'public-ip',
+        'detach',
+        '101',
+        '--alias',
+        'prod'
+      ])
+    ).rejects.toThrow(/requires confirmation/i);
+    expect(nodeStub.getNode).toHaveBeenCalledWith('101');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(reservedIpStub.detachNodePublicIp).not.toHaveBeenCalled();
+  });
+
+  it('skips confirmation for public-ip detach when --force is supplied', async () => {
+    const { confirm, reservedIpStub, runtime, stdout } = createRuntimeFixture({
+      isInteractive: false
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
+      public_ip: '1.1.1.1',
+      type: 'detach',
+      vm_id: 100157
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '1.1.1.1'
       })
     );
   });

@@ -43,19 +43,26 @@ jobs:
       - name: Unit coverage
         run: npm run coverage:unit
 
-      - name: Upload coverage to Codecov
+      - name: Upload unit coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: e2enetworks-oss/e2ectl
           files: coverage/unit/lcov.info
+          flags: unit
           fail_ci_if_error: false
 
-      - name: Build
-        run: make build
+      - name: Integration coverage and tests
+        run: npm run coverage:integration
 
-      - name: Integration tests
-        run: npm run test:integration
+      - name: Upload integration coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: e2enetworks-oss/e2ectl
+          files: coverage/integration/lcov.info
+          flags: integration
+          fail_ci_if_error: false
 
       - name: Package dry run
         run: npm pack --dry-run
