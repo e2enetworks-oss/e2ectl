@@ -14,30 +14,16 @@ export function renderProjectResult(
 
 export function formatProjectListTable(items: ProjectItem[]): string {
   const table = new Table({
-    head: [
-      'ID',
-      'Name',
-      'Role',
-      'CLI Default',
-      'Backend Active',
-      'Default',
-      'Starred',
-      'Policies',
-      'Members'
-    ]
+    head: ['ID', 'Name', 'CLI Default', 'Default', 'Starred']
   });
 
   sortProjectItems(items).forEach((item) => {
     table.push([
       String(item.project_id),
       item.name,
-      item.current_user_role,
       formatYesNo(item.is_cli_default_project),
-      formatYesNo(item.is_backend_active_project),
       formatYesNo(item.is_default),
-      formatYesNo(item.is_starred),
-      String(item.associated_policy_count),
-      String(item.associated_member_count)
+      formatYesNo(item.is_starred)
     ]);
   });
 
@@ -45,26 +31,52 @@ export function formatProjectListTable(items: ProjectItem[]): string {
 }
 
 function renderProjectHuman(result: ProjectCommandResult): string {
-  return result.items.length === 0
-    ? 'No projects found.\n'
-    : `${formatProjectListTable(result.items)}\n`;
+  switch (result.action) {
+    case 'create':
+      return `Created project: ${result.name}\nID: ${result.project_id}\n`;
+    case 'list':
+      return result.items.length === 0
+        ? 'No projects found.\n'
+        : `${formatProjectListTable(result.items)}\n`;
+    case 'star':
+      return `Starred project: ${result.name}\nID: ${result.project_id}\n`;
+    case 'unstar':
+      return `Unstarred project: ${result.name}\nID: ${result.project_id}\n`;
+  }
 }
 
 function normalizeProjectJson(result: ProjectCommandResult): JsonValue {
-  return {
-    action: 'list',
-    items: sortProjectItems(result.items).map((item) =>
-      normalizeProjectItem(item)
-    )
-  };
+  switch (result.action) {
+    case 'create':
+      return {
+        action: 'create',
+        name: result.name,
+        project_id: result.project_id
+      };
+    case 'list':
+      return {
+        action: 'list',
+        items: sortProjectItems(result.items).map((item) =>
+          normalizeProjectItem(item)
+        )
+      };
+    case 'star':
+      return {
+        action: 'star',
+        name: result.name,
+        project_id: result.project_id
+      };
+    case 'unstar':
+      return {
+        action: 'unstar',
+        name: result.name,
+        project_id: result.project_id
+      };
+  }
 }
 
 function normalizeProjectItem(item: ProjectItem): JsonValue {
   return {
-    associated_member_count: item.associated_member_count,
-    associated_policy_count: item.associated_policy_count,
-    current_user_role: item.current_user_role,
-    is_backend_active_project: item.is_backend_active_project,
     is_cli_default_project: item.is_cli_default_project,
     is_default: item.is_default,
     is_starred: item.is_starred,

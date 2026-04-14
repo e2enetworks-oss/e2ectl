@@ -7,10 +7,6 @@ describe('renderProjectResult', () => {
       action: 'list' as const,
       items: [
         {
-          associated_member_count: 2,
-          associated_policy_count: 1,
-          current_user_role: 'Admin',
-          is_backend_active_project: false,
           is_cli_default_project: false,
           is_default: false,
           is_starred: true,
@@ -18,10 +14,6 @@ describe('renderProjectResult', () => {
           project_id: 50001
         },
         {
-          associated_member_count: 1,
-          associated_policy_count: 2,
-          current_user_role: 'Owner',
-          is_backend_active_project: true,
           is_cli_default_project: true,
           is_default: true,
           is_starred: false,
@@ -41,10 +33,6 @@ describe('renderProjectResult', () => {
         action: 'list',
         items: [
           {
-            associated_member_count: 1,
-            associated_policy_count: 2,
-            current_user_role: 'Owner',
-            is_backend_active_project: true,
             is_cli_default_project: true,
             is_default: true,
             is_starred: false,
@@ -52,10 +40,6 @@ describe('renderProjectResult', () => {
             project_id: 46429
           },
           {
-            associated_member_count: 2,
-            associated_policy_count: 1,
-            current_user_role: 'Admin',
-            is_backend_active_project: false,
             is_cli_default_project: false,
             is_default: false,
             is_starred: true,
@@ -64,6 +48,55 @@ describe('renderProjectResult', () => {
           }
         ]
       })}\n`
+    );
+  });
+
+  it('renders json and human output for project create', () => {
+    const result = {
+      action: 'create' as const,
+      name: 'new-project',
+      project_id: 99001
+    };
+
+    expect(renderProjectResult(result, false)).toBe(
+      'Created project: new-project\nID: 99001\n'
+    );
+    expect(renderProjectResult(result, true)).toBe(
+      `${stableStringify({
+        action: 'create',
+        name: 'new-project',
+        project_id: 99001
+      })}\n`
+    );
+  });
+
+  it('renders json and human output for project star', () => {
+    const result = {
+      action: 'star' as const,
+      name: 'my-project',
+      project_id: 46429
+    };
+
+    expect(renderProjectResult(result, false)).toBe(
+      'Starred project: my-project\nID: 46429\n'
+    );
+    expect(renderProjectResult(result, true)).toBe(
+      `${stableStringify({ action: 'star', name: 'my-project', project_id: 46429 })}\n`
+    );
+  });
+
+  it('renders json and human output for project unstar', () => {
+    const result = {
+      action: 'unstar' as const,
+      name: 'my-project',
+      project_id: 46429
+    };
+
+    expect(renderProjectResult(result, false)).toBe(
+      'Unstarred project: my-project\nID: 46429\n'
+    );
+    expect(renderProjectResult(result, true)).toBe(
+      `${stableStringify({ action: 'unstar', name: 'my-project', project_id: 46429 })}\n`
     );
   });
 
