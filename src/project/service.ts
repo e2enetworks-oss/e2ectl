@@ -166,7 +166,17 @@ function normalizeProjectId(projectId: string): number {
     });
   }
 
-  return Number(normalized);
+  const parsed = Number(normalized);
+
+  if (parsed > Number.MAX_SAFE_INTEGER) {
+    throw new CliError('Project ID is too large to represent safely.', {
+      code: 'INVALID_PROJECT_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass a valid numeric project id as the first argument.'
+    });
+  }
+
+  return parsed;
 }
 
 async function findProjectById(

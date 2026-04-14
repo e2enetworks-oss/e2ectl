@@ -198,6 +198,16 @@ describe('ProjectService', () => {
     );
   });
 
+  it('rejects an unsafe-large project id for star', async () => {
+    const { service } = createServiceFixture(
+      createConfig({ defaultLocation: 'Delhi', defaultProjectId: '46429' })
+    );
+
+    await expect(
+      service.starProject('9007199254740992', { alias: 'prod' })
+    ).rejects.toThrow('Project ID is too large to represent safely.');
+  });
+
   it('rejects unknown project id for star', async () => {
     const { service } = createServiceFixture(
       createConfig({ defaultLocation: 'Delhi', defaultProjectId: '46429' })

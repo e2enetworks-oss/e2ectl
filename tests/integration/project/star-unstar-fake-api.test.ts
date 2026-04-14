@@ -249,4 +249,36 @@ describe('project star/unstar against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('fails with an unsafe-large project id', async () => {
+    const tempHome = await createTempHome();
+
+    try {
+      await tempHome.writeConfig({
+        default: 'prod',
+        profiles: {
+          prod: {
+            api_key: 'prod-api-key',
+            auth_token: 'prod-auth-token'
+          }
+        }
+      });
+
+      const result = await runBuiltCli(
+        ['project', 'star', '9007199254740992'],
+        {
+          env: {
+            HOME: tempHome.path
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain(
+        'Project ID is too large to represent safely'
+      );
+    } finally {
+      await tempHome.cleanup();
+    }
+  });
 });
