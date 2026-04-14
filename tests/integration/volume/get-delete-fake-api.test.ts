@@ -62,6 +62,54 @@ describe('volume get/delete against a fake MyAccount API', () => {
     }
   });
 
+  it('renders human volume detail output with attachment context', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/block_storage/25550/': () => ({
+        body: {
+          code: 200,
+          data: {
+            block_id: 25550,
+            is_block_storage_exporting_to_eos: false,
+            name: 'data-01',
+            size: 238419,
+            size_string: '250 GB',
+            snapshot_exist: true,
+            status: 'Attached',
+            vm_detail: {
+              node_id: 301,
+              vm_id: 100157,
+              vm_name: 'node-b'
+            }
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['volume', 'get', '25550'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('ID: 25550');
+      expect(result.stdout).toContain('Attached: yes');
+      expect(result.stdout).toContain('Snapshot Exists: yes');
+      expect(result.stdout).toContain('Attached To: node-b (node 301)');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('deletes one volume with --force and emits deterministic json', async () => {
     const server = await startTestHttpServer({
       'DELETE /myaccount/api/v1/block_storage/25550/': () => ({

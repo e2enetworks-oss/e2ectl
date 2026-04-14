@@ -118,4 +118,93 @@ describe('security-group formatter', () => {
       })}\n`
     );
   });
+
+  it('renders security-group details without any rules', () => {
+    const output = renderSecurityGroupResult(
+      {
+        action: 'get',
+        security_group: {
+          description: 'web ingress',
+          id: 57358,
+          is_all_traffic_rule: false,
+          is_default: false,
+          name: 'web-sg',
+          rules: []
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('ID: 57358');
+    expect(output).toContain('Rules');
+    expect(output).toContain('No rules found.');
+  });
+
+  it('renders update output for humans and deterministic json', () => {
+    const humanOutput = renderSecurityGroupResult(
+      {
+        action: 'update',
+        message: 'Security Group updated successfully.',
+        security_group: {
+          description: 'web ingress',
+          id: 57358,
+          name: 'web-sg',
+          rule_count: 3
+        }
+      },
+      false
+    );
+    const jsonOutput = renderSecurityGroupResult(
+      {
+        action: 'update',
+        message: 'Security Group updated successfully.',
+        security_group: {
+          description: 'web ingress',
+          id: 57358,
+          name: 'web-sg',
+          rule_count: 3
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Updated security group 57358.');
+    expect(humanOutput).toContain('Rules: 3');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'update',
+        message: 'Security Group updated successfully.',
+        security_group: {
+          description: 'web ingress',
+          id: 57358,
+          name: 'web-sg',
+          rule_count: 3
+        }
+      })}\n`
+    );
+  });
+
+  it('renders empty lists and cancelled deletes clearly', () => {
+    const emptyListOutput = renderSecurityGroupResult(
+      {
+        action: 'list',
+        items: []
+      },
+      false
+    );
+    const cancelledDeleteOutput = renderSecurityGroupResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        security_group: {
+          id: 57358,
+          name: 'web-sg'
+        }
+      },
+      false
+    );
+
+    expect(emptyListOutput).toBe('No security groups found.\n');
+    expect(cancelledDeleteOutput).toBe('Deletion cancelled.\n');
+  });
 });

@@ -93,4 +93,59 @@ describe('ssh-key list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human SSH-key list output in sorted order', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/ssh_keys/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              label: 'zeta',
+              pk: 1002,
+              project_name: 'default-project',
+              ssh_key: 'ssh-rsa AAAAB3Nza zeta',
+              ssh_key_type: 'RSA',
+              timestamp: '18-Feb-2025',
+              total_attached_nodes: 1
+            },
+            {
+              label: 'alpha',
+              pk: 1001,
+              project_name: 'default-project',
+              ssh_key: 'ssh-ed25519 AAAAC3Nza alpha',
+              ssh_key_type: 'ED25519',
+              timestamp: '19-Feb-2025',
+              total_attached_nodes: 2
+            }
+          ],
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['ssh-key', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Label');
+      expect(result.stdout).toContain('ED25519');
+      expect(result.stdout.indexOf('alpha')).toBeLessThan(
+        result.stdout.indexOf('zeta')
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

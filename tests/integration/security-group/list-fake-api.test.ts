@@ -84,4 +84,59 @@ describe('security-group list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human security-group list output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/security_group/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              description: 'web ingress',
+              id: 57358,
+              is_all_traffic_rule: false,
+              is_default: false,
+              name: 'web-sg',
+              rules: [
+                {
+                  description: 'ssh',
+                  id: 285096,
+                  network: 'any',
+                  network_cidr: '--',
+                  network_size: 1,
+                  port_range: '22',
+                  protocol_name: 'Custom_TCP',
+                  rule_type: 'Inbound',
+                  vpc_id: null
+                }
+              ]
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['security-group', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Description');
+      expect(result.stdout).toContain('web-sg');
+      expect(result.stdout).toContain('web ingress');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

@@ -69,6 +69,63 @@ describe('vpc get/delete against a fake MyAccount API', () => {
     }
   });
 
+  it('renders human VPC detail output with subnet details', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/vpc/27835/': () => ({
+        body: {
+          code: 200,
+          data: {
+            created_at: '2026-03-13T08:00:00Z',
+            gateway_ip: '10.20.0.1',
+            ipv4_cidr: '10.20.0.0/23',
+            is_e2e_vpc: true,
+            location: 'Delhi',
+            name: 'prod-vpc',
+            network_id: 27835,
+            project_name: 'default-project',
+            state: 'Active',
+            subnets: [
+              {
+                cidr: '10.20.0.0/24',
+                id: 991,
+                subnet_name: 'frontend',
+                totalIPs: 251,
+                usedIPs: 4,
+                vpc_id: 27835
+              }
+            ],
+            vm_count: 2
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['vpc', 'get', '27835'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('VPC ID: 27835');
+      expect(result.stdout).toContain('Gateway IP: 10.20.0.1');
+      expect(result.stdout).toContain(
+        'Subnet Details: frontend (991, 10.20.0.0/24)'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('deletes one VPC with --force and emits deterministic json', async () => {
     const server = await startTestHttpServer({
       'DELETE /myaccount/api/v1/vpc/27835/': () => ({

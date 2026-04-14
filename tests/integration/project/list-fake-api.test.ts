@@ -89,4 +89,63 @@ describe('project list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human project list output without project-scoped defaults', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/pbac/project/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              associated_members: [],
+              associated_policies: [
+                {
+                  id: 11,
+                  policy_name: 'Admin',
+                  policy_set_type: 'custom'
+                }
+              ],
+              current_user_role: 'Owner',
+              is_active_project: true,
+              is_default: true,
+              is_starred: false,
+              name: 'default-project',
+              project_id: 46429
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await tempHome.writeConfig({
+        default: 'prod',
+        profiles: {
+          prod: {
+            api_key: 'prod-api-key',
+            auth_token: 'prod-auth-token'
+          }
+        }
+      });
+
+      const result = await runBuiltCli(['project', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('CLI Default');
+      expect(result.stdout).toContain('default-project');
+      expect(result.stdout).toContain('Owner');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

@@ -106,6 +106,47 @@ describe('security-group get/delete against a fake MyAccount API', () => {
     }
   });
 
+  it('renders human security-group detail output for groups without rules', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/security_group/57358/': () => ({
+        body: {
+          code: 200,
+          data: {
+            description: 'web ingress',
+            id: 57358,
+            is_all_traffic_rule: false,
+            is_default: false,
+            name: 'web-sg',
+            rules: []
+          },
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['security-group', 'get', '57358'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('ID: 57358');
+      expect(result.stdout).toContain('Name: web-sg');
+      expect(result.stdout).toContain('No rules found.');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('deletes one security group with --force and emits deterministic json', async () => {
     const server = await startTestHttpServer({
       'DELETE /myaccount/api/v1/security_group/57358/': () => ({

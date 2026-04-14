@@ -41,4 +41,16 @@ describe('renderProjectResult', () => {
       })}\n`
     );
   });
+
+  it('renders a clear empty state for project lists', () => {
+    expect(
+      renderProjectResult(
+        {
+          action: 'list',
+          items: []
+        },
+        false
+      )
+    ).toBe('No projects found.\n');
+  });
 });

@@ -70,6 +70,56 @@ describe('reserved-ip get/delete against a fake MyAccount API', () => {
     }
   });
 
+  it('renders human reserved-IP detail output when no floating nodes are attached', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              appliance_type: 'NODE',
+              bought_at: '04-11-2024 10:37',
+              floating_ip_attached_nodes: [],
+              ip_address: '164.52.198.54',
+              project_name: 'default-project',
+              reserve_id: 12662,
+              reserved_type: 'AddonIP',
+              status: 'Assigned',
+              vm_id: 100157,
+              vm_name: 'node-a'
+            }
+          ],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['reserved-ip', 'get', '164.52.198.54'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Reserved IP: 164.52.198.54');
+      expect(result.stdout).toContain('Attached VM: node-a (VM 100157)');
+      expect(result.stdout).toContain('Floating Attached Nodes: none');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('rejects invalid reserved IP addresses before any network request', async () => {
     const result = await runBuiltCli(['reserved-ip', 'get', 'bad-ip']);
 

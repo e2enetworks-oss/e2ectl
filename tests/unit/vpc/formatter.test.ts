@@ -1,4 +1,5 @@
 import { formatCliCommand } from '../../../src/app/metadata.js';
+import { stableStringify } from '../../../src/core/json.js';
 import {
   formatVpcCommittedPlansTable,
   formatVpcHourlyPlansTable,
@@ -165,5 +166,139 @@ describe('vpc formatter', () => {
     expect(output).toContain('Backend Record ID: 3956');
     expect(output).toContain('Billing: committed');
     expect(output).toContain(formatCliCommand('vpc get 27835'));
+  });
+
+  it('renders empty list and delete cancellation output clearly', () => {
+    const emptyListOutput = renderVpcResult(
+      {
+        action: 'list',
+        items: [],
+        total_count: 0,
+        total_page_number: 0
+      },
+      false
+    );
+    const cancelledDeleteOutput = renderVpcResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '46429'
+        }
+      },
+      false
+    );
+
+    expect(emptyListOutput).toBe('No VPCs found.\n');
+    expect(cancelledDeleteOutput).toBe('Deletion cancelled.\n');
+  });
+
+  it('renders VPC detail output with subnet summaries', () => {
+    const output = renderVpcResult(
+      {
+        action: 'get',
+        vpc: {
+          attached_vm_count: 2,
+          cidr: '10.20.0.0/23',
+          cidr_source: 'e2e',
+          created_at: '2026-03-13T08:00:00Z',
+          gateway_ip: '10.20.0.1',
+          id: 27835,
+          location: 'Delhi',
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_name: 'default-project',
+          state: 'Active',
+          subnet_count: 1,
+          subnets: [
+            {
+              cidr: '10.20.0.0/24',
+              id: 991,
+              name: 'frontend',
+              total_ips: 251,
+              used_ips: 4
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('VPC ID: 27835');
+    expect(output).toContain('Gateway IP: 10.20.0.1');
+    expect(output).toContain('Subnet Details: frontend (991, 10.20.0.0/24)');
+  });
+
+  it('renders empty hourly and committed plan sections', () => {
+    const output = renderVpcResult(
+      {
+        action: 'plans',
+        committed: {
+          default_post_commit_behavior: 'auto-renew',
+          items: [],
+          supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+        },
+        hourly: {
+          items: []
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Hourly');
+    expect(output).toContain('No hourly plans found.');
+    expect(output).toContain('Committed');
+    expect(output).toContain('No committed plans found.');
+  });
+
+  it('renders deterministic json for hourly custom CIDR VPC creation', () => {
+    const output = renderVpcResult(
+      {
+        action: 'create',
+        billing: {
+          committed_plan_id: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        cidr: {
+          source: 'custom',
+          value: '10.10.0.0/23'
+        },
+        credit_sufficient: true,
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_id: '46429',
+          vpc_id: 3956
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'create',
+        billing: {
+          committed_plan_id: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        cidr: {
+          source: 'custom',
+          value: '10.10.0.0/23'
+        },
+        credit_sufficient: true,
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_id: '46429',
+          vpc_id: 3956
+        }
+      })}\n`
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { formatCliCommand } from '../../../src/app/metadata.js';
+import { stableStringify } from '../../../src/core/json.js';
 import {
   formatVolumeCommittedPlansTable,
   formatVolumeListTable,
@@ -194,5 +195,149 @@ describe('volume formatter', () => {
     expect(output).toContain('Derived IOPS: 5000');
     expect(output).toContain('Committed Plan: 31');
     expect(output).toContain(formatCliCommand('volume list'));
+  });
+
+  it('renders empty lists and delete flows predictably', () => {
+    const emptyListOutput = renderVolumeResult(
+      {
+        action: 'list',
+        items: [],
+        total_count: 0,
+        total_page_number: 0
+      },
+      false
+    );
+    const cancelledDeleteOutput = renderVolumeResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        volume_id: 25550
+      },
+      false
+    );
+    const deletedJsonOutput = renderVolumeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        message: 'Block Storage Deleted',
+        volume_id: 25550
+      },
+      true
+    );
+
+    expect(emptyListOutput).toBe('No volumes found.\n');
+    expect(cancelledDeleteOutput).toBe('Deletion cancelled.\n');
+    expect(deletedJsonOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: 'Block Storage Deleted',
+        volume_id: 25550
+      })}\n`
+    );
+  });
+
+  it('renders volume details with attachment context', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'get',
+        volume: {
+          attached: true,
+          attachment: {
+            node_id: 301,
+            vm_id: 100157,
+            vm_name: 'node-b'
+          },
+          exporting_to_eos: false,
+          id: 25550,
+          name: 'data-01',
+          size_gb: 250,
+          size_label: '250 GB',
+          snapshot_exists: true,
+          status: 'Attached'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('ID: 25550');
+    expect(output).toContain('Attached: yes');
+    expect(output).toContain('Snapshot Exists: yes');
+    expect(output).toContain('Attached To: node-b (node 301)');
+  });
+
+  it('renders empty available-only plan output clearly', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'plans',
+        filters: {
+          available_only: true,
+          size_gb: null
+        },
+        items: [],
+        total_count: 0
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Showing 0 plan rows for available inventory only.'
+    );
+    expect(output).toContain('No available volume plans found.');
+  });
+
+  it('renders deterministic json for hourly volume creation', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'create',
+        billing: {
+          committed_plan: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        requested: {
+          name: 'data-01',
+          size_gb: 250
+        },
+        resolved_plan: {
+          available: true,
+          currency: 'INR',
+          hourly_price: 1.71,
+          iops: 5000,
+          size_gb: 250
+        },
+        volume: {
+          id: 25550,
+          name: 'data-01'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'create',
+        billing: {
+          committed_plan: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        requested: {
+          name: 'data-01',
+          size_gb: 250
+        },
+        resolved_plan: {
+          available: true,
+          currency: 'INR',
+          hourly_price: 1.71,
+          iops: 5000,
+          size_gb: 250
+        },
+        volume: {
+          id: 25550,
+          name: 'data-01'
+        }
+      })}\n`
+    );
   });
 });
