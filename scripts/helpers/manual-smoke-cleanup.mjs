@@ -60,6 +60,14 @@ export function isAlreadyGoneMessage(message) {
   return /\bnot found\b/i.test(message) || /\balready gone\b/i.test(message);
 }
 
+export function shouldRetryVpcDeleteError(message) {
+  return (
+    /you have running servers on this vpc/i.test(message) ||
+    /vpc is in creating state/i.test(message) ||
+    /please try again later/i.test(message)
+  );
+}
+
 export function isMissingFileError(error) {
   return (
     error instanceof Error &&
@@ -445,8 +453,17 @@ async function cleanupVpc(context, fail) {
 
   try {
     const clients = await context.getFallbackClients();
+    const readiness = await waitForVpcDeletionReady(clients.vpc, vpcId);
 
-    await clients.vpc.deleteVpc(vpcId);
+    if (readiness === 'already-gone') {
+      await context.updateManifest((draft) => {
+        draft.vpc_deleted = true;
+      });
+      context.logInfo(`VPC ${vpcId} was already gone.`);
+      return;
+    }
+
+    await deleteVpcWithRetry(clients.vpc, vpcId);
 
     await context.updateManifest((draft) => {
       draft.vpc_deleted = true;
@@ -463,6 +480,82 @@ async function cleanupVpc(context, fail) {
 
     fail(`Failed to delete VPC ${vpcId}: ${formatError(error)}`);
   }
+}
+
+async function waitForVpcDeletionReady(vpcClient, vpcId) {
+  const deadline = Date.now() + VOLUME_READY_TIMEOUT_MS;
+  let lastState = null;
+  let lastVmCount = null;
+  let lastError = null;
+
+  while (Date.now() <= deadline) {
+    try {
+      const vpc = await vpcClient.getVpc(vpcId);
+      const normalizedState = normalizeLifecycleStatus(vpc.state ?? '');
+      const vmCount = typeof vpc.vm_count === 'number' ? vpc.vm_count : 0;
+
+      lastState = vpc.state ?? null;
+      lastVmCount = vmCount;
+      lastError = null;
+
+      if (normalizedState === 'active' && vmCount === 0) {
+        return 'ready';
+      }
+    } catch (error) {
+      if (classifyCleanupError(error) === 'already-gone') {
+        return 'already-gone';
+      }
+
+      lastError = formatError(error);
+    }
+
+    if (Date.now() < deadline) {
+      await delay(VOLUME_READY_POLL_INTERVAL_MS);
+    }
+  }
+
+  const lastObservedState =
+    lastState === null
+      ? (lastError ?? 'No successful VPC get response was observed.')
+      : `state=${lastState}, vm_count=${lastVmCount ?? '<missing>'}`;
+
+  throw new Error(
+    `Timed out waiting for VPC ${vpcId} to become Active before cleanup delete. Last observed state: ${lastObservedState}`
+  );
+}
+
+async function deleteVpcWithRetry(vpcClient, vpcId) {
+  const deadline = Date.now() + VOLUME_READY_TIMEOUT_MS;
+  let lastError = null;
+
+  while (Date.now() <= deadline) {
+    try {
+      await vpcClient.deleteVpc(vpcId);
+      return;
+    } catch (error) {
+      if (classifyCleanupError(error) === 'already-gone') {
+        throw error;
+      }
+
+      const message = formatError(error);
+
+      if (!shouldRetryVpcDeleteError(message)) {
+        throw error;
+      }
+
+      lastError = message;
+    }
+
+    if (Date.now() < deadline) {
+      await delay(VOLUME_READY_POLL_INTERVAL_MS);
+    }
+  }
+
+  throw new Error(
+    `Timed out deleting VPC ${vpcId} during cleanup. Last observed error: ${
+      lastError ?? 'No retryable delete error was captured.'
+    }`
+  );
 }
 
 async function waitForVolumeDeletionReady(volumeClient, volumeId) {

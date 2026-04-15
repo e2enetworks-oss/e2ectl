@@ -2,6 +2,7 @@ import {
   createNodeStep,
   runNodeDeleteSteps,
   runNodeLifecycleActionSteps,
+  runNodePublicIpDetachStep,
   runSecurityGroupSteps,
   runSshKeyDeleteStep,
   runSshKeyCreateAndAttachSteps,
@@ -21,6 +22,14 @@ import { updateSmokeManifest } from '../../manual/helpers/smoke-manifest.js';
 
 vi.mock('../../manual/helpers/smoke-commands.js', () => ({
   discoverAvailableVolumeSize: vi.fn(),
+  normalizeObservedPublicIp: vi.fn((value: string | null | undefined) => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length === 0 || normalized === '[]' ? null : normalized;
+  }),
   runJsonCommand: vi.fn(),
   waitForNodeReadiness: vi.fn(),
   waitForNodeStatus: vi.fn(),
@@ -359,7 +368,15 @@ describe('manual smoke step helpers', () => {
       .mockResolvedValueOnce({
         action: 'get',
         vpc: {
-          id: 23082
+          id: 23082,
+          state: 'Creating'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        vpc: {
+          id: 23082,
+          state: 'Active'
         }
       })
       .mockResolvedValueOnce({
@@ -374,6 +391,14 @@ describe('manual smoke step helpers', () => {
           name: 'prod-vpc',
           private_ip: null,
           subnet_id: null
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          is_vpc_attached: true,
+          status: 'Running'
         }
       })
       .mockResolvedValueOnce({
@@ -410,17 +435,119 @@ describe('manual smoke step helpers', () => {
       vpcId: 23082
     });
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       ['node', 'action', 'vpc', 'attach', '101', '--vpc-id', '23082'],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
-      4,
+      6,
       ['node', 'action', 'vpc', 'detach', '101', '--vpc-id', '23082'],
       context.smokeEnv
     );
     expect(manifest.vpc_id).toBe(23082);
     expect(manifest.vpc_attached_node_id).toBeNull();
+    expect(manifest.vpc_deleted).toBe(true);
+  });
+
+  it('retries VPC delete when the backend still reports running servers after detach', async () => {
+    const { context, manifest } = createFixture();
+
+    vi.useFakeTimers();
+
+    runJsonCommandMock
+      .mockResolvedValueOnce({
+        action: 'create',
+        vpc: {
+          id: 23082
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        vpc: {
+          id: 23082,
+          state: 'Active'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        vpc: {
+          id: 23082,
+          state: 'Active'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'vpc-attach',
+        node_id: 101,
+        result: {
+          message: 'attached',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          is_vpc_attached: true,
+          status: 'Running'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'detached',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      })
+      .mockRejectedValueOnce(new Error('YOU HAVE RUNNING SERVERS ON THIS VPC'))
+      .mockResolvedValueOnce({
+        action: 'delete',
+        vpc: {
+          id: 23082
+        }
+      });
+    updateSmokeManifestMock.mockImplementation((_path, mutate) => {
+      mutate(manifest);
+      return Promise.resolve(manifest);
+    });
+
+    try {
+      const resultPromise = runVpcSteps(context, {
+        nodeId: 101,
+        vpcName: 'release-smoke-vpc'
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(resultPromise).resolves.toEqual({
+        vpcId: 23082
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(runJsonCommandMock).toHaveBeenNthCalledWith(
+      7,
+      ['vpc', 'delete', '23082', '--force'],
+      context.smokeEnv
+    );
+    expect(runJsonCommandMock).toHaveBeenNthCalledWith(
+      8,
+      ['vpc', 'delete', '23082', '--force'],
+      context.smokeEnv
+    );
     expect(manifest.vpc_deleted).toBe(true);
   });
 
@@ -623,6 +750,114 @@ describe('manual smoke step helpers', () => {
     expect(manifest.saved_image_id).toBe('img-455');
   });
 
+  it('accepts save-image responses without an image id and skips saved-image cleanup tracking', async () => {
+    const { context, manifest } = createFixture();
+
+    waitForNodeReadinessMock
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          public_ip_address: '203.0.113.10',
+          status: 'Running'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          public_ip_address: '203.0.113.11',
+          status: 'Running'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          public_ip_address: '203.0.113.11',
+          status: 'Running'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'get',
+        node: {
+          id: 101,
+          public_ip_address: '203.0.113.12',
+          status: 'Running'
+        }
+      });
+    waitForNodeStatusMock.mockResolvedValueOnce({
+      action: 'get',
+      node: {
+        id: 101,
+        public_ip_address: null,
+        status: 'Powered Off'
+      }
+    });
+    runJsonCommandMock
+      .mockResolvedValueOnce({
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 701,
+          created_at: '2026-03-14T08:10:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'power-on',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'save-image',
+        image_name: 'release-smoke-image',
+        node_id: 101,
+        result: {
+          action_id: 703,
+          created_at: '2026-03-14T08:20:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })
+      .mockResolvedValueOnce({
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node upgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3.16GB'
+        }
+      });
+    updateSmokeManifestMock.mockImplementation((_path, mutate) => {
+      mutate(manifest);
+      return Promise.resolve(manifest);
+    });
+
+    const result = await runNodeLifecycleActionSteps(context, {
+      nodeId: 101,
+      saveImageName: 'release-smoke-image'
+    });
+
+    expect(result).toEqual({
+      publicIp: '203.0.113.12'
+    });
+    expect(manifest.saved_image_deleted).toBe(true);
+    expect(manifest.saved_image_id).toBeNull();
+  });
+
   it('reserves a node public ip, deletes the node, and deletes the preserved reserved ip', async () => {
     const { context, manifest } = createFixture();
 
@@ -671,6 +906,50 @@ describe('manual smoke step helpers', () => {
     expect(manifest.preserved_reserved_ip_deleted).toBe(true);
     expect(manifest.security_group_attached_node_id).toBeNull();
     expect(manifest.ssh_key_attached_node_id).toBeNull();
+  });
+
+  it('detaches a node public ip and waits for the node to remain running without it', async () => {
+    const { context } = createFixture();
+
+    waitForNodeReadinessMock.mockResolvedValueOnce({
+      action: 'get',
+      node: {
+        id: 101,
+        public_ip_address: '203.0.113.33',
+        status: 'Running'
+      }
+    });
+    waitForNodeStatusMock.mockResolvedValueOnce({
+      action: 'get',
+      node: {
+        id: 101,
+        public_ip_address: '[]',
+        status: 'Running'
+      }
+    });
+    runJsonCommandMock.mockResolvedValueOnce({
+      action: 'public-ip-detach',
+      message: 'Public IP detached successfully.',
+      node_id: 101,
+      public_ip: '203.0.113.33'
+    });
+
+    const result = await runNodePublicIpDetachStep(context, {
+      nodeId: 101
+    });
+
+    expect(result).toEqual({
+      publicIp: '203.0.113.33'
+    });
+    expect(runJsonCommandMock).toHaveBeenCalledWith(
+      ['node', 'action', 'public-ip', 'detach', '101', '--force'],
+      context.smokeEnv
+    );
+    expect(waitForNodeStatusMock).toHaveBeenCalledWith(101, context.smokeEnv, {
+      acceptedStatuses: ['Running'],
+      description: 'Running without a public IP',
+      requireMissingPublicIp: true
+    });
   });
 
   it('deletes an SSH key and clears the attached node id in the manifest', async () => {

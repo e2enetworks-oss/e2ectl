@@ -360,7 +360,7 @@ describe('project commands', () => {
   it('shows root help for the project command', async () => {
     const output = await renderHelp(['project', '--help']);
 
-    expect(output).toContain('Inspect account-level MyAccount project access.');
+    expect(output).toContain('Manage account-scoped MyAccount projects.');
     expect(output).toContain('list');
     expect(output).toContain('create');
     expect(output).toContain('star');

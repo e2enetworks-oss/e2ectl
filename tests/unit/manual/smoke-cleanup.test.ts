@@ -124,7 +124,13 @@ describe('manual smoke cleanup orchestration', () => {
       },
       vpc: {
         deleteVpc: vi.fn(() => Promise.resolve()),
-        detachNodeVpc: vi.fn(() => Promise.resolve())
+        detachNodeVpc: vi.fn(() => Promise.resolve()),
+        getVpc: vi.fn(() =>
+          Promise.resolve({
+            state: 'Active',
+            vm_count: 0
+          })
+        )
       }
     };
 
@@ -153,6 +159,7 @@ describe('manual smoke cleanup orchestration', () => {
     });
     expect(clients.volume.getVolume).toHaveBeenCalledWith(8801);
     expect(clients.volume.deleteVolume).toHaveBeenCalledWith(8801);
+    expect(clients.vpc.getVpc).toHaveBeenCalledWith(23082);
     expect(clients.vpc.deleteVpc).toHaveBeenCalledWith(23082);
     expect(clients.sshKey.deleteSshKey).toHaveBeenCalledWith(12);
     expect(clients.securityGroup.deleteSecurityGroup).toHaveBeenCalledWith(88);

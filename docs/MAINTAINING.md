@@ -76,6 +76,7 @@ The lane now proves both direct env-backed reads and config-backed operator usag
 Always-covered domains:
 
 - node
+- project
 - reserved-ip
 - volume
 - vpc
@@ -119,6 +120,10 @@ Required smoke env vars:
 - `E2ECTL_SMOKE_NODE_IMAGE`
 - `E2ECTL_SMOKE_UPGRADE_PLAN`
 - `E2ECTL_SMOKE_UPGRADE_IMAGE`
+
+For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full
+`items[].plan` value from `e2ectl --json node catalog plans ...`, not the
+shorter `sku` label.
 
 Optional smoke env vars:
 

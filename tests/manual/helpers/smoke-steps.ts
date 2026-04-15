@@ -2,6 +2,7 @@ import type { SmokeEnv } from './smoke-env.js';
 import { updateSmokeManifest } from './smoke-manifest.js';
 import {
   discoverAvailableVolumeSize,
+  normalizeObservedPublicIp,
   runJsonCommand,
   waitForNodeReadiness,
   waitForNodeStatus,
@@ -101,7 +102,9 @@ interface VpcCreateJson {
 interface VpcGetJson {
   action: 'get';
   vpc: {
+    attached_vm_count?: number | null;
     id: number;
+    state?: string;
   };
 }
 
@@ -172,6 +175,13 @@ interface NodePowerJson {
   };
 }
 
+interface NodePublicIpDetachJson {
+  action: 'public-ip-detach';
+  message: string;
+  node_id: number;
+  public_ip: string;
+}
+
 interface NodeSaveImageJson {
   action: 'save-image';
   image_name: string;
@@ -206,7 +216,7 @@ export interface SmokeStepContext {
 }
 
 const MANUAL_SMOKE_PUBLIC_KEY =
-  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFJlbGVhc2VTbW9rZUtleUZvckUyRUN0bA release-smoke@e2ectl';
+  'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPFfnphs5u7PSX3ZEvaK+xprwm9X67kEKNV7uOXwmsPy release-smoke@e2ectl';
 
 export function buildSecurityGroupRules() {
   return [
@@ -658,6 +668,11 @@ export async function runVpcSteps(
     throw new Error('Expected vpc get to return the created VPC.');
   }
 
+  await waitForVpcState(context, vpcId, {
+    acceptedStates: ['Active'],
+    description: 'Active'
+  });
+
   const vpcAttach = await runJsonCommand<VpcAttachDetachJson>(
     [
       'node',
@@ -682,6 +697,13 @@ export async function runVpcSteps(
   await updateManifest(context, (manifest) => {
     manifest.vpc_attached_node_id = options.nodeId;
   });
+
+  await waitForNodeVpcAttachmentState(
+    context,
+    options.nodeId,
+    true,
+    'attached to the created VPC'
+  );
 
   const vpcDetach = await runJsonCommand<VpcAttachDetachJson>(
     [
@@ -708,10 +730,7 @@ export async function runVpcSteps(
     manifest.vpc_attached_node_id = null;
   });
 
-  const vpcDelete = await runJsonCommand<VpcDeleteJson>(
-    ['vpc', 'delete', String(vpcId), '--force'],
-    context.smokeEnv
-  );
+  const vpcDelete = await deleteVpcWithRetry(context, vpcId);
 
   if (vpcDelete.vpc.id !== vpcId) {
     throw new Error('Expected vpc delete to remove the created VPC.');
@@ -855,15 +874,14 @@ export async function runNodeLifecycleActionSteps(
 
   if (
     saveImage.action !== 'save-image' ||
-    saveImage.node_id !== options.nodeId ||
-    savedImageId.length === 0
+    saveImage.node_id !== options.nodeId
   ) {
-    throw new Error('Expected node save-image to return a saved image id.');
+    throw new Error('Expected node save-image to target the created node.');
   }
 
   await updateManifest(context, (manifest) => {
-    manifest.saved_image_deleted = false;
-    manifest.saved_image_id = savedImageId;
+    manifest.saved_image_deleted = savedImageId.length === 0;
+    manifest.saved_image_id = savedImageId.length === 0 ? null : savedImageId;
   });
 
   await waitForNodeReadiness(options.nodeId, context.smokeEnv, {
@@ -897,6 +915,51 @@ export async function runNodeLifecycleActionSteps(
     requirePublicIp: true
   });
   publicIp = requirePublicIp(nodeGet, options.nodeId);
+
+  return {
+    publicIp
+  };
+}
+
+export async function runNodePublicIpDetachStep(
+  context: SmokeStepContext,
+  options: {
+    nodeId: number;
+  }
+): Promise<{
+  publicIp: string;
+}> {
+  const nodeGet = await waitForNodeReadiness(options.nodeId, context.smokeEnv, {
+    requirePublicIp: true
+  });
+  const publicIp = requirePublicIp(nodeGet, options.nodeId);
+  const detachResult = await runJsonCommand<NodePublicIpDetachJson>(
+    [
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      String(options.nodeId),
+      '--force'
+    ],
+    context.smokeEnv
+  );
+
+  if (
+    detachResult.action !== 'public-ip-detach' ||
+    detachResult.node_id !== options.nodeId ||
+    detachResult.public_ip !== publicIp
+  ) {
+    throw new Error(
+      'Expected node public-ip detach to target the created node and current public IP.'
+    );
+  }
+
+  await waitForNodeStatus(options.nodeId, context.smokeEnv, {
+    acceptedStatuses: ['Running'],
+    description: 'Running without a public IP',
+    requireMissingPublicIp: true
+  });
 
   return {
     publicIp
@@ -993,13 +1056,165 @@ async function updateManifest(
 }
 
 function requirePublicIp(nodeGet: NodeGetJson, nodeId: number): string {
-  const publicIp = nodeGet.node.public_ip_address?.trim();
+  const publicIp = normalizeObservedPublicIp(nodeGet.node.public_ip_address);
 
-  if (publicIp === undefined || publicIp.length === 0) {
+  if (publicIp === null) {
     throw new Error(
       `Expected node ${nodeId} to expose a public IP for manual smoke.`
     );
   }
 
   return publicIp;
+}
+
+async function waitForNodeVpcAttachmentState(
+  context: SmokeStepContext,
+  nodeId: number,
+  expectedAttached: boolean,
+  description: string
+): Promise<NodeGetJson> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let lastNode: NodeGetJson['node'] | undefined;
+  let lastError: Error | undefined;
+
+  while (Date.now() <= deadline) {
+    try {
+      const nodeGet = await runJsonCommand<NodeGetJson>(
+        ['node', 'get', String(nodeId)],
+        context.smokeEnv
+      );
+
+      lastNode = nodeGet.node;
+      lastError = undefined;
+
+      if ((nodeGet.node.is_vpc_attached ?? false) === expectedAttached) {
+        return nodeGet;
+      }
+    } catch (error: unknown) {
+      lastError = toError(error);
+    }
+
+    if (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+
+  const lastObservedState =
+    lastNode === undefined
+      ? (lastError?.message ?? 'No successful node get response was observed.')
+      : `is_vpc_attached=${String(lastNode.is_vpc_attached ?? false)}`;
+
+  throw new Error(
+    `Timed out waiting for node ${nodeId} to become ${description}. Last observed state: ${lastObservedState}`
+  );
+}
+
+async function deleteVpcWithRetry(
+  context: SmokeStepContext,
+  vpcId: number
+): Promise<VpcDeleteJson> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let lastError: Error | undefined;
+
+  while (Date.now() <= deadline) {
+    try {
+      return await runJsonCommand<VpcDeleteJson>(
+        ['vpc', 'delete', String(vpcId), '--force'],
+        context.smokeEnv
+      );
+    } catch (error: unknown) {
+      const resolvedError = toError(error);
+
+      if (!shouldRetryVpcDeleteError(resolvedError.message)) {
+        throw resolvedError;
+      }
+
+      lastError = resolvedError;
+    }
+
+    if (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+
+  throw new Error(
+    `Timed out deleting VPC ${vpcId} after detach. Last observed error: ${
+      lastError?.message ?? 'No retryable delete error was captured.'
+    }`
+  );
+}
+
+async function waitForVpcState(
+  context: SmokeStepContext,
+  vpcId: number,
+  options: {
+    acceptedStates: string[];
+    description: string;
+    requireNoAttachedVmCount?: boolean;
+  }
+): Promise<VpcGetJson> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  const accepted = new Set(
+    options.acceptedStates.map((state) => normalizeLifecycleState(state))
+  );
+  let lastVpc: VpcGetJson['vpc'] | undefined;
+  let lastError: Error | undefined;
+
+  while (Date.now() <= deadline) {
+    try {
+      const vpcGet = await runJsonCommand<VpcGetJson>(
+        ['vpc', 'get', String(vpcId)],
+        context.smokeEnv
+      );
+      const normalizedState = normalizeLifecycleState(vpcGet.vpc.state);
+      const attachedVmCount = vpcGet.vpc.attached_vm_count ?? 0;
+
+      lastVpc = vpcGet.vpc;
+      lastError = undefined;
+
+      if (
+        accepted.has(normalizedState) &&
+        (!options.requireNoAttachedVmCount || attachedVmCount === 0)
+      ) {
+        return vpcGet;
+      }
+    } catch (error: unknown) {
+      lastError = toError(error);
+    }
+
+    if (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
+  }
+
+  const lastObservedState =
+    lastVpc === undefined
+      ? (lastError?.message ?? 'No successful VPC get response was observed.')
+      : `state=${lastVpc.state ?? '<missing>'}`;
+
+  throw new Error(
+    `Timed out waiting for VPC ${vpcId} to become ${
+      options.description
+    }. Last observed state: ${lastObservedState}`
+  );
+}
+
+function shouldRetryVpcDeleteError(message: string): boolean {
+  return (
+    /you have running servers on this vpc/i.test(message) ||
+    /vpc is in creating state/i.test(message) ||
+    /please try again later/i.test(message)
+  );
+}
+
+function normalizeLifecycleState(state: string | undefined): string {
+  return (state ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

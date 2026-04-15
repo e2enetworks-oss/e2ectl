@@ -21,7 +21,7 @@ export function buildProjectCommand(runtime: CliRuntime): Command {
     store: runtime.store
   });
   const command = new Command('project').description(
-    'Inspect account-level MyAccount project access.'
+    'Manage account-scoped MyAccount projects.'
   );
 
   command.helpCommand('help [command]', 'Show help for a project command');

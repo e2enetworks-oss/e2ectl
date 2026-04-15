@@ -19,12 +19,19 @@ describe('package install smoke from tarball', () => {
     const homeEnv = buildHomeEnv(tempHome.path);
 
     try {
+      await access(path.resolve(process.cwd(), 'dist', 'app', 'index.js'));
       await mkdir(packDirectory, { recursive: true });
       await mkdir(prefixDirectory, { recursive: true });
 
       const packResult = await runCommand(
         npmInvocation.command,
-        [...npmInvocation.args, 'pack', '--pack-destination', packDirectory],
+        [
+          ...npmInvocation.args,
+          'pack',
+          '--ignore-scripts',
+          '--pack-destination',
+          packDirectory
+        ],
         {
           env: {
             ...homeEnv,

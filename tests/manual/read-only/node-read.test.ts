@@ -45,6 +45,10 @@ interface NodeListJson extends JsonCommandResult {
   nodes: unknown[];
 }
 
+interface ProjectListJson extends JsonCommandResult {
+  items: unknown[];
+}
+
 interface ReservedIpListJson extends JsonCommandResult {
   items: unknown[];
 }
@@ -143,6 +147,14 @@ describeManual('manual read-only built CLI checks', () => {
 
         expect(nodeList.action).toBe('list');
         expect(Array.isArray(nodeList.nodes)).toBe(true);
+
+        const projectList = await runJsonCommand<ProjectListJson>(
+          ['project', 'list'],
+          configBackedCliEnv
+        );
+
+        expect(projectList.action).toBe('list');
+        expect(Array.isArray(projectList.items)).toBe(true);
 
         const volumePlans = await runJsonCommand<VolumePlansJson>(
           ['volume', 'plans'],

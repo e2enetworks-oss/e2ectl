@@ -10,6 +10,7 @@ import {
   runAddonReservedIpSteps,
   runNodeDeleteSteps,
   runNodeLifecycleActionSteps,
+  runNodePublicIpDetachStep,
   runSecurityGroupSteps,
   runSshKeyCreateAndAttachSteps,
   runSshKeyDeleteStep,
@@ -75,6 +76,63 @@ describe('manual release smoke workflow', () => {
         });
         await runSshKeyDeleteStep(context, {
           sshKeyId
+        });
+      } catch (error: unknown) {
+        workflowError = error;
+        console.error(`Manual smoke manifest: ${context.manifestPath}`);
+      } finally {
+        const cleanupResult = await runCommand(
+          process.execPath,
+          [
+            path.resolve(process.cwd(), 'scripts', 'manual-smoke-cleanup.mjs'),
+            '--manifest',
+            context.manifestPath
+          ],
+          {
+            env: smokeEnv.cliEnv,
+            timeoutMs: MANUAL_SMOKE_CLEANUP_TIMEOUT_MS
+          }
+        );
+
+        if (cleanupResult.exitCode !== 0) {
+          console.error(`Manual smoke manifest: ${context.manifestPath}`);
+          console.error(cleanupResult.stdout);
+          console.error(cleanupResult.stderr);
+
+          if (workflowError === undefined) {
+            cleanupError = new Error(
+              `Manual smoke cleanup failed for manifest ${context.manifestPath}.`
+            );
+          }
+        }
+      }
+
+      if (workflowError !== undefined) {
+        throw toError(workflowError);
+      }
+
+      if (cleanupError !== undefined) {
+        throw cleanupError;
+      }
+    }
+  );
+
+  it(
+    'live-proves node public-ip detach through the built CLI',
+    { timeout: MANUAL_SMOKE_TEST_TIMEOUT_MS },
+    async () => {
+      const runPrefix = `${smokeEnv.prefix}-public-ip-${Date.now().toString(36)}`;
+      const context = await prepareSmokeContext(runPrefix);
+      let cleanupError: Error | undefined;
+      let workflowError: unknown;
+
+      try {
+        const { nodeId } = await createNodeStep(context, {
+          nodeName: `${runPrefix}-node`
+        });
+
+        await runNodePublicIpDetachStep(context, {
+          nodeId
         });
       } catch (error: unknown) {
         workflowError = error;

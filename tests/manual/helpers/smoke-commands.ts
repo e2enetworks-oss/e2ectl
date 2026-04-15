@@ -7,6 +7,7 @@ export interface NodeGetJson {
   action: 'get';
   node: {
     id: number;
+    is_vpc_attached?: boolean;
     public_ip_address?: string | null;
     status: string;
   };
@@ -116,6 +117,7 @@ export async function waitForNodeStatus(
     acceptedStatuses: string[];
     description: string;
     requirePublicIp?: boolean;
+    requireMissingPublicIp?: boolean;
   }
 ): Promise<NodeGetJson> {
   const deadline = Date.now() + NODE_STATUS_TIMEOUT_MS;
@@ -132,15 +134,18 @@ export async function waitForNodeStatus(
         smokeEnv
       );
       const normalizedStatus = normalizeNodeStatus(nodeGet.node.status);
-      const publicIp = nodeGet.node.public_ip_address?.trim();
+      const publicIp = normalizeObservedPublicIp(
+        nodeGet.node.public_ip_address
+      );
+      const hasPublicIp = publicIp !== null;
 
       lastNode = nodeGet.node;
       lastError = undefined;
 
       if (
         acceptedStatuses.has(normalizedStatus) &&
-        (!options.requirePublicIp ||
-          (publicIp !== undefined && publicIp.length > 0))
+        (!options.requirePublicIp || hasPublicIp) &&
+        (!options.requireMissingPublicIp || !hasPublicIp)
       ) {
         return nodeGet;
       }
@@ -157,9 +162,7 @@ export async function waitForNodeStatus(
     lastNode === undefined
       ? (lastError?.message ?? 'No successful node get response was observed.')
       : `status=${lastNode.status}, public_ip=${
-          lastNode.public_ip_address?.trim().length
-            ? lastNode.public_ip_address.trim()
-            : '<missing>'
+          normalizeObservedPublicIp(lastNode.public_ip_address) ?? '<missing>'
         }`;
 
   throw new Error(
@@ -232,6 +235,26 @@ function toError(error: unknown): Error {
 
 function normalizeNodeStatus(status: string): string {
   return normalizeLifecycleStatus(status);
+}
+
+export function normalizeObservedPublicIp(
+  value: string | null | undefined
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const normalized = value.trim();
+
+  if (
+    normalized.length === 0 ||
+    normalized === '[]' ||
+    normalized.toLowerCase() === 'null'
+  ) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function normalizeLifecycleStatus(status: string): string {
