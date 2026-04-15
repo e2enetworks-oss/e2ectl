@@ -12,16 +12,6 @@ describe('project list against a fake MyAccount API', () => {
           code: 200,
           data: [
             {
-              associated_members: [],
-              associated_policies: [
-                {
-                  id: 11,
-                  policy_name: 'Admin',
-                  policy_set_type: 'custom'
-                }
-              ],
-              current_user_role: 'Owner',
-              is_active_project: true,
               is_default: true,
               is_starred: false,
               name: 'default-project',
@@ -60,10 +50,6 @@ describe('project list against a fake MyAccount API', () => {
           action: 'list',
           items: [
             {
-              associated_member_count: 0,
-              associated_policy_count: 1,
-              current_user_role: 'Owner',
-              is_backend_active_project: true,
               is_cli_default_project: false,
               is_default: true,
               is_starred: false,
@@ -97,26 +83,12 @@ describe('project list against a fake MyAccount API', () => {
           code: 200,
           data: [
             {
-              associated_members: [],
-              associated_policies: [],
-              current_user_role: 'Admin',
-              is_active_project: false,
               is_default: false,
               is_starred: true,
               name: 'zeta-project',
               project_id: 50001
             },
             {
-              associated_members: [],
-              associated_policies: [
-                {
-                  id: 11,
-                  policy_name: 'Admin',
-                  policy_set_type: 'custom'
-                }
-              ],
-              current_user_role: 'Owner',
-              is_active_project: true,
               is_default: true,
               is_starred: false,
               name: 'default-project',
@@ -156,7 +128,6 @@ describe('project list against a fake MyAccount API', () => {
       expect(result.stdout.indexOf('default-project')).toBeLessThan(
         result.stdout.indexOf('zeta-project')
       );
-      expect(result.stdout).toContain('Owner');
     } finally {
       await server.close();
       await tempHome.cleanup();

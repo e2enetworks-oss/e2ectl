@@ -58,6 +58,9 @@ If you need to inspect which projects are available to the current account befor
 
 ```bash
 e2ectl project list
+e2ectl project create --name <project-name>
+e2ectl project star <project-id>
+e2ectl project unstar <project-id>
 ```
 
 ### 4. Discover valid plans, images, and billing options
@@ -115,6 +118,9 @@ For `E1` and `E1WC` creates, add `--disk <size-gb>` after selecting the exact pl
 
 ```bash
 e2ectl project list
+e2ectl project create --name <name>
+e2ectl project star <project-id>
+e2ectl project unstar <project-id>
 
 e2ectl reserved-ip list
 e2ectl reserved-ip get <ip-address>
@@ -148,7 +154,7 @@ e2ectl ssh-key create --label <label> --public-key-file ~/.ssh/id_ed25519.pub
 e2ectl ssh-key delete <ssh-key-id>
 ```
 
-`e2ectl project list` is account-scoped. It only needs authentication and does not require `--project-id` or `--location`.
+`e2ectl project list`, `project create`, `project star`, and `project unstar` are account-scoped. They only need authentication and do not require `--project-id` or `--location`.
 
 `e2ectl reserved-ip attach node` uses the backend attach flow. When the target node already has a public NIC, the reserved IP can attach as an add-on IP. When the target node has no current public IP, the same backend flow can promote the reserved IP as the node's primary public IP.
 
@@ -191,7 +197,7 @@ e2ectl config import \
 ```
 
 Good automation entry points include:
-`config list`, `project list`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
+`config list`, `project list`, `project create`, `project star`, `project unstar`, `node catalog os`, `node catalog plans`, `node list`, `reserved-ip list`, `volume plans`, `volume list`, `vpc plans`, `vpc list`, `security-group list`, and `ssh-key list`.
 
 ## Documentation
 

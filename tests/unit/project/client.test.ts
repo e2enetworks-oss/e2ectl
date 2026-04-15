@@ -40,6 +40,58 @@ class StubTransport implements MyAccountTransport {
 }
 
 describe('ProjectApiClient', () => {
+  it('creates a project via POST to the PBAC collection route', async () => {
+    const transport = new StubTransport();
+    const client = new ProjectApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope({
+        project_id: 99001,
+        project_name: 'new-project'
+      })
+    );
+
+    const result = await client.createProject({ name: 'new-project' });
+
+    expect(transport.postMock).toHaveBeenCalledWith('/pbac/project/', {
+      body: { name: 'new-project' },
+      includeProjectContext: false
+    });
+    expect(result).toEqual({
+      project_id: 99001,
+      project_name: 'new-project'
+    });
+  });
+
+  it('stars a project via PUT to the PBAC collection route', async () => {
+    const transport = new StubTransport();
+    const client = new ProjectApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope({
+        project_id: 46429,
+        project_name: 'default-project'
+      })
+    );
+
+    const result = await client.starUnstarProject({
+      is_starred: true,
+      name: 'default-project',
+      project_id: 46429
+    });
+
+    expect(transport.requestMock).toHaveBeenCalledWith({
+      body: { is_starred: true, name: 'default-project', project_id: 46429 },
+      includeProjectContext: false,
+      method: 'PUT',
+      path: '/pbac/project/'
+    });
+    expect(result).toEqual({
+      project_id: 46429,
+      project_name: 'default-project'
+    });
+  });
+
   it('lists projects through the account-scoped PBAC collection route', async () => {
     const transport = new StubTransport();
     const client = new ProjectApiClient(transport);
@@ -47,10 +99,6 @@ describe('ProjectApiClient', () => {
     transport.getMock.mockResolvedValue(
       envelope([
         {
-          associated_members: [],
-          associated_policies: [],
-          current_user_role: 'Owner',
-          is_active_project: true,
           is_default: true,
           is_starred: false,
           name: 'default-project',

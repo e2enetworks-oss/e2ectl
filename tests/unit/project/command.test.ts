@@ -22,12 +22,6 @@ function createProjectClientStub() {
   const listProjects = vi.fn(() =>
     Promise.resolve([
       {
-        associated_members: [],
-        associated_policies: [
-          { id: 1, policy_name: 'Admin', policy_set_type: 'custom' }
-        ],
-        current_user_role: 'Owner',
-        is_active_project: false,
         is_default: true,
         is_starred: false,
         name: 'default-project',
@@ -36,11 +30,29 @@ function createProjectClientStub() {
     ])
   );
 
+  const createProject = vi.fn(() =>
+    Promise.resolve({
+      project_id: 99001,
+      project_name: 'new-project'
+    })
+  );
+
+  const starUnstarProject = vi.fn(
+    (body: { is_starred: boolean; name: string; project_id: number }) =>
+      Promise.resolve({
+        project_id: body.project_id,
+        project_name: body.name
+      })
+  );
+
   const stub: ProjectClient = {
-    listProjects
+    createProject,
+    listProjects,
+    starUnstarProject
   };
 
   return {
+    createProject,
     listProjects,
     stub
   };
@@ -186,10 +198,6 @@ describe('project commands', () => {
         action: 'list',
         items: [
           {
-            associated_member_count: 0,
-            associated_policy_count: 1,
-            current_user_role: 'Owner',
-            is_backend_active_project: false,
             is_cli_default_project: true,
             is_default: true,
             is_starred: false,
@@ -225,7 +233,128 @@ describe('project commands', () => {
     });
     expect(stdout.buffer).toContain('ID');
     expect(stdout.buffer).toContain('default-project');
-    expect(stdout.buffer).toContain('Owner');
+  });
+
+  it('creates a project in deterministic json mode', async () => {
+    const { receivedCredentials, runtime, stdout, stub } =
+      createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'project',
+      'create',
+      '--name',
+      'new-project',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      api_key: 'api-key',
+      auth_token: 'auth-token'
+    });
+    expect(stub.createProject).toHaveBeenCalledWith({ name: 'new-project' });
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'create',
+        name: 'new-project',
+        project_id: 99001
+      })}\n`
+    );
+  });
+
+  it('renders human output for project create', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'project',
+      'create',
+      '--name',
+      'new-project',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Created project: new-project');
+    expect(stdout.buffer).toContain('ID: 99001');
+  });
+
+  it('stars a project in json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'project',
+      'star',
+      '12345',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'star',
+        name: 'default-project',
+        project_id: 12345
+      })}\n`
+    );
+  });
+
+  it('unstars a project in json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'project',
+      'unstar',
+      '12345',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toBe(
+      `${stableStringify({
+        action: 'unstar',
+        name: 'default-project',
+        project_id: 12345
+      })}\n`
+    );
+  });
+
+  it('renders human output for project star', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'project',
+      'star',
+      '12345',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Starred project: default-project');
+    expect(stdout.buffer).toContain('ID: 12345');
   });
 
   it('shows root help for the project command', async () => {
@@ -233,6 +362,9 @@ describe('project commands', () => {
 
     expect(output).toContain('Inspect account-level MyAccount project access.');
     expect(output).toContain('list');
+    expect(output).toContain('create');
+    expect(output).toContain('star');
+    expect(output).toContain('unstar');
     expect(output).toContain('Show help for a project command');
   });
 });
