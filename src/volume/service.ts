@@ -4,7 +4,7 @@ import {
   type ResolvedCredentials
 } from '../config/index.js';
 import { formatCliCommand } from '../app/metadata.js';
-import { CliError, EXIT_CODES } from '../core/errors.js';
+import { CliError, EXIT_CODES, isAppError } from '../core/errors.js';
 import type { VolumeClient } from './client.js';
 import type {
   VolumeCommittedPlan,
@@ -163,137 +163,38 @@ interface ResolvedVolumePlan {
   size_gb: number;
 }
 
+interface NormalizedVolumeCreateBilling {
+  billingType: VolumeBillingType;
+  committedPlanId: number | undefined;
+  postCommitBehavior: VolumePostCommitBehavior | undefined;
+}
+
+interface VolumeCreatePayloadInput {
+  name: string;
+  sizeGb: number;
+}
+
 export class VolumeService {
   constructor(private readonly dependencies: VolumeServiceDependencies) {}
 
   async createVolume(
     options: VolumeCreateOptions
   ): Promise<VolumeCreateCommandResult> {
-    const billingType = normalizeBillingType(options.billingType);
-    const name = normalizeRequiredString(options.name, 'Name', '--name');
-    const sizeGb = normalizePositiveInteger(options.size, 'Size', '--size');
-    const committedPlanId = normalizeOptionalInteger(
-      options.committedPlanId,
-      'Committed plan ID',
-      '--committed-plan-id'
-    );
-    const postCommitBehavior = normalizePostCommitBehavior(
-      options.postCommitBehavior
-    );
-
-    if (billingType === 'committed' && committedPlanId === undefined) {
-      throw new CliError(
-        'Committed plan ID is required when --billing-type committed is used.',
-        {
-          code: 'MISSING_COMMITTED_PLAN_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatCliCommand(`volume plans --size ${sizeGb}`)}, then pass one plan id with --committed-plan-id.`
-        }
-      );
-    }
-
-    if (billingType === 'hourly' && committedPlanId !== undefined) {
-      throw new CliError(
-        'Committed plan ID can only be used with --billing-type committed.',
-        {
-          code: 'UNEXPECTED_COMMITTED_PLAN_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Remove --committed-plan-id, or switch to --billing-type committed.'
-        }
-      );
-    }
-
-    if (billingType === 'hourly' && postCommitBehavior !== undefined) {
-      throw new CliError(
-        '--post-commit-behavior can only be used with --billing-type committed.',
-        {
-          code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Remove --post-commit-behavior, or switch to --billing-type committed.'
-        }
-      );
-    }
+    const input = normalizeVolumeCreatePayloadInput(options);
+    const billing = normalizeVolumeCreateBilling(options, input.sizeGb);
 
     const client = await this.createClient(options);
     const plans = summarizeVolumePlans(await client.listVolumePlans());
-    const matchingPlans = plans.filter((plan) => plan.size_gb === sizeGb);
-
-    if (matchingPlans.length === 0) {
-      throw new CliError(
-        `No active volume plan matches ${sizeGb} GB in the selected location.`,
-        {
-          code: 'VOLUME_PLAN_NOT_FOUND',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatCliCommand('volume plans')} to inspect available sizes, then retry with one of the listed GB values.`
-        }
-      );
-    }
-
-    if (matchingPlans.length > 1) {
-      throw new CliError(
-        `Multiple active volume plans match ${sizeGb} GB, so the CLI cannot derive a unique IOPS value safely.`,
-        {
-          code: 'AMBIGUOUS_VOLUME_PLAN',
-          details: matchingPlans.map(
-            (plan) =>
-              `size_gb=${plan.size_gb}, iops=${plan.iops}, available=${plan.available}, hourly_price=${plan.hourly_price ?? 'unknown'}`
-          ),
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Review ${formatCliCommand('volume plans')} and wait for the platform plan set to become unambiguous for that size.`
-        }
-      );
-    }
-
-    const selectedPlan = matchingPlans[0]!;
-    if (!selectedPlan.available) {
-      throw new CliError(
-        `Volume size ${sizeGb} GB is currently unavailable in inventory.`,
-        {
-          code: 'UNAVAILABLE_VOLUME_PLAN',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatCliCommand('volume plans')} again later and choose a size marked as available.`
-        }
-      );
-    }
-
-    const committedPlan =
-      billingType === 'committed'
-        ? selectCommittedPlan(selectedPlan, committedPlanId!)
-        : null;
-
-    const request = buildVolumeCreateRequest({
-      billingType,
-      iops: selectedPlan.iops,
-      name,
-      sizeGb,
-      ...(committedPlanId === undefined ? {} : { committedPlanId }),
-      ...(postCommitBehavior === undefined ? {} : { postCommitBehavior })
-    });
+    const selectedPlan = selectVolumeCreatePlan(plans, input.sizeGb);
+    const committedPlan = resolveVolumeCommittedPlan(selectedPlan, billing);
+    const request = buildVolumeCreateRequest(input, billing, selectedPlan.iops);
     const result = await client.createVolume(request);
 
     return {
       action: 'create',
-      billing: {
-        committed_plan: committedPlan,
-        post_commit_behavior:
-          billingType === 'committed'
-            ? (postCommitBehavior ?? 'auto-renew')
-            : null,
-        type: billingType
-      },
-      requested: {
-        name,
-        size_gb: sizeGb
-      },
-      resolved_plan: {
-        available: selectedPlan.available,
-        currency: selectedPlan.currency,
-        hourly_price: selectedPlan.hourly_price,
-        iops: selectedPlan.iops,
-        size_gb: selectedPlan.size_gb
-      },
+      billing: summarizeVolumeCreateBilling(billing, committedPlan),
+      requested: summarizeRequestedVolume(input),
+      resolved_plan: summarizeResolvedVolumePlan(selectedPlan),
       volume: normalizeCreatedVolume(result)
     };
   }
@@ -320,14 +221,35 @@ export class VolumeService {
     }
 
     const client = await this.createClient(options);
-    const result = await client.deleteVolume(normalizedVolumeId);
 
-    return {
-      action: 'delete',
-      cancelled: false,
-      message: result.message,
-      volume_id: normalizedVolumeId
-    };
+    try {
+      const result = await client.deleteVolume(normalizedVolumeId);
+
+      return {
+        action: 'delete',
+        cancelled: false,
+        message: result.message,
+        volume_id: normalizedVolumeId
+      };
+    } catch (error: unknown) {
+      if (isVolumeDeleteTimeout(error)) {
+        try {
+          if (!(await volumeStillExists(client, normalizedVolumeId))) {
+            return {
+              action: 'delete',
+              cancelled: false,
+              message: 'Block Storage Deleted',
+              volume_id: normalizedVolumeId
+            };
+          }
+        } catch {
+          // Fall through to preserve the original delete timeout when
+          // reconciliation cannot determine the final state.
+        }
+      }
+
+      throw error;
+    }
   }
 
   async getVolume(
@@ -454,24 +376,143 @@ export class VolumeService {
   }
 }
 
-function buildVolumeCreateRequest(input: {
-  billingType: VolumeBillingType;
-  committedPlanId?: number;
-  iops: number;
-  name: string;
-  postCommitBehavior?: VolumePostCommitBehavior;
-  sizeGb: number;
-}): VolumeCreateRequest {
+function normalizeVolumeCreatePayloadInput(
+  options: VolumeCreateOptions
+): VolumeCreatePayloadInput {
   return {
-    ...(input.billingType === 'committed' && input.committedPlanId !== undefined
+    name: normalizeRequiredString(options.name, 'Name', '--name'),
+    sizeGb: normalizePositiveInteger(options.size, 'Size', '--size')
+  };
+}
+
+function normalizeVolumeCreateBilling(
+  options: VolumeCreateOptions,
+  sizeGb: number
+): NormalizedVolumeCreateBilling {
+  const billingType = normalizeBillingType(options.billingType);
+  const committedPlanId = normalizeOptionalInteger(
+    options.committedPlanId,
+    'Committed plan ID',
+    '--committed-plan-id'
+  );
+  const postCommitBehavior = normalizePostCommitBehavior(
+    options.postCommitBehavior
+  );
+
+  if (billingType === 'committed' && committedPlanId === undefined) {
+    throw new CliError(
+      'Committed plan ID is required when --billing-type committed is used.',
+      {
+        code: 'MISSING_COMMITTED_PLAN_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand(`volume plans --size ${sizeGb}`)}, then pass one plan id with --committed-plan-id.`
+      }
+    );
+  }
+
+  if (billingType === 'hourly' && committedPlanId !== undefined) {
+    throw new CliError(
+      'Committed plan ID can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --committed-plan-id, or switch to --billing-type committed.'
+      }
+    );
+  }
+
+  if (billingType === 'hourly' && postCommitBehavior !== undefined) {
+    throw new CliError(
+      '--post-commit-behavior can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --post-commit-behavior, or switch to --billing-type committed.'
+      }
+    );
+  }
+
+  return {
+    billingType,
+    committedPlanId,
+    postCommitBehavior
+  };
+}
+
+function selectVolumeCreatePlan(
+  plans: VolumePlanItem[],
+  sizeGb: number
+): VolumePlanItem {
+  const matchingPlans = plans.filter((plan) => plan.size_gb === sizeGb);
+
+  if (matchingPlans.length === 0) {
+    throw new CliError(
+      `No active volume plan matches ${sizeGb} GB in the selected location.`,
+      {
+        code: 'VOLUME_PLAN_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand('volume plans')} to inspect available sizes, then retry with one of the listed GB values.`
+      }
+    );
+  }
+
+  if (matchingPlans.length > 1) {
+    throw new CliError(
+      `Multiple active volume plans match ${sizeGb} GB, so the CLI cannot derive a unique IOPS value safely.`,
+      {
+        code: 'AMBIGUOUS_VOLUME_PLAN',
+        details: matchingPlans.map(
+          (plan) =>
+            `size_gb=${plan.size_gb}, iops=${plan.iops}, available=${plan.available}, hourly_price=${plan.hourly_price ?? 'unknown'}`
+        ),
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Review ${formatCliCommand('volume plans')} and wait for the platform plan set to become unambiguous for that size.`
+      }
+    );
+  }
+
+  const selectedPlan = matchingPlans[0]!;
+  if (selectedPlan.available) {
+    return selectedPlan;
+  }
+
+  throw new CliError(
+    `Volume size ${sizeGb} GB is currently unavailable in inventory.`,
+    {
+      code: 'UNAVAILABLE_VOLUME_PLAN',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run ${formatCliCommand('volume plans')} again later and choose a size marked as available.`
+    }
+  );
+}
+
+function resolveVolumeCommittedPlan(
+  plan: VolumePlanItem,
+  billing: NormalizedVolumeCreateBilling
+): VolumeCommittedPlanItem | null {
+  return billing.billingType === 'committed'
+    ? selectCommittedPlan(plan, billing.committedPlanId!)
+    : null;
+}
+
+function buildVolumeCreateRequest(
+  input: VolumeCreatePayloadInput,
+  billing: NormalizedVolumeCreateBilling,
+  iops: number
+): VolumeCreateRequest {
+  return {
+    ...(billing.billingType === 'committed' &&
+    billing.committedPlanId !== undefined
       ? {
-          cn_id: input.committedPlanId,
+          cn_id: billing.committedPlanId,
           cn_status: toBackendPostCommitBehavior(
-            input.postCommitBehavior ?? 'auto-renew'
+            billing.postCommitBehavior ?? 'auto-renew'
           )
         }
       : {}),
-    iops: input.iops,
+    iops,
     name: input.name,
     size: input.sizeGb
   };
@@ -484,6 +525,41 @@ function normalizeCreatedVolume(result: VolumeCreateResult): {
   return {
     id: result.id,
     name: result.image_name
+  };
+}
+
+function summarizeVolumeCreateBilling(
+  billing: NormalizedVolumeCreateBilling,
+  committedPlan: VolumeCommittedPlanItem | null
+): VolumeCreateCommandResult['billing'] {
+  return {
+    committed_plan: committedPlan,
+    post_commit_behavior:
+      billing.billingType === 'committed'
+        ? (billing.postCommitBehavior ?? 'auto-renew')
+        : null,
+    type: billing.billingType
+  };
+}
+
+function summarizeRequestedVolume(
+  input: VolumeCreatePayloadInput
+): VolumeCreateCommandResult['requested'] {
+  return {
+    name: input.name,
+    size_gb: input.sizeGb
+  };
+}
+
+function summarizeResolvedVolumePlan(
+  selectedPlan: VolumePlanItem
+): VolumeCreateCommandResult['resolved_plan'] {
+  return {
+    available: selectedPlan.available,
+    currency: selectedPlan.currency,
+    hourly_price: selectedPlan.hourly_price,
+    iops: selectedPlan.iops,
+    size_gb: selectedPlan.size_gb
   };
 }
 
@@ -508,6 +584,42 @@ function normalizeVolumeDetailItem(item: VolumeSummary): VolumeDetailItem {
     exporting_to_eos: item.is_block_storage_exporting_to_eos ?? false,
     snapshot_exists: item.snapshot_exist ?? false
   };
+}
+
+async function volumeStillExists(
+  client: VolumeClient,
+  volumeId: number
+): Promise<boolean> {
+  let currentPage = 1;
+  let totalPageNumber = 1;
+
+  do {
+    const page = await client.listVolumes(currentPage, VOLUME_LIST_PAGE_SIZE);
+    if (page.items.some((item) => item.block_id === volumeId)) {
+      return true;
+    }
+
+    totalPageNumber = page.total_page_number ?? 1;
+    currentPage += 1;
+
+    if (currentPage > VOLUME_LIST_MAX_PAGES) {
+      throw new CliError(
+        `Volume list exceeded the maximum page limit (${VOLUME_LIST_MAX_PAGES}).`,
+        {
+          code: 'PAGINATION_LIMIT_EXCEEDED',
+          exitCode: EXIT_CODES.network,
+          suggestion:
+            'The API returned an unexpectedly large result set. Retry the command or contact support.'
+        }
+      );
+    }
+  } while (currentPage <= totalPageNumber);
+
+  return false;
+}
+
+function isVolumeDeleteTimeout(error: unknown): boolean {
+  return isAppError(error) && error.code === 'API_TIMEOUT';
 }
 
 function normalizeAttachment(

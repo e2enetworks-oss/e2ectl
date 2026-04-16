@@ -9,7 +9,7 @@ export const EXIT_CODES = {
 
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES];
 
-export interface CliErrorOptions {
+export interface AppErrorOptions {
   cause?: unknown;
   code: string;
   details?: string[];
@@ -17,15 +17,15 @@ export interface CliErrorOptions {
   suggestion?: string;
 }
 
-export class CliError extends Error {
-  override readonly name = 'CliError';
+export class AppError extends Error {
+  override readonly name: string = 'AppError';
   override readonly cause: unknown;
   readonly code: string;
   readonly details: string[];
   readonly exitCode: ExitCode;
   readonly suggestion: string | undefined;
 
-  constructor(message: string, options: CliErrorOptions) {
+  constructor(message: string, options: AppErrorOptions) {
     super(message);
     this.code = options.code;
     this.exitCode = options.exitCode ?? EXIT_CODES.general;
@@ -35,12 +35,22 @@ export class CliError extends Error {
   }
 }
 
-export function isCliError(error: unknown): error is CliError {
-  return error instanceof CliError;
+export type CliErrorOptions = AppErrorOptions;
+
+export class CliError extends AppError {
+  override readonly name: string = 'CliError';
+}
+
+export function isAppError(error: unknown): error is AppError {
+  return error instanceof AppError;
+}
+
+export function isCliError(error: unknown): error is AppError {
+  return isAppError(error);
 }
 
 export function formatError(error: unknown): string {
-  if (isCliError(error)) {
+  if (isAppError(error)) {
     const lines = [`Error: ${error.message}`];
 
     if (error.details.length > 0) {

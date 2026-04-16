@@ -103,4 +103,63 @@ describe('volume list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human list output with sorted attachment details', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/block_storage/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              block_id: 22,
+              name: 'zeta-data',
+              size: 476837,
+              size_string: '500 GB',
+              status: 'Attached',
+              vm_detail: {
+                node_id: 301,
+                vm_id: 100157,
+                vm_name: 'node-b'
+              }
+            },
+            {
+              block_id: 11,
+              name: 'alpha-data',
+              size: 238419,
+              size_string: '250 GB',
+              status: 'Available',
+              vm_detail: {}
+            }
+          ],
+          errors: {},
+          message: 'OK',
+          total_count: 2,
+          total_page_number: 1
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['volume', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Attached To');
+      expect(result.stdout).toContain('node-b (node 301)');
+      expect(result.stdout.indexOf('alpha-data')).toBeLessThan(
+        result.stdout.indexOf('zeta-data')
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

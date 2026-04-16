@@ -43,13 +43,51 @@ jobs:
       - name: Unit coverage
         run: npm run coverage:unit
 
-      - name: Upload coverage to Codecov
+      - name: Upload unit coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: e2enetworks-oss/e2ectl
           files: coverage/unit/lcov.info
+          flags: unit
+          disable_search: true
           fail_ci_if_error: false
+
+      - name: Integration coverage and tests
+        run: npm run coverage:integration
+
+      - name: Upload integration coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: e2enetworks-oss/e2ectl
+          files: coverage/integration/lcov.info
+          flags: integration
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Package dry run
+        run: npm pack --dry-run
+
+  verify-macos:
+    name: verify (macos build test package)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: make test
 
       - name: Build
         run: make build
@@ -59,3 +97,26 @@ jobs:
 
       - name: Package dry run
         run: npm pack --dry-run
+
+  verify-windows:
+    name: verify (windows package smoke)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package install smoke
+        run: node ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts tests/integration/package/install-from-tarball.test.ts

@@ -120,6 +120,77 @@ describe('NodeApiClient', () => {
     expect(result.image_id).toBe('img-455');
   });
 
+  it('upgrades nodes through the dedicated node upgrade path', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        {
+          message: 'Node upgrade initiated'
+        }
+      )
+    );
+
+    const result = await client.upgradeNode('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+
+    expect(transport.requestMock).toHaveBeenCalledWith({
+      body: {
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+      },
+      method: 'PUT',
+      path: '/nodes/upgrade/101'
+    });
+    expect(result).toEqual({
+      location: 'Delhi',
+      message: 'Node upgrade initiated',
+      new_node_image_id: 8802,
+      old_node_image_id: 8801,
+      vm_id: 100157
+    });
+  });
+
+  it('does not send unsupported vm_id or committed_id fields in upgrade requests', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        {
+          message: 'Node upgrade initiated'
+        }
+      )
+    );
+
+    await client.upgradeNode('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+
+    const request = transport.requestMock.mock.calls[0]?.[0] as {
+      body: Record<string, unknown>;
+    };
+
+    expect(request.body).not.toHaveProperty('vm_id');
+    expect(request.body).not.toHaveProperty('committed_id');
+  });
+
   it('attaches saved ssh keys through the node action path', async () => {
     const transport = new StubTransport();
     const client = new NodeApiClient(transport);
@@ -332,6 +403,30 @@ describe('NodeApiClient', () => {
     expect(transport.deleteMock).toHaveBeenCalledWith('/nodes/101/', undefined);
     expect(result).toEqual({
       message: 'Deleted successfully'
+    });
+  });
+
+  it('adds reserve_ip_required only when node delete requests public IP reservation', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope(
+        {},
+        {
+          message: 'Deleted successfully'
+        }
+      )
+    );
+
+    await client.deleteNode('101', {
+      reserve_ip_required: 'true'
+    });
+
+    expect(transport.deleteMock).toHaveBeenCalledWith('/nodes/101/', {
+      query: {
+        reserve_ip_required: 'true'
+      }
     });
   });
 });

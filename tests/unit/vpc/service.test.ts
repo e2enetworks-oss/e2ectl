@@ -132,6 +132,7 @@ describe('VpcService', () => {
     });
     expect(result.items[1]).toMatchObject({
       cidr_source: 'e2e',
+      id: 11,
       subnet_count: 1
     });
   });
@@ -164,6 +165,7 @@ describe('VpcService', () => {
         cidr_source: 'e2e',
         created_at: '2026-03-13T08:00:00Z',
         gateway_ip: '10.20.0.1',
+        id: 27835,
         location: 'Delhi',
         name: 'prod-vpc',
         network_id: 27835,
@@ -262,6 +264,7 @@ describe('VpcService', () => {
       },
       credit_sufficient: true,
       vpc: {
+        id: 27835,
         name: 'prod-vpc',
         network_id: 27835,
         project_id: '46429',
@@ -379,7 +382,11 @@ describe('VpcService.listVpcs — happy path', () => {
     expect(result.total_count).toBe(1);
     expect(result.total_page_number).toBe(1);
     expect(result.items).toHaveLength(1);
-    expect(result.items[0]).toMatchObject({ name: 'vpc-a', network_id: 101 });
+    expect(result.items[0]).toMatchObject({
+      id: 101,
+      name: 'vpc-a',
+      network_id: 101
+    });
   });
 
   it('concatenates items across two pages in order', async () => {
@@ -424,10 +431,12 @@ describe('VpcService.listVpcs — happy path', () => {
     expect(listVpcs).toHaveBeenNthCalledWith(2, 2, 100);
     expect(result.items).toHaveLength(2);
     expect(result.items[0]).toMatchObject({
+      id: 201,
       name: 'vpc-page1',
       network_id: 201
     });
     expect(result.items[1]).toMatchObject({
+      id: 202,
       name: 'vpc-page2',
       network_id: 202
     });
@@ -577,6 +586,7 @@ describe('VpcService.listVpcs — concurrency', () => {
       expect(result.action).toBe('list');
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toMatchObject({
+        id: fixture.expectedNetworkId,
         name: fixture.expectedName,
         network_id: fixture.expectedNetworkId
       });

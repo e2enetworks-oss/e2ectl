@@ -3,6 +3,7 @@ import type {
   ConfigFile,
   ContextField,
   ProfileConfig,
+  ResolvedAccountCredentials,
   ResolvedCredentials
 } from './types.js';
 import {
@@ -65,6 +66,21 @@ export function readContextFromEnv(
 export function resolveCredentials(
   options: ResolveCredentialsOptions
 ): ResolvedCredentials {
+  return resolveCredentialSet(options, 'project') as ResolvedCredentials;
+}
+
+export function resolveAccountCredentials(
+  options: ResolveCredentialsOptions
+): ResolvedAccountCredentials {
+  return resolveCredentialSet(options, 'account') as ResolvedAccountCredentials;
+}
+
+type ResolutionScope = 'account' | 'project';
+
+function resolveCredentialSet(
+  options: ResolveCredentialsOptions,
+  scope: ResolutionScope
+): ResolvedAccountCredentials | ResolvedCredentials {
   const envAuth = readAuthFromEnv(options.env);
   const envContext = readContextFromEnv(options.env);
   const flagContext = readContextFromFlags(options);
@@ -82,7 +98,8 @@ export function resolveCredentials(
       profile,
       envAuth,
       envContext,
-      flagContext
+      flagContext,
+      scope
     );
   }
 
@@ -96,15 +113,19 @@ export function resolveCredentials(
         defaultProfile,
         envAuth,
         envContext,
-        flagContext
+        flagContext,
+        scope
       );
     }
 
     const missingAuthFields = getMissingFields(REQUIRED_AUTH_FIELDS, envAuth);
-    const missingContextFields = getMissingFields(REQUIRED_CONTEXT_FIELDS, {
-      ...envContext,
-      ...flagContext
-    });
+    const missingContextFields =
+      scope === 'project'
+        ? getMissingFields(REQUIRED_CONTEXT_FIELDS, {
+            ...envContext,
+            ...flagContext
+          })
+        : [];
 
     if (missingAuthFields.length > 0 || missingContextFields.length > 0) {
       throwInvalidDefaultProfileError(
@@ -122,7 +143,8 @@ export function resolveCredentials(
     undefined,
     envAuth,
     envContext,
-    flagContext
+    flagContext,
+    scope
   );
 }
 
@@ -139,14 +161,28 @@ export async function resolveStoredCredentials(
   });
 }
 
+export async function resolveStoredAccountCredentials(
+  store: CredentialResolutionStore,
+  options: Omit<ResolveCredentialsOptions, 'config' | 'configPath'>
+): Promise<ResolvedAccountCredentials> {
+  const config = await store.read();
+
+  return resolveAccountCredentials({
+    ...options,
+    config,
+    configPath: store.configPath
+  });
+}
+
 function buildResolvedCredentials(
   options: ResolveCredentialsOptions,
   profileAlias: string | undefined,
   profile: ProfileConfig | undefined,
   envAuth: PartialAuth,
   envContext: PartialContext,
-  flagContext: PartialContext
-): ResolvedCredentials {
+  flagContext: PartialContext,
+  scope: ResolutionScope
+): ResolvedAccountCredentials | ResolvedCredentials {
   const mergedAuth: PartialAuth = {
     ...(profile === undefined
       ? {}
@@ -167,25 +203,42 @@ function buildResolvedCredentials(
     throwMissingAuthError(options, profileAlias, missingAuthFields);
   }
 
-  const missingContextFields = getMissingFields(
-    REQUIRED_CONTEXT_FIELDS,
-    mergedContext
-  );
-  if (missingContextFields.length > 0) {
-    throwMissingContextError(options, profileAlias, missingContextFields);
+  if (scope === 'project') {
+    const missingContextFields = getMissingFields(
+      REQUIRED_CONTEXT_FIELDS,
+      mergedContext
+    );
+    if (missingContextFields.length > 0) {
+      throwMissingContextError(options, profileAlias, missingContextFields);
+    }
+
+    validateResolvedContext(
+      mergedContext.project_id ?? '',
+      mergedContext.location ?? ''
+    );
+
+    const resolvedCredentials: ResolvedCredentials = {
+      api_key: mergedAuth.api_key ?? '',
+      auth_token: mergedAuth.auth_token ?? '',
+      project_id: mergedContext.project_id ?? '',
+      location: mergedContext.location ?? '',
+      source: inferCredentialSource(profile, envAuth)
+    };
+
+    return profileAlias === undefined
+      ? resolvedCredentials
+      : {
+          ...resolvedCredentials,
+          alias: profileAlias
+        };
   }
 
-  validateResolvedContext(
-    mergedContext.project_id ?? '',
-    mergedContext.location ?? ''
-  );
-
-  const resolvedCredentials = {
+  const optionalContext = buildOptionalResolvedContext(mergedContext);
+  const resolvedCredentials: ResolvedAccountCredentials = {
     api_key: mergedAuth.api_key ?? '',
     auth_token: mergedAuth.auth_token ?? '',
-    project_id: mergedContext.project_id ?? '',
-    location: mergedContext.location ?? '',
-    source: inferCredentialSource(profile, envAuth)
+    source: inferCredentialSource(profile, envAuth),
+    ...optionalContext
   };
 
   return profileAlias === undefined
@@ -409,6 +462,22 @@ function validateResolvedContext(projectId: string, location: string): void {
         'Pass a supported location with --location or save a supported default location on the profile.'
     });
   }
+}
+
+function buildOptionalResolvedContext(
+  context: PartialContext
+): Partial<Pick<ResolvedAccountCredentials, 'location' | 'project_id'>> {
+  const projectId = context.project_id?.trim();
+  const location = context.location?.trim();
+
+  if (isNonEmptyString(projectId) && isNonEmptyString(location)) {
+    validateResolvedContext(projectId, location);
+  }
+
+  return {
+    ...(isNonEmptyString(projectId) ? { project_id: projectId } : {}),
+    ...(isNonEmptyString(location) ? { location } : {})
+  };
 }
 
 function inferCredentialSource(

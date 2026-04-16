@@ -117,6 +117,41 @@ describe('node formatter', () => {
     );
   });
 
+  it('sorts human node list output by id for deterministic operator output', () => {
+    const output = renderNodeResult(
+      {
+        action: 'list',
+        nodes: [
+          {
+            id: 205,
+            is_locked: false,
+            name: 'node-b',
+            plan: 'C3.16GB',
+            private_ip_address: '10.0.0.2',
+            public_ip_address: '1.1.1.2',
+            status: 'Running'
+          },
+          {
+            id: 101,
+            is_locked: false,
+            name: 'node-a',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.1',
+            public_ip_address: '1.1.1.1',
+            status: 'Running'
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      },
+      false
+    );
+
+    expect(output.indexOf('node-a')).toBeLessThan(output.indexOf('node-b'));
+    expect(output).toContain('101');
+    expect(output).toContain('205');
+  });
+
   it('renders billing metadata for node create results', () => {
     const output = renderNodeResult(
       {
@@ -166,6 +201,40 @@ describe('node formatter', () => {
         null,
         2
       ) + '\n'
+    );
+  });
+
+  it('renders delete output with explicit reserve-public-ip state when requested', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        message: 'Success',
+        node_id: 101,
+        reserve_public_ip_requested: true
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        node_id: 101,
+        reserve_public_ip_requested: false
+      },
+      true
+    );
+
+    expect(humanOutput).toBe(
+      'Deleted node 101.\nReserved Public IP: requested.\n'
+    );
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: true,
+        node_id: 101,
+        reserve_public_ip_requested: false
+      })}\n`
     );
   });
 
@@ -540,6 +609,61 @@ describe('node formatter', () => {
     expect(committedTable).toContain('2 vCPU / 6 GB / N/A');
   });
 
+  it('shows E1 create examples with disk guidance and the default storage example', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [
+          {
+            available_inventory: true,
+            committed_options: [
+              {
+                days: 90,
+                id: 2711,
+                name: '90 Days Committed , Rs. 6026.0',
+                total_price: 6026
+              }
+            ],
+            config: {
+              disk_gb: 0,
+              family: 'General Purpose',
+              ram: '6.00',
+              series: 'E1',
+              vcpu: 2
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 2.25,
+              price_per_month: 1642.5
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+            row: 1,
+            sku: 'E1.6GB'
+          }
+        ],
+        query: {
+          billing_type: 'all',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      formatCliCommand(
+        'node create --name <name> --plan E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi --image Ubuntu-24.04-Distro --disk 150'
+      )
+    );
+    expect(output).toContain(
+      'E1/E1WC configs also require --disk <size-gb>. Allowed sizes: 75-2400 GB; 25 GB steps below 150 GB; 50 GB steps at or above 150 GB.'
+    );
+  });
+
   it('renders a family-specific no-match message when the family filter excludes all configs', () => {
     const output = renderNodeResult(
       {
@@ -646,6 +770,104 @@ describe('node formatter', () => {
     expect(sshKeyOutput).toContain('Status: Done');
   });
 
+  it('renders warnings and deterministic json for public-ip detach results', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested public IP detach for node 101.');
+    expect(humanOutput).toContain('Public IP: 151.185.42.45');
+    expect(humanOutput).toContain('Message: Public IP detached successfully.');
+    expect(humanOutput).toContain(
+      'Warning: This node may no longer be publicly reachable.'
+    );
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      })}\n`
+    );
+  });
+
+  it('renders deterministic cancelled output for public-ip detach', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Cancelled public IP detach for node 101.');
+    expect(humanOutput).toContain('Public IP: 151.185.42.45');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'public-ip-detach',
+        cancelled: true,
+        node_id: 101,
+        public_ip: '151.185.42.45'
+      })}\n`
+    );
+  });
+
+  it('renders clean human summaries for node upgrade results', () => {
+    const output = renderNodeResult(
+      {
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node upgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Requested node upgrade for node 101.');
+    expect(output).toContain(
+      'Target Plan: C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    );
+    expect(output).toContain('Target Image: Ubuntu-24.04-Distro');
+    expect(output).toContain('Message: Node upgrade initiated');
+    expect(output).toContain('VM ID: 100157');
+    expect(output).toContain('Location: Delhi');
+  });
+
   it('renders deterministic json for the new node action results', () => {
     const output = renderNodeResult(
       {
@@ -684,6 +906,45 @@ describe('node formatter', () => {
         null,
         2
       ) + '\n'
+    );
+  });
+
+  it('preserves backend downgrade wording in deterministic node upgrade json', () => {
+    const output = renderNodeResult(
+      {
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node downgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-2vCPU-4RAM-100DISK-C3.4GB-Ubuntu-24.04-Delhi'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node downgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-2vCPU-4RAM-100DISK-C3.4GB-Ubuntu-24.04-Delhi'
+        }
+      })}\n`
     );
   });
 
@@ -778,5 +1039,244 @@ describe('node formatter', () => {
         2
       ) + '\n'
     );
+  });
+
+  it('renders the empty catalog-os branch clearly', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-os',
+        catalog: {
+          category_list: []
+        }
+      },
+      false
+    );
+
+    expect(output).toBe('No OS catalog rows found.\n');
+  });
+
+  it('renders the no-family-match catalog-plans branch clearly', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'GPU',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: ['C3', 'M3'],
+          empty_reason: 'no_family_match'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Filters: OS=Ubuntu 24.04, Billing=hourly, Family=GPU'
+    );
+    expect(output).toContain('Available Families: C3, M3');
+    expect(output).toContain('No configs were found for family GPU.');
+  });
+
+  it('renders power-off output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested power off for node 101.');
+    expect(humanOutput).toContain('Action ID: 702');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'power-off',
+        node_id: 101,
+        result: {
+          action_id: 702,
+          created_at: '2026-03-14T08:15:00Z',
+          image_id: null,
+          status: 'In Progress'
+        }
+      })}\n`
+    );
+  });
+
+  it('renders save-image output for humans', () => {
+    const output = renderNodeResult(
+      {
+        action: 'save-image',
+        image_name: 'node-a-image',
+        node_id: 101,
+        result: {
+          action_id: 703,
+          created_at: '2026-03-14T08:20:00Z',
+          image_id: 'img-455',
+          status: 'In Progress'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain(
+      'Requested save image for node 101 as node-a-image.'
+    );
+    expect(output).toContain('Image ID: img-455');
+  });
+
+  it('renders security-group action output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'security-group-detach',
+        node_id: 101,
+        result: {
+          message: 'Security Groups Detached Successfully'
+        },
+        security_group_ids: [44, 45]
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      },
+      true
+    );
+
+    expect(humanOutput).toContain(
+      'Requested security-group detach for node 101.'
+    );
+    expect(humanOutput).toContain('Security Group IDs: 44, 45');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      })}\n`
+    );
+  });
+
+  it('renders volume action output for both humans and json', () => {
+    const humanOutput = renderNodeResult(
+      {
+        action: 'volume-attach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage is Attached to VM.'
+        },
+        volume: {
+          id: 8801
+        }
+      },
+      false
+    );
+    const jsonOutput = renderNodeResult(
+      {
+        action: 'volume-detach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage Detach Process is Started.'
+        },
+        volume: {
+          id: 8801
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toContain('Requested volume attach for node 101.');
+    expect(humanOutput).toContain('Volume ID: 8801');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'volume-detach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage Detach Process is Started.'
+        },
+        volume: {
+          id: 8801
+        }
+      })}\n`
+    );
+  });
+
+  it('renders VPC action output for both subnet-free and subnet-aware branches', () => {
+    const attachOutput = renderNodeResult(
+      {
+        action: 'vpc-attach',
+        node_id: 101,
+        result: {
+          message: 'VPC attached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      },
+      false
+    );
+    const detachOutput = renderNodeResult(
+      {
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'VPC detached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: '10.0.0.25',
+          subnet_id: 991
+        }
+      },
+      false
+    );
+
+    expect(attachOutput).toContain('Requested VPC attach for node 101.');
+    expect(attachOutput).not.toContain('Subnet ID:');
+    expect(attachOutput).not.toContain('Private IP:');
+    expect(detachOutput).toContain('Requested VPC detach for node 101.');
+    expect(detachOutput).toContain('Subnet ID: 991');
+    expect(detachOutput).toContain('Private IP: 10.0.0.25');
   });
 });

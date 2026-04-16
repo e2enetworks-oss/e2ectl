@@ -64,7 +64,7 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a VPC. Inspect \`${formatCliCommand('vpc plans')}\` first to choose hourly or committed billing intentionally.`
+        `Create a VPC. Inspect \`${formatCliCommand('vpc plans')}\` first to choose hourly or committed billing intentionally. Follow-up commands use the VPC ID shown in the response.`
       )
       .requiredOption('--name <name>', 'VPC name.')
       .requiredOption(
@@ -98,7 +98,11 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
   });
 
   addContextOptions(
-    command.command('get <vpcId>').description('Get details for a VPC.')
+    command
+      .command('get <vpcId>')
+      .description(
+        'Get details for a VPC by its canonical VPC ID (the network_id shown by create/list output).'
+      )
   ).action(
     async (
       vpcId: string,
@@ -118,7 +122,9 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
   addContextOptions(
     command
       .command('delete <vpcId>')
-      .description('Delete a VPC.')
+      .description(
+        'Delete a VPC by its canonical VPC ID (the network_id shown by create/list output).'
+      )
       .option('--force', 'Skip the interactive confirmation prompt.')
   ).action(
     async (

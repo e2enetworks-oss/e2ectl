@@ -23,6 +23,7 @@ export interface NodeDetails extends NodeSummary {
   memory?: string;
   os_info?: NodeOsInfo;
   price?: string;
+  security_group_count?: number;
   vm_id?: number;
   vcpus?: string;
 }
@@ -157,6 +158,7 @@ export interface NodeCreateRequest {
   cn_id?: number;
   cn_status?: NodeCommittedCreateStatus;
   default_public_ip: boolean;
+  disk?: number;
   disable_password: boolean;
   enable_bitninja: boolean;
   image: string;
@@ -178,6 +180,19 @@ export interface NodeCreateResult {
 
 export interface NodeDeleteResult {
   message: string;
+}
+
+export interface NodeUpgradeRequest {
+  image: string;
+  plan: string;
+}
+
+export interface NodeUpgradeResult {
+  location?: string | null;
+  message: string;
+  new_node_image_id?: number | null;
+  old_node_image_id?: number | null;
+  vm_id?: number | null;
 }
 
 export type NodeActionType =

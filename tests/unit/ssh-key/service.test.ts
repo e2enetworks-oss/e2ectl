@@ -19,7 +19,11 @@ function createConfig(): ConfigFile {
   };
 }
 
-function createServiceFixture(): {
+function createServiceFixture(options?: {
+  confirmResult?: boolean;
+  isInteractive?: boolean;
+}): {
+  confirm: ReturnType<typeof vi.fn>;
   createSshKey: ReturnType<typeof vi.fn>;
   deleteSshKey: ReturnType<typeof vi.fn>;
   listSshKeys: ReturnType<typeof vi.fn>;
@@ -33,6 +37,7 @@ function createServiceFixture(): {
   const listSshKeys = vi.fn();
   const readPublicKeyFile = vi.fn();
   const readPublicKeyFromStdin = vi.fn();
+  const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
   const client: SshKeyClient = {
@@ -41,12 +46,12 @@ function createServiceFixture(): {
     listSshKeys
   };
   const service = new SshKeyService({
-    confirm: vi.fn(() => Promise.resolve(true)),
+    confirm,
     createSshKeyClient: vi.fn((resolvedCredentials: ResolvedCredentials) => {
       credentials = resolvedCredentials;
       return client;
     }),
-    isInteractive: true,
+    isInteractive: options?.isInteractive ?? true,
     readPublicKeyFile,
     readPublicKeyFromStdin,
     store: {
@@ -56,6 +61,7 @@ function createServiceFixture(): {
   });
 
   return {
+    confirm,
     createSshKey,
     deleteSshKey,
     listSshKeys,
@@ -201,6 +207,93 @@ describe('SshKeyService', () => {
     });
   });
 
+  it('rejects blank public-key-file values before trying to read anything', async () => {
+    const { readPublicKeyFile, readPublicKeyFromStdin, service } =
+      createServiceFixture();
+
+    await expect(
+      service.createSshKey({
+        label: 'demo',
+        publicKeyFile: '   '
+      })
+    ).rejects.toMatchObject({
+      message: 'Public key file cannot be empty.'
+    });
+
+    expect(readPublicKeyFile).not.toHaveBeenCalled();
+    expect(readPublicKeyFromStdin).not.toHaveBeenCalled();
+  });
+
+  it('wraps filesystem errors when reading SSH public keys from disk', async () => {
+    const { createSshKey, readPublicKeyFile, service } = createServiceFixture();
+
+    readPublicKeyFile.mockRejectedValue(new Error('permission denied'));
+
+    await expect(
+      service.createSshKey({
+        label: 'demo',
+        publicKeyFile: '/tmp/demo.pub'
+      })
+    ).rejects.toMatchObject({
+      code: 'PUBLIC_KEY_READ_FAILED',
+      message: 'Could not read SSH public key file: /tmp/demo.pub'
+    });
+
+    expect(createSshKey).not.toHaveBeenCalled();
+  });
+
+  it('wraps stdin read errors when --public-key-file - is used', async () => {
+    const { createSshKey, readPublicKeyFromStdin, service } =
+      createServiceFixture();
+
+    readPublicKeyFromStdin.mockRejectedValue(new Error('stdin closed'));
+
+    await expect(
+      service.createSshKey({
+        label: 'demo',
+        publicKeyFile: '-'
+      })
+    ).rejects.toMatchObject({
+      code: 'PUBLIC_KEY_READ_FAILED',
+      message: 'Could not read SSH public key content from stdin.'
+    });
+
+    expect(createSshKey).not.toHaveBeenCalled();
+  });
+
+  it('infers Unknown key types when the backend does not label an unfamiliar prefix', async () => {
+    const { createSshKey, readPublicKeyFile, service } = createServiceFixture();
+
+    readPublicKeyFile.mockResolvedValue('ssh-weird AAAA demo@laptop\n');
+    createSshKey.mockResolvedValue({
+      label: 'demo',
+      pk: 15400,
+      project_id: '46429',
+      ssh_key: 'ssh-weird AAAA demo@laptop',
+      timestamp: '19-Feb-2025'
+    });
+
+    const result = await service.createSshKey({
+      alias: 'prod',
+      label: 'demo',
+      publicKeyFile: '/tmp/demo.pub'
+    });
+
+    expect(result).toEqual({
+      action: 'create',
+      item: {
+        attached_nodes: 0,
+        created_at: '19-Feb-2025',
+        id: 15400,
+        label: 'demo',
+        project_id: '46429',
+        project_name: null,
+        public_key: 'ssh-weird AAAA demo@laptop',
+        type: 'Unknown'
+      }
+    });
+  });
+
   it('normalizes listed SSH keys into the clean CLI item shape', async () => {
     const { listSshKeys, service } = createServiceFixture();
 
@@ -235,6 +328,82 @@ describe('SshKeyService', () => {
     });
   });
 
+  it('fails clearly when a requested SSH key id is missing from the saved list', async () => {
+    const { listSshKeys, service } = createServiceFixture();
+
+    listSshKeys.mockResolvedValue([]);
+
+    await expect(
+      service.getSshKey('15398', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'SSH_KEY_NOT_FOUND',
+      message: 'SSH key 15398 was not found.'
+    });
+  });
+
+  it('rejects non-numeric SSH key ids for get before any network work', async () => {
+    const { listSshKeys, service } = createServiceFixture();
+
+    await expect(
+      service.getSshKey('demo', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SSH_KEY_ID',
+      message: 'SSH key ID must be numeric.'
+    });
+
+    expect(listSshKeys).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-numeric SSH key ids for delete before any network work', async () => {
+    const { deleteSshKey, service } = createServiceFixture();
+
+    await expect(
+      service.deleteSshKey('demo', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SSH_KEY_ID',
+      message: 'SSH key ID must be numeric.'
+    });
+
+    expect(deleteSshKey).not.toHaveBeenCalled();
+  });
+
+  it('returns a cancelled delete result when the confirmation prompt is declined', async () => {
+    const { confirm, deleteSshKey, service } = createServiceFixture({
+      confirmResult: false
+    });
+
+    const result = await service.deleteSshKey('15398', { alias: 'prod' });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete SSH key 15398? This cannot be undone.'
+    );
+    expect(deleteSshKey).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: true,
+      id: 15398
+    });
+  });
+
+  it('requires --force for delete in non-interactive mode', async () => {
+    const { deleteSshKey, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.deleteSshKey('15398', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a SSH key requires confirmation in an interactive terminal.'
+    });
+
+    expect(deleteSshKey).not.toHaveBeenCalled();
+  });
+
   it('deletes one SSH key with an explicit force flag', async () => {
     const { deleteSshKey, service } = createServiceFixture();
 
@@ -247,6 +416,27 @@ describe('SshKeyService', () => {
       force: true
     });
 
+    expect(deleteSshKey).toHaveBeenCalledWith(15398);
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      id: 15398,
+      message: 'SSH Key has been deleted successfully.'
+    });
+  });
+
+  it('confirms interactive deletes before calling the backend', async () => {
+    const { confirm, deleteSshKey, service } = createServiceFixture();
+
+    deleteSshKey.mockResolvedValue({
+      message: 'SSH Key has been deleted successfully.'
+    });
+
+    const result = await service.deleteSshKey('15398', { alias: 'prod' });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete SSH key 15398? This cannot be undone.'
+    );
     expect(deleteSshKey).toHaveBeenCalledWith(15398);
     expect(result).toEqual({
       action: 'delete',

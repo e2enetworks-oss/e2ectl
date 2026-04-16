@@ -8,9 +8,10 @@ import {
   NodeService,
   type NodeCatalogPlansOptions,
   type NodeContextOptions,
-  type NodeCreateOptions,
   type NodeDeleteOptions,
+  type NodePublicIpDetachOptions,
   type NodeSaveImageOptions,
+  type NodeUpgradeOptions,
   type NodeVolumeActionOptions,
   type NodeVpcActionOptions
 } from './service.js';
@@ -23,6 +24,23 @@ interface NodeSshKeyAttachCommandOptions extends NodeContextOptions {
   sshKeyId: string[];
 }
 
+interface NodeSecurityGroupActionCommandOptions extends NodeContextOptions {
+  securityGroupId: string[];
+}
+
+interface NodeCreateCommandOptions extends NodeContextOptions {
+  billingType?: string;
+  committedPlanId?: string;
+  disk?: string;
+  image: string;
+  name: string;
+  plan: string;
+  sshKeyId?: string[] | string;
+}
+
+type NodeUpgradeCommandOptions = NodeUpgradeOptions;
+type NodePublicIpDetachCommandOptions = NodePublicIpDetachOptions;
+
 const NODE_CATALOG_BILLING_TYPE_CHOICES = [
   'hourly',
   'committed',
@@ -34,6 +52,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   const service = new NodeService({
     confirm: (message) => runtime.confirm(message),
     createNodeClient: (credentials) => runtime.createNodeClient(credentials),
+    createReservedIpClient: (credentials) =>
+      runtime.createReservedIpClient(credentials),
+    createSecurityGroupClient: (credentials) =>
+      runtime.createSecurityGroupClient(credentials),
     createSshKeyClient: (credentials) =>
       runtime.createSshKeyClient(credentials),
     createVolumeClient: (credentials) =>
@@ -68,7 +90,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`.`
+        `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
@@ -85,15 +107,49 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         '--committed-plan-id <committedPlanId>',
         `Committed plan id returned by \`${formatCliCommand('node catalog plans')}\`.`
       )
-  ).action(async (options: NodeCreateOptions, commandInstance: Command) => {
-    const result = await service.createNode(options);
-    runtime.stdout.write(
-      renderNodeResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      .option(
+        '--disk <disk>',
+        'Root disk size in GB. Required for E1/E1WC plans and rejected for other plans.'
       )
-    );
-  });
+      .option(
+        '--ssh-key-id <sshKeyId>',
+        'Saved SSH key id to attach during node creation. Repeat to attach multiple keys.',
+        collectOptionValue
+      )
+  ).action(
+    async (options: NodeCreateCommandOptions, commandInstance: Command) => {
+      const result = await service.createNode({
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.billingType === undefined
+          ? {}
+          : { billingType: options.billingType }),
+        ...(options.committedPlanId === undefined
+          ? {}
+          : { committedPlanId: options.committedPlanId }),
+        ...(options.disk === undefined ? {} : { disk: options.disk }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        image: options.image,
+        name: options.name,
+        plan: options.plan,
+        sshKeyIds: toOptionArray(options.sshKeyId)
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   addContextOptions(
     command.command('get <nodeId>').description('Get details for a node.')
@@ -115,8 +171,50 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
+      .command('upgrade <nodeId>')
+      .description('Request a node plan and image change.')
+      .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
+      .requiredOption('--image <image>', 'MyAccount image identifier.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeUpgradeCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.upgradeNode(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.force === undefined ? {} : { force: options.force }),
+        image: options.image,
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        plan: options.plan,
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            })
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
       .command('delete <nodeId>')
       .description('Delete a node.')
+      .option(
+        '--reserve-public-ip',
+        "Preserve the node's current public IP as a reserved IP during deletion."
+      )
       .option('--force', 'Skip the interactive confirmation prompt.')
   ).action(
     async (
@@ -146,7 +244,7 @@ function buildNodeActionCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('action').description(
-    'Run non-interactive power, image, and attachment actions on a node.'
+    'Run power, image, public-IP, and attachment actions on a node.'
   );
 
   command.helpCommand('help [command]', 'Show help for a node action command');
@@ -208,9 +306,54 @@ function buildNodeActionCommand(
     }
   );
 
+  command.addCommand(buildNodeActionPublicIpCommand(service, runtime));
   command.addCommand(buildNodeActionVpcCommand(service, runtime));
   command.addCommand(buildNodeActionVolumeCommand(service, runtime));
+  command.addCommand(buildNodeActionSecurityGroupCommand(service, runtime));
   command.addCommand(buildNodeActionSshKeyCommand(service, runtime));
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildNodeActionPublicIpCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('public-ip').description(
+    'Detach the current primary public IP from a node.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node action public-ip command'
+  );
+
+  addContextOptions(
+    command
+      .command('detach <nodeId>')
+      .description(
+        "Detach the node's current primary public IPv4. The node may no longer be publicly reachable."
+      )
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodePublicIpDetachCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachPublicIp(nodeId, options);
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   command.action(() => {
     command.outputHelp();
@@ -339,6 +482,102 @@ function buildNodeActionVolumeCommand(
   return command;
 }
 
+function buildNodeActionSecurityGroupCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('security-group').description(
+    'Attach or detach security groups on a node.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node action security-group command'
+  );
+
+  addContextOptions(
+    command
+      .command('attach <nodeId>')
+      .description('Attach one or more security groups to a node.')
+      .requiredOption(
+        '--security-group-id <securityGroupId>',
+        'Security group id to attach. Repeat to attach multiple security groups.',
+        collectOptionValue
+      )
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeSecurityGroupActionCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.attachSecurityGroups(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        securityGroupIds: toOptionArray(options.securityGroupId)
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('detach <nodeId>')
+      .description('Detach one or more security groups from a node.')
+      .requiredOption(
+        '--security-group-id <securityGroupId>',
+        'Security group id to detach. Repeat to detach multiple security groups.',
+        collectOptionValue
+      )
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeSecurityGroupActionCommandOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachSecurityGroups(nodeId, {
+        ...(options.alias === undefined ? {} : { alias: options.alias }),
+        ...(options.location === undefined
+          ? {}
+          : {
+              location: options.location
+            }),
+        ...(options.projectId === undefined
+          ? {}
+          : {
+              projectId: options.projectId
+            }),
+        securityGroupIds: toOptionArray(options.securityGroupId)
+      });
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
 function buildNodeActionVpcCommand(
   service: NodeService,
   runtime: CliRuntime
@@ -356,7 +595,10 @@ function buildNodeActionVpcCommand(
     command
       .command('attach <nodeId>')
       .description('Attach a VPC to a node.')
-      .requiredOption('--vpc-id <vpcId>', 'VPC id to attach.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'Canonical VPC ID (the network_id shown by vpc create/get/list) to attach.'
+      )
       .option('--subnet-id <subnetId>', 'Optional VPC subnet id to use.')
       .option('--private-ip <privateIp>', 'Optional private IP to request.')
   ).action(
@@ -379,7 +621,10 @@ function buildNodeActionVpcCommand(
     command
       .command('detach <nodeId>')
       .description('Detach a VPC from a node.')
-      .requiredOption('--vpc-id <vpcId>', 'VPC id to detach.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'Canonical VPC ID (the network_id shown by vpc create/get/list) to detach.'
+      )
       .option('--subnet-id <subnetId>', 'Optional VPC subnet id to detach.')
       .option('--private-ip <privateIp>', 'Optional private IP to detach.')
   ).action(

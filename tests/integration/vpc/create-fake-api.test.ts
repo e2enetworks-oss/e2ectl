@@ -71,6 +71,7 @@ describe('vpc create against a fake MyAccount API', () => {
           },
           credit_sufficient: true,
           vpc: {
+            id: 27835,
             name: 'prod-vpc',
             network_id: 27835,
             project_id: '46429',

@@ -73,6 +73,7 @@ jobs:
           make lint
           npm run coverage:unit
           make build
+          npm run test:integration
           npm pack --dry-run
 
       - name: Decide npm dist-tag
