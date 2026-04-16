@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.2.0...v0.3.0) (2026-04-10)
+
+
+### Features
+
+- Volume, VPC, and SSH key management commands for create, list, get, and delete workflows.
+- Catalog-driven node discovery and richer node action support, including power, image save, and attachment flows.
+- Deterministic `--json` output across the main operator workflows for automation and scripting.
+
+
+### Changed
+
+- Adopted the scoped npm package name `@e2enetworks-oss/e2ectl`.
+- Standardized auth and default context handling around saved profiles, alias defaults, and explicit overrides.
+- Raised the supported runtime baseline to Node.js 24.
+
+
+### Fixed
+
+- Hardened config resolution and stale-default handling when environment credentials are complete.
+- Centralized and softened MyAccount API error handling for more predictable CLI behavior.
+- Tightened validation around node billing and discovery flows.
+- Improved CI and release hardening, including integration-gated `develop` merges, coverage reporting, and npm publishing setup.
+
 ## [Unreleased]
 
 ## [0.2.0] - 2026-04-02
