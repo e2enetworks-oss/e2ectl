@@ -5,15 +5,25 @@ All notable changes to this project will be documented in this file.
 ## [0.4.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.3.0...v0.4.0) (2026-04-16)
 
 
-### Features
+### Added
 
-* add account project listing ([5fa502f](https://github.com/e2enetworks-oss/e2ectl/commit/5fa502fa0ed542d037f94600401ef7cc5c0cca43))
-* add node public ip detach action ([0d05d4a](https://github.com/e2enetworks-oss/e2ectl/commit/0d05d4a256ebb9496b805b04bb2665b860ddd637))
+- Project commands for listing, creating, and starring or unstarring MyAccount projects.
+- Reserved IP commands for listing, reserving, attaching, detaching, and deleting public IP allocations.
+- Security group commands, including node attach and detach workflows.
+- Node upgrade support and explicit public IP detach actions.
 
 
-### Miscellaneous Chores
+### Changed
 
-* prepare 0.4.0 release ([e0d4757](https://github.com/e2enetworks-oss/e2ectl/commit/e0d4757149387079b0ec021714b416c387c8f585))
+- Expanded CLI coverage across node, volume, VPC, SSH key, reserved IP, security group, and project workflows.
+- Strengthened live smoke and release verification for package install, saved-image cleanup, and disposable Chennai-region resource flows.
+
+
+### Fixed
+
+- Cross-platform tarball install smoke now works on Windows and avoids `npm pack` race conditions.
+- E1 and E1WC node create validation now enforces required `--disk` sizing rules before network calls.
+- Codecov uploads now publish deterministic unit and integration coverage reports without file-search bleed-through.
 
 ## [0.3.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.2.0...v0.3.0) (2026-04-10)
 
