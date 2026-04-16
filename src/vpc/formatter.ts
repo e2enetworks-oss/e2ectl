@@ -19,7 +19,7 @@ export function renderVpcResult(
 export function formatVpcListTable(items: VpcListItem[]): string {
   const table = new Table({
     head: [
-      'Network ID',
+      'VPC ID',
       'Name',
       'State',
       'CIDR',
@@ -31,7 +31,7 @@ export function formatVpcListTable(items: VpcListItem[]): string {
 
   sortVpcListItems(items).forEach((item) => {
     table.push([
-      String(item.network_id),
+      String(item.id),
       item.name,
       item.state,
       item.cidr,
@@ -107,12 +107,12 @@ function renderVpcHuman(result: VpcCommandResult): string {
 
       return (
         `Created VPC request: ${result.vpc.name}\n` +
-        `VPC ID: ${result.vpc.vpc_id}\n` +
-        `Network ID: ${result.vpc.network_id}\n` +
+        `VPC ID: ${result.vpc.id}\n` +
+        `Backend Record ID: ${result.vpc.vpc_id}\n` +
         `Billing: ${billingSummary}\n` +
         `CIDR: ${cidrSummary}\n` +
         '\n' +
-        `Next: run ${formatCliCommand('vpc list')} to inspect the VPC state.\n`
+        `Use VPC ID ${result.vpc.id} for follow-up commands like ${formatCliCommand(`vpc get ${result.vpc.id}`)}.\n`
       );
     }
     case 'delete':
@@ -167,6 +167,7 @@ function normalizeVpcJson(result: VpcCommandResult): JsonValue {
         },
         credit_sufficient: result.credit_sufficient,
         vpc: {
+          id: result.vpc.id,
           name: result.vpc.name,
           network_id: result.vpc.network_id,
           project_id: result.vpc.project_id,
@@ -255,6 +256,7 @@ function normalizeVpcListJsonItem(item: VpcListItem): JsonValue {
     cidr_source: item.cidr_source,
     created_at: item.created_at,
     gateway_ip: item.gateway_ip,
+    id: item.id,
     location: item.location,
     name: item.name,
     network_id: item.network_id,
@@ -307,13 +309,12 @@ function sortVpcHourlyPlans(items: VpcHourlyPlanItem[]): VpcHourlyPlanItem[] {
 
 function sortVpcListItems(items: VpcListItem[]): VpcListItem[] {
   return [...items].sort((left, right) => {
-    const leftKey = [left.name, String(left.network_id).padStart(10, '0')].join(
+    const leftKey = [left.name, String(left.id).padStart(10, '0')].join(
       '\u0000'
     );
-    const rightKey = [
-      right.name,
-      String(right.network_id).padStart(10, '0')
-    ].join('\u0000');
+    const rightKey = [right.name, String(right.id).padStart(10, '0')].join(
+      '\u0000'
+    );
 
     return leftKey.localeCompare(rightKey);
   });
@@ -321,7 +322,7 @@ function sortVpcListItems(items: VpcListItem[]): VpcListItem[] {
 
 function formatVpcDetails(item: VpcListItem): string {
   const lines = [
-    `Network ID: ${item.network_id}`,
+    `VPC ID: ${item.id}`,
     `Name: ${item.name}`,
     `State: ${item.state}`,
     `CIDR: ${item.cidr}`,

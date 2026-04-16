@@ -2,6 +2,7 @@ import type {
   ConfigFile,
   ResolvedCredentials
 } from '../../../src/config/index.js';
+import { AppError, EXIT_CODES } from '../../../src/core/errors.js';
 import { VolumeService } from '../../../src/volume/service.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 
@@ -212,6 +213,91 @@ describe('VolumeService', () => {
       message: 'Block Storage Deleted',
       volume_id: 22
     });
+  });
+
+  it('treats delete timeouts as success when a follow-up list shows the volume is gone', async () => {
+    const { deleteVolume, listVolumes, service } = createServiceFixture();
+
+    deleteVolume.mockRejectedValue(
+      new AppError('Delete request timed out.', {
+        code: 'API_TIMEOUT',
+        exitCode: EXIT_CODES.network
+      })
+    );
+    listVolumes.mockResolvedValue({
+      items: [],
+      total_count: 0,
+      total_page_number: 1
+    });
+
+    const result = await service.deleteVolume('22', {
+      alias: 'prod',
+      force: true
+    });
+
+    expect(listVolumes).toHaveBeenCalledWith(1, 100);
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: false,
+      message: 'Block Storage Deleted',
+      volume_id: 22
+    });
+  });
+
+  it('rethrows the original delete timeout when the volume still exists after reconciliation', async () => {
+    const { deleteVolume, listVolumes, service } = createServiceFixture();
+    const timeoutError = new AppError('Delete request timed out.', {
+      code: 'API_TIMEOUT',
+      exitCode: EXIT_CODES.network
+    });
+
+    deleteVolume.mockRejectedValue(timeoutError);
+    listVolumes.mockResolvedValue({
+      items: [
+        {
+          block_id: 22,
+          name: 'zeta-data',
+          size: 476837,
+          size_string: '500 GB',
+          status: 'Available',
+          vm_detail: {}
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    await expect(
+      service.deleteVolume('22', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toBe(timeoutError);
+    expect(listVolumes).toHaveBeenCalledWith(1, 100);
+  });
+
+  it('preserves the original delete timeout when reconciliation also fails', async () => {
+    const { deleteVolume, listVolumes, service } = createServiceFixture();
+    const timeoutError = new AppError('Delete request timed out.', {
+      code: 'API_TIMEOUT',
+      exitCode: EXIT_CODES.network
+    });
+
+    deleteVolume.mockRejectedValue(timeoutError);
+    listVolumes.mockRejectedValue(
+      new AppError('List request timed out.', {
+        code: 'API_TIMEOUT',
+        exitCode: EXIT_CODES.network
+      })
+    );
+
+    await expect(
+      service.deleteVolume('22', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toBe(timeoutError);
+    expect(listVolumes).toHaveBeenCalledWith(1, 100);
   });
 
   it('groups committed options under each normalized size plan', async () => {

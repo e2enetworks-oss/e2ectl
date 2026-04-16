@@ -1,0 +1,310 @@
+import type {
+  ApiEnvelope,
+  ApiRequestOptions,
+  MyAccountTransport
+} from '../../../src/myaccount/index.js';
+import { ReservedIpApiClient } from '../../../src/reserved-ip/client.js';
+
+class StubTransport implements MyAccountTransport {
+  readonly deleteMock = vi.fn();
+  readonly getMock = vi.fn();
+  readonly postMock = vi.fn();
+  readonly requestMock = vi.fn();
+
+  delete<TResponse = ApiEnvelope<unknown>>(
+    path: string,
+    options?: Omit<ApiRequestOptions<TResponse>, 'method' | 'path'>
+  ): Promise<TResponse> {
+    return this.deleteMock(path, options) as Promise<TResponse>;
+  }
+
+  get<TResponse = ApiEnvelope<unknown>>(
+    path: string,
+    options?: Omit<ApiRequestOptions<TResponse>, 'method' | 'path'>
+  ): Promise<TResponse> {
+    return this.getMock(path, options) as Promise<TResponse>;
+  }
+
+  post<TResponse = ApiEnvelope<unknown>>(
+    path: string,
+    options?: Omit<ApiRequestOptions<TResponse>, 'method' | 'path'>
+  ): Promise<TResponse> {
+    return this.postMock(path, options) as Promise<TResponse>;
+  }
+
+  request<TResponse = ApiEnvelope<unknown>>(
+    options: ApiRequestOptions<TResponse>
+  ): Promise<TResponse> {
+    return this.requestMock(options) as Promise<TResponse>;
+  }
+}
+
+describe('ReservedIpApiClient', () => {
+  it('lists reserved IPs through the reserve_ips collection path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([
+        {
+          appliance_type: 'NODE',
+          bought_at: '04-11-2024 10:37',
+          floating_ip_attached_nodes: [],
+          ip_address: '164.52.198.54',
+          project_name: 'default-project',
+          reserve_id: 12662,
+          reserved_type: 'AddonIP',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        }
+      ])
+    );
+
+    const result = await client.listReservedIps();
+
+    expect(transport.getMock).toHaveBeenCalledWith('/reserve_ips/', undefined);
+    expect(result).toEqual([
+      {
+        appliance_type: 'NODE',
+        bought_at: '04-11-2024 10:37',
+        floating_ip_attached_nodes: [],
+        ip_address: '164.52.198.54',
+        project_name: 'default-project',
+        reserve_id: 12662,
+        reserved_type: 'AddonIP',
+        status: 'Assigned',
+        vm_id: 100157,
+        vm_name: 'node-a'
+      }
+    ]);
+  });
+
+  it('creates reserved IPs through the reserve_ips collection path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope({
+        appliance_type: 'NODE',
+        bought_at: '04-11-2024 10:37',
+        floating_ip_attached_nodes: [],
+        ip_address: '164.52.198.54',
+        project_name: 'default-project',
+        reserve_id: 12662,
+        reserved_type: 'AddonIP',
+        status: 'Reserved',
+        vm_id: null,
+        vm_name: '--'
+      })
+    );
+
+    const result = await client.createReservedIp();
+
+    expect(transport.postMock).toHaveBeenCalledWith('/reserve_ips/', undefined);
+    expect(result.ip_address).toBe('164.52.198.54');
+  });
+
+  it('attaches reserved IPs to nodes through the reserve_ips action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/reserve_ips/164.52.198.54/actions/',
+      {
+        body: {
+          type: 'attach',
+          vm_id: 100157
+        }
+      }
+    );
+    expect(result).toEqual({
+      ip_address: '164.52.198.54',
+      message: 'IP assigned successfully.',
+      status: 'Assigned',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    });
+  });
+
+  it('detaches reserved IPs from nodes through the reserve_ips action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.54',
+          status: 'Reserved',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP detached successfully.'
+        }
+      )
+    );
+
+    const result = await client.detachReservedIpFromNode('164.52.198.54', {
+      type: 'detach',
+      vm_id: 100157
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/reserve_ips/164.52.198.54/actions/',
+      {
+        body: {
+          type: 'detach',
+          vm_id: 100157
+        }
+      }
+    );
+    expect(result).toEqual({
+      ip_address: '164.52.198.54',
+      message: 'IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    });
+  });
+
+  it('detaches node primary public IPs through the public reserve-ip action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '151.185.42.45',
+          status: 'Reserved',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'Public IP detached successfully.'
+        }
+      )
+    );
+
+    const result = await client.detachNodePublicIp({
+      public_ip: '151.185.42.45',
+      type: 'detach',
+      vm_id: 100157
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/reserve_ips/public_reserveip_actions/',
+      {
+        body: {
+          public_ip: '151.185.42.45',
+          type: 'detach',
+          vm_id: 100157
+        }
+      }
+    );
+    expect(result).toEqual({
+      ip_address: '151.185.42.45',
+      message: 'Public IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    });
+  });
+
+  it('reserves a node current public IP through the reserve_ips action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.55',
+          status: 'Live Reserved',
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP reserved successfully.'
+        }
+      )
+    );
+
+    const result = await client.reserveNodePublicIp('164.52.198.55', {
+      type: 'live-reserve',
+      vm_id: 100157
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/reserve_ips/164.52.198.55/actions/',
+      {
+        body: {
+          type: 'live-reserve',
+          vm_id: 100157
+        }
+      }
+    );
+    expect(result).toEqual({
+      ip_address: '164.52.198.55',
+      message: 'IP reserved successfully.',
+      status: 'Live Reserved',
+      vm_id: null,
+      vm_name: 'node-a'
+    });
+  });
+
+  it('deletes reserved IPs through the reserve_ips action path', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope(
+        {
+          message: 'IP Released 164.52.198.54'
+        },
+        {
+          message: 'Success'
+        }
+      )
+    );
+
+    const result = await client.deleteReservedIp('164.52.198.54');
+
+    expect(transport.deleteMock).toHaveBeenCalledWith(
+      '/reserve_ips/164.52.198.54/actions/',
+      undefined
+    );
+    expect(result).toEqual({
+      message: 'IP Released 164.52.198.54'
+    });
+  });
+});
+
+function envelope<TData>(
+  data: TData,
+  overrides: Partial<ApiEnvelope<TData>> = {}
+): ApiEnvelope<TData> {
+  return {
+    code: overrides.code ?? 200,
+    data,
+    errors: overrides.errors ?? {},
+    message: overrides.message ?? 'Success'
+  };
+}

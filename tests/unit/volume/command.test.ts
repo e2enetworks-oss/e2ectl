@@ -1,3 +1,5 @@
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
@@ -109,6 +111,19 @@ describe('volume commands', () => {
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
+      createProjectClient: vi.fn(() => {
+        throw new Error('Project client should not be created for this test.');
+      }) as unknown as CliRuntime['createProjectClient'],
+      createReservedIpClient: vi.fn(() => {
+        throw new Error(
+          'Reserved IP client should not be created for this test.'
+        );
+      }) as unknown as CliRuntime['createReservedIpClient'],
+      createSecurityGroupClient: vi.fn(() => {
+        throw new Error(
+          'Security group client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => never,
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
@@ -144,6 +159,48 @@ describe('volume commands', () => {
       default_project_id: '12345',
       default_location: 'Delhi'
     });
+  }
+
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
   }
 
   it('lists volumes in deterministic json mode using alias defaults', async () => {
@@ -184,6 +241,25 @@ describe('volume commands', () => {
         total_page_number: 1
       })}\n`
     );
+  });
+
+  it('renders human volume list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'volume',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('data-01');
+    expect(stdout.buffer).toContain('250 GB');
   });
 
   it('renders volume plans in human-readable mode', async () => {
@@ -288,6 +364,26 @@ describe('volume commands', () => {
     );
   });
 
+  it('renders human volume detail output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'volume',
+      'get',
+      '25550',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID: 25550');
+    expect(stdout.buffer).toContain('Name: data-01');
+    expect(stdout.buffer).toContain('Snapshot Exists: no');
+  });
+
   it('deletes one volume in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -314,6 +410,26 @@ describe('volume commands', () => {
         volume_id: 25550
       })}\n`
     );
+  });
+
+  it('renders human volume delete output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'volume',
+      'delete',
+      '25550',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Deleted volume 25550.');
+    expect(stdout.buffer).toContain('Message: Block Storage Deleted');
   });
 
   it('creates volumes with committed billing in deterministic json mode', async () => {
@@ -377,5 +493,54 @@ describe('volume commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('renders human volume create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'volume',
+      'create',
+      '--alias',
+      'prod',
+      '--name',
+      'data-01',
+      '--size',
+      '250',
+      '--billing-type',
+      'committed',
+      '--committed-plan-id',
+      '31'
+    ]);
+
+    expect(stdout.buffer).toContain('Created volume: data-01');
+    expect(stdout.buffer).toContain('Committed Plan: 31');
+    expect(stdout.buffer).toContain('Next: run e2ectl volume list');
+  });
+
+  it('shows root help for volume commands', async () => {
+    const help = await renderHelp(['volume']);
+
+    expect(help).toContain('Manage MyAccount block storage volumes.');
+    expect(help).toContain('Show help for a volume command');
+  });
+
+  it('shows help for volume create', async () => {
+    const help = await renderHelp(['volume', 'create', '--help']);
+
+    expect(help).toContain('Create a block storage volume.');
+    expect(help).toContain('--committed-plan-id <committedPlanId>');
+    expect(help).toContain('--post-commit-behavior <behavior>');
+  });
+
+  it('shows help for volume delete', async () => {
+    const help = await renderHelp(['volume', 'delete', '--help']);
+
+    expect(help).toContain('Delete a volume.');
+    expect(help).toContain('--force');
   });
 });

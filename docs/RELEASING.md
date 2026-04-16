@@ -1,44 +1,48 @@
 # Releasing e2ectl
 
-This is the steady-state release runbook for `e2ectl`.
+This document is for maintainers executing a release.
 
-For CI ownership and promotion readiness, use [docs/MAINTAINING.md](./MAINTAINING.md). For day-to-day contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md).
+For CI policy and promotion readiness, use [docs/MAINTAINING.md](./MAINTAINING.md). For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Prerequisites
+## Before You Start
 
-Before running the release flow, confirm the repository is already set up for automated publishing:
+Confirm the repository is already set up for automated publishing:
 
-- the npm scope `@e2enetworks-oss` is owned by a company-controlled npm organization
-- the npm package `@e2enetworks-oss/e2ectl` is configured for public publishing on npmjs
-- npm trusted publishing is configured for this repository and the workflow file `release-please.yml`
-- maintainers can merge to `main` and approve release PRs under the current repository rules
+- the npm scope `@e2enetworks-oss` is owned by the correct npm organization
+- the package is configured for public publishing on npmjs
+- npm trusted publishing is configured for this repository and `release-please.yml`
+- maintainers can merge to `main` and approve release PRs
 
-This release path does not use a personal PAT, `RELEASE_PLEASE_TOKEN`, or a long-lived npm publish token. Release Please runs with GitHub's built-in `GITHUB_TOKEN`, and npm publishing is handled by npm trusted publishing over OIDC.
+This release path does not use a personal PAT, `RELEASE_PLEASE_TOKEN`, or a long-lived npm token. Release Please uses GitHub's built-in `GITHUB_TOKEN`, and npm publish uses trusted publishing over OIDC.
 
-One consequence of using `GITHUB_TOKEN` is that GitHub does not trigger additional workflows from the release PR or release objects created by Release Please. The authoritative release-time verification therefore runs inside the same `release-please.yml` workflow before the publish step. Keep branch protection and maintainer expectations aligned with that behavior.
-
-## Normal Release Flow
+## Release Flow
 
 1. Merge feature work into `develop`.
 2. Wait for the `develop` tip to pass the promotion gate from [docs/MAINTAINING.md](./MAINTAINING.md).
 3. Open a promotion PR from `develop` to `main`.
-4. Merge the promotion PR after the `main`-targeted checks and merge queue requirements pass.
+4. Merge the promotion PR after the `main` checks pass.
 5. Wait for Release Please to open or update the release PR on `main`.
 6. Review the generated version bump and changelog, then merge the release PR.
-7. Confirm the `release-please` workflow publishes the package to npm and that a GitHub Release was created.
+7. Confirm the `release-please` workflow publishes to npm and creates a GitHub Release.
 
-Because Release Please uses `GITHUB_TOKEN`, releases and release PRs are created from the repository workflow context rather than from a personal account.
+## Platform Proof Story
+
+- Linux is the full verify-and-publish gate.
+- macOS adds build, test, and package confidence before promotion.
+- Windows adds package install and basic CLI smoke before promotion.
+
+Cross-platform confidence lives in `verify.yml`. Publish-time verification in `release-please.yml` stays Linux-only.
 
 ## Dist-Tag Policy
 
 - Stable releases publish to npm dist-tag `latest`.
-- Pre-release versions with a suffix such as `-rc.1` publish to npm dist-tag `next`.
+- Pre-release versions such as `-rc.1` publish to npm dist-tag `next`.
 
-The dist-tag is derived automatically from the version Release Please created.
+The dist-tag is derived automatically from the version Release Please creates.
 
-## Verification Before Promotion
+## Publish-Time Verification
 
-Before promoting `develop` to `main`, complete the promotion gate owned by [docs/MAINTAINING.md](./MAINTAINING.md):
+Before npm publish, `release-please.yml` reruns the Linux release gate on the tagged commit:
 
 ```bash
 make lint
@@ -48,49 +52,44 @@ npm run test:integration
 npm pack --dry-run
 ```
 
-Operational notes:
+## Optional Live Rehearsal
 
-- Public runtime support starts at Node.js 24.
-- `npm run coverage:unit` enforces the minimum 80% unit coverage floor used by CI and release-time verification.
-- npm trusted publishing currently requires npm CLI `11.5.1+`, which the release workflow installs explicitly.
+If you want live API confidence beyond CI:
 
-When Release Please creates a release in CI, the workflow reruns release-time verification on the tagged commit:
+- `npm run test:manual` is the safe read-only lane
+- `npm run test:manual:smoke` is the destructive disposable-resource lane
 
-```bash
-make lint
-npm run coverage:unit
-make build
-npm pack --dry-run
-```
+The safe read-only lane now covers both env-backed reads and config-backed saved-profile resolution from a temp `HOME`.
 
-If the release needs live API confidence beyond the automated gate, run the opt-in manual node read checks before promotion.
+The destructive smoke lane now covers the accepted first-release proof surface, including node volume/VPC/SSH-key attach flows, node power and upgrade actions, saved-image capture, and the existing disposable resource lifecycle checks.
 
-## Maintainer Checklist
+For exact commands, env vars, and cleanup behavior, use [docs/MAINTAINING.md](./MAINTAINING.md).
+
+For the first public release and future release candidates, running both live lanes is strongly recommended when safe credentials and disposable quota are available. This remains recommended guidance, not mandatory policy.
+
+## Release Checklist
 
 Before merging the promotion PR:
 
-- confirm the exact `develop` commit is green on the promotion gate
+- confirm the exact `develop` commit is green
 - confirm docs and command examples are current
-- confirm any release automation or dist-tag changes were documented in this file
+- strongly consider running both live lanes for first-release and release-candidate promotions
 
 Before merging the Release Please PR:
 
 - review the generated version bump
-- review the generated changelog for accuracy and scope
+- review the generated changelog for accuracy
 - confirm no one hand-edited package versions or changelog entries outside the release PR
 
 After publish completes:
 
 - verify the GitHub Release and tag exist
 - verify the package resolves from npm with the expected dist-tag
-- verify the install path matches the published release you intended to promote
+- verify the install path matches the published release you intended to ship
 
-## Changelog And Versioning Policy
+## Versioning And Changelog Policy
 
 - Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates.
-- Conventional Commits drive the default version bump:
-  - `fix:` -> patch
-  - `feat:` -> minor
-  - `feat!:` or `BREAKING CHANGE:` -> major
-- Do not hand-edit changelog entries or `package.json` versions in normal feature PRs.
+- Conventional Commits drive the default version bump.
+- Do not hand-edit changelog entries or `package.json` versions in normal feature work.
 - If a release needs an explicit version override, use a commit body with `Release-As: x.y.z`.

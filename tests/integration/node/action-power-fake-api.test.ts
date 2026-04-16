@@ -125,4 +125,81 @@ describe('node power actions against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human power action output for both on and off flows', async () => {
+    const powerOnServer = await startTestHttpServer({
+      'PUT /myaccount/api/v1/nodes/101/actions/': () => ({
+        body: {
+          code: 200,
+          data: {
+            action_type: 'Power On',
+            created_at: '2026-03-14T08:10:00Z',
+            id: 701,
+            resource_id: '101',
+            status: 'In Progress'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const powerOffServer = await startTestHttpServer({
+      'PUT /myaccount/api/v1/nodes/101/actions/': () => ({
+        body: {
+          code: 200,
+          data: {
+            action_type: 'Power Off',
+            created_at: '2026-03-14T08:15:00Z',
+            id: 702,
+            resource_id: '101',
+            status: 'In Progress'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const powerOnResult = await runBuiltCli(
+        ['node', 'action', 'power-on', '101'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${powerOnServer.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+      const powerOffResult = await runBuiltCli(
+        ['node', 'action', 'power-off', '101'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${powerOffServer.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(powerOnResult.exitCode).toBe(0);
+      expect(powerOnResult.stderr).toBe('');
+      expect(powerOnResult.stdout).toContain(
+        'Requested power on for node 101.'
+      );
+      expect(powerOnResult.stdout).toContain('Action ID: 701');
+
+      expect(powerOffResult.exitCode).toBe(0);
+      expect(powerOffResult.stderr).toBe('');
+      expect(powerOffResult.stdout).toContain(
+        'Requested power off for node 101.'
+      );
+      expect(powerOffResult.stdout).toContain('Action ID: 702');
+    } finally {
+      await powerOnServer.close();
+      await powerOffServer.close();
+      await tempHome.cleanup();
+    }
+  });
 });

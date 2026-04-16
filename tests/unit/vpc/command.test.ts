@@ -1,3 +1,5 @@
+import { Command, CommanderError } from 'commander';
+
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
@@ -118,6 +120,19 @@ describe('vpc commands', () => {
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
+      createProjectClient: vi.fn(() => {
+        throw new Error('Project client should not be created for this test.');
+      }) as unknown as CliRuntime['createProjectClient'],
+      createReservedIpClient: vi.fn(() => {
+        throw new Error(
+          'Reserved IP client should not be created for this test.'
+        );
+      }) as unknown as CliRuntime['createReservedIpClient'],
+      createSecurityGroupClient: vi.fn(() => {
+        throw new Error(
+          'Security group client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => never,
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
@@ -155,6 +170,48 @@ describe('vpc commands', () => {
     });
   }
 
+  async function renderHelp(args: string[]): Promise<string> {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    prepareProgramForHelp(program);
+    const chunks: string[] = [];
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+    const restoreSpy = () => {
+      stdoutSpy.mockRestore();
+    };
+
+    try {
+      await program.parseAsync(['node', CLI_COMMAND_NAME, ...args]);
+    } catch (error: unknown) {
+      restoreSpy();
+
+      if (
+        !(error instanceof CommanderError) ||
+        error.code !== 'commander.helpDisplayed'
+      ) {
+        throw error;
+      }
+
+      return chunks.join('');
+    }
+
+    restoreSpy();
+    return chunks.join('');
+  }
+
+  function prepareProgramForHelp(program: Command): void {
+    program.exitOverride();
+
+    for (const childCommand of program.commands) {
+      prepareProgramForHelp(childCommand);
+    }
+  }
+
   it('lists VPCs in deterministic json mode using alias defaults', async () => {
     const { receivedCredentials, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -185,6 +242,7 @@ describe('vpc commands', () => {
             cidr_source: 'e2e',
             created_at: '2026-03-13T08:00:00Z',
             gateway_ip: null,
+            id: 27835,
             location: null,
             name: 'prod-vpc',
             network_id: 27835,
@@ -198,6 +256,25 @@ describe('vpc commands', () => {
         total_page_number: 1
       })}\n`
     );
+  });
+
+  it('renders human VPC list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'vpc',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('VPC ID');
+    expect(stdout.buffer).toContain('prod-vpc');
+    expect(stdout.buffer).toContain('10.20.0.0/23');
   });
 
   it('renders VPC plans in human-readable mode', async () => {
@@ -265,6 +342,7 @@ describe('vpc commands', () => {
         },
         credit_sufficient: true,
         vpc: {
+          id: 27835,
           name: 'prod-vpc',
           network_id: 27835,
           project_id: '12345',
@@ -272,6 +350,36 @@ describe('vpc commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('renders human VPC create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'vpc',
+      'create',
+      '--alias',
+      'prod',
+      '--name',
+      'prod-vpc',
+      '--billing-type',
+      'committed',
+      '--cidr-source',
+      'custom',
+      '--cidr',
+      '10.10.0.0/23',
+      '--committed-plan-id',
+      '91'
+    ]);
+
+    expect(stdout.buffer).toContain('Created VPC request: prod-vpc');
+    expect(stdout.buffer).toContain('VPC ID: 27835');
+    expect(stdout.buffer).toContain('CIDR: custom 10.10.0.0/23');
+    expect(stdout.buffer).toContain('Use VPC ID 27835');
   });
 
   it('gets one VPC in deterministic json mode', async () => {
@@ -300,6 +408,7 @@ describe('vpc commands', () => {
           cidr_source: 'e2e',
           created_at: '2026-03-13T08:00:00Z',
           gateway_ip: null,
+          id: 27835,
           location: null,
           name: 'prod-vpc',
           network_id: 27835,
@@ -310,6 +419,26 @@ describe('vpc commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('renders human VPC detail output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'vpc',
+      'get',
+      '27835',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('VPC ID: 27835');
+    expect(stdout.buffer).toContain('Name: prod-vpc');
+    expect(stdout.buffer).toContain('Source: E2E');
   });
 
   it('deletes one VPC in deterministic json mode', async () => {
@@ -342,5 +471,49 @@ describe('vpc commands', () => {
         }
       })}\n`
     );
+  });
+
+  it('renders human VPC delete output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'vpc',
+      'delete',
+      '27835',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Deleted VPC 27835.');
+    expect(stdout.buffer).toContain(
+      'Message: Delete Vpc Initiated Successfully'
+    );
+  });
+
+  it('shows root help for vpc commands', async () => {
+    const help = await renderHelp(['vpc']);
+
+    expect(help).toContain('Manage MyAccount VPC networks.');
+    expect(help).toContain('Show help for a vpc command');
+  });
+
+  it('shows help for vpc create', async () => {
+    const help = await renderHelp(['vpc', 'create', '--help']);
+
+    expect(help).toContain('Create a VPC.');
+    expect(help).toContain('--cidr-source <cidrSource>');
+    expect(help).toContain('--committed-plan-id <committedPlanId>');
+  });
+
+  it('shows help for vpc delete', async () => {
+    const help = await renderHelp(['vpc', 'delete', '--help']);
+
+    expect(help).toContain('Delete a VPC by its canonical VPC ID');
+    expect(help).toContain('--force');
   });
 });

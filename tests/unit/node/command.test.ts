@@ -4,6 +4,9 @@ import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient, NodeCreateRequest } from '../../../src/node/index.js';
+import { NodeService } from '../../../src/node/service.js';
+import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
+import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
@@ -162,6 +165,15 @@ function createNodeClientStub() {
       status: 'In Progress'
     })
   );
+  const upgradeNode = vi.fn(() =>
+    Promise.resolve({
+      location: 'Delhi',
+      message: 'Node upgrade initiated',
+      new_node_image_id: 8802,
+      old_node_image_id: 8801,
+      vm_id: 100157
+    })
+  );
 
   const stub: NodeClient = {
     attachSshKeys,
@@ -173,7 +185,8 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
-    saveNodeImage
+    saveNodeImage,
+    upgradeNode
   };
 
   return {
@@ -187,6 +200,7 @@ function createNodeClientStub() {
     powerOffNode,
     powerOnNode,
     saveNodeImage,
+    upgradeNode,
     stub
   };
 }
@@ -219,6 +233,62 @@ function createSshKeyClientStub() {
   return {
     createSshKey,
     listSshKeys,
+    stub
+  };
+}
+
+function createSecurityGroupClientStub() {
+  const attachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Group Attached Successfully'
+    })
+  );
+  const detachNodeSecurityGroups = vi.fn(() =>
+    Promise.resolve({
+      message: 'Security Groups Detached Successfully'
+    })
+  );
+
+  const stub: SecurityGroupClient = {
+    attachNodeSecurityGroups,
+    createSecurityGroup: vi.fn(),
+    deleteSecurityGroup: vi.fn(),
+    detachNodeSecurityGroups,
+    getSecurityGroup: vi.fn(),
+    listSecurityGroups: vi.fn(),
+    updateSecurityGroup: vi.fn()
+  };
+
+  return {
+    attachNodeSecurityGroups,
+    detachNodeSecurityGroups,
+    stub
+  };
+}
+
+function createReservedIpClientStub() {
+  const detachNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '1.1.1.1',
+      message: 'Public IP detached successfully.',
+      status: 'Reserved',
+      vm_id: 100157,
+      vm_name: 'node-a'
+    })
+  );
+
+  const stub: ReservedIpClient = {
+    attachReservedIpToNode: vi.fn(),
+    createReservedIp: vi.fn(),
+    deleteReservedIp: vi.fn(),
+    detachNodePublicIp,
+    detachReservedIpFromNode: vi.fn(),
+    listReservedIps: vi.fn(),
+    reserveNodePublicIp: vi.fn()
+  };
+
+  return {
+    detachNodePublicIp,
     stub
   };
 }
@@ -312,7 +382,9 @@ describe('node commands', () => {
     nodeStub: ReturnType<typeof createNodeClientStub>;
     prompt: ReturnType<typeof vi.fn>;
     receivedCredentials: () => ResolvedCredentials | undefined;
+    reservedIpStub: ReturnType<typeof createReservedIpClientStub>;
     runtime: CliRuntime;
+    securityGroupStub: ReturnType<typeof createSecurityGroupClientStub>;
     sshKeyStub: ReturnType<typeof createSshKeyClientStub>;
     stdout: MemoryWriter;
     volumeStub: ReturnType<typeof createVolumeClientStub>;
@@ -322,6 +394,8 @@ describe('node commands', () => {
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
     const nodeStub = createNodeClientStub();
+    const reservedIpStub = createReservedIpClientStub();
+    const securityGroupStub = createSecurityGroupClientStub();
     const sshKeyStub = createSshKeyClientStub();
     const volumeStub = createVolumeClientStub();
     const vpcStub = createVpcClientStub();
@@ -337,6 +411,11 @@ describe('node commands', () => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
       },
+      createProjectClient: vi.fn(() => {
+        throw new Error('Project client should not be created for this test.');
+      }) as unknown as CliRuntime['createProjectClient'],
+      createReservedIpClient: vi.fn(() => reservedIpStub.stub),
+      createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),
       createVpcClient: vi.fn(() => vpcStub.stub),
@@ -355,7 +434,9 @@ describe('node commands', () => {
       nodeStub,
       prompt,
       receivedCredentials: () => credentials,
+      reservedIpStub,
       runtime,
+      securityGroupStub,
       sshKeyStub,
       stdout,
       volumeStub,
@@ -410,6 +491,25 @@ describe('node commands', () => {
         total_page_number: 1
       })
     );
+  });
+
+  it('renders human node list output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'list',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('ID');
+    expect(stdout.buffer).toContain('node-a');
+    expect(stdout.buffer).toContain('1.1.1.1');
   });
 
   it('applies per-command project and location overrides', async () => {
@@ -562,6 +662,245 @@ describe('node commands', () => {
           }
         ],
         requested: 1
+      })
+    );
+  });
+
+  it('renders human node create output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'create',
+      '--name',
+      'new-node',
+      '--plan',
+      'plan-123',
+      '--image',
+      'Ubuntu-24.04-Distro',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Billing Type: hourly');
+    expect(stdout.buffer).toContain('Requested: 1');
+    expect(stdout.buffer).toContain('Created: 1');
+    expect(stdout.buffer).toContain('new-node');
+  });
+
+  it('maps repeated --ssh-key-id flags into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'new-node',
+        '--plan',
+        'plan-123',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--ssh-key-id',
+        '12',
+        '--ssh-key-id',
+        '13',
+        '--ssh-key-id',
+        '12',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      // Keep the real implementation active while still asserting the mapped options.
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'new-node',
+        plan: 'plan-123',
+        sshKeyIds: ['12', '13', '12']
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
+  it('maps --disk into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'new-node',
+        '--plan',
+        'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--disk',
+        '150',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        disk: '150',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'new-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        sshKeyIds: []
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
+  it('attaches security groups after resolving the node vm id', async () => {
+    const { runtime, stdout, securityGroupStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'security-group',
+      'attach',
+      '101',
+      '--security-group-id',
+      '44',
+      '--security-group-id',
+      '45',
+      '--security-group-id',
+      '44',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(securityGroupStub.attachNodeSecurityGroups).toHaveBeenCalledWith(
+      100157,
+      {
+        security_group_ids: [44, 45]
+      }
+    );
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      })
+    );
+  });
+
+  it('detaches security groups in deterministic json mode', async () => {
+    const { runtime, stdout, securityGroupStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'security-group',
+      'detach',
+      '101',
+      '--security-group-id',
+      '45',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(securityGroupStub.detachNodeSecurityGroups).toHaveBeenCalledWith(
+      100157,
+      {
+        security_group_ids: [45]
+      }
+    );
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'security-group-detach',
+        node_id: 101,
+        result: {
+          message: 'Security Groups Detached Successfully'
+        },
+        security_group_ids: [45]
+      })
+    );
+  });
+
+  it('detaches the current public IP in deterministic json mode with context overrides', async () => {
+    const {
+      confirm,
+      nodeStub,
+      receivedCredentials,
+      reservedIpStub,
+      runtime,
+      stdout
+    } = createRuntimeFixture({
+      isInteractive: true
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--project-id',
+      '46429',
+      '--location',
+      'Chennai'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      location: 'Chennai',
+      project_id: '46429'
+    });
+    expect(nodeStub.getNode).toHaveBeenCalledWith('101');
+    expect(confirm).toHaveBeenCalledWith(
+      'Detach public IP 1.1.1.1 from node 101? The node may no longer be publicly reachable.'
+    );
+    expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
+      public_ip: '1.1.1.1',
+      type: 'detach',
+      vm_id: 100157
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '1.1.1.1'
       })
     );
   });
@@ -882,6 +1221,72 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human power-on output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'power-on',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested power on for node 101.');
+    expect(stdout.buffer).toContain('Action ID: 701');
+  });
+
+  it('requests node upgrade through the top-level lifecycle command', async () => {
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'upgrade',
+      '101',
+      '--plan',
+      'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi',
+      '--image',
+      'Ubuntu-24.04-Distro',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Upgrade node 101 to plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi with image Ubuntu-24.04-Distro? This is disruptive.'
+    );
+    expect(nodeStub.upgradeNode).toHaveBeenCalledWith('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'upgrade',
+        details: {
+          location: 'Delhi',
+          new_node_image_id: 8802,
+          old_node_image_id: 8801,
+          vm_id: 100157
+        },
+        message: 'Node upgrade initiated',
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+        }
+      })
+    );
+  });
+
   it('requests save-image with the provided name', async () => {
     const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -915,6 +1320,30 @@ describe('node commands', () => {
         }
       })
     );
+  });
+
+  it('renders human save-image output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'save-image',
+      '101',
+      '--name',
+      'node-a-image',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain(
+      'Requested save image for node 101 as node-a-image.'
+    );
+    expect(stdout.buffer).toContain('Image ID: img-455');
   });
 
   it('routes VPC attach through the dedicated VPC client', async () => {
@@ -966,6 +1395,34 @@ describe('node commands', () => {
     );
   });
 
+  it('renders human VPC attach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'vpc',
+      'attach',
+      '101',
+      '--vpc-id',
+      '23082',
+      '--subnet-id',
+      '991',
+      '--private-ip',
+      '10.0.0.25',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested VPC attach for node 101.');
+    expect(stdout.buffer).toContain('VPC ID: 23082');
+    expect(stdout.buffer).toContain('Private IP: 10.0.0.25');
+  });
+
   it('resolves node vm ids before detaching volumes', async () => {
     const { nodeStub, runtime, stdout, volumeStub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -1002,6 +1459,32 @@ describe('node commands', () => {
           id: 8801
         }
       })
+    );
+  });
+
+  it('renders human volume detach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'volume',
+      'detach',
+      '101',
+      '--volume-id',
+      '8801',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested volume detach for node 101.');
+    expect(stdout.buffer).toContain('Volume ID: 8801');
+    expect(stdout.buffer).toContain(
+      'Message: Block Storage Detach Process is Started.'
     );
   });
 
@@ -1064,6 +1547,98 @@ describe('node commands', () => {
     );
   });
 
+  it('requires force outside an interactive terminal for public-ip detach after resolving node details', async () => {
+    const { confirm, nodeStub, reservedIpStub, runtime } = createRuntimeFixture(
+      {
+        isInteractive: false
+      }
+    );
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'action',
+        'public-ip',
+        'detach',
+        '101',
+        '--alias',
+        'prod'
+      ])
+    ).rejects.toThrow(/requires confirmation/i);
+    expect(nodeStub.getNode).toHaveBeenCalledWith('101');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(reservedIpStub.detachNodePublicIp).not.toHaveBeenCalled();
+  });
+
+  it('skips confirmation for public-ip detach when --force is supplied', async () => {
+    const { confirm, reservedIpStub, runtime, stdout } = createRuntimeFixture({
+      isInteractive: false
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
+      public_ip: '1.1.1.1',
+      type: 'detach',
+      vm_id: 100157
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'public-ip-detach',
+        message: 'Public IP detached successfully.',
+        node_id: 101,
+        public_ip: '1.1.1.1'
+      })
+    );
+  });
+
+  it('renders human public-ip detach output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'public-ip',
+      'detach',
+      '101',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Requested public IP detach for node 101.');
+    expect(stdout.buffer).toContain('Public IP: 1.1.1.1');
+    expect(stdout.buffer).toContain(
+      'Message: Public IP detached successfully.'
+    );
+    expect(stdout.buffer).toContain(
+      'Warning: This node may no longer be publicly reachable.'
+    );
+  });
+
   it('cancels deletion when the confirmation is declined', async () => {
     const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture({
       confirmResult: false,
@@ -1091,7 +1666,8 @@ describe('node commands', () => {
       toJsonOutput({
         action: 'delete',
         cancelled: true,
-        node_id: 101
+        node_id: 101,
+        reserve_public_ip_requested: false
       })
     );
   });
@@ -1137,13 +1713,49 @@ describe('node commands', () => {
     ]);
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101');
+    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101', undefined);
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'delete',
         cancelled: false,
         message: 'Success',
-        node_id: 101
+        node_id: 101,
+        reserve_public_ip_requested: false
+      })
+    );
+  });
+
+  it('deletes a node while requesting public IP reservation when --reserve-public-ip is supplied', async () => {
+    const { confirm, nodeStub, runtime, stdout } = createRuntimeFixture({
+      isInteractive: false
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'node',
+      'delete',
+      '101',
+      '--alias',
+      'prod',
+      '--reserve-public-ip',
+      '--force'
+    ]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(nodeStub.deleteNode).toHaveBeenCalledWith('101', {
+      reserve_ip_required: 'true'
+    });
+    expect(stdout.buffer).toBe(
+      toJsonOutput({
+        action: 'delete',
+        cancelled: false,
+        message: 'Success',
+        node_id: 101,
+        reserve_public_ip_requested: true
       })
     );
   });

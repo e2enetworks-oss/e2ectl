@@ -77,4 +77,50 @@ describe('node get against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('renders human node detail output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/nodes/101/': () => ({
+        body: {
+          code: 200,
+          data: {
+            created_at: '2026-03-11T10:00:00Z',
+            disk: '100 GB',
+            id: 101,
+            location: 'Delhi',
+            memory: '8 GB',
+            name: 'node-a',
+            plan: 'C3.8GB',
+            private_ip_address: '10.0.0.1',
+            public_ip_address: '1.1.1.1',
+            status: 'Running',
+            vcpus: '4'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['node', 'get', '101'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('ID: 101');
+      expect(result.stdout).toContain('Name: node-a');
+      expect(result.stdout).toContain('Public IP: 1.1.1.1');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

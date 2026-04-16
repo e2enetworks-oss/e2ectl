@@ -23,6 +23,9 @@ type VolumeListApiResponse = ApiResponse<
   }
 >;
 
+const BLOCK_STORAGE_PATH = '/block_storage/';
+const BLOCK_STORAGE_PLANS_PATH = '/block_storage/plans/';
+
 export interface VolumeClient {
   attachVolumeToNode(
     volumeId: number,
@@ -51,18 +54,15 @@ export class VolumeApiClient implements VolumeClient {
     >({
       body,
       method: 'PUT',
-      path: `/block_storage/${volumeId}/vm/attach/`
+      path: buildAttachVolumePath(volumeId)
     });
 
-    return {
-      message: response.message,
-      ...response.data
-    };
+    return mapVolumeNodeActionResponse(response);
   }
 
   async createVolume(body: VolumeCreateRequest): Promise<VolumeCreateResult> {
     const response = await this.transport.post<ApiEnvelope<VolumeCreateResult>>(
-      '/block_storage/',
+      BLOCK_STORAGE_PATH,
       {
         body
       }
@@ -74,11 +74,9 @@ export class VolumeApiClient implements VolumeClient {
   async deleteVolume(volumeId: number): Promise<{ message: string }> {
     const response = await this.transport.delete<
       ApiEnvelope<Record<string, unknown>>
-    >(`/block_storage/${volumeId}/`);
+    >(buildVolumePath(volumeId));
 
-    return {
-      message: response.message
-    };
+    return mapVolumeDeleteResponse(response);
   }
 
   async detachVolumeFromNode(
@@ -90,18 +88,15 @@ export class VolumeApiClient implements VolumeClient {
     >({
       body,
       method: 'PUT',
-      path: `/block_storage/${volumeId}/vm/detach/`
+      path: buildDetachVolumePath(volumeId)
     });
 
-    return {
-      message: response.message,
-      ...response.data
-    };
+    return mapVolumeNodeActionResponse(response);
   }
 
   async getVolume(volumeId: number): Promise<VolumeDetails> {
     const response = await this.transport.get<ApiEnvelope<VolumeDetails>>(
-      `/block_storage/${volumeId}/`
+      buildVolumePath(volumeId)
     );
 
     return response.data;
@@ -109,7 +104,7 @@ export class VolumeApiClient implements VolumeClient {
 
   async listVolumePlans(): Promise<VolumePlan[]> {
     const response = await this.transport.get<ApiEnvelope<VolumePlan[]>>(
-      '/block_storage/plans/'
+      BLOCK_STORAGE_PLANS_PATH
     );
 
     return response.data;
@@ -120,7 +115,7 @@ export class VolumeApiClient implements VolumeClient {
     perPage: number
   ): Promise<VolumeListResult> {
     const response = await this.transport.get<VolumeListApiResponse>(
-      '/block_storage/',
+      BLOCK_STORAGE_PATH,
       {
         query: {
           page_no: String(pageNumber),
@@ -129,14 +124,49 @@ export class VolumeApiClient implements VolumeClient {
       }
     );
 
-    return {
-      items: response.data,
-      ...(response.total_count === undefined
-        ? {}
-        : { total_count: response.total_count }),
-      ...(response.total_page_number === undefined
-        ? {}
-        : { total_page_number: response.total_page_number })
-    };
+    return mapVolumeListResponse(response);
   }
+}
+
+function buildVolumePath(volumeId: number): string {
+  return `${BLOCK_STORAGE_PATH}${volumeId}/`;
+}
+
+function buildAttachVolumePath(volumeId: number): string {
+  return `${buildVolumePath(volumeId)}vm/attach/`;
+}
+
+function buildDetachVolumePath(volumeId: number): string {
+  return `${buildVolumePath(volumeId)}vm/detach/`;
+}
+
+function mapVolumeDeleteResponse(
+  response: ApiEnvelope<Record<string, unknown>>
+): { message: string } {
+  return {
+    message: response.message
+  };
+}
+
+function mapVolumeNodeActionResponse(
+  response: ApiEnvelope<Omit<VolumeNodeActionResult, 'message'>>
+): VolumeNodeActionResult {
+  return {
+    message: response.message,
+    ...response.data
+  };
+}
+
+function mapVolumeListResponse(
+  response: VolumeListApiResponse
+): VolumeListResult {
+  return {
+    items: response.data,
+    ...(response.total_count === undefined
+      ? {}
+      : { total_count: response.total_count }),
+    ...(response.total_page_number === undefined
+      ? {}
+      : { total_page_number: response.total_page_number })
+  };
 }

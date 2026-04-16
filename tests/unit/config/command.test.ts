@@ -4,16 +4,16 @@ import path from 'node:path';
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
-import type {
-  ProfileConfig,
-  ResolvedCredentials
-} from '../../../src/config/index.js';
+import type { ResolvedCredentials } from '../../../src/config/index.js';
 import {
   ApiCredentialValidator,
+  MyAccountApiTransport,
+  type ApiAuthCredentials,
   type CredentialValidationResult
-} from '../../../src/myaccount/credential-validator.js';
-import { MyAccountApiTransport } from '../../../src/myaccount/index.js';
+} from '../../../src/myaccount/index.js';
 import { NodeApiClient } from '../../../src/node/index.js';
+import { ReservedIpApiClient } from '../../../src/reserved-ip/index.js';
+import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
 import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
 import { VolumeApiClient } from '../../../src/volume/index.js';
 import { VpcApiClient } from '../../../src/vpc/index.js';
@@ -21,7 +21,7 @@ import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 class StubCredentialValidator extends ApiCredentialValidator {
-  readonly calls: ProfileConfig[] = [];
+  readonly calls: ApiAuthCredentials[] = [];
   private readonly result: CredentialValidationResult;
 
   constructor(result: CredentialValidationResult = { valid: true }) {
@@ -30,9 +30,9 @@ class StubCredentialValidator extends ApiCredentialValidator {
   }
 
   override validate(
-    profile: ProfileConfig
+    credentials: ApiAuthCredentials
   ): Promise<CredentialValidationResult> {
-    this.calls.push(profile);
+    this.calls.push(credentials);
     return Promise.resolve(this.result);
   }
 }
@@ -64,6 +64,15 @@ describe('config commands', () => {
         confirm,
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
+        createProjectClient: vi.fn(() => {
+          throw new Error(
+            'Project client should not be created for this test.'
+          );
+        }) as unknown as CliRuntime['createProjectClient'],
+        createReservedIpClient: (credentials: ResolvedCredentials) =>
+          new ReservedIpApiClient(new MyAccountApiTransport(credentials)),
+        createSecurityGroupClient: (credentials: ResolvedCredentials) =>
+          new SecurityGroupApiClient(new MyAccountApiTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
           new SshKeyApiClient(new MyAccountApiTransport(credentials)),
         createVolumeClient: (credentials: ResolvedCredentials) =>
@@ -489,9 +498,7 @@ describe('config commands', () => {
     expect(validator.calls).toEqual([
       {
         api_key: 'api-imported',
-        auth_token: 'auth-imported',
-        default_project_id: '46429',
-        default_location: 'Delhi'
+        auth_token: 'auth-imported'
       }
     ]);
     await expect(store.read()).resolves.toEqual({
@@ -545,9 +552,7 @@ describe('config commands', () => {
     expect(validator.calls).toEqual([
       {
         api_key: 'api-imported',
-        auth_token: 'auth-imported',
-        default_project_id: '46429',
-        default_location: 'Delhi'
+        auth_token: 'auth-imported'
       }
     ]);
     await expect(store.read()).resolves.toEqual({

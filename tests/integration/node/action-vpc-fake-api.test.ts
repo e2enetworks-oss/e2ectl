@@ -80,6 +80,74 @@ describe('node VPC actions against a fake MyAccount API', () => {
     }
   });
 
+  it('attaches VPCs without subnet-only fields when subnet and private IP are omitted', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/vpc/node/attach/': () => ({
+        body: {
+          code: 200,
+          data: {
+            project_id: '46429',
+            vpc_id: 23082,
+            vpc_name: 'prod-vpc'
+          },
+          errors: {},
+          message: 'VPC attached successfully.'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'node',
+          'action',
+          'vpc',
+          'attach',
+          '101',
+          '--vpc-id',
+          '23082'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe(
+        `${stableStringify({
+          action: 'vpc-attach',
+          node_id: 101,
+          result: {
+            message: 'VPC attached successfully.',
+            project_id: '46429'
+          },
+          vpc: {
+            id: 23082,
+            name: 'prod-vpc',
+            private_ip: null,
+            subnet_id: null
+          }
+        })}\n`
+      );
+      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+        action: 'attach',
+        network_id: 23082,
+        node_id: 101
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('detaches VPCs without frontend-only fields', async () => {
     const server = await startTestHttpServer({
       'POST /myaccount/api/v1/vpc/node/detach/': () => ({
@@ -142,6 +210,61 @@ describe('node VPC actions against a fake MyAccount API', () => {
         network_id: 23082,
         node_id: 101
       });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('renders human VPC action output with subnet context', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/vpc/node/attach/': () => ({
+        body: {
+          code: 200,
+          data: {
+            project_id: '46429',
+            vpc_id: 23082,
+            vpc_name: 'prod-vpc'
+          },
+          errors: {},
+          message: 'VPC attached successfully.'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'node',
+          'action',
+          'vpc',
+          'attach',
+          '101',
+          '--vpc-id',
+          '23082',
+          '--subnet-id',
+          '991',
+          '--private-ip',
+          '10.0.0.25'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Requested VPC attach for node 101.');
+      expect(result.stdout).toContain('VPC ID: 23082');
+      expect(result.stdout).toContain('Subnet ID: 991');
+      expect(result.stdout).toContain('Private IP: 10.0.0.25');
+      expect(result.stdout).toContain('Message: VPC attached successfully.');
     } finally {
       await server.close();
       await tempHome.cleanup();

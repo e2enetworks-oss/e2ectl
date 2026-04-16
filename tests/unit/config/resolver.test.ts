@@ -1,4 +1,7 @@
-import { resolveCredentials } from '../../../src/config/resolver.js';
+import {
+  resolveAccountCredentials,
+  resolveCredentials
+} from '../../../src/config/resolver.js';
 import type { ConfigFile } from '../../../src/config/index.js';
 import { CliError, EXIT_CODES } from '../../../src/core/errors.js';
 
@@ -213,6 +216,76 @@ describe('resolveCredentials', () => {
       'Config path: /tmp/config.json'
     ]);
     expect(error.suggestion).toContain('Fix the saved default profile');
+  });
+});
+
+describe('resolveAccountCredentials', () => {
+  it('resolves account-scoped auth without requiring saved project context', () => {
+    const result = resolveAccountCredentials({
+      config: {
+        profiles: {
+          prod: {
+            api_key: 'api-prod',
+            auth_token: 'auth-prod'
+          }
+        },
+        default: 'prod'
+      },
+      env: {}
+    });
+
+    expect(result).toEqual({
+      alias: 'prod',
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      source: 'profile'
+    });
+  });
+
+  it('carries optional saved context when it exists so account commands can reflect the CLI default project', () => {
+    const result = resolveAccountCredentials({
+      config: {
+        profiles: {
+          prod: {
+            api_key: 'api-prod',
+            auth_token: 'auth-prod',
+            default_project_id: '123',
+            default_location: 'Delhi'
+          }
+        },
+        default: 'prod'
+      },
+      env: {}
+    });
+
+    expect(result).toEqual({
+      alias: 'prod',
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      project_id: '123',
+      location: 'Delhi',
+      source: 'profile'
+    });
+  });
+
+  it('ignores a stale default alias when environment auth is complete for account-scoped commands', () => {
+    const result = resolveAccountCredentials({
+      config: {
+        profiles: {},
+        default: 'missing'
+      },
+      configPath: '/tmp/config.json',
+      env: {
+        E2E_API_KEY: 'api-env',
+        E2E_AUTH_TOKEN: 'auth-env'
+      }
+    });
+
+    expect(result).toEqual({
+      api_key: 'api-env',
+      auth_token: 'auth-env',
+      source: 'env'
+    });
   });
 });
 

@@ -1,7 +1,6 @@
-import type { ProfileConfig } from '../config/index.js';
-import { CliError, EXIT_CODES } from '../core/errors.js';
+import { AppError, EXIT_CODES } from '../core/errors.js';
 import { MyAccountApiTransport } from './transport.js';
-import type { ApiEnvelope, FetchLike } from './types.js';
+import type { ApiAuthCredentials, ApiEnvelope, FetchLike } from './types.js';
 
 export interface CredentialValidationResult {
   message?: string;
@@ -9,7 +8,9 @@ export interface CredentialValidationResult {
 }
 
 export interface CredentialValidator {
-  validate(profile: ProfileConfig): Promise<CredentialValidationResult>;
+  validate(
+    credentials: ApiAuthCredentials
+  ): Promise<CredentialValidationResult>;
 }
 
 export interface ApiCredentialValidatorOptions {
@@ -25,10 +26,12 @@ export class ApiCredentialValidator implements CredentialValidator {
     this.options = options;
   }
 
-  async validate(profile: ProfileConfig): Promise<CredentialValidationResult> {
+  async validate(
+    credentials: ApiAuthCredentials
+  ): Promise<CredentialValidationResult> {
     const transport = new MyAccountApiTransport(
       {
-        ...profile,
+        ...credentials,
         source: 'profile'
       },
       this.options
@@ -56,9 +59,9 @@ export class ApiCredentialValidator implements CredentialValidator {
   }
 }
 
-function isCredentialAuthFailure(error: unknown): error is CliError {
+function isCredentialAuthFailure(error: unknown): error is AppError {
   return (
-    error instanceof CliError &&
+    error instanceof AppError &&
     error.exitCode === EXIT_CODES.auth &&
     error.code === 'API_REQUEST_FAILED'
   );

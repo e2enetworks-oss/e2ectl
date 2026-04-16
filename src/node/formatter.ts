@@ -2,6 +2,11 @@ import Table from 'cli-table3';
 
 import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
+import {
+  CUSTOM_STORAGE_DEFAULT_DISK_GB,
+  formatCustomStorageDiskHint,
+  isCustomStorageSeries
+} from './custom-storage.js';
 import type {
   NodeCatalogBillingType,
   NodeCatalogOsData,
@@ -346,15 +351,13 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .join('\n') + '\n'
       );
     case 'delete':
-      return result.cancelled
-        ? 'Deletion cancelled.\n'
-        : `Deleted node ${result.node_id}.\n`;
+      return formatNodeDeleteResult(result);
     case 'get':
       return `${formatNodeDetails(result.node)}\n`;
     case 'list':
       return result.nodes.length === 0
         ? 'No nodes found.\n'
-        : `${formatNodesTable(result.nodes)}\n`;
+        : `${formatNodesTable(sortNodeSummariesById(result.nodes))}\n`;
     case 'power-off':
       return (
         [`Requested power off for node ${result.node_id}.`]
@@ -367,6 +370,8 @@ function renderNodeHuman(result: NodeCommandResult): string {
           .concat(formatNodeActionSummary(result.result))
           .join('\n') + '\n'
       );
+    case 'public-ip-detach':
+      return formatNodePublicIpDetachResult(result);
     case 'save-image':
       return (
         [
@@ -374,6 +379,24 @@ function renderNodeHuman(result: NodeCommandResult): string {
         ]
           .concat(formatNodeActionSummary(result.result))
           .join('\n') + '\n'
+      );
+    case 'upgrade':
+      return formatNodeUpgradeResult(result);
+    case 'security-group-attach':
+      return (
+        [
+          `Requested security-group attach for node ${result.node_id}.`,
+          `Security Group IDs: ${result.security_group_ids.join(', ')}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
+      );
+    case 'security-group-detach':
+      return (
+        [
+          `Requested security-group detach for node ${result.node_id}.`,
+          `Security Group IDs: ${result.security_group_ids.join(', ')}`,
+          `Message: ${result.result.message}`
+        ].join('\n') + '\n'
       );
     case 'ssh-key-attach':
       return (
@@ -505,13 +528,15 @@ function renderNodeJson(result: NodeCommandResult): string {
           ? {
               action: 'delete',
               cancelled: true,
-              node_id: result.node_id
+              node_id: result.node_id,
+              reserve_public_ip_requested: result.reserve_public_ip_requested
             }
           : {
               action: 'delete',
               cancelled: false,
               message: result.message ?? '',
-              node_id: result.node_id
+              node_id: result.node_id,
+              reserve_public_ip_requested: result.reserve_public_ip_requested
             }
       );
     case 'get':
@@ -538,12 +563,74 @@ function renderNodeJson(result: NodeCommandResult): string {
         node_id: result.node_id,
         result: normalizeNodeActionJson(result.result)
       });
+    case 'public-ip-detach':
+      return renderJson(
+        'cancelled' in result
+          ? {
+              action: 'public-ip-detach',
+              cancelled: true,
+              node_id: result.node_id,
+              public_ip: result.public_ip
+            }
+          : {
+              action: 'public-ip-detach',
+              message: result.message,
+              node_id: result.node_id,
+              public_ip: result.public_ip
+            }
+      );
     case 'save-image':
       return renderJson({
         action: 'save-image',
         image_name: result.image_name,
         node_id: result.node_id,
         result: normalizeNodeActionJson(result.result)
+      });
+    case 'upgrade':
+      return renderJson(
+        'cancelled' in result
+          ? {
+              action: 'upgrade',
+              cancelled: true,
+              node_id: result.node_id,
+              requested: {
+                image: result.requested.image,
+                plan: result.requested.plan
+              }
+            }
+          : {
+              action: 'upgrade',
+              details: {
+                location: result.details.location,
+                new_node_image_id: result.details.new_node_image_id,
+                old_node_image_id: result.details.old_node_image_id,
+                vm_id: result.details.vm_id
+              },
+              message: result.message,
+              node_id: result.node_id,
+              requested: {
+                image: result.requested.image,
+                plan: result.requested.plan
+              }
+            }
+      );
+    case 'security-group-attach':
+      return renderJson({
+        action: 'security-group-attach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message
+        },
+        security_group_ids: result.security_group_ids
+      });
+    case 'security-group-detach':
+      return renderJson({
+        action: 'security-group-detach',
+        node_id: result.node_id,
+        result: {
+          message: result.result.message
+        },
+        security_group_ids: result.security_group_ids
       });
     case 'ssh-key-attach':
       return renderJson({
@@ -614,6 +701,82 @@ function renderNodeJson(result: NodeCommandResult): string {
 
 function renderJson(value: unknown): string {
   return `${stableStringify(value as JsonValue)}\n`;
+}
+
+function formatNodeDeleteResult(
+  result: Extract<NodeCommandResult, { action: 'delete' }>
+): string {
+  const lines = [
+    result.cancelled ? 'Deletion cancelled.' : `Deleted node ${result.node_id}.`
+  ];
+
+  if (result.reserve_public_ip_requested) {
+    lines.push('Reserved Public IP: requested.');
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function formatNodeUpgradeResult(
+  result: Extract<NodeCommandResult, { action: 'upgrade' }>
+): string {
+  if ('cancelled' in result) {
+    return (
+      [
+        'Node upgrade cancelled.',
+        `Node ID: ${result.node_id}`,
+        `Target Plan: ${result.requested.plan}`,
+        `Target Image: ${result.requested.image}`
+      ].join('\n') + '\n'
+    );
+  }
+
+  const lines = [
+    `Requested node upgrade for node ${result.node_id}.`,
+    `Target Plan: ${result.requested.plan}`,
+    `Target Image: ${result.requested.image}`,
+    `Message: ${result.message}`
+  ];
+
+  if (result.details.vm_id !== null) {
+    lines.push(`VM ID: ${result.details.vm_id}`);
+  }
+
+  if (result.details.location !== null) {
+    lines.push(`Location: ${result.details.location}`);
+  }
+
+  if (result.details.old_node_image_id !== null) {
+    lines.push(`Old Node Image ID: ${result.details.old_node_image_id}`);
+  }
+
+  if (result.details.new_node_image_id !== null) {
+    lines.push(`New Node Image ID: ${result.details.new_node_image_id}`);
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function formatNodePublicIpDetachResult(
+  result: Extract<NodeCommandResult, { action: 'public-ip-detach' }>
+): string {
+  if ('cancelled' in result) {
+    return (
+      [
+        `Cancelled public IP detach for node ${result.node_id}.`,
+        `Public IP: ${result.public_ip}`
+      ].join('\n') + '\n'
+    );
+  }
+
+  return (
+    [
+      `Requested public IP detach for node ${result.node_id}.`,
+      `Public IP: ${result.public_ip}`,
+      `Message: ${result.message}`,
+      'Warning: This node may no longer be publicly reachable.'
+    ].join('\n') + '\n'
+  );
 }
 
 function sortNodeSummariesById(nodes: NodeSummary[]): NodeSummary[] {
@@ -696,6 +859,13 @@ function formatNodeCatalogCreateExamples(
     buildHourlyCreateExample(hourlyExampleItem)
   ];
 
+  if (items.some((item) => isCustomStorageSeries(item.config.series))) {
+    exampleLines.push(
+      '',
+      `E1/E1WC configs also require --disk <size-gb>. ${formatCustomStorageDiskHint()}`
+    );
+  }
+
   if (billingType !== 'hourly') {
     if (committedExample === undefined) {
       exampleLines.push(
@@ -734,9 +904,7 @@ function findCommittedCreateExample(items: NodeCatalogPlanItem[]):
 }
 
 function buildHourlyCreateExample(item: NodeCatalogPlanItem): string {
-  return formatCliCommand(
-    `node create --name <name> --plan ${item.plan} --image ${item.image}`
-  );
+  return formatCliCommand(buildNodeCreateExample(item));
 }
 
 function buildCommittedCreateExample(
@@ -744,9 +912,25 @@ function buildCommittedCreateExample(
   committedPlanId: number
 ): string {
   return (
-    `${formatCliCommand(`node create --name <name> --plan ${item.plan} --image ${item.image}`)} ` +
+    `${formatCliCommand(buildNodeCreateExample(item))} ` +
     `--billing-type committed --committed-plan-id ${committedPlanId}`
   );
+}
+
+function buildNodeCreateExample(item: NodeCatalogPlanItem): string {
+  return [
+    'node',
+    'create',
+    '--name',
+    '<name>',
+    '--plan',
+    item.plan,
+    '--image',
+    item.image,
+    ...(isCustomStorageSeries(item.config.series)
+      ? ['--disk', String(CUSTOM_STORAGE_DEFAULT_DISK_GB)]
+      : [])
+  ].join(' ');
 }
 
 function formatQuantity(value: number | string | null, unit: string): string {
@@ -764,10 +948,6 @@ function trimNumericString(value: string | null): string | null {
 
   const normalizedValue = Number.parseFloat(value);
   return Number.isFinite(normalizedValue) ? normalizedValue.toString() : value;
-}
-
-function isCustomStorageSeries(series: string | null | undefined): boolean {
-  return series === 'E1' || series === 'E1WC';
 }
 
 function collectVisibleFamiliesFromItems(

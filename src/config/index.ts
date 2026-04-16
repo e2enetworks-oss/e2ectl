@@ -1,11 +1,17 @@
 export { buildConfigCommand } from './command.js';
-export { resolveCredentials, resolveStoredCredentials } from './resolver.js';
+export {
+  resolveAccountCredentials,
+  resolveCredentials,
+  resolveStoredAccountCredentials,
+  resolveStoredCredentials
+} from './resolver.js';
 export { ConfigStore, createEmptyConfig, normalizeConfig } from './store.js';
 export type {
   AuthField,
   ConfigFile,
   ContextField,
   ProfileConfig,
+  ResolvedAccountCredentials,
   ProfileSummary,
   ResolvedCredentials
 } from './types.js';
