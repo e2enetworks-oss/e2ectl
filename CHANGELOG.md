@@ -12,19 +12,6 @@ All notable changes to this project will be documented in this file.
 - Security group commands, including node attach and detach workflows.
 - Node upgrade support and explicit public IP detach actions.
 
-
-### Changed
-
-- Expanded CLI coverage across node, volume, VPC, SSH key, reserved IP, security group, and project workflows.
-- Strengthened live smoke and release verification for package install, saved-image cleanup, and disposable Chennai-region resource flows.
-
-
-### Fixed
-
-- Cross-platform tarball install smoke now works on Windows and avoids `npm pack` race conditions.
-- E1 and E1WC node create validation now enforces required `--disk` sizing rules before network calls.
-- Codecov uploads now publish deterministic unit and integration coverage reports without file-search bleed-through.
-
 ## [0.3.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.2.0...v0.3.0) (2026-04-10)
 
 
