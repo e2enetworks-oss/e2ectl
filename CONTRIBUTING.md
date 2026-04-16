@@ -2,7 +2,7 @@
 
 This document is for people changing the `e2ectl` codebase.
 
-If you are using the CLI, start with [README.md](./README.md). If you own CI or promotion readiness, use [docs/MAINTAINING.md](./docs/MAINTAINING.md). If you are cutting a release, use [docs/RELEASING.md](./docs/RELEASING.md).
+If you are using the CLI, start with [README.md](./README.md) and the [user guides](./docs/user-guides/index.md). If you own CI, promotion readiness, or release execution, use [docs/maintainers/maintaining.md](./docs/maintainers/maintaining.md) and [docs/maintainers/releasing.md](./docs/maintainers/releasing.md).
 
 ## Requirements
 
@@ -16,6 +16,7 @@ npm install
 make lint
 make test
 make build
+npm run docs:check
 npm run test:integration
 ```
 
@@ -51,14 +52,17 @@ src/
   volume/
   vpc/
   ssh-key/
+docs/
+  user-guides/
+  maintainers/
 ```
 
-### Architecture Rules
+## Architecture Rules
 
 - `command.ts` defines CLI flags and delegates immediately.
 - `service.ts` owns validation, defaults, prompts, and orchestration.
 - `client.ts` owns reusable API paths and response parsing.
-- `formatter.ts` owns human-readable and `--json` output.
+- `formatter.ts` owns human-readable output and deterministic `--json` output.
 - Shared transport and API failure handling stay in `src/myaccount/`.
 - Keep changes explicit and local. Avoid speculative abstractions and broad refactors.
 
@@ -68,16 +72,22 @@ Run this local gate before asking for review:
 
 ```bash
 make lint
+make test
+make build
+npm run docs:check
 npm run coverage:unit
-npm run coverage:integration
-env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
+npm run test:integration
+npm pack --dry-run
 ```
 
 What each command covers:
 
 - `make lint`: Prettier check, ESLint, and TypeScript `--noEmit`
+- `make test`: default unit test lane
+- `make build`: production build of the CLI
+- `npm run docs:check`: repo-local Markdown link and anchor verification
 - `npm run coverage:unit`: unit coverage gate
-- `npm run coverage:integration`: rebuilds the CLI, runs the integration suite under `c8`, and writes `coverage/integration/lcov.info`
+- `npm run test:integration`: integration suite against the built CLI
 - `npm pack --dry-run`: publishable package preview
 
 ## Testing Expectations
@@ -87,18 +97,26 @@ What each command covers:
 - Update tests in the domain you changed.
 - Treat `--json` output as a contract.
 - Manual live lanes are opt-in only. Do not run destructive live smoke as part of normal feature work.
-- For exact live-lane commands and env contracts, use [docs/MAINTAINING.md](./docs/MAINTAINING.md).
+- For exact live-lane commands and env contracts, use [docs/maintainers/maintaining.md](./docs/maintainers/maintaining.md).
 
-## Documentation Expectations
+## Documentation Contract
 
-Update docs by audience:
+Route updates by audience:
 
-- [README.md](./README.md) for operators and automation users
-- [CONTRIBUTING.md](./CONTRIBUTING.md) for code contributors
-- [docs/MAINTAINING.md](./docs/MAINTAINING.md) for maintainers and CI owners
-- [docs/RELEASING.md](./docs/RELEASING.md) for release execution
+- [README.md](./README.md) is the product-facing front door for operators and evaluators.
+- [docs/user-guides/](./docs/user-guides/index.md) is the canonical home for operator task guides, command-family guides, troubleshooting, and automation recipes.
+- [CONTRIBUTING.md](./CONTRIBUTING.md) is the canonical home for contributor workflow, architecture, and verification expectations.
+- [docs/maintainers/](./docs/maintainers/maintaining.md) is the canonical home for CI policy, promotion readiness, and release runbooks.
 
-Keep one clear home for each recurring fact. Do not duplicate the same explanation across every doc.
+Keep one canonical home for each recurring fact. Prefer linking to the source-of-truth page instead of re-explaining the same workflow in multiple places.
+
+### Docs Safety Contract
+
+- Never use real-looking API keys, auth tokens, or config payloads in examples.
+- Always use obvious placeholders such as `<api-key>`, `<auth-token>`, `<project-id>`, and `<node-id>`.
+- Never tell users to paste raw secrets or full config files into issues, chats, or troubleshooting output.
+- Troubleshooting guidance must explain what to redact before sharing command output.
+- Automation examples should avoid patterns that leak secrets into shell history, CI logs, or screenshots.
 
 ## Pull Requests
 
@@ -112,4 +130,4 @@ Keep one clear home for each recurring fact. Do not duplicate the same explanati
 
 - Release Please owns [CHANGELOG.md](./CHANGELOG.md) and package version updates on `main`.
 - Do not hand-edit `package.json` versions or changelog entries in normal feature work.
-- If release automation changes, update [docs/RELEASING.md](./docs/RELEASING.md) in the same PR.
+- If release automation changes, update [docs/maintainers/releasing.md](./docs/maintainers/releasing.md) in the same PR.
