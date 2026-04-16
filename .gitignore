@@ -140,6 +140,4 @@ vite.config.ts.timestamp-*
 
 # Local temporary and OS files
 .tmp/
-.gstack/
-docs/docs-split-plan.md
 .DS_Store
