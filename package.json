@@ -1,6 +1,6 @@
 {
   "name": "@e2enetworks-oss/e2ectl",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "CLI for managing E2E Networks MyAccount resources.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {
