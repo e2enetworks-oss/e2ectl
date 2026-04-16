@@ -2,3 +2,6 @@ CHANGELOG.md
 REVIEW.md
 TODO.md
 .claude/
+.gstack/
+docs/docs-split-plan.md
+*.tgz
