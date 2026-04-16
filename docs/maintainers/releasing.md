@@ -2,7 +2,7 @@
 
 This document is for maintainers executing a release.
 
-For CI policy and promotion readiness, use [docs/MAINTAINING.md](./MAINTAINING.md). For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md).
+For CI policy and promotion readiness, use [maintaining.md](./maintaining.md). For contributor workflow, use [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Before You Start
 
@@ -18,7 +18,7 @@ This release path does not use a personal PAT, `RELEASE_PLEASE_TOKEN`, or a long
 ## Release Flow
 
 1. Merge feature work into `develop`.
-2. Wait for the `develop` tip to pass the promotion gate from [docs/MAINTAINING.md](./MAINTAINING.md).
+2. Wait for the `develop` tip to pass the promotion gate from [maintaining.md](./maintaining.md).
 3. Open a promotion PR from `develop` to `main`.
 4. Merge the promotion PR after the `main` checks pass.
 5. Wait for Release Please to open or update the release PR on `main`.
@@ -61,9 +61,9 @@ If you want live API confidence beyond CI:
 
 The safe read-only lane now covers both env-backed reads and config-backed saved-profile resolution from a temp `HOME`.
 
-The destructive smoke lane now covers the accepted first-release proof surface, including node volume/VPC/SSH-key attach flows, node power and upgrade actions, saved-image capture, and the existing disposable resource lifecycle checks.
+The destructive smoke lane now covers the accepted first-release proof surface, including node volume, VPC, and SSH-key attach flows, node power and upgrade actions, saved-image capture, and the existing disposable resource lifecycle checks.
 
-For exact commands, env vars, and cleanup behavior, use [docs/MAINTAINING.md](./MAINTAINING.md).
+For exact commands, env vars, and cleanup behavior, use [maintaining.md](./maintaining.md).
 
 For the first public release and future release candidates, running both live lanes is strongly recommended when safe credentials and disposable quota are available. This remains recommended guidance, not mandatory policy.
 
@@ -89,7 +89,7 @@ After publish completes:
 
 ## Versioning And Changelog Policy
 
-- Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates.
+- Release Please owns [CHANGELOG.md](../../CHANGELOG.md) and package version updates.
 - Conventional Commits drive the default version bump.
 - Do not hand-edit changelog entries or `package.json` versions in normal feature work.
 - If a release needs an explicit version override, use a commit body with `Release-As: x.y.z`.

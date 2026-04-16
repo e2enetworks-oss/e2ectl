@@ -2,7 +2,7 @@
 
 This document is for maintainers who own branch policy, CI health, promotion readiness, and live verification.
 
-For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release execution, use [docs/RELEASING.md](./RELEASING.md).
+For contributor workflow, use [CONTRIBUTING.md](../../CONTRIBUTING.md). For release execution, use [releasing.md](./releasing.md).
 
 ## Branch Policy
 
@@ -14,12 +14,13 @@ For contributor workflow, use [CONTRIBUTING.md](../CONTRIBUTING.md). For release
 
 ## CI And Promotion Gate
 
-The reference contract is [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
+The reference contract is [`.github/workflows/verify.yml`](../../.github/workflows/verify.yml).
 
 Linux is the authoritative promotion gate:
 
 ```bash
 make lint
+npm run docs:check
 npm run coverage:unit
 npm run coverage:integration
 env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
@@ -27,7 +28,7 @@ env npm_config_cache=/tmp/e2ectl-npm-cache npm pack --dry-run
 
 The CI matrix is:
 
-- Linux: full gate with lint, unit coverage upload, integration coverage upload, and package dry run
+- Linux: full gate with lint, docs check, unit coverage upload, integration coverage upload, and package dry run
 - macOS: build, unit-test, integration, and package confidence
 - Windows: package install, help, and `--json` smoke
 
@@ -121,9 +122,7 @@ Required smoke env vars:
 - `E2ECTL_SMOKE_UPGRADE_PLAN`
 - `E2ECTL_SMOKE_UPGRADE_IMAGE`
 
-For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full
-`items[].plan` value from `e2ectl --json node catalog plans ...`, not the
-shorter `sku` label.
+For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full `items[].plan` value from `e2ectl --json node catalog plans ...`, not the shorter `sku` label.
 
 Optional smoke env vars:
 
@@ -194,9 +193,10 @@ Before opening a promotion PR from `develop` to `main`, confirm:
 
 ## Documentation Ownership
 
-- [README.md](../README.md): operators and automation users
-- [CONTRIBUTING.md](../CONTRIBUTING.md): code contributors
-- [docs/MAINTAINING.md](./MAINTAINING.md): maintainers and CI owners
-- [docs/RELEASING.md](./RELEASING.md): release execution
+- [README.md](../../README.md): operators and evaluators
+- [docs/user-guides/](../user-guides/index.md): operator task guides, command guides, troubleshooting, and automation recipes
+- [CONTRIBUTING.md](../../CONTRIBUTING.md): code contributors
+- [docs/maintainers/maintaining.md](./maintaining.md): maintainers and CI owners
+- [docs/maintainers/releasing.md](./releasing.md): release execution
 
-Release Please owns [CHANGELOG.md](../CHANGELOG.md) and package version updates. Do not hand-edit them in normal maintenance work.
+Release Please owns [CHANGELOG.md](../../CHANGELOG.md) and package version updates. Do not hand-edit them in normal maintenance work.

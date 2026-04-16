@@ -40,6 +40,9 @@ jobs:
       - name: Lint
         run: make lint
 
+      - name: Docs check
+        run: npm run docs:check
+
       - name: Unit coverage
         run: npm run coverage:unit
 
