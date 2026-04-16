@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.3.0...v0.4.0) (2026-04-16)
+
+
+### Added
+
+- Project commands for listing, creating, and starring or unstarring MyAccount projects.
+- Reserved IP commands for listing, reserving, attaching, detaching, and deleting public IP allocations.
+- Security group commands, including node attach and detach workflows.
+- Node upgrade support and explicit public IP detach actions.
+
 ## [0.3.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.2.0...v0.3.0) (2026-04-10)
 
 
