@@ -9,27 +9,15 @@ import {
   type ImageDeleteOptions,
   type ImageImportOptions
 } from './service.js';
+import { IMAGE_OS_CHOICES } from './types.js';
 
 interface GlobalOptions {
   json?: boolean;
 }
 
-interface ImageImportCommandOptions extends ImageImportOptions {
-  name: string;
-  os?: string;
-  url: string;
-}
-
 interface ImageRenameCommandOptions extends ImageContextOptions {
   name: string;
 }
-
-const IMAGE_OS_CHOICES = [
-  'CENTOS',
-  'UBUNTU',
-  'WINDOWS_BIOS',
-  'WINDOWS_UEFI'
-] as const;
 
 export function buildImageCommand(runtime: CliRuntime): Command {
   const service = new ImageService({
@@ -89,17 +77,15 @@ export function buildImageCommand(runtime: CliRuntime): Command {
           .choices(IMAGE_OS_CHOICES)
           .default('CENTOS')
       )
-  ).action(
-    async (options: ImageImportCommandOptions, commandInstance: Command) => {
-      const result = await service.importImage(options);
-      runtime.stdout.write(
-        renderImageResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
-  );
+  ).action(async (options: ImageImportOptions, commandInstance: Command) => {
+    const result = await service.importImage(options);
+    runtime.stdout.write(
+      renderImageResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  });
 
   addContextOptions(
     command

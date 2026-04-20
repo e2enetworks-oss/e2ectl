@@ -952,6 +952,25 @@ describe('NodeService', () => {
     expect(createNode).not.toHaveBeenCalled();
   });
 
+  it('rejects E1 disk sizes below the default size that do not match downsize increments', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        disk: '130',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size below 150 GB must be a multiple of 25 GB.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
   it('maps committed create options to cn_id and auto_renew status', async () => {
     const { createNode, service } = createServiceFixture();
 

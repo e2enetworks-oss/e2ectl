@@ -53,7 +53,7 @@ function createImageClientStub() {
 }
 
 describe('image commands', () => {
-  function createRuntimeFixture(): {
+  function createRuntimeFixture(options?: { confirmResult?: boolean }): {
     imageStub: ReturnType<typeof createImageClientStub>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
@@ -66,7 +66,7 @@ describe('image commands', () => {
     let credentials: ResolvedCredentials | undefined;
 
     const runtime: CliRuntime = {
-      confirm: vi.fn(() => Promise.resolve(true)),
+      confirm: vi.fn(() => Promise.resolve(options?.confirmResult ?? true)),
       createImageClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return imageStub.stub;
@@ -251,6 +251,27 @@ describe('image commands', () => {
     expect(parsed.cancelled).toBe(false);
   });
 
+  it('cancels image delete through the command layer when confirmation is declined', async () => {
+    const { imageStub, runtime, stdout } = createRuntimeFixture({
+      confirmResult: false
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'image',
+      'delete',
+      '1001',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(imageStub.deleteImage).not.toHaveBeenCalled();
+    expect(stdout.buffer).toBe('Deletion cancelled.\n');
+  });
+
   it('renames an image', async () => {
     const { imageStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -278,10 +299,12 @@ describe('image commands', () => {
     expect(parsed.name).toBe('renamed-image');
   });
 
-  it('outputs help when image command is called with no subcommand', () => {
+  it('outputs help when image command is called with no subcommand', async () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);
     const imageCommand = program.commands.find((c) => c.name() === 'image');
+
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'image']);
 
     expect(imageCommand).toBeDefined();
     expect(imageCommand?.commands.map((c) => c.name())).toContain('list');
@@ -291,5 +314,6 @@ describe('image commands', () => {
     expect(imageCommand?.commands.map((c) => c.name())).not.toContain(
       'create-node'
     );
+    expect(imageCommand?.helpInformation()).toContain('Manage saved images.');
   });
 });

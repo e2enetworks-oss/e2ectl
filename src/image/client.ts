@@ -1,10 +1,11 @@
 import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
 
-import type {
-  ImageActionRequest,
-  ImageActionResult,
-  ImageImportRequest,
-  ImageSummary
+import {
+  IMAGE_ACTION_RENAME,
+  type ImageActionRequest,
+  type ImageActionResult,
+  type ImageImportRequest,
+  type ImageSummary
 } from './types.js';
 
 const IMAGES_SAVED_PATH = '/images/saved-images/';
@@ -61,7 +62,10 @@ export class ImageApiClient implements ImageClient {
   }
 
   async renameImage(imageId: string, name: string): Promise<ImageActionResult> {
-    const body: ImageActionRequest = { action_type: 'rename', name };
+    const body: ImageActionRequest = {
+      action_type: IMAGE_ACTION_RENAME,
+      name
+    };
     const response = await this.transport.request<
       ApiEnvelope<ImageActionResult>
     >({

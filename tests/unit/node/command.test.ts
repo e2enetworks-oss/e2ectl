@@ -1226,6 +1226,23 @@ describe('node commands', () => {
     );
   });
 
+  it('renders catalog help when the catalog namespace is called without a subcommand', async () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    const nodeCommand = program.commands.find((c) => c.name() === 'node');
+    const catalogCommand = nodeCommand?.commands.find(
+      (c) => c.name() === 'catalog'
+    );
+
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'node', 'catalog']);
+
+    expect(catalogCommand?.helpInformation()).toContain(
+      'Discover valid OS, plan, and image combinations for node creation.'
+    );
+    expect(catalogCommand?.helpInformation()).toContain('plans');
+    expect(catalogCommand?.helpInformation()).toContain('os');
+  });
+
   it('requests power-on through the node action subtree', async () => {
     const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);

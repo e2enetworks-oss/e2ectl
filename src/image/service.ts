@@ -5,7 +5,7 @@ import {
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ImageClient } from './client.js';
-import type { ImageSummary } from './types.js';
+import type { ImageOsChoice, ImageSummary } from './types.js';
 
 export interface ImageContextOptions {
   alias?: string;
@@ -15,7 +15,7 @@ export interface ImageContextOptions {
 
 export interface ImageImportOptions extends ImageContextOptions {
   name: string;
-  os?: string;
+  os?: ImageOsChoice;
   url: string;
 }
 
