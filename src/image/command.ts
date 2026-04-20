@@ -14,12 +14,6 @@ interface GlobalOptions {
   json?: boolean;
 }
 
-interface ImageCreateCommandOptions extends ImageContextOptions {
-  name: string;
-  plan: string;
-  sshKeyId?: string[] | string;
-}
-
 interface ImageImportCommandOptions extends ImageImportOptions {
   name: string;
   os?: string;
@@ -41,7 +35,6 @@ export function buildImageCommand(runtime: CliRuntime): Command {
   const service = new ImageService({
     confirm: (message) => runtime.confirm(message),
     createImageClient: (credentials) => runtime.createImageClient(credentials),
-    createNodeClient: (credentials) => runtime.createNodeClient(credentials),
     isInteractive: runtime.isInteractive,
     store: runtime.store
   });
@@ -66,7 +59,9 @@ export function buildImageCommand(runtime: CliRuntime): Command {
   });
 
   addContextOptions(
-    command.command('get <imageId>').description('Get details for a saved image.')
+    command
+      .command('get <imageId>')
+      .description('Get details for a saved image.')
   ).action(
     async (
       imageId: string,
@@ -148,57 +143,9 @@ export function buildImageCommand(runtime: CliRuntime): Command {
     }
   );
 
-  addContextOptions(
-    command
-      .command('create-node <imageId>')
-      .description('Create a new node from a saved image.')
-      .requiredOption('--name <name>', 'Node name.')
-      .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
-      .option(
-        '--ssh-key-id <sshKeyId>',
-        'Saved SSH key id to attach during node creation. Repeat to attach multiple keys.',
-        collectOptionValue
-      )
-  ).action(
-    async (
-      imageId: string,
-      options: ImageCreateCommandOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.createNodeFromImage(imageId, {
-        ...(options.alias === undefined ? {} : { alias: options.alias }),
-        ...(options.location === undefined ? {} : { location: options.location }),
-        ...(options.projectId === undefined
-          ? {}
-          : { projectId: options.projectId }),
-        name: options.name,
-        plan: options.plan,
-        sshKeyIds: toOptionArray(options.sshKeyId)
-      });
-      runtime.stdout.write(
-        renderImageResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
-  );
-
   command.action(() => {
     command.outputHelp();
   });
 
   return command;
-}
-
-function collectOptionValue(value: string, previous: string[] = []): string[] {
-  return [...previous, value];
-}
-
-function toOptionArray(value: string[] | string | undefined): string[] {
-  if (value === undefined) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
 }

@@ -61,9 +61,10 @@ export interface NodeCreateOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
   disk?: string;
-  image: string;
+  image?: string;
   name: string;
   plan: string;
+  savedImageId?: string;
   sshKeyIds?: string[];
 }
 
@@ -381,6 +382,7 @@ interface NodeCreatePayloadInput {
   committedPlanId: number | null;
   disk: number | null;
   image: string;
+  isSavedImage: boolean;
   name: string;
   plan: string;
 }
@@ -1094,16 +1096,66 @@ function normalizeNodeCreatePayloadInput(
 ): NodeCreatePayloadInput {
   const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
   const disk = normalizeOptionalNodeDiskSize(options.disk);
+  const image = normalizeNodeCreateImageSelection(
+    options.image,
+    options.savedImageId
+  );
 
   assertNodeCreateDiskCompatibility(plan, disk);
 
   return {
     committedPlanId,
     disk,
-    image: normalizeRequiredString(options.image, 'Image', '--image'),
+    image: image.id,
+    isSavedImage: image.isSavedImage,
     name: normalizeRequiredString(options.name, 'Name', '--name'),
     plan
   };
+}
+
+function normalizeNodeCreateImageSelection(
+  image: string | undefined,
+  savedImageId: string | undefined
+): {
+  id: string;
+  isSavedImage: boolean;
+} {
+  if (image !== undefined && savedImageId !== undefined) {
+    throw new CliError('Pass either --image or --saved-image-id, not both.', {
+      code: 'CONFLICTING_CREATE_IMAGE_FLAGS',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use --image for catalog images, or use --saved-image-id for saved images.'
+    });
+  }
+
+  if (savedImageId !== undefined) {
+    return {
+      id: normalizeRequiredString(
+        savedImageId,
+        'Saved image ID',
+        '--saved-image-id'
+      ),
+      isSavedImage: true
+    };
+  }
+
+  if (image !== undefined) {
+    return {
+      id: normalizeRequiredString(image, 'Image', '--image'),
+      isSavedImage: false
+    };
+  }
+
+  throw new CliError(
+    'Either --image or --saved-image-id is required for node create.',
+    {
+      code: 'MISSING_CREATE_IMAGE_FLAG',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use --image for a catalog image, or use --saved-image-id for a saved image.'
+    }
+  );
 }
 
 function normalizeCommittedPlanId(
@@ -1285,6 +1337,7 @@ function buildNodeCreatePayload(
       plan: input.plan
     }),
     ...(input.disk === null ? {} : { disk: input.disk }),
+    is_saved_image: input.isSavedImage,
     ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
   };
 }

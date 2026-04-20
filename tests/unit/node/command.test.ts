@@ -407,6 +407,9 @@ describe('node commands', () => {
 
     const runtime: CliRuntime = {
       confirm,
+      createImageClient: vi.fn(() => {
+        throw new Error('Image client should not be created for this test.');
+      }) as unknown as CliRuntime['createImageClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
@@ -764,6 +767,40 @@ describe('node commands', () => {
         image: 'Ubuntu-24.04-Distro',
         name: 'new-node',
         plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        sshKeyIds: []
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
+  it('maps --saved-image-id into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'image-node',
+        '--plan',
+        'plan-123',
+        '--saved-image-id',
+        'img-455',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        name: 'image-node',
+        plan: 'plan-123',
+        savedImageId: 'img-455',
         sshKeyIds: []
       });
       createNodeSpy.mockRestore();

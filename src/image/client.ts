@@ -1,7 +1,4 @@
-import type {
-  ApiEnvelope,
-  MyAccountTransport
-} from '../myaccount/index.js';
+import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
 
 import type {
   ImageActionRequest,
@@ -57,9 +54,8 @@ export class ImageApiClient implements ImageClient {
   }
 
   async listImages(): Promise<ImageSummary[]> {
-    const response = await this.transport.get<ApiEnvelope<ImageSummary[]>>(
-      IMAGES_SAVED_PATH
-    );
+    const response =
+      await this.transport.get<ApiEnvelope<ImageSummary[]>>(IMAGES_SAVED_PATH);
 
     return response.data;
   }

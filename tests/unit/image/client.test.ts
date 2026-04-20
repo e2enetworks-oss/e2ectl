@@ -61,9 +61,7 @@ describe('ImageApiClient', () => {
     const transport = new StubTransport();
     const client = new ImageApiClient(transport);
 
-    transport.getMock.mockResolvedValue(
-      envelope([makeImageSummary()])
-    );
+    transport.getMock.mockResolvedValue(envelope([makeImageSummary()]));
 
     const result = await client.listImages();
 
@@ -92,7 +90,10 @@ describe('ImageApiClient', () => {
     const client = new ImageApiClient(transport);
 
     transport.postMock.mockResolvedValue(
-      envelope({}, { message: 'The image import job has been initiated successfully.' })
+      envelope(
+        {},
+        { message: 'The image import job has been initiated successfully.' }
+      )
     );
 
     const result = await client.importImage({

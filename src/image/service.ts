@@ -3,11 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../config/index.js';
-import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import type { NodeClient } from '../node/index.js';
-import { buildDefaultNodeCreateRequest } from '../node/defaults.js';
-import type { NodeCreateResult } from '../node/types.js';
 import type { ImageClient } from './client.js';
 import type { ImageSummary } from './types.js';
 
@@ -29,12 +25,6 @@ export interface ImageDeleteOptions extends ImageContextOptions {
 
 export interface ImageRenameOptions extends ImageContextOptions {
   name: string;
-}
-
-export interface ImageCreateNodeOptions extends ImageContextOptions {
-  name: string;
-  plan: string;
-  sshKeyIds?: string[];
 }
 
 export interface ImageItem {
@@ -80,14 +70,7 @@ export interface ImageRenameCommandResult {
   name: string;
 }
 
-export interface ImageCreateNodeCommandResult {
-  action: 'create-node';
-  image_id: string;
-  result: NodeCreateResult;
-}
-
 export type ImageCommandResult =
-  | ImageCreateNodeCommandResult
   | ImageDeleteCommandResult
   | ImageGetCommandResult
   | ImageImportCommandResult
@@ -102,7 +85,6 @@ interface ImageStore {
 export interface ImageServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createImageClient(credentials: ResolvedCredentials): ImageClient;
-  createNodeClient(credentials: ResolvedCredentials): NodeClient;
   isInteractive: boolean;
   store: ImageStore;
 }
@@ -186,26 +168,6 @@ export class ImageService {
     const result = await client.renameImage(imageId, name);
 
     return { action: 'rename', id: imageId, message: result.message, name };
-  }
-
-  async createNodeFromImage(
-    imageId: string,
-    options: ImageCreateNodeOptions
-  ): Promise<ImageCreateNodeCommandResult> {
-    const name = normalizeRequiredString(options.name, 'Name', '--name');
-    const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
-    const credentials = await resolveStoredCredentials(
-      this.dependencies.store,
-      options
-    );
-    const client = this.dependencies.createNodeClient(credentials);
-    const result = await client.createNode({
-      ...buildDefaultNodeCreateRequest({ image: imageId, name, plan }),
-      is_saved_image: true,
-      ssh_keys: options.sshKeyIds ?? []
-    });
-
-    return { action: 'create-node', image_id: imageId, result };
   }
 
   private async createImageClient(

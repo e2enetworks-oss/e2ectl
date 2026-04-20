@@ -4,7 +4,6 @@ import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { ImageClient } from '../../../src/image/index.js';
-import type { NodeClient } from '../../../src/node/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function makeImageSummary(overrides = {}) {
@@ -36,7 +35,10 @@ function createImageClientStub() {
   );
   const listImages = vi.fn(() => Promise.resolve([makeImageSummary()]));
   const renameImage = vi.fn(() =>
-    Promise.resolve({ message: 'Image name changed successfully', status: true })
+    Promise.resolve({
+      message: 'Image name changed successfully',
+      status: true
+    })
   );
 
   const stub: ImageClient = {
@@ -50,38 +52,9 @@ function createImageClientStub() {
   return { deleteImage, getImage, importImage, listImages, renameImage, stub };
 }
 
-function createNodeClientStub() {
-  const createNode = vi.fn(() =>
-    Promise.resolve({
-      node_create_response: [
-        { id: 9001, name: 'web-01', plan: 'e2-standard-2', status: 'new' }
-      ],
-      total_number_of_node_created: 1,
-      total_number_of_node_requested: 1
-    })
-  );
-
-  const stub: NodeClient = {
-    attachSshKeys: vi.fn(),
-    createNode,
-    deleteNode: vi.fn(),
-    getNode: vi.fn(),
-    listNodeCatalogOs: vi.fn(),
-    listNodeCatalogPlans: vi.fn(),
-    listNodes: vi.fn(),
-    powerOffNode: vi.fn(),
-    powerOnNode: vi.fn(),
-    saveNodeImage: vi.fn(),
-    upgradeNode: vi.fn()
-  };
-
-  return { createNode, stub };
-}
-
 describe('image commands', () => {
   function createRuntimeFixture(): {
     imageStub: ReturnType<typeof createImageClientStub>;
-    nodeStub: ReturnType<typeof createNodeClientStub>;
     receivedCredentials: () => ResolvedCredentials | undefined;
     runtime: CliRuntime;
     stdout: MemoryWriter;
@@ -90,7 +63,6 @@ describe('image commands', () => {
     const store = new ConfigStore({ configPath });
     const stdout = new MemoryWriter();
     const imageStub = createImageClientStub();
-    const nodeStub = createNodeClientStub();
     let credentials: ResolvedCredentials | undefined;
 
     const runtime: CliRuntime = {
@@ -99,7 +71,9 @@ describe('image commands', () => {
         credentials = resolvedCredentials;
         return imageStub.stub;
       },
-      createNodeClient: () => nodeStub.stub,
+      createNodeClient: vi.fn(() => {
+        throw new Error('Node client should not be created for this test.');
+      }) as unknown as CliRuntime['createNodeClient'],
       createProjectClient: vi.fn(() => {
         throw new Error('Project client should not be created for this test.');
       }) as unknown as CliRuntime['createProjectClient'],
@@ -134,8 +108,7 @@ describe('image commands', () => {
       receivedCredentials: () => credentials,
       runtime,
       stdout,
-      imageStub,
-      nodeStub
+      imageStub
     };
   }
 
@@ -305,70 +278,6 @@ describe('image commands', () => {
     expect(parsed.name).toBe('renamed-image');
   });
 
-  it('creates a node from a saved image', async () => {
-    const { nodeStub, runtime, stdout } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'image',
-      'create-node',
-      '1001',
-      '--alias',
-      'prod',
-      '--name',
-      'web-01',
-      '--plan',
-      'e2-standard-2'
-    ]);
-
-    expect(nodeStub.createNode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image: '1001',
-        is_saved_image: true,
-        name: 'web-01',
-        plan: 'e2-standard-2'
-      })
-    );
-    const parsed = JSON.parse(stdout.buffer) as {
-      action: string;
-      image_id: string;
-    };
-    expect(parsed.action).toBe('create-node');
-    expect(parsed.image_id).toBe('1001');
-  });
-
-  it('attaches multiple ssh keys when creating a node from an image', async () => {
-    const { nodeStub, runtime } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      'image',
-      'create-node',
-      '1001',
-      '--alias',
-      'prod',
-      '--name',
-      'web-01',
-      '--plan',
-      'e2-standard-2',
-      '--ssh-key-id',
-      '101',
-      '--ssh-key-id',
-      '102'
-    ]);
-
-    expect(nodeStub.createNode).toHaveBeenCalledWith(
-      expect.objectContaining({ ssh_keys: ['101', '102'] })
-    );
-  });
-
   it('outputs help when image command is called with no subcommand', () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);
@@ -379,6 +288,8 @@ describe('image commands', () => {
     expect(imageCommand?.commands.map((c) => c.name())).toContain('import');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('delete');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('rename');
-    expect(imageCommand?.commands.map((c) => c.name())).toContain('create-node');
+    expect(imageCommand?.commands.map((c) => c.name())).not.toContain(
+      'create-node'
+    );
   });
 });

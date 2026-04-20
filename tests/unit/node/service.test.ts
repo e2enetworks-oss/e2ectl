@@ -1116,6 +1116,62 @@ describe('NodeService', () => {
     });
   });
 
+  it('creates a saved-image node request with is_saved_image true', async () => {
+    const { createNode, service } = createServiceFixture();
+
+    await service.createNode({
+      alias: 'prod',
+      name: 'image-node',
+      plan: 'plan-123',
+      savedImageId: 'img-455'
+    });
+
+    expect(createNode).toHaveBeenCalledWith({
+      backups: false,
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'img-455',
+      is_ipv6_availed: false,
+      is_saved_image: true,
+      label: 'default',
+      name: 'image-node',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      ssh_keys: [],
+      start_scripts: []
+    });
+  });
+
+  it('requires exactly one create image source', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        name: 'demo-node',
+        plan: 'plan-123'
+      })
+    ).rejects.toMatchObject({
+      message: 'Either --image or --saved-image-id is required for node create.'
+    });
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'plan-123',
+        savedImageId: 'img-455'
+      })
+    ).rejects.toMatchObject({
+      message: 'Pass either --image or --saved-image-id, not both.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
   it('groups catalog plans by config and keeps committed options nested', async () => {
     const { listNodeCatalogPlans, service } = createServiceFixture();
 

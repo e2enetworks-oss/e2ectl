@@ -4,7 +4,6 @@ import type {
 } from '../../../src/config/index.js';
 import { ImageService } from '../../../src/image/service.js';
 import type { ImageClient } from '../../../src/image/client.js';
-import type { NodeClient } from '../../../src/node/index.js';
 
 function createConfig(): ConfigFile {
   return {
@@ -46,7 +45,6 @@ function createServiceFixture(options?: {
   getImage: ReturnType<typeof vi.fn>;
   importImage: ReturnType<typeof vi.fn>;
   listImages: ReturnType<typeof vi.fn>;
-  createNode: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   renameImage: ReturnType<typeof vi.fn>;
   service: ImageService;
@@ -56,7 +54,6 @@ function createServiceFixture(options?: {
   const importImage = vi.fn();
   const listImages = vi.fn();
   const renameImage = vi.fn();
-  const createNode = vi.fn();
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
@@ -68,27 +65,12 @@ function createServiceFixture(options?: {
     renameImage
   };
 
-  const nodeClient: NodeClient = {
-    attachSshKeys: vi.fn(),
-    createNode,
-    deleteNode: vi.fn(),
-    getNode: vi.fn(),
-    listNodeCatalogOs: vi.fn(),
-    listNodeCatalogPlans: vi.fn(),
-    listNodes: vi.fn(),
-    powerOffNode: vi.fn(),
-    powerOnNode: vi.fn(),
-    saveNodeImage: vi.fn(),
-    upgradeNode: vi.fn()
-  };
-
   const service = new ImageService({
     confirm,
     createImageClient: vi.fn((resolvedCredentials: ResolvedCredentials) => {
       credentials = resolvedCredentials;
       return imageClient;
     }),
-    createNodeClient: vi.fn(() => nodeClient),
     isInteractive: options?.isInteractive ?? true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
@@ -102,7 +84,6 @@ function createServiceFixture(options?: {
     getImage,
     importImage,
     listImages,
-    createNode,
     receivedCredentials: () => credentials,
     renameImage,
     service
@@ -111,8 +92,7 @@ function createServiceFixture(options?: {
 
 describe('ImageService', () => {
   it('lists images and maps api fields to ImageItem shape', async () => {
-    const { listImages, receivedCredentials, service } =
-      createServiceFixture();
+    const { listImages, receivedCredentials, service } = createServiceFixture();
 
     listImages.mockResolvedValue([makeImageSummary()]);
 
@@ -306,69 +286,6 @@ describe('ImageService', () => {
 
     await expect(
       service.renameImage('1001', { name: '' })
-    ).rejects.toMatchObject({ message: 'Name cannot be empty.' });
-  });
-
-  it('creates a node from a saved image with is_saved_image: true', async () => {
-    const { createNode, service } = createServiceFixture();
-
-    createNode.mockResolvedValue({
-      node_create_response: [
-        { id: 9001, name: 'web-01', plan: 'e2-standard-2', status: 'new' }
-      ],
-      total_number_of_node_created: 1,
-      total_number_of_node_requested: 1
-    });
-
-    const result = await service.createNodeFromImage('1001', {
-      name: 'web-01',
-      plan: 'e2-standard-2'
-    });
-
-    expect(createNode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image: '1001',
-        is_saved_image: true,
-        name: 'web-01',
-        plan: 'e2-standard-2'
-      })
-    );
-    expect(result).toMatchObject({
-      action: 'create-node',
-      image_id: '1001',
-      result: expect.objectContaining({
-        total_number_of_node_created: 1
-      })
-    });
-  });
-
-  it('attaches ssh keys when creating a node from an image', async () => {
-    const { createNode, service } = createServiceFixture();
-
-    createNode.mockResolvedValue({
-      node_create_response: [
-        { id: 9002, name: 'db-01', plan: 'e2-standard-4', status: 'new' }
-      ],
-      total_number_of_node_created: 1,
-      total_number_of_node_requested: 1
-    });
-
-    await service.createNodeFromImage('1001', {
-      name: 'db-01',
-      plan: 'e2-standard-4',
-      sshKeyIds: ['101', '102']
-    });
-
-    expect(createNode).toHaveBeenCalledWith(
-      expect.objectContaining({ ssh_keys: ['101', '102'] })
-    );
-  });
-
-  it('rejects blank name when creating a node from an image', async () => {
-    const { service } = createServiceFixture();
-
-    await expect(
-      service.createNodeFromImage('1001', { name: '', plan: 'e2-standard-2' })
     ).rejects.toMatchObject({ message: 'Name cannot be empty.' });
   });
 });

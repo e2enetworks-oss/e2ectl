@@ -86,7 +86,12 @@ describe('image formatter', () => {
 
   it('renders human delete output for confirmed deletion', () => {
     const output = renderImageResult(
-      { action: 'delete', cancelled: false, id: '1001', message: 'Image deleted successfully' },
+      {
+        action: 'delete',
+        cancelled: false,
+        id: '1001',
+        message: 'Image deleted successfully'
+      },
       false
     );
     expect(output).toContain('Deleted image 1001');
@@ -112,25 +117,6 @@ describe('image formatter', () => {
       false
     );
     expect(output).toContain('Renamed image 1001 to: new-name');
-  });
-
-  it('renders human create-node output', () => {
-    const output = renderImageResult(
-      {
-        action: 'create-node',
-        image_id: '1001',
-        result: {
-          node_create_response: [
-            { id: 9001, name: 'web-01', plan: 'e2-standard-2', status: 'new' }
-          ],
-          total_number_of_node_created: 1,
-          total_number_of_node_requested: 1
-        }
-      },
-      false
-    );
-    expect(output).toContain('1 node(s) from image 1001');
-    expect(output).toContain('web-01');
   });
 
   it('renders stable json list output with scaler_group_count', () => {

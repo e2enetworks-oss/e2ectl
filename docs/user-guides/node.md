@@ -48,6 +48,15 @@ For committed billing, add `--billing-type committed --committed-plan-id <commit
 
 For `E1` and `E1WC` plans, also pass `--disk <size-gb>`.
 
+To create from a saved image instead of a saved image, use:
+
+```bash
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --saved-image-id <image-id>
+```
+
 ### Upgrade A Node
 
 ```bash
@@ -68,6 +77,8 @@ e2ectl node action power-on <node-id>
 ```bash
 e2ectl node action save-image <node-id> --name <image-name>
 ```
+
+Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --saved-image-id <image-id>`.
 
 ### Detach The Current Primary Public IP
 
@@ -117,6 +128,7 @@ e2ectl node action security-group attach <node-id> \
 - [Quickstart](./quickstart.md)
 - [Create your first node](./workflows/first-node.md)
 - [Networking and storage workflow](./workflows/networking-and-storage.md)
+- [Image](./image.md)
 - [Reserved IP](./reserved-ip.md)
 - [Volume](./volume.md)
 - [VPC](./vpc.md)

@@ -146,6 +146,9 @@ describe('reserved-ip commands', () => {
 
     const runtime: CliRuntime = {
       confirm: vi.fn(() => Promise.resolve(true)),
+      createImageClient: vi.fn(() => {
+        throw new Error('Image client should not be created for this test.');
+      }) as unknown as CliRuntime['createImageClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeClient;

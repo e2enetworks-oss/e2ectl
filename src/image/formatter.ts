@@ -56,16 +56,6 @@ function renderImageHuman(result: ImageCommandResult): string {
         : `Deleted image ${result.id}.\nMessage: ${result.message ?? ''}\n`;
     case 'rename':
       return `Renamed image ${result.id} to: ${result.name}\nMessage: ${result.message}\n`;
-    case 'create-node': {
-      const nodes = result.result.node_create_response;
-      const lines = [
-        `Created ${result.result.total_number_of_node_created} node(s) from image ${result.image_id}.`
-      ];
-      nodes.forEach((node) => {
-        lines.push(`  Node: ${node.name} (ID: ${node.id}, Status: ${node.status})`);
-      });
-      return lines.join('\n') + '\n';
-    }
   }
 }
 
@@ -99,12 +89,6 @@ function normalizeJsonResult(result: ImageCommandResult): JsonValue {
         id: result.id,
         message: result.message,
         name: result.name
-      };
-    case 'create-node':
-      return {
-        action: 'create-node',
-        image_id: result.image_id,
-        result: result.result as unknown as JsonValue
       };
   }
 }
