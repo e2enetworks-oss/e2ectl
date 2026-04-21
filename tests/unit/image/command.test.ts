@@ -28,11 +28,6 @@ function createImageClientStub() {
     Promise.resolve({ message: 'Image deleted successfully' })
   );
   const getImage = vi.fn(() => Promise.resolve(makeImageSummary()));
-  const importImage = vi.fn(() =>
-    Promise.resolve({
-      message: 'The image import job has been initiated successfully.'
-    })
-  );
   const listImages = vi.fn(() => Promise.resolve([makeImageSummary()]));
   const renameImage = vi.fn(() =>
     Promise.resolve({
@@ -44,12 +39,11 @@ function createImageClientStub() {
   const stub: ImageClient = {
     deleteImage,
     getImage,
-    importImage,
     listImages,
     renameImage
   };
 
-  return { deleteImage, getImage, importImage, listImages, renameImage, stub };
+  return { deleteImage, getImage, listImages, renameImage, stub };
 }
 
 describe('image commands', () => {
@@ -193,38 +187,6 @@ describe('image commands', () => {
     expect(parsed.item.image_id).toBe('1001');
   });
 
-  it('imports an image from a public url', async () => {
-    const { imageStub, runtime, stdout } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'image',
-      'import',
-      '--alias',
-      'prod',
-      '--name',
-      'my-import',
-      '--url',
-      'https://example.com/image.qcow2',
-      '--os',
-      'UBUNTU'
-    ]);
-
-    expect(imageStub.importImage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image_name: 'my-import',
-        public_url: 'https://example.com/image.qcow2',
-        os: 'UBUNTU'
-      })
-    );
-    const parsed = JSON.parse(stdout.buffer) as { action: string };
-    expect(parsed.action).toBe('import');
-  });
-
   it('deletes an image after confirmation', async () => {
     const { imageStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -308,7 +270,7 @@ describe('image commands', () => {
 
     expect(imageCommand).toBeDefined();
     expect(imageCommand?.commands.map((c) => c.name())).toContain('list');
-    expect(imageCommand?.commands.map((c) => c.name())).toContain('import');
+    expect(imageCommand?.commands.map((c) => c.name())).not.toContain('import');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('delete');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('rename');
     expect(imageCommand?.commands.map((c) => c.name())).not.toContain(

@@ -73,17 +73,6 @@ describe('image formatter', () => {
     expect(output).toContain('Project: default-project');
   });
 
-  it('renders human import output', () => {
-    const output = renderImageResult(
-      {
-        action: 'import',
-        message: 'The image import job has been initiated successfully.'
-      },
-      false
-    );
-    expect(output).toContain('initiated successfully');
-  });
-
   it('renders human delete output for confirmed deletion', () => {
     const output = renderImageResult(
       {

@@ -11,11 +11,5 @@ describe('image module exports', () => {
 
   it('exposes shared image constants from the types module', () => {
     expect(imageTypes.IMAGE_ACTION_RENAME).toBe('rename');
-    expect(imageTypes.IMAGE_OS_CHOICES).toEqual([
-      'CENTOS',
-      'UBUNTU',
-      'WINDOWS_BIOS',
-      'WINDOWS_UEFI'
-    ]);
   });
 });

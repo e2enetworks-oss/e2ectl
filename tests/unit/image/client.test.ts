@@ -85,40 +85,6 @@ describe('ImageApiClient', () => {
     expect(result.image_id).toBe('1001');
   });
 
-  it('imports an image from a public url', async () => {
-    const transport = new StubTransport();
-    const client = new ImageApiClient(transport);
-
-    transport.postMock.mockResolvedValue(
-      envelope(
-        {},
-        { message: 'The image import job has been initiated successfully.' }
-      )
-    );
-
-    const result = await client.importImage({
-      image_name: 'my-import',
-      location: 'Delhi',
-      os: 'UBUNTU',
-      public_url: 'https://example.com/image.qcow2'
-    });
-
-    expect(transport.postMock).toHaveBeenCalledWith(
-      '/images/import-image/',
-      expect.objectContaining({
-        body: {
-          image_name: 'my-import',
-          location: 'Delhi',
-          os: 'UBUNTU',
-          public_url: 'https://example.com/image.qcow2'
-        }
-      })
-    );
-    expect(result.message).toBe(
-      'The image import job has been initiated successfully.'
-    );
-  });
-
   it('deletes an image and returns the response message', async () => {
     const transport = new StubTransport();
     const client = new ImageApiClient(transport);

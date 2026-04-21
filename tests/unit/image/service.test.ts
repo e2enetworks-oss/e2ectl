@@ -43,7 +43,6 @@ function createServiceFixture(options?: {
   confirm: ReturnType<typeof vi.fn>;
   deleteImage: ReturnType<typeof vi.fn>;
   getImage: ReturnType<typeof vi.fn>;
-  importImage: ReturnType<typeof vi.fn>;
   listImages: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   renameImage: ReturnType<typeof vi.fn>;
@@ -51,7 +50,6 @@ function createServiceFixture(options?: {
 } {
   const deleteImage = vi.fn();
   const getImage = vi.fn();
-  const importImage = vi.fn();
   const listImages = vi.fn();
   const renameImage = vi.fn();
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
@@ -60,7 +58,6 @@ function createServiceFixture(options?: {
   const imageClient: ImageClient = {
     deleteImage,
     getImage,
-    importImage,
     listImages,
     renameImage
   };
@@ -82,7 +79,6 @@ function createServiceFixture(options?: {
     confirm,
     deleteImage,
     getImage,
-    importImage,
     listImages,
     receivedCredentials: () => credentials,
     renameImage,
@@ -167,55 +163,6 @@ describe('ImageService', () => {
     await service.getImage(' 1001 ', {});
 
     expect(getImage).toHaveBeenCalledWith('1001');
-  });
-
-  it('imports an image from a public url', async () => {
-    const { importImage, service } = createServiceFixture();
-
-    importImage.mockResolvedValue({
-      message: 'The image import job has been initiated successfully.'
-    });
-
-    const result = await service.importImage({
-      alias: 'prod',
-      name: 'imported-image',
-      url: 'https://example.com/image.qcow2'
-    });
-
-    expect(importImage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        image_name: 'imported-image',
-        public_url: 'https://example.com/image.qcow2'
-      })
-    );
-    expect(result).toEqual({
-      action: 'import',
-      message: 'The image import job has been initiated successfully.'
-    });
-  });
-
-  it('passes the os option when provided on import', async () => {
-    const { importImage, service } = createServiceFixture();
-
-    importImage.mockResolvedValue({ message: 'OK' });
-
-    await service.importImage({
-      name: 'ubuntu-image',
-      os: 'UBUNTU',
-      url: 'https://example.com/ubuntu.qcow2'
-    });
-
-    expect(importImage).toHaveBeenCalledWith(
-      expect.objectContaining({ os: 'UBUNTU' })
-    );
-  });
-
-  it('rejects blank name on import', async () => {
-    const { service } = createServiceFixture();
-
-    await expect(
-      service.importImage({ name: '  ', url: 'https://example.com/img.qcow2' })
-    ).rejects.toMatchObject({ message: 'Name cannot be empty.' });
   });
 
   it('deletes an image after confirmation', async () => {

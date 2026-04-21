@@ -5,18 +5,12 @@ import {
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ImageClient } from './client.js';
-import type { ImageOsChoice, ImageSummary } from './types.js';
+import type { ImageSummary } from './types.js';
 
 export interface ImageContextOptions {
   alias?: string;
   location?: string;
   projectId?: string;
-}
-
-export interface ImageImportOptions extends ImageContextOptions {
-  name: string;
-  os?: ImageOsChoice;
-  url: string;
 }
 
 export interface ImageDeleteOptions extends ImageContextOptions {
@@ -51,11 +45,6 @@ export interface ImageGetCommandResult {
   item: ImageItem;
 }
 
-export interface ImageImportCommandResult {
-  action: 'import';
-  message: string;
-}
-
 export interface ImageDeleteCommandResult {
   action: 'delete';
   cancelled: boolean;
@@ -73,7 +62,6 @@ export interface ImageRenameCommandResult {
 export type ImageCommandResult =
   | ImageDeleteCommandResult
   | ImageGetCommandResult
-  | ImageImportCommandResult
   | ImageListCommandResult
   | ImageRenameCommandResult;
 
@@ -112,26 +100,6 @@ export class ImageService {
     const image = await client.getImage(normalizedImageId);
 
     return { action: 'get', item: summarizeImage(image) };
-  }
-
-  async importImage(
-    options: ImageImportOptions
-  ): Promise<ImageImportCommandResult> {
-    const name = normalizeRequiredString(options.name, 'Name', '--name');
-    const url = normalizeRequiredString(options.url, 'URL', '--url');
-    const credentials = await resolveStoredCredentials(
-      this.dependencies.store,
-      options
-    );
-    const client = this.dependencies.createImageClient(credentials);
-    const result = await client.importImage({
-      image_name: name,
-      location: credentials.location,
-      ...(options.os === undefined ? {} : { os: options.os }),
-      public_url: url
-    });
-
-    return { action: 'import', message: result.message };
   }
 
   async deleteImage(

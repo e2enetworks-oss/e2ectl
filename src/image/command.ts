@@ -1,4 +1,4 @@
-import { Command, Option } from 'commander';
+import { Command } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
 import type { CliRuntime } from '../app/index.js';
@@ -6,10 +6,8 @@ import { renderImageResult } from './formatter.js';
 import {
   ImageService,
   type ImageContextOptions,
-  type ImageDeleteOptions,
-  type ImageImportOptions
+  type ImageDeleteOptions
 } from './service.js';
-import { IMAGE_OS_CHOICES } from './types.js';
 
 interface GlobalOptions {
   json?: boolean;
@@ -65,27 +63,6 @@ export function buildImageCommand(runtime: CliRuntime): Command {
       );
     }
   );
-
-  addContextOptions(
-    command
-      .command('import')
-      .description('Import an image from a public URL into saved images.')
-      .requiredOption('--name <name>', 'Name for the imported image.')
-      .requiredOption('--url <url>', 'Public URL of the image to import.')
-      .addOption(
-        new Option('--os <os>', 'Operating system type of the image.')
-          .choices(IMAGE_OS_CHOICES)
-          .default('CENTOS')
-      )
-  ).action(async (options: ImageImportOptions, commandInstance: Command) => {
-    const result = await service.importImage(options);
-    runtime.stdout.write(
-      renderImageResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
-  });
 
   addContextOptions(
     command

@@ -1,12 +1,3 @@
-export const IMAGE_OS_CHOICES = [
-  'CENTOS',
-  'UBUNTU',
-  'WINDOWS_BIOS',
-  'WINDOWS_UEFI'
-] as const;
-
-export type ImageOsChoice = (typeof IMAGE_OS_CHOICES)[number];
-
 export const IMAGE_ACTION_RENAME = 'rename' as const;
 
 export interface ImageSummary {
@@ -21,13 +12,6 @@ export interface ImageSummary {
   project_name?: string;
   running_vms: number;
   scaler_group_count?: number;
-}
-
-export interface ImageImportRequest {
-  image_name: string;
-  location: string;
-  os?: ImageOsChoice;
-  public_url: string;
 }
 
 export interface ImageActionRequest {

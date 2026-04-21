@@ -48,8 +48,6 @@ function renderImageHuman(result: ImageCommandResult): string {
         : `${formatImageTable(result.items)}\n`;
     case 'get':
       return `${formatImageDetails(result.item)}\n`;
-    case 'import':
-      return `${result.message}\n`;
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -72,8 +70,6 @@ function normalizeJsonResult(result: ImageCommandResult): JsonValue {
       };
     case 'get':
       return { action: 'get', item: normalizeJsonItem(result.item) };
-    case 'import':
-      return { action: 'import', message: result.message };
     case 'delete':
       return result.cancelled
         ? { action: 'delete', cancelled: true, id: result.id }
