@@ -159,6 +159,16 @@ describe('ImageService', () => {
     expect(result).toMatchObject({ action: 'get', item: { image_id: '1001' } });
   });
 
+  it('trims image ids before get requests', async () => {
+    const { getImage, service } = createServiceFixture();
+
+    getImage.mockResolvedValue(makeImageSummary());
+
+    await service.getImage(' 1001 ', {});
+
+    expect(getImage).toHaveBeenCalledWith('1001');
+  });
+
   it('imports an image from a public url', async () => {
     const { importImage, service } = createServiceFixture();
 
@@ -227,6 +237,22 @@ describe('ImageService', () => {
     });
   });
 
+  it('trims image ids before delete confirmation and requests', async () => {
+    const { confirm, deleteImage, service } = createServiceFixture({
+      confirmResult: true
+    });
+
+    deleteImage.mockResolvedValue({ message: 'Image deleted successfully' });
+
+    const result = await service.deleteImage(' 1001 ', {});
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete image 1001? This cannot be undone.'
+    );
+    expect(deleteImage).toHaveBeenCalledWith('1001');
+    expect(result.id).toBe('1001');
+  });
+
   it('cancels delete when user declines confirmation', async () => {
     const { confirm, deleteImage, service } = createServiceFixture({
       confirmResult: false
@@ -262,6 +288,16 @@ describe('ImageService', () => {
     });
   });
 
+  it('rejects blank image ids before delete prompts', async () => {
+    const { confirm, deleteImage, service } = createServiceFixture();
+
+    await expect(service.deleteImage('   ', {})).rejects.toMatchObject({
+      message: 'Image ID cannot be empty.'
+    });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(deleteImage).not.toHaveBeenCalled();
+  });
+
   it('renames an image', async () => {
     const { renameImage, service } = createServiceFixture();
 
@@ -279,6 +315,31 @@ describe('ImageService', () => {
       message: 'Image name changed successfully',
       name: 'new-name'
     });
+  });
+
+  it('trims image ids before rename requests', async () => {
+    const { renameImage, service } = createServiceFixture();
+
+    renameImage.mockResolvedValue({
+      message: 'Image name changed successfully',
+      status: true
+    });
+
+    const result = await service.renameImage(' 1001 ', { name: 'new-name' });
+
+    expect(renameImage).toHaveBeenCalledWith('1001', 'new-name');
+    expect(result.id).toBe('1001');
+  });
+
+  it('rejects blank image ids on rename', async () => {
+    const { renameImage, service } = createServiceFixture();
+
+    await expect(
+      service.renameImage('   ', { name: 'new-name' })
+    ).rejects.toMatchObject({
+      message: 'Image ID cannot be empty.'
+    });
+    expect(renameImage).not.toHaveBeenCalled();
   });
 
   it('rejects blank name on rename', async () => {

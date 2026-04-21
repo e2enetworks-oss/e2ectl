@@ -107,8 +107,9 @@ export class ImageService {
     imageId: string,
     options: ImageContextOptions
   ): Promise<ImageGetCommandResult> {
+    const normalizedImageId = normalizeImageId(imageId);
     const client = await this.createImageClient(options);
-    const image = await client.getImage(imageId);
+    const image = await client.getImage(normalizedImageId);
 
     return { action: 'get', item: summarizeImage(image) };
   }
@@ -137,24 +138,26 @@ export class ImageService {
     imageId: string,
     options: ImageDeleteOptions
   ): Promise<ImageDeleteCommandResult> {
+    const normalizedImageId = normalizeImageId(imageId);
+
     if (!(options.force ?? false)) {
       assertCanDelete(this.dependencies.isInteractive, 'image');
       const confirmed = await this.dependencies.confirm(
-        `Delete image ${imageId}? This cannot be undone.`
+        `Delete image ${normalizedImageId}? This cannot be undone.`
       );
 
       if (!confirmed) {
-        return { action: 'delete', cancelled: true, id: imageId };
+        return { action: 'delete', cancelled: true, id: normalizedImageId };
       }
     }
 
     const client = await this.createImageClient(options);
-    const result = await client.deleteImage(imageId);
+    const result = await client.deleteImage(normalizedImageId);
 
     return {
       action: 'delete',
       cancelled: false,
-      id: imageId,
+      id: normalizedImageId,
       message: result.message
     };
   }
@@ -163,11 +166,17 @@ export class ImageService {
     imageId: string,
     options: ImageRenameOptions
   ): Promise<ImageRenameCommandResult> {
+    const normalizedImageId = normalizeImageId(imageId);
     const name = normalizeRequiredString(options.name, 'Name', '--name');
     const client = await this.createImageClient(options);
-    const result = await client.renameImage(imageId, name);
+    const result = await client.renameImage(normalizedImageId, name);
 
-    return { action: 'rename', id: imageId, message: result.message, name };
+    return {
+      action: 'rename',
+      id: normalizedImageId,
+      message: result.message,
+      name
+    };
   }
 
   private async createImageClient(
@@ -212,6 +221,19 @@ function normalizeRequiredString(
     code: 'EMPTY_REQUIRED_VALUE',
     exitCode: EXIT_CODES.usage,
     suggestion: `Pass a non-empty value with ${flag}.`
+  });
+}
+
+function normalizeImageId(imageId: string): string {
+  const normalizedImageId = imageId.trim();
+  if (normalizedImageId.length > 0) {
+    return normalizedImageId;
+  }
+
+  throw new CliError('Image ID cannot be empty.', {
+    code: 'EMPTY_IMAGE_ID',
+    exitCode: EXIT_CODES.usage,
+    suggestion: 'Pass the saved image id as the first argument.'
   });
 }
 

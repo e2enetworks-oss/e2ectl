@@ -48,7 +48,7 @@ For committed billing, add `--billing-type committed --committed-plan-id <commit
 
 For `E1` and `E1WC` plans, also pass `--disk <size-gb>`.
 
-To create from a saved image instead of a saved image, use:
+To create from a saved image instead of a catalog image, use:
 
 ```bash
 e2ectl node create \

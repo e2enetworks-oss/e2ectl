@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It helps operators and automation manage projects, nodes, saved images, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, shared default context, and deterministic `--json` output.
+It provides a unified CLI to manage E2E MyAccount resources—compute nodes, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
 
 ## Requirements
 
@@ -55,7 +55,7 @@ e2ectl node create \
   --image <image>
 ```
 
-If the selected plan is `E1` or `E1WC`, also pass `--disk <size-gb>`. For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quickstart.md) and the [first-node workflow](./docs/user-guides/workflows/first-node.md).
+For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quickstart.md) and the [first-node workflow](./docs/user-guides/workflows/first-node.md).
 
 ## Common Workflows
 
