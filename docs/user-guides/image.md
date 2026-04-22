@@ -9,9 +9,9 @@ Saved images can come from `e2ectl node action save-image` or from `e2ectl image
 ## Before You Start
 
 - Decide whether you need a saved image (`e2ectl image`) or a catalog image (`e2ectl node catalog plans`). They use different identifiers.
-- Use `e2ectl image list` to find the `Template ID` and `OS` values needed for node creation.
+- Use `e2ectl image list` to find the `Template ID` needed for node creation.
 - For `image import`, make sure the source is a public URL that MyAccount can reach. Local file paths are not supported.
-- To create a node from a saved image, use `e2ectl node create --image <os-distribution> --saved-image-template-id <template-id>`.
+- To create a node from a saved image, use `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>`. The `--image` value is the same catalog image identifier used in regular node creates (e.g. `Ubuntu-24.04-Distro`), not the saved image's OS name.
 
 ## Common Tasks
 
@@ -44,11 +44,11 @@ e2ectl image rename <image-id> --name <new-image-name>
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --image <os-distribution> \
+  --image <catalog-image> \
   --saved-image-template-id <template-id>
 ```
 
-Find `<template-id>` and `<os-distribution>` in the `Template ID` and `OS` columns of `e2ectl image list`. Use `e2ectl node catalog plans` first so `--plan` comes from the current catalog output. Repeat `--ssh-key-id <ssh-key-id>` to attach more than one saved SSH key during node creation.
+This is identical to a regular node create with two additions: `--saved-image-template-id` (the `Template ID` from `e2ectl image list`) and `is_saved_image` is set automatically. `--image` takes the same catalog image identifier as a regular create (e.g. `Ubuntu-24.04-Distro` from `node catalog plans`). Repeat `--ssh-key-id <ssh-key-id>` to attach more than one saved SSH key during node creation.
 
 ### Delete A Saved Image
 
@@ -73,7 +73,7 @@ Create a node from a saved image with multiple SSH keys:
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --image <os-distribution> \
+  --image Ubuntu-24.04-Distro \
   --saved-image-template-id <template-id> \
   --ssh-key-id <ssh-key-id-1> \
   --ssh-key-id <ssh-key-id-2>
@@ -88,8 +88,8 @@ e2ectl image delete <image-id> --force
 ## Automation Notes
 
 - `image list` and `image get` are the safest discovery commands for scripts.
-- Use `e2ectl --json image list` when later steps need exact `template_id` and `os_distribution` values for node creation.
-- Keep saved-image node creates catalog-first by discovering the target plan with `e2ectl node catalog plans` on the same branch and environment.
+- Use `e2ectl --json image list` when later steps need the exact `template_id` to pass as `--saved-image-template-id`.
+- Keep saved-image node creates catalog-first: discover `--plan` and `--image` from `e2ectl node catalog plans`, then add `--saved-image-template-id` from `e2ectl image list`.
 - In non-interactive automation, use `image delete --force` when the workflow intentionally skips confirmation.
 
 ## Related Guides

@@ -1310,7 +1310,7 @@ function buildNodeCreatePayload(
     ...(input.disk === null ? {} : { disk: input.disk }),
     is_saved_image: isSavedImage,
     ...(isSavedImage
-      ? { saved_image_template_id: input.savedImageTemplateId }
+      ? { saved_image_template_id: String(input.savedImageTemplateId) }
       : {}),
     ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
   };

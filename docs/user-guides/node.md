@@ -48,17 +48,17 @@ For committed billing, add `--billing-type committed --committed-plan-id <commit
 
 For `E1` and `E1WC` plans, also pass `--disk <size-gb>`.
 
-To create from a saved image instead of a catalog image, use:
+To create from a saved image, use the same `--image` value as a regular node create and add `--saved-image-template-id`:
 
 ```bash
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --image <os-distribution> \
+  --image <catalog-image> \
   --saved-image-template-id <template-id>
 ```
 
-Find `<template-id>` in the `Template ID` column of `e2ectl image list`. Find `<os-distribution>` in the `OS` column of the same row.
+`<catalog-image>` is the same image identifier from `node catalog plans` (e.g. `Ubuntu-24.04-Distro`). Find `<template-id>` in the `Template ID` column of `e2ectl image list`.
 
 ### Upgrade A Node
 
@@ -81,7 +81,7 @@ e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>
 ```
 
-Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <os-distribution> --saved-image-template-id <template-id>`.
+Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
 
 ### Detach The Current Primary Public IP
 

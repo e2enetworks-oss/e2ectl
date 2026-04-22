@@ -164,7 +164,7 @@ function summarizeImage(image: ImageSummary): ImageItem {
   return {
     creation_time: image.creation_time,
     image_id: image.image_id,
-    image_name: image.image_name,
+    image_name: image.image_name ?? image.name ?? '',
     image_size: image.image_size,
     image_state: image.image_state,
     is_windows: image.is_windows ?? false,

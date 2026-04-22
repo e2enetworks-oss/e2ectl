@@ -1158,7 +1158,7 @@ describe('NodeService', () => {
       name: 'image-node',
       number_of_instances: 1,
       plan: 'plan-123',
-      saved_image_template_id: 1448,
+      saved_image_template_id: '1448',
       ssh_keys: [],
       start_scripts: []
     });

@@ -3,10 +3,11 @@ export const IMAGE_ACTION_RENAME = 'rename' as const;
 export interface ImageSummary {
   creation_time: string;
   image_id: string;
-  image_name: string;
+  image_name?: string;
   image_size: string;
   image_state: string;
   is_windows?: boolean;
+  name?: string;
   node_plans_available?: boolean;
   os_distribution: string;
   project_name?: string;

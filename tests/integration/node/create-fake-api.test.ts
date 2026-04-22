@@ -456,7 +456,7 @@ describe('node create against a fake MyAccount API', () => {
         name: 'demo-node',
         number_of_instances: 1,
         plan: 'plan-123',
-        saved_image_template_id: 1001,
+        saved_image_template_id: '1001',
         ssh_keys: [],
         start_scripts: []
       });
