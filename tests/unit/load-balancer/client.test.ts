@@ -123,7 +123,9 @@ describe('LoadBalancerApiClient', () => {
         lb_mode: 'TCP',
         lb_type: 'external',
         public_ip: '5.6.7.8',
-        context: [{ backends: [], tcp_backend: [], lb_port: '80', plan_name: 'LB-2' }]
+        context: [
+          { backends: [], tcp_backend: [], lb_port: '80', plan_name: 'LB-2' }
+        ]
       })
     );
 
@@ -140,9 +142,7 @@ describe('LoadBalancerApiClient', () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
-    transport.requestMock.mockResolvedValue(
-      envelope({})
-    );
+    transport.requestMock.mockResolvedValue(envelope({}));
 
     const body: LoadBalancerCreateRequest = {
       lb_name: 'my-alb',
@@ -174,9 +174,7 @@ describe('LoadBalancerApiClient', () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
-    transport.deleteMock.mockResolvedValue(
-      envelope({})
-    );
+    transport.deleteMock.mockResolvedValue(envelope({}));
 
     await client.deleteLoadBalancer('42');
 
@@ -190,9 +188,7 @@ describe('LoadBalancerApiClient', () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
-    transport.deleteMock.mockResolvedValue(
-      envelope({})
-    );
+    transport.deleteMock.mockResolvedValue(envelope({}));
 
     await client.deleteLoadBalancer('42', { reserve_ip_required: 'true' });
 

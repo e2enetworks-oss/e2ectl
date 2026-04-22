@@ -4,11 +4,13 @@ import type {
   LoadBalancerCreateRequest,
   LoadBalancerCreateResult,
   LoadBalancerDetails,
+  LoadBalancerPlan,
   LoadBalancerSummary,
   LoadBalancerUpdateRequest
 } from './types.js';
 
 const LOAD_BALANCERS_PATH = '/appliances/load-balancers/';
+const LOAD_BALANCER_PLANS_PATH = '/appliances/load-balancers/plans/';
 const APPLIANCES_PATH = '/appliances/';
 
 export type LoadBalancerDeleteQuery = Record<'reserve_ip_required', 'true'>;
@@ -22,6 +24,7 @@ export interface LoadBalancerClient {
     query?: LoadBalancerDeleteQuery
   ): Promise<{ message: string }>;
   getLoadBalancer(lbId: string): Promise<LoadBalancerDetails>;
+  listLoadBalancerPlans(): Promise<LoadBalancerPlan[]>;
   listLoadBalancers(): Promise<LoadBalancerSummary[]>;
   updateLoadBalancer(
     lbId: string,
@@ -62,10 +65,19 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
     return response.data;
   }
 
+  async listLoadBalancerPlans(): Promise<LoadBalancerPlan[]> {
+    const response = await this.transport.get<ApiEnvelope<LoadBalancerPlan[]>>(
+      LOAD_BALANCER_PLANS_PATH
+    );
+
+    return response.data;
+  }
+
   async listLoadBalancers(): Promise<LoadBalancerSummary[]> {
-    const response = await this.transport.get<
-      ApiEnvelope<LoadBalancerSummary[]>
-    >(LOAD_BALANCERS_PATH);
+    const response =
+      await this.transport.get<ApiEnvelope<LoadBalancerSummary[]>>(
+        LOAD_BALANCERS_PATH
+      );
 
     return response.data;
   }

@@ -17,6 +17,7 @@ import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
 import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
 import { VolumeApiClient } from '../../../src/volume/index.js';
 import { VpcApiClient } from '../../../src/vpc/index.js';
+import { LoadBalancerApiClient } from '../../../src/load-balancer/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -77,6 +78,8 @@ describe('config commands', () => {
           new SshKeyApiClient(new MyAccountApiTransport(credentials)),
         createVolumeClient: (credentials: ResolvedCredentials) =>
           new VolumeApiClient(new MyAccountApiTransport(credentials)),
+        createLoadBalancerClient: (credentials: ResolvedCredentials) =>
+          new LoadBalancerApiClient(new MyAccountApiTransport(credentials)),
         createVpcClient: (credentials: ResolvedCredentials) =>
           new VpcApiClient(new MyAccountApiTransport(credentials)),
         credentialValidator: validator,

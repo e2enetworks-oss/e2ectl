@@ -4,9 +4,10 @@ import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type { LoadBalancerBackend, LoadBalancerTcpBackend } from './types.js';
 import type {
-  LoadBalancerBackendListCommandResult,
+  LoadBalancerBackendGroupListCommandResult,
   LoadBalancerCommandResult,
-  LoadBalancerListCommandResult
+  LoadBalancerListCommandResult,
+  LoadBalancerPlansCommandResult
 } from './service.js';
 
 export function renderLoadBalancerResult(
@@ -38,12 +39,22 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         ? 'Deletion cancelled.\n'
         : `Deleted load balancer ${result.lb_id}.\nMessage: ${result.message ?? ''}\n`;
 
-    case 'backend-list':
-      return renderBackendListHuman(result);
+    case 'backend-group-list':
+      return renderBackendGroupListHuman(result);
 
-    case 'backend-add':
+    case 'backend-group-create':
       return `${result.message}\n`;
+
+    case 'backend-server-add':
+      return `${result.message}\n`;
+
+    case 'plans':
+      return result.items.length === 0
+        ? 'No load balancer plans available.\n'
+        : `${formatLoadBalancerPlansTable(result.items)}\n`;
   }
+
+  return '';
 }
 
 function renderLoadBalancerJson(result: LoadBalancerCommandResult): string {
@@ -88,22 +99,41 @@ function normalizeLoadBalancerJson(
             message: result.message ?? ''
           };
 
-    case 'backend-list':
+    case 'backend-group-list':
       return {
-        action: 'backend-list',
+        action: 'backend-group-list',
         lb_id: result.lb_id,
         lb_mode: result.lb_mode,
         backends: result.backends as unknown as JsonValue,
         tcp_backends: result.tcp_backends as unknown as JsonValue
       };
 
-    case 'backend-add':
+    case 'backend-group-create':
       return {
-        action: 'backend-add',
+        action: 'backend-group-create',
         lb_id: result.lb_id,
         message: result.message
       };
+
+    case 'backend-server-add':
+      return {
+        action: 'backend-server-add',
+        lb_id: result.lb_id,
+        message: result.message
+      };
+
+    case 'plans':
+      return {
+        action: 'plans',
+        items: result.items.map((item) => ({
+          id: item.id,
+          plan_name: item.plan_name,
+          lb_type: item.lb_type
+        }))
+      };
   }
+
+  return null;
 }
 
 function formatLoadBalancerListTable(
@@ -127,8 +157,8 @@ function formatLoadBalancerListTable(
   return table.toString();
 }
 
-function renderBackendListHuman(
-  result: LoadBalancerBackendListCommandResult
+function renderBackendGroupListHuman(
+  result: LoadBalancerBackendGroupListCommandResult
 ): string {
   const isTcp = result.tcp_backends.length > 0;
 
@@ -184,4 +214,23 @@ function formatTcpBackendGroup(group: LoadBalancerTcpBackend): string {
   }
 
   return header + serverTable.toString();
+}
+
+function formatLoadBalancerPlansTable(
+  items: LoadBalancerPlansCommandResult['items']
+): string {
+  const table = new Table({
+    head: ['ID', 'Plan Name', 'Type', 'Active']
+  });
+
+  for (const item of items) {
+    table.push([
+      item.id,
+      item.plan_name,
+      item.lb_type,
+      item.is_active === false ? 'No' : 'Yes'
+    ]);
+  }
+
+  return table.toString();
 }

@@ -5,7 +5,8 @@ import type { CliRuntime } from '../app/index.js';
 import { renderLoadBalancerResult } from './formatter.js';
 import {
   LoadBalancerService,
-  type LoadBalancerBackendAddOptions,
+  type LoadBalancerBackendGroupCreateOptions,
+  type LoadBalancerBackendServerAddOptions,
   type LoadBalancerContextOptions,
   type LoadBalancerCreateOptions,
   type LoadBalancerDeleteOptions
@@ -16,7 +17,6 @@ interface GlobalOptions {
 }
 
 const LB_MODE_CHOICES = ['HTTP', 'HTTPS', 'BOTH', 'TCP'] as const;
-const LB_TYPE_CHOICES = ['external', 'internal'] as const;
 const LB_ALGORITHM_CHOICES = ['roundrobin', 'leastconn', 'source'] as const;
 
 export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
@@ -32,7 +32,10 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
     'Manage MyAccount load balancers (ALB and NLB).'
   );
 
-  command.helpCommand('help [command]', 'Show help for a load-balancer command');
+  command.helpCommand(
+    'help [command]',
+    'Show help for a load-balancer command'
+  );
 
   addContextOptions(
     command
@@ -51,13 +54,30 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
   );
 
   addContextOptions(
+    command.command('plans').description('List available load balancer plans.')
+  ).action(
+    async (options: LoadBalancerContextOptions, commandInstance: Command) => {
+      const result = await service.listPlans(options);
+      runtime.stdout.write(
+        renderLoadBalancerResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
     command
       .command('create')
       .description(
-        'Create a new load balancer. Use --mode HTTP, HTTPS, or BOTH for an ALB; use --mode TCP for an NLB.'
+        'Create a new load balancer. Use --mode HTTP, HTTPS, or BOTH for an ALB; use --mode TCP for an NLB. Run "load-balancer plans" first to see available plans.'
       )
       .requiredOption('--name <name>', 'Load balancer name.')
-      .requiredOption('--plan <plan>', 'Load balancer plan identifier (e.g. LB-2).')
+      .requiredOption(
+        '--plan <plan>',
+        'Load balancer plan identifier (e.g. LB-2). Run "load-balancer plans" to list available plans.'
+      )
       .addOption(
         new Option(
           '--mode <mode>',
@@ -70,13 +90,9 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         '--port <port>',
         'Frontend listener port (e.g. 80 for HTTP, 443 for HTTPS).'
       )
-      .addOption(
-        new Option(
-          '--type <type>',
-          'Load balancer visibility. "external" assigns a public IP; "internal" uses VPC only.'
-        )
-          .choices(LB_TYPE_CHOICES)
-          .default('external')
+      .option(
+        '--vpc <vpcId>',
+        'VPC or network ID to attach the load balancer to. Use "load-balancer plans" to see available plans.'
       )
       .option('--backend-name <backendName>', 'Initial backend group name.')
       .option(
@@ -175,6 +191,29 @@ function buildLoadBalancerBackendCommand(
     'Show help for a load-balancer backend command'
   );
 
+  command.addCommand(buildLoadBalancerBackendGroupCommand(service, runtime));
+  command.addCommand(buildLoadBalancerBackendServerCommand(service, runtime));
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildLoadBalancerBackendGroupCommand(
+  service: LoadBalancerService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('group').description(
+    'Manage backend groups on a load balancer.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a load-balancer backend group command'
+  );
+
   addContextOptions(
     command
       .command('list <lbId>')
@@ -187,7 +226,7 @@ function buildLoadBalancerBackendCommand(
       options: LoadBalancerContextOptions,
       commandInstance: Command
     ) => {
-      const result = await service.listBackends(lbId, options);
+      const result = await service.listBackendGroups(lbId, options);
       runtime.stdout.write(
         renderLoadBalancerResult(
           result,
@@ -199,13 +238,73 @@ function buildLoadBalancerBackendCommand(
 
   addContextOptions(
     command
-      .command('add <lbId>')
+      .command('create <lbId>')
       .description(
-        'Add a server to an existing backend group, or create a new backend group with that server. For NLB, only one backend group is allowed.'
+        'Create a new backend group on a load balancer. For NLB, only one backend group is allowed.'
       )
+      .requiredOption('--name <name>', 'Backend group name.')
+      .addOption(
+        new Option(
+          '--algorithm <algorithm>',
+          'Load balancing algorithm.'
+        ).choices(LB_ALGORITHM_CHOICES)
+      )
+      .option(
+        '--domain-name <domainName>',
+        'Domain name for the backend group (ALB only).'
+      )
+      .option('--http-check', 'Enable HTTP health checks (ALB only).')
+      .option('--check-url <checkUrl>', 'Health check path.', '/')
+      .option('--backend-port <backendPort>', 'NLB backend group port.')
+      .option('--server-ip <serverIp>', 'Optional initial server IP address.')
+      .option('--server-port <serverPort>', 'Optional initial server port.')
+      .option(
+        '--server-name <serverName>',
+        'Optional initial server identifier. Required when --server-ip is set.'
+      )
+  ).action(
+    async (
+      lbId: string,
+      options: LoadBalancerBackendGroupCreateOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.createBackendGroup(lbId, options);
+      runtime.stdout.write(
+        renderLoadBalancerResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildLoadBalancerBackendServerCommand(
+  service: LoadBalancerService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('server').description(
+    'Manage servers within backend groups on a load balancer.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a load-balancer backend server command'
+  );
+
+  addContextOptions(
+    command
+      .command('add <lbId>')
+      .description('Add a server to an existing backend group.')
       .requiredOption(
         '--backend-name <backendName>',
-        'Backend group name. If it already exists, the server is appended; otherwise a new group is created.'
+        'Backend group name to add the server to.'
       )
       .requiredOption('--server-ip <serverIp>', 'Backend server IP address.')
       .requiredOption('--server-port <serverPort>', 'Backend server port.')
@@ -213,36 +312,13 @@ function buildLoadBalancerBackendCommand(
         '--server-name <serverName>',
         'Unique identifier for this server within the backend group.'
       )
-      .option(
-        '--domain-name <domainName>',
-        'Domain name for a new backend group (ALB only).'
-      )
-      .addOption(
-        new Option(
-          '--algorithm <algorithm>',
-          'Load balancing algorithm for a new backend group.'
-        ).choices(LB_ALGORITHM_CHOICES)
-      )
-      .option(
-        '--http-check',
-        'Enable HTTP health checks for a new backend group (ALB only).'
-      )
-      .option(
-        '--check-url <checkUrl>',
-        'Health check path for a new backend group.',
-        '/'
-      )
-      .option(
-        '--backend-port <backendPort>',
-        'NLB backend group port (required when creating a new NLB backend group).'
-      )
   ).action(
     async (
       lbId: string,
-      options: LoadBalancerBackendAddOptions,
+      options: LoadBalancerBackendServerAddOptions,
       commandInstance: Command
     ) => {
-      const result = await service.addBackend(lbId, options);
+      const result = await service.addBackendServer(lbId, options);
       runtime.stdout.write(
         renderLoadBalancerResult(
           result,

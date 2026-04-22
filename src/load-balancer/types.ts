@@ -1,6 +1,13 @@
 export type LoadBalancerMode = 'HTTP' | 'HTTPS' | 'BOTH' | 'TCP';
-export type LoadBalancerType = 'external' | 'internal';
+export type LoadBalancerVpc = 'external' | 'internal';
 export type LoadBalancerAlgorithm = 'source' | 'roundrobin' | 'leastconn';
+
+export interface LoadBalancerPlan {
+  id: string;
+  plan_name: string;
+  lb_type: LoadBalancerVpc;
+  is_active?: boolean;
+}
 
 export interface LoadBalancerServer {
   backend_name: string;
@@ -27,13 +34,22 @@ export interface LoadBalancerTcpBackend {
   servers: LoadBalancerServer[];
 }
 
+export type LoadBalancerPlanItem = LoadBalancerPlan;
+
+export interface LoadBalancerPlansCommandResult {
+  action: 'plans';
+  items: LoadBalancerPlanItem[];
+  message?: string;
+}
+
 export interface LoadBalancerCreateRequest {
   lb_name: string;
-  lb_type: LoadBalancerType;
+  lb_type: LoadBalancerVpc;
   lb_mode: LoadBalancerMode;
   lb_port: string;
   plan_name: string;
   node_list_type: 'S';
+  network_id?: number;
   backends: LoadBalancerBackend[];
   tcp_backend: LoadBalancerTcpBackend[];
   acl_list: [];
@@ -62,11 +78,15 @@ export interface LoadBalancerDetails {
   lb_mode?: string;
   lb_type?: string;
   public_ip?: string | null;
-  context?: {
-    backends?: LoadBalancerBackend[];
-    tcp_backend?: LoadBalancerTcpBackend[];
-    [key: string]: unknown;
-  }[];
+  context?:
+    | {
+        backends?: LoadBalancerBackend[];
+        tcp_backend?: LoadBalancerTcpBackend[];
+        lb_port?: string;
+        plan_name?: string;
+        [key: string]: unknown;
+      }[]
+    | undefined;
 }
 
 export interface LoadBalancerCreateResult {

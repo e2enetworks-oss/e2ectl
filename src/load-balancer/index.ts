@@ -6,9 +6,23 @@ export type {
   LoadBalancerCreateResult,
   LoadBalancerDetails,
   LoadBalancerMode,
+  LoadBalancerPlan,
+  LoadBalancerPlanItem,
+  LoadBalancerPlansCommandResult,
   LoadBalancerServer,
   LoadBalancerSummary,
   LoadBalancerTcpBackend,
-  LoadBalancerType,
-  LoadBalancerUpdateRequest
+  LoadBalancerUpdateRequest,
+  LoadBalancerVpc
 } from './types.js';
+export type {
+  LoadBalancerBackendGroupCreateOptions,
+  LoadBalancerBackendGroupCreateCommandResult,
+  LoadBalancerBackendGroupListCommandResult,
+  LoadBalancerBackendServerAddCommandResult,
+  LoadBalancerBackendServerAddOptions,
+  LoadBalancerCommandResult,
+  LoadBalancerContextOptions,
+  LoadBalancerCreateOptions,
+  LoadBalancerDeleteOptions
+} from './service.js';

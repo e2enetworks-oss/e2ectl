@@ -122,10 +122,10 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-list', () => {
+  describe('backend-group-list', () => {
     it('renders "No backend groups" when empty', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-list',
+        action: 'backend-group-list',
         lb_id: '10',
         lb_mode: 'HTTP',
         backends: [],
@@ -138,7 +138,7 @@ describe('renderLoadBalancerResult', () => {
 
     it('renders ALB backend groups with server table', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-list',
+        action: 'backend-group-list',
         lb_id: '10',
         lb_mode: 'HTTP',
         backends: [
@@ -151,7 +151,11 @@ describe('renderLoadBalancerResult', () => {
             http_check: true,
             check_url: '/health',
             servers: [
-              { backend_name: 'srv-1', backend_ip: '10.0.0.1', backend_port: 8080 }
+              {
+                backend_name: 'srv-1',
+                backend_ip: '10.0.0.1',
+                backend_port: 8080
+              }
             ]
           }
         ],
@@ -166,7 +170,7 @@ describe('renderLoadBalancerResult', () => {
 
     it('renders NLB tcp backend groups', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-list',
+        action: 'backend-group-list',
         lb_id: '20',
         lb_mode: 'TCP',
         backends: [],
@@ -176,7 +180,11 @@ describe('renderLoadBalancerResult', () => {
             port: 8080,
             balance: 'leastconn',
             servers: [
-              { backend_name: 'srv-1', backend_ip: '10.0.0.2', backend_port: 8080 }
+              {
+                backend_name: 'srv-1',
+                backend_ip: '10.0.0.2',
+                backend_port: 8080
+              }
             ]
           }
         ]
@@ -185,16 +193,79 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('Backend Group: tcp-grp');
       expect(output).toContain('8080');
     });
+
+    it('renders JSON for backend-group-list', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-list',
+        lb_id: '10',
+        lb_mode: 'HTTP',
+        backends: [],
+        tcp_backends: []
+      };
+      const output = renderLoadBalancerResult(result, true);
+      const parsed = JSON.parse(output) as { action: string; lb_id: string };
+      expect(parsed.action).toBe('backend-group-list');
+      expect(parsed.lb_id).toBe('10');
+    });
   });
 
-  describe('backend-add', () => {
-    it('renders backend-add message', () => {
+  describe('backend-group-create', () => {
+    it('renders backend-group-create message (human)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-add',
+        action: 'backend-group-create',
+        lb_id: '10',
+        message: 'Backend group "api" created.'
+      };
+      expect(renderLoadBalancerResult(result, false)).toBe(
+        'Backend group "api" created.\n'
+      );
+    });
+
+    it('renders JSON for backend-group-create', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-create',
+        lb_id: '10',
+        message: 'Backend group "api" created.'
+      };
+      const output = renderLoadBalancerResult(result, true);
+      const parsed = JSON.parse(output) as {
+        action: string;
+        lb_id: string;
+        message: string;
+      };
+      expect(parsed.action).toBe('backend-group-create');
+      expect(parsed.lb_id).toBe('10');
+      expect(parsed.message).toBe('Backend group "api" created.');
+    });
+  });
+
+  describe('backend-server-add', () => {
+    it('renders backend-server-add message (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-add',
         lb_id: '10',
         message: 'Server "srv-2" added to backend group "web".'
       };
-      expect(renderLoadBalancerResult(result, false)).toContain('srv-2');
+      expect(renderLoadBalancerResult(result, false)).toBe(
+        'Server "srv-2" added to backend group "web".\n'
+      );
+    });
+
+    it('renders JSON for backend-server-add', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-add',
+        lb_id: '10',
+        message: 'Server "srv-2" added to backend group "web".'
+      };
+      const output = renderLoadBalancerResult(result, true);
+      const parsed = JSON.parse(output) as {
+        action: string;
+        lb_id: string;
+        message: string;
+      };
+      expect(parsed.action).toBe('backend-server-add');
+      expect(parsed.lb_id).toBe('10');
+      expect(parsed.message).toContain('srv-2');
     });
   });
 });

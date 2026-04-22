@@ -16,6 +16,7 @@ import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
+import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createProjectClientStub() {
@@ -95,6 +96,11 @@ describe('project commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
+      createLoadBalancerClient: vi.fn(() => {
+        throw new Error(
+          'Load balancer client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => LoadBalancerClient,
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,

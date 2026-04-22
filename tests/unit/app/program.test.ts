@@ -11,6 +11,7 @@ describe('createProgram', () => {
     ).toEqual([
       'config',
       'project',
+      'load-balancer',
       'node',
       'reserved-ip',
       'volume',

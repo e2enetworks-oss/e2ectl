@@ -6,17 +6,18 @@ The `load-balancer` command group lets you create, list, and delete load balance
 
 Two load balancer types are supported:
 
-| Type | Mode flag | Layer | Use case |
-|------|-----------|-------|----------|
+| Type                                | Mode flag                  | Layer   | Use case                                                |
+| ----------------------------------- | -------------------------- | ------- | ------------------------------------------------------- |
 | **ALB** (Application Load Balancer) | `HTTP`, `HTTPS`, or `BOTH` | Layer 7 | HTTP/HTTPS routing, domain-based routing, health checks |
-| **NLB** (Network Load Balancer) | `TCP` | Layer 4 | TCP passthrough, port-based routing |
+| **NLB** (Network Load Balancer)     | `TCP`                      | Layer 4 | TCP passthrough, port-based routing                     |
 
 ---
 
 ## Before You Start
 
 - Configure a profile with your API key and auth token: `e2ectl config set`
-- Know your load balancer plan identifier (e.g. `LB-2`, `LB-3`).
+- List available plans first: `e2ectl load-balancer plans`
+- Note the plan identifier (e.g. `LB-2`, `LB-3`).
 - For backend servers, have the server IP address and port ready.
 
 ---
@@ -31,6 +32,18 @@ e2ectl load-balancer list
 
 ```
 e2ectl load-balancer list --json
+```
+
+### List Available Load Balancer Plans
+
+First, list available plans to find the plan identifier you want to use:
+
+```
+e2ectl load-balancer plans
+```
+
+```
+e2ectl load-balancer plans --json
 ```
 
 ### Create an ALB (HTTP)
@@ -68,7 +81,7 @@ e2ectl load-balancer create \
 
 ### Create an Internal Load Balancer (VPC only)
 
-Use `--type internal` to create an LB without a public IP — it is accessible only within the VPC.
+Use `--vpc <networkId>` to attach the load balancer to a VPC — it will be accessible only within that VPC network.
 
 ```
 e2ectl load-balancer create \
@@ -76,7 +89,7 @@ e2ectl load-balancer create \
   --plan LB-2 \
   --mode HTTP \
   --port 80 \
-  --type internal
+  --vpc 12345
 ```
 
 ### List Backend Groups and Their Servers
@@ -141,6 +154,14 @@ e2ectl load-balancer delete <lbId> --force --reserve-public-ip
 
 ## Command Reference
 
+### `e2ectl load-balancer plans`
+
+Lists all available load balancer plans with their identifiers and types (external/internal).
+
+**Context options**: `--alias`, `--project-id`, `--location`, `--json`
+
+---
+
 ### `e2ectl load-balancer list`
 
 Lists all load balancers for the active profile.
@@ -153,22 +174,22 @@ Lists all load balancers for the active profile.
 
 Creates a new load balancer.
 
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--name <name>` | Yes | Load balancer name |
-| `--plan <plan>` | Yes | Plan identifier (e.g. `LB-2`) |
-| `--mode <mode>` | Yes | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB) |
-| `--port <port>` | Yes | Frontend listener port |
-| `--type <type>` | No | `external` (default) or `internal` |
-| `--backend-name <name>` | No | Initial backend group name |
-| `--server-ip <ip>` | No* | Backend server IP. Required when `--backend-name` is set |
-| `--server-port <port>` | No | Backend server port. Defaults to `--port` |
-| `--server-name <name>` | No* | Server identifier. Required when `--backend-name` is set |
-| `--algorithm <algo>` | No | `roundrobin` (default), `leastconn`, or `source` |
-| `--domain-name <domain>` | No | Domain name for ALB backend |
-| `--http-check` | No | Enable HTTP health checks (ALB only) |
-| `--check-url <path>` | No | Health check path (default: `/`) |
-| `--backend-port <port>` | No | NLB backend group port. Defaults to `--server-port` |
+| Flag                     | Required | Description                                                                  |
+| ------------------------ | -------- | ---------------------------------------------------------------------------- |
+| `--name <name>`          | Yes      | Load balancer name                                                           |
+| `--plan <plan>`          | Yes      | Plan identifier (e.g. `LB-2`). Run `load-balancer plans` first.              |
+| `--mode <mode>`          | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                |
+| `--port <port>`          | Yes      | Frontend listener port                                                       |
+| `--vpc <networkId>`      | No       | VPC network ID to attach the LB (creates internal LB). Run `vpc list` first. |
+| `--backend-name <name>`  | No       | Initial backend group name                                                   |
+| `--server-ip <ip>`       | No\*     | Backend server IP. Required when `--backend-name` is set                     |
+| `--server-port <port>`   | No       | Backend server port. Defaults to `--port`                                    |
+| `--server-name <name>`   | No\*     | Server identifier. Required when `--backend-name` is set                     |
+| `--algorithm <algo>`     | No       | `roundrobin` (default), `leastconn`, or `source`                             |
+| `--domain-name <domain>` | No       | Domain name for ALB backend                                                  |
+| `--http-check`           | No       | Enable HTTP health checks (ALB only)                                         |
+| `--check-url <path>`     | No       | Health check path (default: `/`)                                             |
+| `--backend-port <port>`  | No       | NLB backend group port. Defaults to `--server-port`                          |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
@@ -178,10 +199,10 @@ Creates a new load balancer.
 
 Deletes a load balancer. Prompts for confirmation unless `--force` is passed.
 
-| Flag | Description |
-|------|-------------|
-| `--force` | Skip the interactive confirmation prompt |
-| `--reserve-public-ip` | Preserve the public IP as a reserved IP |
+| Flag                  | Description                              |
+| --------------------- | ---------------------------------------- |
+| `--force`             | Skip the interactive confirmation prompt |
+| `--reserve-public-ip` | Preserve the public IP as a reserved IP  |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
@@ -199,17 +220,17 @@ Lists all backend groups and their servers for a load balancer.
 
 Adds a server to an existing backend group, or creates a new backend group with that server.
 
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--backend-name <name>` | Yes | Backend group name |
-| `--server-ip <ip>` | Yes | Backend server IP address |
-| `--server-port <port>` | Yes | Backend server port |
-| `--server-name <name>` | Yes | Unique server identifier within the group |
-| `--domain-name <domain>` | No | Domain for a new ALB backend group |
-| `--algorithm <algo>` | No | `roundrobin` (default), `leastconn`, or `source` |
-| `--http-check` | No | Enable health checks for a new ALB backend group |
-| `--check-url <path>` | No | Health check path (default: `/`) |
-| `--backend-port <port>` | No | Port for a new NLB backend group |
+| Flag                     | Required | Description                                      |
+| ------------------------ | -------- | ------------------------------------------------ |
+| `--backend-name <name>`  | Yes      | Backend group name                               |
+| `--server-ip <ip>`       | Yes      | Backend server IP address                        |
+| `--server-port <port>`   | Yes      | Backend server port                              |
+| `--server-name <name>`   | Yes      | Unique server identifier within the group        |
+| `--domain-name <domain>` | No       | Domain for a new ALB backend group               |
+| `--algorithm <algo>`     | No       | `roundrobin` (default), `leastconn`, or `source` |
+| `--http-check`           | No       | Enable health checks for a new ALB backend group |
+| `--check-url <path>`     | No       | Health check path (default: `/`)                 |
+| `--backend-port <port>`  | No       | Port for a new NLB backend group                 |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
