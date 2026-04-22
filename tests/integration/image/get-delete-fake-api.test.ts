@@ -53,7 +53,8 @@ describe('image get/delete against a fake MyAccount API', () => {
             os_distribution: 'CentOS 7',
             project_name: null,
             running_vms: 0,
-            scaler_group_count: 0
+            scaler_group_count: 0,
+            template_id: null
           }
         })}\n`
       );

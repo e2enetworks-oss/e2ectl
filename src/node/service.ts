@@ -1126,7 +1126,6 @@ function normalizeNodeCreatePayloadInput(
   };
 }
 
-
 function normalizeCommittedPlanId(
   billingType: NodeCreateBillingType,
   committedPlanId: string | undefined

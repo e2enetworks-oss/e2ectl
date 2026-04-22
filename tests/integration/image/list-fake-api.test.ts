@@ -69,7 +69,8 @@ describe('image list against a fake MyAccount API', () => {
               os_distribution: 'CentOS 7',
               project_name: 'default-project',
               running_vms: 0,
-              scaler_group_count: 1
+              scaler_group_count: 1,
+              template_id: null
             },
             {
               creation_time: '2026-03-12T10:00:00Z',
@@ -82,7 +83,8 @@ describe('image list against a fake MyAccount API', () => {
               os_distribution: 'Ubuntu 24.04',
               project_name: null,
               running_vms: 2,
-              scaler_group_count: 0
+              scaler_group_count: 0,
+              template_id: null
             }
           ]
         })}\n`
