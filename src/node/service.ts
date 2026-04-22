@@ -1097,12 +1097,15 @@ function normalizeNodeCreatePayloadInput(
   const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
   const disk = normalizeOptionalNodeDiskSize(options.disk);
   if (options.image === undefined) {
-    throw new CliError('--image is required for node create.', {
-      code: 'MISSING_IMAGE_FLAG',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Pass a catalog image with --image. Run node catalog os to see available images.'
-    });
+    throw new CliError(
+      '--image is required for node create, including saved-image launches.',
+      {
+        code: 'MISSING_IMAGE_FLAG',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Pass the catalog image with --image. For saved-image launches, keep --image and add --saved-image-template-id. Run node catalog plans to find a valid plan/image pair.'
+      }
+    );
   }
   const image = normalizeRequiredString(options.image, 'Image', '--image');
   const savedImageTemplateId =

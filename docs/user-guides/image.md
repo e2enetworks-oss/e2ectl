@@ -2,15 +2,15 @@
 
 ## What This Command Group Does
 
-`e2ectl image` lists, inspects, imports, renames, and deletes saved images.
+`e2ectl image` lists, inspects, renames, and deletes saved images.
 
-Saved images can come from `e2ectl node action save-image` or from `e2ectl image import`.
+Saved images are reusable images for your selected project and location. A common flow is to create one from an existing node with `e2ectl node action save-image`, then use that saved image for later node launches.
 
 ## Before You Start
 
 - Decide whether you need a saved image (`e2ectl image`) or a catalog image (`e2ectl node catalog plans`). They use different identifiers.
+- To create a saved image from an existing node, run `e2ectl node action save-image <node-id> --name <image-name>`.
 - Use `e2ectl image list` to find the `Template ID` needed for node creation.
-- For `image import`, make sure the source is a public URL that MyAccount can reach. Local file paths are not supported.
 - To create a node from a saved image, use `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>`. The `--image` value is the same catalog image identifier used in regular node creates (e.g. `Ubuntu-24.04-Distro`), not the saved image's OS name.
 
 ## Common Tasks
@@ -21,16 +21,6 @@ Saved images can come from `e2ectl node action save-image` or from `e2ectl image
 e2ectl image list
 e2ectl image get <image-id>
 ```
-
-### Import An Image From A Public URL
-
-```bash
-e2ectl image import \
-  --name <image-name> \
-  --url <public-image-url>
-```
-
-If the imported image is not CentOS, add `--os UBUNTU`, `--os WINDOWS_BIOS`, or `--os WINDOWS_UEFI`. If you omit `--os`, the CLI uses `CENTOS`.
 
 ### Rename A Saved Image
 
@@ -58,13 +48,16 @@ e2ectl image delete <image-id>
 
 ## Examples
 
-Import an Ubuntu image:
+Save an image from an existing node, then reuse it for a new node:
 
 ```bash
-e2ectl image import \
-  --name ubuntu-golden-2404 \
-  --url https://example.com/images/ubuntu-24.04.qcow2 \
-  --os UBUNTU
+e2ectl node action save-image <node-id> --name <image-name>
+e2ectl image list
+e2ectl node create \
+  --name <new-node-name> \
+  --plan <plan> \
+  --image <catalog-image> \
+  --saved-image-template-id <template-id>
 ```
 
 Create a node from a saved image with multiple SSH keys:

@@ -91,7 +91,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a new node from an exact catalog plan and either a catalog image or saved image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
+        `Create a new node from an exact catalog plan and catalog image. To launch from a saved image, still pass the catalog \`--image\` and add \`--saved-image-template-id\`. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')

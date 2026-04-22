@@ -13,7 +13,9 @@ describe('node create validation through the built CLI', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toContain('--image is required for node create.');
+    expect(result.stderr).toContain(
+      '--image is required for node create, including saved-image launches.'
+    );
   });
 
   it('rejects a non-numeric --saved-image-template-id', async () => {

@@ -1174,7 +1174,8 @@ describe('NodeService', () => {
         plan: 'plan-123'
       })
     ).rejects.toMatchObject({
-      message: '--image is required for node create.'
+      message:
+        '--image is required for node create, including saved-image launches.'
     });
 
     expect(createNodeClient).not.toHaveBeenCalled();
