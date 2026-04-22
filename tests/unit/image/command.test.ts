@@ -27,7 +27,6 @@ function createImageClientStub() {
   const deleteImage = vi.fn(() =>
     Promise.resolve({ message: 'Image deleted successfully' })
   );
-  const getImage = vi.fn(() => Promise.resolve(makeImageSummary()));
   const listImages = vi.fn(() => Promise.resolve([makeImageSummary()]));
   const renameImage = vi.fn(() =>
     Promise.resolve({
@@ -38,12 +37,11 @@ function createImageClientStub() {
 
   const stub: ImageClient = {
     deleteImage,
-    getImage,
     listImages,
     renameImage
   };
 
-  return { deleteImage, getImage, listImages, renameImage, stub };
+  return { deleteImage, listImages, renameImage, stub };
 }
 
 describe('image commands', () => {
@@ -161,30 +159,6 @@ describe('image commands', () => {
     expect(stdout.buffer).toContain('my-image');
     expect(stdout.buffer).toContain('Scale Groups');
     expect(stdout.buffer).toContain('3');
-  });
-
-  it('gets an image in json mode', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'image',
-      'get',
-      '1001',
-      '--alias',
-      'prod'
-    ]);
-
-    const parsed = JSON.parse(stdout.buffer) as {
-      action: string;
-      item: { image_id: string };
-    };
-    expect(parsed.action).toBe('get');
-    expect(parsed.item.image_id).toBe('1001');
   });
 
   it('deletes an image after confirmation', async () => {

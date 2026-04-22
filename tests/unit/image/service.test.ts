@@ -42,14 +42,12 @@ function createServiceFixture(options?: {
 }): {
   confirm: ReturnType<typeof vi.fn>;
   deleteImage: ReturnType<typeof vi.fn>;
-  getImage: ReturnType<typeof vi.fn>;
   listImages: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   renameImage: ReturnType<typeof vi.fn>;
   service: ImageService;
 } {
   const deleteImage = vi.fn();
-  const getImage = vi.fn();
   const listImages = vi.fn();
   const renameImage = vi.fn();
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
@@ -57,7 +55,6 @@ function createServiceFixture(options?: {
 
   const imageClient: ImageClient = {
     deleteImage,
-    getImage,
     listImages,
     renameImage
   };
@@ -78,7 +75,6 @@ function createServiceFixture(options?: {
   return {
     confirm,
     deleteImage,
-    getImage,
     listImages,
     receivedCredentials: () => credentials,
     renameImage,
@@ -143,27 +139,6 @@ describe('ImageService', () => {
       project_name: null,
       scaler_group_count: 0
     });
-  });
-
-  it('gets a single image by id', async () => {
-    const { getImage, service } = createServiceFixture();
-
-    getImage.mockResolvedValue(makeImageSummary());
-
-    const result = await service.getImage('1001', { alias: 'prod' });
-
-    expect(getImage).toHaveBeenCalledWith('1001');
-    expect(result).toMatchObject({ action: 'get', item: { image_id: '1001' } });
-  });
-
-  it('trims image ids before get requests', async () => {
-    const { getImage, service } = createServiceFixture();
-
-    getImage.mockResolvedValue(makeImageSummary());
-
-    await service.getImage(' 1001 ', {});
-
-    expect(getImage).toHaveBeenCalledWith('1001');
   });
 
   it('deletes an image after confirmation', async () => {

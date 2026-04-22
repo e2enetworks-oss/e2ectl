@@ -15,7 +15,6 @@ export interface ImageDeleteResult {
 
 export interface ImageClient {
   deleteImage(imageId: string): Promise<ImageDeleteResult>;
-  getImage(imageId: string): Promise<ImageSummary>;
   listImages(): Promise<ImageSummary[]>;
   renameImage(imageId: string, name: string): Promise<ImageActionResult>;
 }
@@ -29,14 +28,6 @@ export class ImageApiClient implements ImageClient {
     >(buildImagePath(imageId));
 
     return { message: response.message };
-  }
-
-  async getImage(imageId: string): Promise<ImageSummary> {
-    const response = await this.transport.get<ApiEnvelope<ImageSummary>>(
-      buildImagePath(imageId)
-    );
-
-    return response.data;
   }
 
   async listImages(): Promise<ImageSummary[]> {

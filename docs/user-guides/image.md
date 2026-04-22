@@ -15,11 +15,10 @@ Saved images are reusable images for your selected project and location. A commo
 
 ## Common Tasks
 
-### List And Inspect Saved Images
+### List Saved Images
 
 ```bash
 e2ectl image list
-e2ectl image get <image-id>
 ```
 
 ### Rename A Saved Image
@@ -80,7 +79,7 @@ e2ectl image delete <image-id> --force
 
 ## Automation Notes
 
-- `image list` and `image get` are the safest discovery commands for scripts.
+- `image list` is the safest discovery command for scripts.
 - Use `e2ectl --json image list` when later steps need the exact `template_id` to pass as `--saved-image-template-id`.
 - Keep saved-image node creates catalog-first: discover `--plan` and `--image` from `e2ectl node catalog plans`, then add `--saved-image-template-id` from `e2ectl image list`.
 - In non-interactive automation, use `image delete --force` when the workflow intentionally skips confirmation.

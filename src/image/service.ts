@@ -41,11 +41,6 @@ export interface ImageListCommandResult {
   items: ImageItem[];
 }
 
-export interface ImageGetCommandResult {
-  action: 'get';
-  item: ImageItem;
-}
-
 export interface ImageDeleteCommandResult {
   action: 'delete';
   cancelled: boolean;
@@ -62,7 +57,6 @@ export interface ImageRenameCommandResult {
 
 export type ImageCommandResult =
   | ImageDeleteCommandResult
-  | ImageGetCommandResult
   | ImageListCommandResult
   | ImageRenameCommandResult;
 
@@ -90,17 +84,6 @@ export class ImageService {
       action: 'list',
       items: (await client.listImages()).map(summarizeImage)
     };
-  }
-
-  async getImage(
-    imageId: string,
-    options: ImageContextOptions
-  ): Promise<ImageGetCommandResult> {
-    const normalizedImageId = normalizeImageId(imageId);
-    const client = await this.createImageClient(options);
-    const image = await client.getImage(normalizedImageId);
-
-    return { action: 'get', item: summarizeImage(image) };
   }
 
   async deleteImage(

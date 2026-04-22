@@ -73,18 +73,6 @@ describe('ImageApiClient', () => {
     expect(result[0]?.image_name).toBe('my-image');
   });
 
-  it('gets a single image by id', async () => {
-    const transport = new StubTransport();
-    const client = new ImageApiClient(transport);
-
-    transport.getMock.mockResolvedValue(envelope(makeImageSummary()));
-
-    const result = await client.getImage('1001');
-
-    expect(transport.getMock).toHaveBeenCalledWith('/images/1001/', undefined);
-    expect(result.image_id).toBe('1001');
-  });
-
   it('deletes an image and returns the response message', async () => {
     const transport = new StubTransport();
     const client = new ImageApiClient(transport);

@@ -101,7 +101,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       )
       .option(
         '--saved-image-template-id <savedImageTemplateId>',
-        'Saved image template ID (template_id) returned by image list or image get.'
+        'Saved image template ID (template_id) returned by image list.'
       )
       .addOption(
         new Option(

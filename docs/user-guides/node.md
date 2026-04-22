@@ -81,7 +81,7 @@ e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>
 ```
 
-Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
+Manage saved images later with `e2ectl image list`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
 
 ### Detach The Current Primary Public IP
 

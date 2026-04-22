@@ -16,7 +16,6 @@ export function formatImageTable(items: ImageItem[]): string {
       'ID',
       'Template ID',
       'Name',
-      'OS',
       'Size',
       'State',
       'Running VMs',
@@ -30,7 +29,6 @@ export function formatImageTable(items: ImageItem[]): string {
       item.image_id,
       item.template_id !== null ? String(item.template_id) : '',
       item.image_name,
-      item.os_distribution,
       item.image_size,
       item.image_state,
       String(item.running_vms),
@@ -48,8 +46,6 @@ function renderImageHuman(result: ImageCommandResult): string {
       return result.items.length === 0
         ? 'No saved images found.\n'
         : `${formatImageTable(result.items)}\n`;
-    case 'get':
-      return `${formatImageDetails(result.item)}\n`;
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -70,8 +66,6 @@ function normalizeJsonResult(result: ImageCommandResult): JsonValue {
         action: 'list',
         items: sortImageItems(result.items).map(normalizeJsonItem)
       };
-    case 'get':
-      return { action: 'get', item: normalizeJsonItem(result.item) };
     case 'delete':
       return result.cancelled
         ? { action: 'delete', cancelled: true, id: result.id }
@@ -121,21 +115,4 @@ function sortImageItems(items: ImageItem[]): ImageItem[] {
 
     return leftKey.localeCompare(rightKey);
   });
-}
-
-function formatImageDetails(item: ImageItem): string {
-  return [
-    `ID: ${item.image_id}`,
-    `Template ID: ${item.template_id !== null ? String(item.template_id) : ''}`,
-    `Name: ${item.image_name}`,
-    `OS: ${item.os_distribution}`,
-    `Size: ${item.image_size}`,
-    `State: ${item.image_state}`,
-    `Running VMs: ${item.running_vms}`,
-    `Scale Groups: ${item.scaler_group_count}`,
-    `Node Plans Available: ${item.node_plans_available}`,
-    `Windows: ${item.is_windows}`,
-    `Project: ${item.project_name ?? ''}`,
-    `Created: ${item.creation_time}`
-  ].join('\n');
 }

@@ -46,26 +46,6 @@ export function buildImageCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
-      .command('get <imageId>')
-      .description('Get details for a saved image.')
-  ).action(
-    async (
-      imageId: string,
-      options: ImageContextOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.getImage(imageId, options);
-      runtime.stdout.write(
-        renderImageResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
-  );
-
-  addContextOptions(
-    command
       .command('delete <imageId>')
       .description('Delete a saved image.')
       .option('--force', 'Skip the interactive confirmation prompt.')

@@ -28,7 +28,7 @@ describe('image formatter', () => {
 
     expect(table).toContain('1001');
     expect(table).toContain('my-image');
-    expect(table).toContain('Ubuntu 22.04');
+    expect(table).not.toContain('Ubuntu 22.04');
     expect(table).toContain('20GB');
     expect(table).toContain('READY');
     expect(table).toContain('Scale Groups');
@@ -59,19 +59,6 @@ describe('image formatter', () => {
   it('renders empty list message', () => {
     const output = renderImageResult({ action: 'list', items: [] }, false);
     expect(output).toBe('No saved images found.\n');
-  });
-
-  it('renders human get detail output with all fields including scale groups', () => {
-    const output = renderImageResult(
-      { action: 'get', item: makeItem() },
-      false
-    );
-
-    expect(output).toContain('ID: 1001');
-    expect(output).toContain('Name: my-image');
-    expect(output).toContain('Scale Groups: 3');
-    expect(output).toContain('Running VMs: 2');
-    expect(output).toContain('Project: default-project');
   });
 
   it('renders human delete output for confirmed deletion', () => {
