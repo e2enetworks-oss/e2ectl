@@ -11,6 +11,10 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import {
+  LoadBalancerApiClient,
+  type LoadBalancerClient
+} from '../load-balancer/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import { ProjectApiClient, type ProjectClient } from '../project/index.js';
 import {
@@ -31,6 +35,9 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createLoadBalancerClient(
+    credentials: ResolvedCredentials
+  ): LoadBalancerClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
@@ -56,6 +63,10 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createLoadBalancerClient: (credentials) =>
+      new LoadBalancerApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
