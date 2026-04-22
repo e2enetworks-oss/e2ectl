@@ -33,6 +33,7 @@ export interface ImageItem {
   project_name: string | null;
   running_vms: number;
   scaler_group_count: number;
+  template_id: number | null;
 }
 
 export interface ImageListCommandResult {
@@ -170,8 +171,9 @@ function summarizeImage(image: ImageSummary): ImageItem {
     node_plans_available: image.node_plans_available ?? false,
     os_distribution: image.os_distribution,
     project_name: image.project_name ?? null,
-    running_vms: image.running_vms,
-    scaler_group_count: image.scaler_group_count ?? 0
+    running_vms: Number(image.running_vms),
+    scaler_group_count: image.scaler_group_count ?? 0,
+    template_id: image.template_id ?? null
   };
 }
 

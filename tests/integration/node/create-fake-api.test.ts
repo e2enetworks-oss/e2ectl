@@ -396,7 +396,9 @@ describe('node create against a fake MyAccount API', () => {
           'demo-node',
           '--plan',
           'plan-123',
-          '--saved-image-id',
+          '--image',
+          'Ubuntu-24.04-Distro',
+          '--saved-image-template-id',
           '1001'
         ],
         {
@@ -447,13 +449,14 @@ describe('node create against a fake MyAccount API', () => {
         default_public_ip: false,
         disable_password: true,
         enable_bitninja: false,
-        image: '1001',
+        image: 'Ubuntu-24.04-Distro',
         is_ipv6_availed: false,
         is_saved_image: true,
         label: 'default',
         name: 'demo-node',
         number_of_instances: 1,
         plan: 'plan-123',
+        saved_image_template_id: 1001,
         ssh_keys: [],
         start_scripts: []
       });

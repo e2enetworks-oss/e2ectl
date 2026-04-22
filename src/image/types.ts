@@ -10,8 +10,9 @@ export interface ImageSummary {
   node_plans_available?: boolean;
   os_distribution: string;
   project_name?: string;
-  running_vms: number;
+  running_vms: number | string;
   scaler_group_count?: number;
+  template_id?: number;
 }
 
 export interface ImageActionRequest {

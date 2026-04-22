@@ -161,13 +161,14 @@ export interface NodeCreateRequest {
   disk?: number;
   disable_password: boolean;
   enable_bitninja: boolean;
-  image: string;
+  image?: string;
   is_ipv6_availed: boolean;
   is_saved_image: boolean;
   label: string;
   name: string;
   number_of_instances: number;
   plan: string;
+  saved_image_template_id?: number;
   ssh_keys: string[];
   start_scripts: string[];
 }

@@ -14,6 +14,7 @@ export function formatImageTable(items: ImageItem[]): string {
   const table = new Table({
     head: [
       'ID',
+      'Template ID',
       'Name',
       'OS',
       'Size',
@@ -27,6 +28,7 @@ export function formatImageTable(items: ImageItem[]): string {
   sortImageItems(items).forEach((item) => {
     table.push([
       item.image_id,
+      item.template_id !== null ? String(item.template_id) : '',
       item.image_name,
       item.os_distribution,
       item.image_size,
@@ -101,18 +103,19 @@ function normalizeJsonItem(item: ImageItem): JsonValue {
     os_distribution: item.os_distribution,
     project_name: item.project_name,
     running_vms: item.running_vms,
-    scaler_group_count: item.scaler_group_count
+    scaler_group_count: item.scaler_group_count,
+    template_id: item.template_id
   };
 }
 
 function sortImageItems(items: ImageItem[]): ImageItem[] {
   return [...items].sort((left, right) => {
     const leftKey = [
-      left.image_name.toLowerCase(),
+      (left.image_name ?? '').toLowerCase(),
       left.image_id.padStart(10, '0')
     ].join('\u0000');
     const rightKey = [
-      right.image_name.toLowerCase(),
+      (right.image_name ?? '').toLowerCase(),
       right.image_id.padStart(10, '0')
     ].join('\u0000');
 
@@ -123,6 +126,7 @@ function sortImageItems(items: ImageItem[]): ImageItem[] {
 function formatImageDetails(item: ImageItem): string {
   return [
     `ID: ${item.image_id}`,
+    `Template ID: ${item.template_id !== null ? String(item.template_id) : ''}`,
     `Name: ${item.image_name}`,
     `OS: ${item.os_distribution}`,
     `Size: ${item.image_size}`,

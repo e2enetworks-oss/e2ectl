@@ -17,6 +17,7 @@ function makeItem(overrides = {}) {
     project_name: 'default-project',
     running_vms: 2,
     scaler_group_count: 3,
+    template_id: 1448,
     ...overrides
   };
 }

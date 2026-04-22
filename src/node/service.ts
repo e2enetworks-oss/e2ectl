@@ -64,7 +64,7 @@ export interface NodeCreateOptions extends NodeContextOptions {
   image?: string;
   name: string;
   plan: string;
-  savedImageId?: string;
+  savedImageTemplateId?: string;
   sshKeyIds?: string[];
 }
 
@@ -382,8 +382,8 @@ interface NodeCreatePayloadInput {
   committedPlanId: number | null;
   disk: number | null;
   image: string;
-  isSavedImage: boolean;
   name: string;
+  savedImageTemplateId?: number;
   plan: string;
 }
 
@@ -1096,67 +1096,36 @@ function normalizeNodeCreatePayloadInput(
 ): NodeCreatePayloadInput {
   const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
   const disk = normalizeOptionalNodeDiskSize(options.disk);
-  const image = normalizeNodeCreateImageSelection(
-    options.image,
-    options.savedImageId
-  );
+  if (options.image === undefined) {
+    throw new CliError('--image is required for node create.', {
+      code: 'MISSING_IMAGE_FLAG',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Pass a catalog image with --image. Run node catalog os to see available images.'
+    });
+  }
+  const image = normalizeRequiredString(options.image, 'Image', '--image');
+  const savedImageTemplateId =
+    options.savedImageTemplateId !== undefined
+      ? normalizeRequiredNumericId(
+          options.savedImageTemplateId,
+          'Saved image template ID',
+          '--saved-image-template-id'
+        )
+      : undefined;
 
   assertNodeCreateDiskCompatibility(plan, disk);
 
   return {
     committedPlanId,
     disk,
-    image: image.id,
-    isSavedImage: image.isSavedImage,
+    image,
+    ...(savedImageTemplateId !== undefined ? { savedImageTemplateId } : {}),
     name: normalizeRequiredString(options.name, 'Name', '--name'),
     plan
   };
 }
 
-function normalizeNodeCreateImageSelection(
-  image: string | undefined,
-  savedImageId: string | undefined
-): {
-  id: string;
-  isSavedImage: boolean;
-} {
-  if (image !== undefined && savedImageId !== undefined) {
-    throw new CliError('Pass either --image or --saved-image-id, not both.', {
-      code: 'CONFLICTING_CREATE_IMAGE_FLAGS',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Use --image for catalog images, or use --saved-image-id for saved images.'
-    });
-  }
-
-  if (savedImageId !== undefined) {
-    return {
-      id: normalizeRequiredString(
-        savedImageId,
-        'Saved image ID',
-        '--saved-image-id'
-      ),
-      isSavedImage: true
-    };
-  }
-
-  if (image !== undefined) {
-    return {
-      id: normalizeRequiredString(image, 'Image', '--image'),
-      isSavedImage: false
-    };
-  }
-
-  throw new CliError(
-    'Either --image or --saved-image-id is required for node create.',
-    {
-      code: 'MISSING_CREATE_IMAGE_FLAG',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Use --image for a catalog image, or use --saved-image-id for a saved image.'
-    }
-  );
-}
 
 function normalizeCommittedPlanId(
   billingType: NodeCreateBillingType,
@@ -1324,6 +1293,8 @@ function buildNodeCreatePayload(
   input: NodeCreatePayloadInput,
   resolvedKeys: ResolvedSshKey[]
 ): NodeCreateRequest {
+  const isSavedImage = input.savedImageTemplateId !== undefined;
+
   return {
     ...buildDefaultNodeCreateRequest({
       ...(input.committedPlanId === null
@@ -1337,7 +1308,10 @@ function buildNodeCreatePayload(
       plan: input.plan
     }),
     ...(input.disk === null ? {} : { disk: input.disk }),
-    is_saved_image: input.isSavedImage,
+    is_saved_image: isSavedImage,
+    ...(isSavedImage
+      ? { saved_image_template_id: input.savedImageTemplateId }
+      : {}),
     ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
   };
 }

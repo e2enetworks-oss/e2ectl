@@ -9,9 +9,9 @@ Saved images can come from `e2ectl node action save-image` or from `e2ectl image
 ## Before You Start
 
 - Decide whether you need a saved image (`e2ectl image`) or a catalog image (`e2ectl node catalog plans`). They use different identifiers.
-- Use the exact saved-image id from `image list`, `image get`, or `node action save-image`.
+- Use `e2ectl image list` to find the `Template ID` and `OS` values needed for node creation.
 - For `image import`, make sure the source is a public URL that MyAccount can reach. Local file paths are not supported.
-- To create a node from a saved image, use `e2ectl node create --saved-image-id <image-id>`.
+- To create a node from a saved image, use `e2ectl node create --image <os-distribution> --saved-image-template-id <template-id>`.
 
 ## Common Tasks
 
@@ -44,10 +44,11 @@ e2ectl image rename <image-id> --name <new-image-name>
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --saved-image-id <image-id>
+  --image <os-distribution> \
+  --saved-image-template-id <template-id>
 ```
 
-Use `e2ectl node catalog plans` first so `--plan` comes from the current catalog output. Repeat `--ssh-key-id <ssh-key-id>` to attach more than one saved SSH key during node creation.
+Find `<template-id>` and `<os-distribution>` in the `Template ID` and `OS` columns of `e2ectl image list`. Use `e2ectl node catalog plans` first so `--plan` comes from the current catalog output. Repeat `--ssh-key-id <ssh-key-id>` to attach more than one saved SSH key during node creation.
 
 ### Delete A Saved Image
 
@@ -72,7 +73,8 @@ Create a node from a saved image with multiple SSH keys:
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --saved-image-id <image-id> \
+  --image <os-distribution> \
+  --saved-image-template-id <template-id> \
   --ssh-key-id <ssh-key-id-1> \
   --ssh-key-id <ssh-key-id-2>
 ```
@@ -86,7 +88,7 @@ e2ectl image delete <image-id> --force
 ## Automation Notes
 
 - `image list` and `image get` are the safest discovery commands for scripts.
-- Use `e2ectl --json image list` when later steps need exact `image_id` values.
+- Use `e2ectl --json image list` when later steps need exact `template_id` and `os_distribution` values for node creation.
 - Keep saved-image node creates catalog-first by discovering the target plan with `e2ectl node catalog plans` on the same branch and environment.
 - In non-interactive automation, use `image delete --force` when the workflow intentionally skips confirmation.
 

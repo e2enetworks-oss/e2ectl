@@ -1140,9 +1140,10 @@ describe('NodeService', () => {
 
     await service.createNode({
       alias: 'prod',
+      image: 'Ubuntu-24.04-Distro',
       name: 'image-node',
       plan: 'plan-123',
-      savedImageId: 'img-455'
+      savedImageTemplateId: '1448'
     });
 
     expect(createNode).toHaveBeenCalledWith({
@@ -1150,20 +1151,21 @@ describe('NodeService', () => {
       default_public_ip: false,
       disable_password: true,
       enable_bitninja: false,
-      image: 'img-455',
+      image: 'Ubuntu-24.04-Distro',
       is_ipv6_availed: false,
       is_saved_image: true,
       label: 'default',
       name: 'image-node',
       number_of_instances: 1,
       plan: 'plan-123',
+      saved_image_template_id: 1448,
       ssh_keys: [],
       start_scripts: []
     });
   });
 
-  it('requires exactly one create image source', async () => {
-    const { createNode, createNodeClient, service } = createServiceFixture();
+  it('requires --image for node create', async () => {
+    const { createNodeClient, service } = createServiceFixture();
 
     await expect(
       service.createNode({
@@ -1172,23 +1174,10 @@ describe('NodeService', () => {
         plan: 'plan-123'
       })
     ).rejects.toMatchObject({
-      message: 'Either --image or --saved-image-id is required for node create.'
-    });
-
-    await expect(
-      service.createNode({
-        alias: 'prod',
-        image: 'Ubuntu-24.04-Distro',
-        name: 'demo-node',
-        plan: 'plan-123',
-        savedImageId: 'img-455'
-      })
-    ).rejects.toMatchObject({
-      message: 'Pass either --image or --saved-image-id, not both.'
+      message: '--image is required for node create.'
     });
 
     expect(createNodeClient).not.toHaveBeenCalled();
-    expect(createNode).not.toHaveBeenCalled();
   });
 
   it('groups catalog plans by config and keeps committed options nested', async () => {

@@ -2,10 +2,11 @@ import type { NodeCommittedCreateStatus, NodeCreateRequest } from './types.js';
 
 export interface BuildNodeCreateRequestInput extends Pick<
   NodeCreateRequest,
-  'image' | 'name' | 'plan'
+  'name' | 'plan'
 > {
   cn_id?: number;
   cn_status?: NodeCommittedCreateStatus;
+  image?: string;
 }
 
 // Keep the create payload aligned with the public-node serializer:
@@ -24,7 +25,7 @@ export const DEFAULT_NODE_CREATE_REQUEST = {
   start_scripts: []
 } as const satisfies Omit<
   NodeCreateRequest,
-  'cn_id' | 'cn_status' | 'image' | 'name' | 'plan'
+  'cn_id' | 'cn_status' | 'image' | 'name' | 'plan' | 'saved_image_template_id'
 >;
 
 export function buildDefaultNodeCreateRequest(

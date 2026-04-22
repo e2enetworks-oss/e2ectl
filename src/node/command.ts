@@ -35,7 +35,7 @@ interface NodeCreateCommandOptions extends NodeContextOptions {
   image?: string;
   name: string;
   plan: string;
-  savedImageId?: string;
+  savedImageTemplateId?: string;
   sshKeyId?: string[] | string;
 }
 
@@ -100,8 +100,8 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         'Catalog image identifier returned by node catalog plans.'
       )
       .option(
-        '--saved-image-id <savedImageId>',
-        'Saved image identifier returned by image list, image get, or node action save-image.'
+        '--saved-image-template-id <savedImageTemplateId>',
+        'Saved image template ID (template_id) returned by image list or image get.'
       )
       .addOption(
         new Option(
@@ -148,9 +148,9 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         ...(options.image === undefined ? {} : { image: options.image }),
         name: options.name,
         plan: options.plan,
-        ...(options.savedImageId === undefined
+        ...(options.savedImageTemplateId === undefined
           ? {}
-          : { savedImageId: options.savedImageId }),
+          : { savedImageTemplateId: options.savedImageTemplateId }),
         sshKeyIds: toOptionArray(options.sshKeyId)
       });
       runtime.stdout.write(

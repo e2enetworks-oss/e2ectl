@@ -54,8 +54,11 @@ To create from a saved image instead of a catalog image, use:
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
-  --saved-image-id <image-id>
+  --image <os-distribution> \
+  --saved-image-template-id <template-id>
 ```
+
+Find `<template-id>` in the `Template ID` column of `e2ectl image list`. Find `<os-distribution>` in the `OS` column of the same row.
 
 ### Upgrade A Node
 
@@ -78,7 +81,7 @@ e2ectl node action power-on <node-id>
 e2ectl node action save-image <node-id> --name <image-name>
 ```
 
-Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --saved-image-id <image-id>`.
+Manage saved images later with `e2ectl image list`, `e2ectl image get`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <os-distribution> --saved-image-template-id <template-id>`.
 
 ### Detach The Current Primary Public IP
 

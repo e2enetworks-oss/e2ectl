@@ -773,7 +773,7 @@ describe('node commands', () => {
     }
   });
 
-  it('maps --saved-image-id into node create service options', async () => {
+  it('maps --saved-image-template-id into node create service options', async () => {
     const { runtime } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -789,8 +789,10 @@ describe('node commands', () => {
         'image-node',
         '--plan',
         'plan-123',
-        '--saved-image-id',
-        'img-455',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--saved-image-template-id',
+        '1448',
         '--alias',
         'prod'
       ]);
@@ -798,9 +800,10 @@ describe('node commands', () => {
       expect(createNodeSpy).toHaveBeenCalledWith({
         alias: 'prod',
         billingType: 'hourly',
+        image: 'Ubuntu-24.04-Distro',
         name: 'image-node',
         plan: 'plan-123',
-        savedImageId: 'img-455',
+        savedImageTemplateId: '1448',
         sshKeyIds: []
       });
       createNodeSpy.mockRestore();

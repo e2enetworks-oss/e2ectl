@@ -113,7 +113,8 @@ describe('ImageService', () => {
           os_distribution: 'Ubuntu 22.04',
           project_name: 'default-project',
           running_vms: 2,
-          scaler_group_count: 1
+          scaler_group_count: 1,
+          template_id: null
         }
       ]
     });
