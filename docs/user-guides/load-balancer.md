@@ -112,7 +112,7 @@ e2ectl load-balancer create \
   --plan ELB-2 \
   --mode HTTP \
   --port 80 \
-  --vpc 12345 \
+  --vpc <networkId> \
   --backend-name web \
   --server-ip 10.0.0.1 \
   --server-port 8080 \

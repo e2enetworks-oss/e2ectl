@@ -643,4 +643,79 @@ describe('load-balancer commands', () => {
       'Server "server-2" deleted from backend group "web".'
     );
   });
+
+  it('lists backend servers via backend server list', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'load-balancer',
+      'backend',
+      'server',
+      'list',
+      '10',
+      'web',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('server-1');
+    expect(stdout.buffer).toContain('10.0.0.1');
+  });
+
+  it('backend sub-command with no sub-command prints help without throwing', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'load-balancer',
+        'backend',
+        '--alias',
+        'prod'
+      ])
+    ).resolves.not.toThrow();
+  });
+
+  it('backend group sub-command with no sub-command prints help without throwing', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'load-balancer',
+        'backend',
+        'group',
+        '--alias',
+        'prod'
+      ])
+    ).resolves.not.toThrow();
+  });
+
+  it('backend server sub-command with no sub-command prints help without throwing', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'load-balancer',
+        'backend',
+        'server',
+        '--alias',
+        'prod'
+      ])
+    ).resolves.not.toThrow();
+  });
 });

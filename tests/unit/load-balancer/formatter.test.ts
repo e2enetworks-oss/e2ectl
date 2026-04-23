@@ -415,6 +415,25 @@ describe('renderLoadBalancerResult', () => {
       expect(parsed.lb_id).toBe('10');
       expect(parsed.message).toBe('Backend group "api" created.');
     });
+
+    it('renders Backend Port row when backend_port is set (NLB backend group)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-create',
+        group: {
+          backend_port: 8080,
+          health_check: false,
+          name: 'tcp-grp',
+          protocol: 'TCP',
+          routing_policy: 'roundrobin',
+          servers: []
+        },
+        lb_id: '20',
+        message: 'Backend group "tcp-grp" created.'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Backend Port');
+      expect(output).toContain('8080');
+    });
   });
 
   describe('backend-server-add', () => {
