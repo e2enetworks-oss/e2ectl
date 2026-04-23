@@ -301,7 +301,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
         lb_name: 'my-alb',
         lb_port: '80',
         lb_type: 'external',
-        node_list_type: 'S',
+        node_list_type: 'D',
         plan_name: 'LB-2',
         server_timeout: 60,
         ssl_context: {
@@ -405,7 +405,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
         lb_name: 'my-alb',
         lb_port: '80',
         lb_type: 'external',
-        node_list_type: 'S',
+        node_list_type: 'D',
         plan_name: 'LB-2',
         server_timeout: 60,
         ssl_context: {
