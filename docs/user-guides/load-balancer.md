@@ -17,7 +17,7 @@ Two load balancer types are supported:
 
 - Configure a profile with your API key and auth token: `e2ectl config set`
 - List available plans first: `e2ectl load-balancer plans`
-- Pick the base plan name you want to create with (for example `LB-2`).
+- Pick the base plan name you want to create with (for example `ELB-2`).
 - If you want committed billing, note the committed option shown under that base plan.
 - Use `e2ectl load-balancer plans --json` when you need the committed plan ID.
 - For backend servers, have the server IP address and port ready.
@@ -59,9 +59,26 @@ Creates an Application Load Balancer that listens on port 80 with one backend gr
 ```
 e2ectl load-balancer create \
   --name my-alb \
-  --plan LB-2 \
+  --plan ELB-2 \
   --mode HTTP \
   --port 80 \
+  --backend-name web \
+  --server-ip 10.0.0.1 \
+  --server-port 8080 \
+  --server-name server-1
+```
+
+### Create an ALB (HTTPS or BOTH)
+
+`--mode HTTPS` and `--mode BOTH` require `--ssl-certificate-id`. Get your certificate ID from the E2E Networks Console.
+
+```
+e2ectl load-balancer create \
+  --name my-https-alb \
+  --plan ELB-2 \
+  --mode HTTPS \
+  --port 443 \
+  --ssl-certificate-id <certId> \
   --backend-name web \
   --server-ip 10.0.0.1 \
   --server-port 8080 \
@@ -75,7 +92,7 @@ Creates a Network Load Balancer that passes TCP traffic through on port 80.
 ```
 e2ectl load-balancer create \
   --name my-nlb \
-  --plan LB-2 \
+  --plan ELB-2 \
   --mode TCP \
   --port 80 \
   --backend-name tcp-group \
@@ -92,10 +109,14 @@ Use `--vpc <networkId>` to attach the load balancer to a VPC — it will be acce
 ```
 e2ectl load-balancer create \
   --name internal-alb \
-  --plan LB-2 \
+  --plan ELB-2 \
   --mode HTTP \
   --port 80 \
-  --vpc 12345
+  --vpc 12345 \
+  --backend-name web \
+  --server-ip 10.0.0.1 \
+  --server-port 8080 \
+  --server-name server-1
 ```
 
 ### Create a Committed Load Balancer
@@ -109,11 +130,15 @@ e2ectl load-balancer plans
 ```
 e2ectl load-balancer create \
   --name committed-alb \
-  --plan LB-2 \
+  --plan ELB-2 \
   --committed-plan "90 Days" \
   --post-commit-behavior auto-renew \
   --mode HTTP \
-  --port 80
+  --port 80 \
+  --backend-name web \
+  --server-ip 10.0.0.1 \
+  --server-port 8080 \
+  --server-name server-1
 ```
 
 If you prefer deterministic scripting, use the committed plan ID from `load-balancer plans --json`:
@@ -121,11 +146,15 @@ If you prefer deterministic scripting, use the committed plan ID from `load-bala
 ```
 e2ectl load-balancer create \
   --name committed-alb \
-  --plan LB-2 \
+  --plan ELB-2 \
   --committed-plan-id 901 \
   --post-commit-behavior hourly-billing \
   --mode HTTP \
-  --port 80
+  --port 80 \
+  --backend-name web \
+  --server-ip 10.0.0.1 \
+  --server-port 8080 \
+  --server-name server-1
 ```
 
 ### List Backend Groups
@@ -159,13 +188,12 @@ For ALBs, this adds another backend group. For NLBs, only one backend group is a
 ```
 e2ectl load-balancer backend group create <lbId> \
   --name api \
+  --backend-protocol HTTPS \
   --server-ip 10.0.0.9 \
   --server-port 9090 \
   --server-name api-server-1 \
-  --domain-name api.example.com \
   --algorithm leastconn \
-  --http-check \
-  --check-url /health
+  --http-check
 ```
 
 ### Delete a Backend Group
@@ -247,22 +275,23 @@ Creates a new load balancer.
 | Flag                                | Required | Description                                                                  |
 | ----------------------------------- | -------- | ---------------------------------------------------------------------------- |
 | `--name <name>`                     | Yes      | Load balancer name                                                           |
-| `--plan <plan>`                     | Yes      | Base plan name (for example `LB-2`). Run `load-balancer plans` first.        |
+| `--plan <plan>`                     | Yes      | Base plan name (for example `ELB-2`). Run `load-balancer plans` first.       |
 | `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                |
 | `--port <port>`                     | Yes      | Frontend listener port                                                       |
+| `--backend-name <name>`             | Yes      | Initial backend group name                                                   |
+| `--server-ip <ip>`                  | Yes      | Backend server IP address                                                    |
+| `--server-name <name>`              | Yes      | Unique server identifier within the backend group                            |
+| `--server-port <port>`              | No       | Backend server port. Defaults to `--port`                                    |
+| `--algorithm <algo>`                | No       | `roundrobin` (default), `leastconn`, or `source`                             |
+| `--backend-protocol <protocol>`     | No       | `HTTP` (default) or `HTTPS` for the initial ALB backend group                |
+| `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                         |
+| `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                          |
 | `--committed-plan <name>`           | No       | Committed plan name under the selected base plan                             |
 | `--committed-plan-id <id>`          | No       | Committed plan ID under the selected base plan                               |
 | `--post-commit-behavior <behavior>` | No       | `auto-renew` or `hourly-billing` after the committed term ends               |
+| `--ssl-certificate-id <id>`         | No\*     | SSL certificate ID. **Required** when `--mode` is `HTTPS` or `BOTH`          |
 | `--vpc <networkId>`                 | No       | VPC network ID to attach the LB (creates internal LB). Run `vpc list` first. |
-| `--backend-name <name>`             | No       | Initial backend group name                                                   |
-| `--server-ip <ip>`                  | No\*     | Backend server IP. Required when `--backend-name` is set                     |
-| `--server-port <port>`              | No       | Backend server port. Defaults to `--port`                                    |
-| `--server-name <name>`              | No\*     | Server identifier. Required when `--backend-name` is set                     |
-| `--algorithm <algo>`                | No       | `roundrobin` (default), `leastconn`, or `source`                             |
-| `--domain-name <domain>`            | No       | Domain name for ALB backend                                                  |
-| `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                         |
-| `--check-url <path>`                | No       | Health check path (default: `/`)                                             |
-| `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                          |
+| `--security-group <id>`             | No       | Security group ID to attach to the load balancer                             |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
@@ -283,7 +312,7 @@ Deletes a load balancer. Prompts for confirmation unless `--force` is passed.
 
 ### `e2ectl load-balancer backend group list <lbId>`
 
-Lists all backend groups for a load balancer. Columns: Backend Group, Backend Type, Routing Policy, Protocol, Health Check, Servers.
+Lists all backend groups for a load balancer. Columns: Backend Group, Routing Policy, Protocol, Health Check, Servers.
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
@@ -293,17 +322,16 @@ Lists all backend groups for a load balancer. Columns: Backend Group, Backend Ty
 
 Creates a backend group on an existing load balancer.
 
-| Flag                     | Required | Description                                      |
-| ------------------------ | -------- | ------------------------------------------------ |
-| `--name <name>`          | Yes      | Backend group name                               |
-| `--server-ip <ip>`       | No       | Optional first backend server IP address         |
-| `--server-port <port>`   | No       | Optional first backend server port               |
-| `--server-name <name>`   | No\*     | Required when `--server-ip` is set               |
-| `--domain-name <domain>` | No       | Domain for a new ALB backend group               |
-| `--algorithm <algo>`     | No       | `roundrobin` (default), `leastconn`, or `source` |
-| `--http-check`           | No       | Enable health checks for a new ALB backend group |
-| `--check-url <path>`     | No       | Health check path (default: `/`)                 |
-| `--backend-port <port>`  | No       | Port for a new NLB backend group                 |
+| Flag                            | Required | Description                                        |
+| ------------------------------- | -------- | -------------------------------------------------- |
+| `--name <name>`                 | Yes      | Backend group name                                 |
+| `--backend-protocol <protocol>` | No       | `HTTP` (default) or `HTTPS` for ALB backend groups |
+| `--server-ip <ip>`              | No       | Optional first backend server IP address           |
+| `--server-port <port>`          | No       | Optional first backend server port                 |
+| `--server-name <name>`          | No\*     | Required when `--server-ip` is set                 |
+| `--algorithm <algo>`            | No       | `roundrobin` (default), `leastconn`, or `source`   |
+| `--http-check`                  | No       | Enable health checks for a new ALB backend group   |
+| `--backend-port <port>`         | No       | Port for a new NLB backend group                   |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 

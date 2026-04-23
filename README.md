@@ -75,6 +75,7 @@ Command guides:
 
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
+- [Load Balancer](./docs/user-guides/load-balancer.md)
 - [Node](./docs/user-guides/node.md)
 - [Reserved IP](./docs/user-guides/reserved-ip.md)
 - [Volume](./docs/user-guides/volume.md)

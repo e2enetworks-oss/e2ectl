@@ -268,7 +268,10 @@ describe('load-balancer commands', () => {
       'server-1'
     ]);
 
-    expect(stdout.buffer).toContain('42');
+    expect(stdout.buffer).toContain('Load balancer created.');
+    expect(stdout.buffer).toContain('lb-42');
+    expect(stdout.buffer).toContain('my-alb');
+    expect(stdout.buffer).toContain('web');
   });
 
   it('creates a committed LB and prints committed billing details', async () => {
@@ -308,7 +311,9 @@ describe('load-balancer commands', () => {
         cn_status: 'auto_renew'
       })
     );
-    expect(stdout.buffer.trim()).toBe('lb-42');
+    expect(stdout.buffer).toContain('Committed');
+    expect(stdout.buffer).toContain('90 Days');
+    expect(stdout.buffer).toContain('lb-42');
   });
 
   it('creates an internal LB when --vpc is provided', async () => {
@@ -397,7 +402,8 @@ describe('load-balancer commands', () => {
     ]);
 
     expect(lbStub.deleteLoadBalancer).toHaveBeenCalledWith('42', undefined);
-    expect(stdout.buffer).toContain('Deleted');
+    expect(stdout.buffer).toContain('Load balancer deleted.');
+    expect(stdout.buffer).toContain('42');
   });
 
   it('lists backend groups via backend group list', async () => {
@@ -455,6 +461,8 @@ describe('load-balancer commands', () => {
       'prod',
       '--name',
       'web',
+      '--backend-protocol',
+      'HTTPS',
       '--server-ip',
       '10.0.0.5',
       '--server-port',
@@ -463,8 +471,10 @@ describe('load-balancer commands', () => {
       'server-2'
     ]);
 
-    expect(stdout.buffer).toContain('web');
-    expect(stdout.buffer).toContain('created');
+    expect(stdout.buffer).toContain('Backend group "web" created.');
+    expect(stdout.buffer).toContain('Protocol');
+    expect(stdout.buffer).toContain('HTTPS');
+    expect(stdout.buffer).toContain('server-2');
   });
 
   it('adds a server to an existing backend group via backend server add', async () => {

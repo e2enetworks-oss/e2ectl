@@ -340,6 +340,29 @@ function createServiceFixture(options?: {
 }
 
 describe('LoadBalancerService', () => {
+  describe('listPlans', () => {
+    it('returns a plans result with items', async () => {
+      const { service, listLoadBalancerPlans } = createServiceFixture();
+
+      const result = await service.listPlans({});
+
+      expect(result.action).toBe('plans');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.name).toBe('LB-2');
+      expect(listLoadBalancerPlans).toHaveBeenCalled();
+    });
+
+    it('returns empty items when no plans are available', async () => {
+      const { service, listLoadBalancerPlans } = createServiceFixture();
+      listLoadBalancerPlans.mockResolvedValue([]);
+
+      const result = await service.listPlans({});
+
+      expect(result.action).toBe('plans');
+      expect(result.items).toHaveLength(0);
+    });
+  });
+
   describe('listLoadBalancers', () => {
     it('returns a list result', async () => {
       const { service, listLoadBalancers } = createServiceFixture();
@@ -359,7 +382,7 @@ describe('LoadBalancerService', () => {
     it('creates an ALB with HTTP mode and puts backends in backends[]', async () => {
       const { service, createLoadBalancer } = createServiceFixture();
 
-      await service.createLoadBalancer({
+      const result = await service.createLoadBalancer({
         name: 'my-alb',
         plan: 'LB-2',
         mode: 'HTTP',
@@ -376,7 +399,32 @@ describe('LoadBalancerService', () => {
       expect(body.backends).toHaveLength(1);
       expect(body.tcp_backend).toHaveLength(0);
       expect(body.backends[0]!.name).toBe('web');
+      expect(body.backends[0]?.backend_mode).toBe('http');
+      expect(body.backends[0]?.backend_ssl).toBe(false);
       expect(body.backends[0]?.servers?.[0]?.backend_ip).toBe('10.0.0.1');
+      expect(result.requested.name).toBe('my-alb');
+      expect(result.backend.protocol).toBe('HTTP');
+    });
+
+    it('maps --backend-protocol HTTPS to backend_ssl for ALB create', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+
+      await service.createLoadBalancer({
+        name: 'my-alb',
+        plan: 'LB-2',
+        mode: 'HTTP',
+        port: '80',
+        backendName: 'web',
+        backendProtocol: 'HTTPS',
+        serverIp: '10.0.0.1',
+        serverPort: '8080',
+        serverName: 'server-1'
+      });
+
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.backends[0]?.backend_mode).toBe('https');
+      expect(body.backends[0]?.backend_ssl).toBe(true);
     });
 
     it('creates an NLB with TCP mode and puts backend in tcp_backend[]', async () => {
@@ -478,6 +526,57 @@ describe('LoadBalancerService', () => {
       expect(body.cn_id).toBe(901);
       expect(body.cn_status).toBe('hourly_billing');
       expect(body.plan_name).toBe('LB-2');
+    });
+
+    it('throws MISSING_SSL_CERTIFICATE_ID when mode is HTTPS and no cert provided', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'lb',
+          plan: 'LB-2',
+          mode: 'HTTPS',
+          port: '443',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'MISSING_SSL_CERTIFICATE_ID' });
+    });
+
+    it('throws MISSING_SSL_CERTIFICATE_ID when mode is BOTH and no cert provided', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'lb',
+          plan: 'LB-2',
+          mode: 'BOTH',
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'MISSING_SSL_CERTIFICATE_ID' });
+    });
+
+    it('passes ssl_certificate_id when mode is HTTPS and cert is provided', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+
+      await service.createLoadBalancer({
+        name: 'lb',
+        plan: 'LB-2',
+        mode: 'HTTPS',
+        port: '443',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1',
+        sslCertificateId: '99'
+      });
+
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.ssl_certificate_id).toBe(99);
     });
 
     it('throws on invalid mode', async () => {
@@ -595,6 +694,22 @@ describe('LoadBalancerService', () => {
         reserve_ip_required: 'true'
       });
     });
+
+    it('throws CONFIRMATION_REQUIRED when not interactive and force is not set', async () => {
+      const { service } = createServiceFixture({ isInteractive: false });
+
+      await expect(service.deleteLoadBalancer('42', {})).rejects.toMatchObject({
+        code: 'CONFIRMATION_REQUIRED'
+      });
+    });
+
+    it('throws when lbId is not a numeric string', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.deleteLoadBalancer('not-a-number', { force: true })
+      ).rejects.toThrow();
+    });
   });
 
   describe('listBackendGroups', () => {
@@ -622,6 +737,49 @@ describe('LoadBalancerService', () => {
     });
   });
 
+  describe('listBackendServers', () => {
+    it('returns servers from an ALB backend group', async () => {
+      const { service } = createServiceFixture();
+
+      const result = await service.listBackendServers('10', 'web', {});
+
+      expect(result.action).toBe('backend-server-list');
+      expect(result.lb_id).toBe('10');
+      expect(result.group_name).toBe('web');
+      expect(result.servers).toHaveLength(1);
+      expect(result.servers[0]!.backend_name).toBe('server-1');
+    });
+
+    it('returns servers from an NLB backend group', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      const result = await service.listBackendServers('20', 'tcp-grp', {});
+
+      expect(result.action).toBe('backend-server-list');
+      expect(result.group_name).toBe('tcp-grp');
+      expect(result.servers).toHaveLength(1);
+      expect(result.servers[0]!.backend_name).toBe('srv-1');
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.listBackendServers('10', 'nonexistent', {})
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.listBackendServers('20', 'nonexistent', {})
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+  });
+
   describe('createBackendGroup', () => {
     it('creates a new ALB backend group (no server provided)', async () => {
       const { service, getLoadBalancer, updateLoadBalancer } =
@@ -631,12 +789,13 @@ describe('LoadBalancerService', () => {
       const result = await service.createBackendGroup('30', {
         name: 'api',
         algorithm: 'leastconn',
-        domainName: 'api.example.com'
+        backendProtocol: 'HTTPS'
       });
 
       expect(result.action).toBe('backend-group-create');
       expect(result.lb_id).toBe('30');
       expect(result.message).toContain('"api"');
+      expect(result.group.protocol).toBe('HTTPS');
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -644,6 +803,8 @@ describe('LoadBalancerService', () => {
       expect(body.backends[0]?.name).toBe('api');
       expect(body.backends[0]?.servers).toHaveLength(0);
       expect(body.backends[0]?.balance).toBe('leastconn');
+      expect(body.backends[0]?.backend_mode).toBe('https');
+      expect(body.backends[0]?.backend_ssl).toBe(true);
     });
 
     it('creates a new ALB backend group with initial server', async () => {
@@ -819,6 +980,60 @@ describe('LoadBalancerService', () => {
         code: 'LAST_BACKEND_GROUP_NOT_DELETABLE'
       });
     });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      await expect(
+        service.deleteBackendGroup('10', 'nonexistent', {})
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue({
+        ...createNlbDetails(),
+        context: [
+          {
+            backends: [],
+            tcp_backend: [
+              {
+                backend_name: 'tcp-grp',
+                port: 8080,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-1',
+                    backend_ip: '10.0.0.2',
+                    backend_port: 8080
+                  }
+                ]
+              },
+              {
+                backend_name: 'tcp-grp-2',
+                port: 9090,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-2',
+                    backend_ip: '10.0.0.3',
+                    backend_port: 9090
+                  }
+                ]
+              }
+            ],
+            lb_port: '80',
+            node_list_type: 'S',
+            plan_name: 'LB-2'
+          }
+        ]
+      });
+
+      await expect(
+        service.deleteBackendGroup('20', 'nonexistent', {})
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
   });
 
   describe('addBackendServer', () => {
@@ -989,6 +1204,103 @@ describe('LoadBalancerService', () => {
       ).rejects.toMatchObject({
         code: 'LAST_BACKEND_SERVER_NOT_DELETABLE'
       });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      await expect(
+        service.deleteBackendServer('10', {
+          backendName: 'nonexistent',
+          serverName: 'server-1'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.deleteBackendServer('20', {
+          backendName: 'nonexistent',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_SERVER_NOT_FOUND when server name does not exist in group', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      await expect(
+        service.deleteBackendServer('10', {
+          backendName: 'web',
+          serverName: 'nonexistent-server'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_SERVER_AMBIGUOUS when multiple servers share the same name', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createAlbDetails({
+          context: [
+            {
+              backends: [
+                {
+                  name: 'web',
+                  domain_name: 'example.com',
+                  backend_mode: 'http',
+                  balance: 'roundrobin',
+                  backend_ssl: false,
+                  http_check: false,
+                  check_url: '/',
+                  servers: [
+                    {
+                      backend_name: 'dup',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 8080
+                    },
+                    {
+                      backend_name: 'dup',
+                      backend_ip: '10.0.0.2',
+                      backend_port: 8080
+                    }
+                  ]
+                }
+              ],
+              tcp_backend: [],
+              lb_port: '80',
+              node_list_type: 'S',
+              plan_name: 'LB-2'
+            }
+          ]
+        })
+      );
+
+      await expect(
+        service.deleteBackendServer('10', {
+          backendName: 'web',
+          serverName: 'dup'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_AMBIGUOUS' });
+    });
+
+    it('throws LOAD_BALANCER_CONTEXT_MISSING when context is undefined', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue({
+        ...createAlbDetails(),
+        context: undefined
+      } as LoadBalancerDetails);
+
+      await expect(
+        service.deleteBackendServer('10', {
+          backendName: 'web',
+          serverName: 'server-1'
+        })
+      ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
   });
 });

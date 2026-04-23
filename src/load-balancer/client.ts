@@ -169,8 +169,9 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
     const items: LoadBalancerSummary[] = [];
     let pageNumber = 1;
     let totalPages: number | undefined;
+    const MAX_PAGES = 50;
 
-    while (true) {
+    while (pageNumber <= MAX_PAGES) {
       const response = await this.transport.get<LoadBalancerListApiResponse>(
         APPLIANCES_PATH,
         {

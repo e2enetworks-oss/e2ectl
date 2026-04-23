@@ -3,7 +3,9 @@ import Table from 'cli-table3';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type { LoadBalancerCommittedPlan } from './types.js';
 import type {
+  LoadBalancerBackendGroupCreateCommandResult,
   LoadBalancerBackendGroupListCommandResult,
+  LoadBalancerCreateCommandResult,
   LoadBalancerBackendServerListCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerListCommandResult,
@@ -27,21 +29,24 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         : `${formatLoadBalancerListTable(result.items)}\n`;
 
     case 'create':
-      return `${result.result.id}\n`;
+      return renderLoadBalancerCreateHuman(result);
 
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
-        : `Deleted load balancer ${result.lb_id}.\nMessage: ${result.message ?? ''}\n`;
+        : `Load balancer deleted.\n${formatFieldTable([['Load Balancer ID', result.lb_id]])}\n`;
 
     case 'backend-group-list':
       return renderBackendGroupListHuman(result);
 
     case 'backend-group-create':
-      return `${result.message}\n`;
+      return renderBackendGroupCreateHuman(result);
 
     case 'backend-group-delete':
-      return `${result.message}\n`;
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id],
+        ['Backend Group', result.group_name]
+      ])}\n`;
 
     case 'backend-server-list':
       return result.servers.length === 0
@@ -49,10 +54,16 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         : `${formatBackendServerListTable(result.servers)}\n`;
 
     case 'backend-server-add':
-      return `${result.message}\n`;
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id]
+      ])}\n`;
 
     case 'backend-server-delete':
-      return `${result.message}\n`;
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id],
+        ['Backend Group', result.group_name],
+        ['Server', result.server_name]
+      ])}\n`;
 
     case 'plans':
       return result.items.length === 0
@@ -86,11 +97,26 @@ function normalizeLoadBalancerJson(
     case 'create':
       return {
         action: 'create',
+        backend: {
+          backend_port: result.backend.backend_port,
+          health_check: result.backend.health_check,
+          name: result.backend.name,
+          protocol: result.backend.protocol,
+          routing_policy: result.backend.routing_policy,
+          servers: result.backend.servers as unknown as JsonValue
+        },
         billing: {
           committed_plan_id: result.billing.committed_plan_id,
           committed_plan_name: result.billing.committed_plan_name,
           post_commit_behavior: result.billing.post_commit_behavior,
           type: result.billing.type
+        },
+        requested: {
+          frontend_port: result.requested.frontend_port,
+          mode: result.requested.mode,
+          name: result.requested.name,
+          plan_name: result.requested.plan_name,
+          type: result.requested.type
         },
         result: {
           appliance_id: result.result.appliance_id,
@@ -122,6 +148,14 @@ function normalizeLoadBalancerJson(
     case 'backend-group-create':
       return {
         action: 'backend-group-create',
+        group: {
+          backend_port: result.group.backend_port,
+          health_check: result.group.health_check,
+          name: result.group.name,
+          protocol: result.group.protocol,
+          routing_policy: result.group.routing_policy,
+          servers: result.group.servers as unknown as JsonValue
+        },
         lb_id: result.lb_id,
         message: result.message
       };
@@ -216,7 +250,6 @@ function renderBackendGroupListHuman(
   const table = new Table({
     head: [
       'Backend Group',
-      'Backend Type',
       'Routing Policy',
       'Protocol',
       'Health Check',
@@ -228,10 +261,9 @@ function renderBackendGroupListHuman(
     for (const g of result.tcp_backends) {
       table.push([
         g.backend_name,
-        'TCP',
         g.balance,
         'TCP',
-        '--',
+        `Port: ${g.port}`,
         String(g.servers.length)
       ]);
     }
@@ -239,7 +271,6 @@ function renderBackendGroupListHuman(
     for (const g of result.backends) {
       table.push([
         g.name,
-        (g.backend_mode ?? 'http').toUpperCase(),
         g.balance,
         g.backend_ssl ? 'HTTPS' : 'HTTP',
         g.http_check ? 'enabled' : 'disabled',
@@ -249,6 +280,60 @@ function renderBackendGroupListHuman(
   }
 
   return table.toString();
+}
+
+function renderLoadBalancerCreateHuman(
+  result: LoadBalancerCreateCommandResult
+): string {
+  const billing =
+    result.billing.type === 'committed' && result.billing.committed_plan_name
+      ? `Committed (${result.billing.committed_plan_name})`
+      : 'Hourly';
+
+  const serverSummary = result.backend.servers
+    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
+    .join(', ');
+
+  const rows: Array<[string, string]> = [
+    ['Load Balancer ID', result.result.id],
+    ['Name', result.requested.name],
+    ['Mode', result.requested.mode],
+    ['Plan', result.requested.plan_name],
+    ['Port', String(result.requested.frontend_port)],
+    ['Billing', billing],
+    ['Backend', result.backend.name]
+  ];
+
+  if (serverSummary) {
+    rows.push(['Servers', serverSummary]);
+  }
+
+  return `Load balancer created.\n${formatFieldTable(rows)}\n`;
+}
+
+function renderBackendGroupCreateHuman(
+  result: LoadBalancerBackendGroupCreateCommandResult
+): string {
+  const serverSummary = result.group.servers
+    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
+    .join(', ');
+
+  const rows: Array<[string, string]> = [
+    ['Load Balancer ID', result.lb_id],
+    ['Backend Group', result.group.name],
+    ['Protocol', result.group.protocol],
+    ['Routing Policy', result.group.routing_policy]
+  ];
+
+  if (result.group.backend_port !== null) {
+    rows.push(['Backend Port', String(result.group.backend_port)]);
+  }
+
+  if (serverSummary) {
+    rows.push(['Servers', serverSummary]);
+  }
+
+  return `${result.message}\n${formatFieldTable(rows)}\n`;
 }
 
 function formatBackendServerListTable(
@@ -336,4 +421,14 @@ function formatPlanPrice(value: number | undefined): string {
 
 function formatPlanScalar(value: number | undefined): string {
   return value === undefined || value < 0 ? '--' : String(value);
+}
+
+function formatFieldTable(rows: Array<[string, string]>): string {
+  const table = new Table({ head: ['Field', 'Value'] });
+
+  for (const [field, value] of rows) {
+    table.push([field, value]);
+  }
+
+  return table.toString();
 }

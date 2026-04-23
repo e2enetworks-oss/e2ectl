@@ -66,11 +66,32 @@ describe('load-balancer create against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         stableStringify({
           action: 'create',
+          backend: {
+            backend_port: null,
+            health_check: false,
+            name: 'web',
+            protocol: 'HTTP',
+            routing_policy: 'roundrobin',
+            servers: [
+              {
+                backend_ip: '10.0.0.1',
+                backend_name: 'server-1',
+                backend_port: 8080
+              }
+            ]
+          },
           billing: {
             committed_plan_id: null,
             committed_plan_name: null,
             post_commit_behavior: null,
             type: 'hourly'
+          },
+          requested: {
+            frontend_port: 80,
+            mode: 'HTTP',
+            name: 'my-alb',
+            plan_name: 'LB-2',
+            type: 'external'
           },
           result: {
             appliance_id: 42,
@@ -87,6 +108,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
         backends: [
           {
             target: 'networkMappingNode',
+            backend_mode: 'http',
             backend_ssl: false,
             balance: 'roundrobin',
             checkbox_enable: true,
@@ -317,11 +339,32 @@ describe('load-balancer create against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         stableStringify({
           action: 'create',
+          backend: {
+            backend_port: null,
+            health_check: false,
+            name: 'web',
+            protocol: 'HTTP',
+            routing_policy: 'roundrobin',
+            servers: [
+              {
+                backend_ip: '10.0.0.1',
+                backend_name: 'server-1',
+                backend_port: 80
+              }
+            ]
+          },
           billing: {
             committed_plan_id: 901,
             committed_plan_name: '90 Days',
             post_commit_behavior: 'hourly_billing',
             type: 'committed'
+          },
+          requested: {
+            frontend_port: 80,
+            mode: 'HTTP',
+            name: 'internal-committed-alb',
+            plan_name: 'LB-2',
+            type: 'internal'
           },
           result: {
             appliance_id: 42,
@@ -338,6 +381,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
         backends: [
           {
             target: 'networkMappingNode',
+            backend_mode: 'http',
             backend_ssl: false,
             balance: 'roundrobin',
             checkbox_enable: true,

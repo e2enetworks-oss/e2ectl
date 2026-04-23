@@ -19,6 +19,7 @@ interface GlobalOptions {
 
 const LB_MODE_CHOICES = ['HTTP', 'HTTPS', 'BOTH', 'TCP'] as const;
 const LB_ALGORITHM_CHOICES = ['roundrobin', 'leastconn', 'source'] as const;
+const ALB_BACKEND_PROTOCOL_CHOICES = ['HTTP', 'HTTPS'] as const;
 
 export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
   const service = new LoadBalancerService({
@@ -100,9 +101,11 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         '--committed-plan-id <id>',
         'Committed plan ID for the selected base plan. Useful with "load-balancer plans --json".'
       )
-      .option(
-        '--post-commit-behavior <behavior>',
-        'What should happen after the committed term ends: auto-renew or hourly-billing. Defaults to auto-renew.'
+      .addOption(
+        new Option(
+          '--post-commit-behavior <behavior>',
+          'What should happen after the committed term ends. Defaults to auto-renew.'
+        ).choices(['auto-renew', 'hourly-billing'])
       )
       .option(
         '--vpc <vpcId>',
@@ -129,22 +132,25 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           .choices(LB_ALGORITHM_CHOICES)
           .default('roundrobin')
       )
-      .option(
-        '--domain-name <domainName>',
-        'Domain name for the initial backend group (ALB only). Defaults to localhost.'
+      .addOption(
+        new Option(
+          '--backend-protocol <protocol>',
+          'Backend protocol for the initial ALB backend group.'
+        )
+          .choices(ALB_BACKEND_PROTOCOL_CHOICES)
+          .default('HTTP')
       )
       .option(
         '--http-check',
         'Enable HTTP health checks on the initial backend group (ALB only).'
       )
       .option(
-        '--check-url <checkUrl>',
-        'Health check path for the initial backend group.',
-        '/'
-      )
-      .option(
         '--backend-port <backendPort>',
         'NLB backend group port. Defaults to --server-port.'
+      )
+      .option(
+        '--ssl-certificate-id <id>',
+        'SSL certificate ID to attach. Required when --mode is HTTPS or BOTH.'
       )
       .option(
         '--security-group <securityGroupId>',
@@ -288,12 +294,15 @@ function buildLoadBalancerBackendGroupCommand(
           'Load balancing algorithm.'
         ).choices(LB_ALGORITHM_CHOICES)
       )
-      .option(
-        '--domain-name <domainName>',
-        'Domain name for the backend group (ALB only).'
+      .addOption(
+        new Option(
+          '--backend-protocol <protocol>',
+          'Backend protocol for ALB backend groups.'
+        )
+          .choices(ALB_BACKEND_PROTOCOL_CHOICES)
+          .default('HTTP')
       )
       .option('--http-check', 'Enable HTTP health checks (ALB only).')
-      .option('--check-url <checkUrl>', 'Health check path.', '/')
       .option('--backend-port <backendPort>', 'NLB backend group port.')
       .option('--server-ip <serverIp>', 'Optional initial server IP address.')
       .option('--server-port <serverPort>', 'Optional initial server port.')

@@ -50,11 +50,11 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   serverPort?: string;
   serverName?: string;
   algorithm?: string;
-  domainName?: string;
+  backendProtocol?: string;
   httpCheck?: boolean;
-  checkUrl?: string;
   backendPort?: string;
   securityGroupId?: string;
+  sslCertificateId?: string;
 }
 
 export interface LoadBalancerDeleteOptions extends LoadBalancerContextOptions {
@@ -65,9 +65,8 @@ export interface LoadBalancerDeleteOptions extends LoadBalancerContextOptions {
 export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerContextOptions {
   name: string;
   algorithm?: string;
-  domainName?: string;
+  backendProtocol?: string;
   httpCheck?: boolean;
-  checkUrl?: string;
   backendPort?: string;
   serverIp?: string;
   serverPort?: string;
@@ -101,6 +100,8 @@ export interface LoadBalancerCreateCommandResult {
     post_commit_behavior: LoadBalancerCommittedStatus | null;
     type: 'committed' | 'hourly';
   };
+  backend: LoadBalancerCreatedBackendSummary;
+  requested: LoadBalancerRequestedSummary;
   result: LoadBalancerCreateResult;
 }
 
@@ -121,6 +122,7 @@ export interface LoadBalancerBackendGroupListCommandResult {
 
 export interface LoadBalancerBackendGroupCreateCommandResult {
   action: 'backend-group-create';
+  group: LoadBalancerCreatedBackendSummary;
   lb_id: string;
   message: string;
 }
@@ -158,6 +160,23 @@ export interface LoadBalancerPlansCommandResult {
   items: LoadBalancerPlan[];
 }
 
+export interface LoadBalancerRequestedSummary {
+  frontend_port: number;
+  mode: LoadBalancerMode;
+  name: string;
+  plan_name: string;
+  type: LoadBalancerVpc;
+}
+
+export interface LoadBalancerCreatedBackendSummary {
+  backend_port: number | null;
+  health_check: boolean | null;
+  name: string;
+  protocol: 'HTTP' | 'HTTPS' | 'TCP';
+  routing_policy: LoadBalancerAlgorithm;
+  servers: LoadBalancerServer[];
+}
+
 export type LoadBalancerCommandResult =
   | LoadBalancerListCommandResult
   | LoadBalancerCreateCommandResult
@@ -187,6 +206,7 @@ export interface LoadBalancerServiceDependencies {
 
 const DEFAULT_TIMEOUT = 60;
 const ALB_MODES: LoadBalancerMode[] = ['HTTP', 'HTTPS', 'BOTH'];
+const ALB_BACKEND_PROTOCOLS = ['HTTP', 'HTTPS'] as const;
 const DEFAULT_POST_COMMIT_BEHAVIOR: LoadBalancerCommittedStatus = 'auto_renew';
 
 export class LoadBalancerService {
@@ -225,10 +245,30 @@ export class LoadBalancerService {
     const credentials = await this.resolveContext(options);
     const client = this.dependencies.createLoadBalancerClient(credentials);
 
+    const SSL_MODES: LoadBalancerMode[] = ['HTTPS', 'BOTH'];
+    const requiresSslCert = (SSL_MODES as string[]).includes(mode);
+    if (requiresSslCert && !options.sslCertificateId) {
+      throw new CliError(
+        `--ssl-certificate-id is required when --mode is ${mode}.`,
+        { code: 'MISSING_SSL_CERTIFICATE_ID', exitCode: EXIT_CODES.usage }
+      );
+    }
+    const sslCertificateId = requiresSslCert
+      ? normalizeRequiredNumericId(
+          options.sslCertificateId!,
+          'SSL certificate ID',
+          '--ssl-certificate-id'
+        )
+      : null;
+
     const isAlb = (ALB_MODES as string[]).includes(mode);
+    const albBackendProtocol = isAlb
+      ? assertAlbBackendProtocol(options.backendProtocol)
+      : null;
 
     const backends: LoadBalancerBackend[] = [];
     const tcpBackend: LoadBalancerTcpBackend[] = [];
+    let backendSummary: LoadBalancerCreatedBackendSummary;
 
     {
       const serverPort = assertPort(
@@ -247,17 +287,26 @@ export class LoadBalancerService {
         backends.push({
           target: 'networkMappingNode',
           name: options.backendName!,
-          domain_name: options.domainName ?? 'localhost',
+          backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
+          domain_name: 'localhost',
           balance: algorithm,
-          backend_ssl: false,
+          backend_ssl: albBackendProtocol === 'HTTPS',
           http_check: options.httpCheck ?? false,
-          check_url: options.checkUrl ?? '/',
+          check_url: '/',
           servers: [{ ...server, target: 'backend' }],
           checkbox_enable: true,
           scaler_port: null,
           scaler_id: null,
           websocket_timeout: null
         });
+        backendSummary = {
+          backend_port: null,
+          health_check: options.httpCheck ?? false,
+          name: options.backendName!,
+          protocol: albBackendProtocol!,
+          routing_policy: algorithm,
+          servers: [server]
+        };
       } else {
         const backendPort = assertPort(
           options.backendPort ?? options.serverPort ?? options.port,
@@ -269,6 +318,14 @@ export class LoadBalancerService {
           balance: algorithm,
           servers: [{ ...server, target: 'backend' }]
         });
+        backendSummary = {
+          backend_port: backendPort,
+          health_check: null,
+          name: options.backendName!,
+          protocol: 'TCP',
+          routing_policy: algorithm,
+          servers: [server]
+        };
       }
     }
 
@@ -323,7 +380,7 @@ export class LoadBalancerService {
       enable_bitninja: false,
       is_ipv6_attached: false,
       lb_reserve_ip: '',
-      ssl_certificate_id: null,
+      ssl_certificate_id: sslCertificateId,
       ssl_context: { redirect_to_https: false },
       vpc_list: vpcList ?? [],
       ...(securityGroupId === null
@@ -339,11 +396,20 @@ export class LoadBalancerService {
 
     return {
       action: 'create',
+      backend: backendSummary!,
       billing: {
         committed_plan_id: billing.committedPlanId,
         committed_plan_name: billing.committedPlanName,
         post_commit_behavior: billing.postCommitBehavior,
         type: billing.type
+      },
+      requested: {
+        frontend_port: port,
+        mode,
+        name: assertNonEmpty(options.name, '--name'),
+        plan_name:
+          billing.basePlanName ?? assertNonEmpty(options.plan, '--plan'),
+        type: lbType
       },
       result
     };
@@ -353,6 +419,9 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerDeleteOptions
   ): Promise<LoadBalancerDeleteCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+
     if (!(options.force ?? false)) {
       assertCanDelete(this.dependencies.isInteractive);
       const confirmed = await this.dependencies.confirm(
@@ -363,8 +432,6 @@ export class LoadBalancerService {
         return { action: 'delete', cancelled: true, lb_id: lbId };
       }
     }
-
-    const client = await this.createClient(options);
     const result = await client.deleteLoadBalancer(
       lbId,
       options.reservePublicIp ? { reserve_ip_required: 'true' } : undefined
@@ -382,6 +449,7 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerBackendGroupListCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
     const context = lb.context?.[0];
@@ -399,6 +467,7 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendGroupCreateOptions
   ): Promise<LoadBalancerBackendGroupCreateCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
 
     const client = await this.createClient(options);
@@ -419,6 +488,9 @@ export class LoadBalancerService {
     const currentBackends = context.backends ?? [];
     const currentTcpBackends = context.tcp_backend ?? [];
     const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
+    const albBackendProtocol = isNlb
+      ? null
+      : assertAlbBackendProtocol(options.backendProtocol);
 
     // NLB guard: only one backend group allowed
     if (isNlb && currentTcpBackends.length > 0) {
@@ -505,15 +577,29 @@ export class LoadBalancerService {
           tcp_backend: [...currentTcpBackends, newTcpGroup]
         })
       );
+
+      return {
+        action: 'backend-group-create',
+        group: {
+          backend_port: backendPort,
+          health_check: null,
+          name: options.name,
+          protocol: 'TCP',
+          routing_policy: algorithm,
+          servers
+        },
+        lb_id: lbId,
+        message: `Backend group "${options.name}" created.`
+      };
     } else {
       const newAlbGroup: LoadBalancerBackend = {
         name: options.name,
-        domain_name: options.domainName ?? 'localhost',
-        backend_mode: 'http',
+        domain_name: 'localhost',
+        backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
         balance: algorithm,
-        backend_ssl: false,
+        backend_ssl: albBackendProtocol === 'HTTPS',
         http_check: options.httpCheck ?? false,
-        check_url: options.checkUrl ?? '/',
+        check_url: '/',
         servers
       };
 
@@ -529,13 +615,20 @@ export class LoadBalancerService {
           tcp_backend: currentTcpBackends
         })
       );
+      return {
+        action: 'backend-group-create',
+        group: {
+          backend_port: null,
+          health_check: options.httpCheck ?? false,
+          name: options.name,
+          protocol: albBackendProtocol!,
+          routing_policy: algorithm,
+          servers
+        },
+        lb_id: lbId,
+        message: `Backend group "${options.name}" created.`
+      };
     }
-
-    return {
-      action: 'backend-group-create',
-      lb_id: lbId,
-      message: `Backend group "${options.name}" created.`
-    };
   }
 
   async deleteBackendGroup(
@@ -543,6 +636,7 @@ export class LoadBalancerService {
     groupName: string,
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerBackendGroupDeleteCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
     const context = lb.context?.[0];
@@ -662,6 +756,7 @@ export class LoadBalancerService {
     groupName: string,
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerBackendServerListCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
     const context = lb.context?.[0];
@@ -706,6 +801,7 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerAddOptions
   ): Promise<LoadBalancerBackendServerAddCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const serverPort = assertPort(options.serverPort, '--server-port');
     const serverIp = assertServerIp(options.serverIp);
 
@@ -824,6 +920,7 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerDeleteOptions
   ): Promise<LoadBalancerBackendServerDeleteCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const serverPort =
       options.serverPort === undefined
         ? undefined
@@ -1369,7 +1466,7 @@ function normalizeExistingMode(
 }
 
 function normalizeNodeListType(value: unknown): 'S' | 'D' {
-  return value === 'D' ? 'D' : 'S';
+  return value === 'S' ? 'S' : 'D';
 }
 
 function getContextTimeoutValue(
@@ -1464,6 +1561,32 @@ function assertAlgorithm(algorithm: string): LoadBalancerAlgorithm {
   }
 
   return lower;
+}
+
+function assertAlbBackendProtocol(
+  protocol: string | undefined
+): (typeof ALB_BACKEND_PROTOCOLS)[number] {
+  const normalized = (protocol ?? 'HTTP').trim().toUpperCase();
+
+  if (
+    (ALB_BACKEND_PROTOCOLS as readonly string[]).includes(normalized) === false
+  ) {
+    throw new CliError(
+      `Invalid --backend-protocol "${protocol}". Must be one of: ${ALB_BACKEND_PROTOCOLS.join(', ')}.`,
+      {
+        code: 'INVALID_LB_BACKEND_PROTOCOL',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+
+  return normalized as (typeof ALB_BACKEND_PROTOCOLS)[number];
+}
+
+function normalizeAlbBackendProtocol(
+  protocol: (typeof ALB_BACKEND_PROTOCOLS)[number]
+): 'http' | 'https' {
+  return protocol === 'HTTPS' ? 'https' : 'http';
 }
 
 function assertPort(port: string, flag: string): number {

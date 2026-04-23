@@ -245,6 +245,8 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
           '10',
           '--name',
           'web',
+          '--backend-protocol',
+          'HTTPS',
           '--server-ip',
           '10.0.0.5',
           '--server-port',
@@ -264,6 +266,8 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('web');
       expect(result.stdout).toContain('created');
+      expect(result.stdout).toContain('Protocol');
+      expect(result.stdout).toContain('HTTPS');
       expect(receivedPutBodies).toHaveLength(1);
       expect(
         JSON.parse((receivedPutBodies[0] as { body: string }).body)
@@ -272,8 +276,8 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
         acl_map: [],
         backends: [
           {
-            backend_mode: 'http',
-            backend_ssl: false,
+            backend_mode: 'https',
+            backend_ssl: true,
             balance: 'roundrobin',
             check_url: '/',
             domain_name: 'localhost',

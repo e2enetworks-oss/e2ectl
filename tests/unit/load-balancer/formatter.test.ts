@@ -70,14 +70,35 @@ describe('renderLoadBalancerResult', () => {
   });
 
   describe('create', () => {
-    it('renders confirmation with appliance id (human)', () => {
+    it('renders requested and created summaries (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'create',
+        backend: {
+          backend_port: null,
+          health_check: false,
+          name: 'web',
+          protocol: 'HTTP',
+          routing_policy: 'roundrobin',
+          servers: [
+            {
+              backend_name: 'server-1',
+              backend_ip: '10.0.0.1',
+              backend_port: 8080
+            }
+          ]
+        },
         billing: {
           committed_plan_id: null,
           committed_plan_name: null,
           post_commit_behavior: null,
           type: 'hourly'
+        },
+        requested: {
+          frontend_port: 80,
+          mode: 'HTTP',
+          name: 'my-alb',
+          plan_name: 'LB-2',
+          type: 'external'
         },
         result: {
           appliance_id: 99,
@@ -87,17 +108,36 @@ describe('renderLoadBalancerResult', () => {
         }
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toBe('lb-99\n');
+      expect(output).toContain('Load balancer created.');
+      expect(output).toContain('my-alb');
+      expect(output).toContain('lb-99');
+      expect(output).toContain('web');
+      expect(output).toContain('server-1 (10.0.0.1:8080)');
     });
 
     it('renders JSON for create', () => {
       const result: LoadBalancerCommandResult = {
         action: 'create',
+        backend: {
+          backend_port: null,
+          health_check: true,
+          name: 'web',
+          protocol: 'HTTPS',
+          routing_policy: 'leastconn',
+          servers: []
+        },
         billing: {
           committed_plan_id: 901,
           committed_plan_name: '90 Days',
           post_commit_behavior: 'auto_renew',
           type: 'committed'
+        },
+        requested: {
+          frontend_port: 443,
+          mode: 'HTTPS',
+          name: 'my-alb',
+          plan_name: 'LB-2',
+          type: 'external'
         },
         result: {
           appliance_id: 99,
@@ -109,10 +149,14 @@ describe('renderLoadBalancerResult', () => {
       const output = renderLoadBalancerResult(result, true);
       const parsed = JSON.parse(output) as {
         action: string;
+        backend: { protocol: string };
         billing: { type: string };
+        requested: { name: string };
       };
       expect(parsed.action).toBe('create');
+      expect(parsed.backend.protocol).toBe('HTTPS');
       expect(parsed.billing.type).toBe('committed');
+      expect(parsed.requested.name).toBe('my-alb');
     });
   });
 
@@ -224,8 +268,8 @@ describe('renderLoadBalancerResult', () => {
         message: 'Resource deleted.'
       };
       const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Load balancer deleted.');
       expect(output).toContain('42');
-      expect(output).toContain('Resource deleted.');
     });
   });
 
@@ -273,6 +317,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('roundrobin');
       expect(output).toContain('enabled');
       expect(output).toContain('1');
+      expect(output).not.toContain('Backend Type');
     });
 
     it('renders NLB tcp backend groups', () => {
@@ -317,30 +362,56 @@ describe('renderLoadBalancerResult', () => {
   });
 
   describe('backend-group-create', () => {
-    it('renders backend-group-create message (human)', () => {
+    it('renders backend-group-create summary (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-create',
+        group: {
+          backend_port: null,
+          health_check: false,
+          name: 'api',
+          protocol: 'HTTP',
+          routing_policy: 'leastconn',
+          servers: [
+            {
+              backend_name: 'api-1',
+              backend_ip: '10.0.0.2',
+              backend_port: 8080
+            }
+          ]
+        },
         lb_id: '10',
         message: 'Backend group "api" created.'
       };
-      expect(renderLoadBalancerResult(result, false)).toBe(
-        'Backend group "api" created.\n'
-      );
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Backend group "api" created.');
+      expect(output).toContain('Protocol');
+      expect(output).toContain('HTTP');
+      expect(output).toContain('api-1');
     });
 
     it('renders JSON for backend-group-create', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-create',
+        group: {
+          backend_port: null,
+          health_check: true,
+          name: 'api',
+          protocol: 'HTTPS',
+          routing_policy: 'leastconn',
+          servers: []
+        },
         lb_id: '10',
         message: 'Backend group "api" created.'
       };
       const output = renderLoadBalancerResult(result, true);
       const parsed = JSON.parse(output) as {
         action: string;
+        group: { protocol: string };
         lb_id: string;
         message: string;
       };
       expect(parsed.action).toBe('backend-group-create');
+      expect(parsed.group.protocol).toBe('HTTPS');
       expect(parsed.lb_id).toBe('10');
       expect(parsed.message).toBe('Backend group "api" created.');
     });
@@ -353,9 +424,9 @@ describe('renderLoadBalancerResult', () => {
         lb_id: '10',
         message: 'Server "srv-2" added to backend group "web".'
       };
-      expect(renderLoadBalancerResult(result, false)).toBe(
-        'Server "srv-2" added to backend group "web".\n'
-      );
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Server "srv-2" added to backend group "web".');
+      expect(output).toContain('10');
     });
 
     it('renders JSON for backend-server-add', () => {
@@ -385,9 +456,12 @@ describe('renderLoadBalancerResult', () => {
         message: 'Server "srv-2" deleted from backend group "web".',
         server_name: 'srv-2'
       };
-      expect(renderLoadBalancerResult(result, false)).toBe(
-        'Server "srv-2" deleted from backend group "web".\n'
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain(
+        'Server "srv-2" deleted from backend group "web".'
       );
+      expect(output).toContain('web');
+      expect(output).toContain('srv-2');
     });
 
     it('renders JSON for backend-server-delete', () => {
