@@ -10,23 +10,35 @@ function buildListResponse() {
     code: 200,
     data: [
       {
+        appliance_instance: [
+          {
+            context: {
+              lb_mode: 'HTTP',
+              lb_type: 'External',
+              tcp_backend: []
+            }
+          }
+        ],
         id: 1,
-        appliance_name: 'my-alb',
-        status: 'RUNNING',
-        lb_mode: 'HTTP',
-        lb_type: 'external',
-        public_ip: '1.2.3.4'
+        name: 'my-alb',
+        node_detail: {
+          public_ip: '1.2.3.4',
+          private_ip: '10.0.0.1'
+        },
+        status: 'RUNNING'
       }
     ],
     errors: {},
-    message: 'OK'
+    message: 'OK',
+    total_count: 1,
+    total_page_number: 1
   };
 }
 
 describe('load-balancer list against a fake MyAccount API', () => {
   it('fetches load balancers and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/appliances/load-balancers/': () => ({
+      'GET /myaccount/api/v1/appliances/': () => ({
         body: buildListResponse()
       })
     });
@@ -53,12 +65,19 @@ describe('load-balancer list against a fake MyAccount API', () => {
               id: 1,
               lb_mode: 'HTTP',
               lb_type: 'external',
+              private_ip: '10.0.0.1',
               public_ip: '1.2.3.4',
               status: 'RUNNING'
             }
           ]
         }) + '\n'
       );
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]!.query).toMatchObject({
+        advance_search_string: 'false',
+        page_no: '1',
+        per_page: '100'
+      });
     } finally {
       await server.close();
       await tempHome.cleanup();
@@ -67,7 +86,7 @@ describe('load-balancer list against a fake MyAccount API', () => {
 
   it('outputs human-readable table when --json is not passed', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/appliances/load-balancers/': () => ({
+      'GET /myaccount/api/v1/appliances/': () => ({
         body: buildListResponse()
       })
     });

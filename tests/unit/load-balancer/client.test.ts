@@ -45,31 +45,107 @@ function envelope<T>(data: T): ApiEnvelope<T> {
 }
 
 describe('LoadBalancerApiClient', () => {
-  it('lists load balancers via GET /appliances/load-balancers/', async () => {
+  it('lists load balancer plans with committed options', async () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
     transport.getMock.mockResolvedValue(
       envelope([
         {
-          id: 1,
-          appliance_name: 'my-alb',
-          status: 'RUNNING',
-          lb_mode: 'HTTP',
-          lb_type: 'external',
-          public_ip: '1.2.3.4'
+          appliance_config: [
+            {
+              committed_sku: [
+                {
+                  committed_days: 90,
+                  committed_sku_id: 901,
+                  committed_sku_name: '90 Days',
+                  committed_sku_price: 5000
+                }
+              ],
+              disk: 50,
+              hourly: 3,
+              name: 'LB-2',
+              price: 2000,
+              ram: 4,
+              template_id: 'plan-1',
+              vcpu: 2
+            }
+          ]
         }
       ])
     );
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancerPlans();
 
     expect(transport.getMock).toHaveBeenCalledWith(
-      '/appliances/load-balancers/',
+      '/appliance-type/',
       undefined
     );
+    expect(result).toEqual([
+      {
+        committed_sku: [
+          {
+            committed_days: 90,
+            committed_sku_id: 901,
+            committed_sku_name: '90 Days',
+            committed_sku_price: 5000
+          }
+        ],
+        disk: 50,
+        hourly: 3,
+        name: 'LB-2',
+        price: 2000,
+        ram: 4,
+        template_id: 'plan-1',
+        vcpu: 2
+      }
+    ]);
+  });
+
+  it('lists load balancers via GET /appliances/', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [
+        {
+          appliance_instance: [
+            {
+              context: {
+                lb_mode: 'HTTP',
+                lb_type: 'External',
+                tcp_backend: []
+              }
+            }
+          ],
+          id: 1,
+          name: 'my-alb',
+          node_detail: {
+            public_ip: '1.2.3.4'
+          },
+          status: 'RUNNING'
+        }
+      ],
+      errors: {},
+      message: 'OK',
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(transport.getMock).toHaveBeenCalledWith('/appliances/', {
+      query: {
+        advance_search_string: 'false',
+        page_no: '1',
+        per_page: '100'
+      }
+    });
     expect(result).toHaveLength(1);
-    expect(result[0].appliance_name).toBe('my-alb');
+    expect(result[0]!.appliance_name).toBe('my-alb');
+    expect(result[0]!.lb_mode).toBe('HTTP');
+    expect(result[0]!.lb_type).toBe('external');
   });
 
   it('creates a load balancer via POST /appliances/load-balancers/', async () => {
@@ -111,20 +187,30 @@ describe('LoadBalancerApiClient', () => {
     expect(result.appliance_id).toBe(42);
   });
 
-  it('gets a single load balancer via GET /appliances/load-balancers/<id>/', async () => {
+  it('gets a single load balancer via GET /appliances/<id>/', async () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
     transport.getMock.mockResolvedValue(
       envelope({
         id: 99,
-        appliance_name: 'my-nlb',
+        name: 'my-nlb',
         status: 'RUNNING',
-        lb_mode: 'TCP',
-        lb_type: 'external',
-        public_ip: '5.6.7.8',
-        context: [
-          { backends: [], tcp_backend: [], lb_port: '80', plan_name: 'LB-2' }
+        node_detail: {
+          private_ip: '10.0.0.5',
+          public_ip: '5.6.7.8'
+        },
+        appliance_instance: [
+          {
+            context: {
+              backends: [],
+              tcp_backend: [],
+              lb_mode: 'TCP',
+              lb_type: 'external',
+              lb_port: '80',
+              plan_name: 'LB-2'
+            }
+          }
         ]
       })
     );
@@ -132,10 +218,15 @@ describe('LoadBalancerApiClient', () => {
     const result = await client.getLoadBalancer('99');
 
     expect(transport.getMock).toHaveBeenCalledWith(
-      '/appliances/load-balancers/99/',
+      '/appliances/99/',
       undefined
     );
     expect(result.appliance_name).toBe('my-nlb');
+    expect(result.lb_mode).toBe('TCP');
+    expect(result.lb_type).toBe('external');
+    expect(result.public_ip).toBe('5.6.7.8');
+    expect(result.private_ip).toBe('10.0.0.5');
+    expect(result.context?.[0]?.lb_port).toBe('80');
   });
 
   it('updates a load balancer via PUT /appliances/load-balancers/<id>/', async () => {

@@ -7,6 +7,7 @@ import {
   LoadBalancerService,
   type LoadBalancerBackendGroupCreateOptions,
   type LoadBalancerBackendServerAddOptions,
+  type LoadBalancerBackendServerDeleteOptions,
   type LoadBalancerContextOptions,
   type LoadBalancerCreateOptions,
   type LoadBalancerDeleteOptions
@@ -24,6 +25,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createLoadBalancerClient: (credentials) =>
       runtime.createLoadBalancerClient(credentials),
+    createVpcClient: (credentials) => runtime.createVpcClient(credentials),
     isInteractive: runtime.isInteractive,
     store: runtime.store
   });
@@ -71,12 +73,12 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        'Create a new load balancer. Use --mode HTTP, HTTPS, or BOTH for an ALB; use --mode TCP for an NLB. Run "load-balancer plans" first to see available plans.'
+        'Create a new load balancer. Use --mode HTTP, HTTPS, or BOTH for an ALB; use --mode TCP for an NLB. Run "load-balancer plans" first to inspect base plans and any committed options.'
       )
       .requiredOption('--name <name>', 'Load balancer name.')
       .requiredOption(
         '--plan <plan>',
-        'Load balancer plan identifier (e.g. LB-2). Run "load-balancer plans" to list available plans.'
+        'Load balancer base plan name exactly as shown by "load-balancer plans" (for example E2E-LB-2).'
       )
       .addOption(
         new Option(
@@ -91,21 +93,33 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         'Frontend listener port (e.g. 80 for HTTP, 443 for HTTPS).'
       )
       .option(
-        '--vpc <vpcId>',
-        'VPC or network ID to attach the load balancer to. Use "load-balancer plans" to see available plans.'
+        '--committed-plan <name>',
+        'Committed plan name for the selected base plan, exactly as shown in "load-balancer plans".'
       )
-      .option('--backend-name <backendName>', 'Initial backend group name.')
       .option(
-        '--server-ip <serverIp>',
-        'Backend server IP address. Required when --backend-name is set.'
+        '--committed-plan-id <id>',
+        'Committed plan ID for the selected base plan. Useful with "load-balancer plans --json".'
       )
+      .option(
+        '--post-commit-behavior <behavior>',
+        'What should happen after the committed term ends: auto-renew or hourly-billing. Defaults to auto-renew.'
+      )
+      .option(
+        '--vpc <vpcId>',
+        'VPC or network ID to attach the load balancer to. This creates an internal load balancer.'
+      )
+      .requiredOption(
+        '--backend-name <backendName>',
+        'Initial backend group name.'
+      )
+      .requiredOption('--server-ip <serverIp>', 'Backend server IP address.')
       .option(
         '--server-port <serverPort>',
         'Backend server port. Defaults to --port.'
       )
-      .option(
+      .requiredOption(
         '--server-name <serverName>',
-        'Backend server identifier. Required when --backend-name is set.'
+        'Backend server identifier.'
       )
       .addOption(
         new Option(
@@ -117,7 +131,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       )
       .option(
         '--domain-name <domainName>',
-        'Domain name for the initial backend group (ALB only).'
+        'Domain name for the initial backend group (ALB only). Defaults to localhost.'
       )
       .option(
         '--http-check',
@@ -131,6 +145,10 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       .option(
         '--backend-port <backendPort>',
         'NLB backend group port. Defaults to --server-port.'
+      )
+      .option(
+        '--security-group <securityGroupId>',
+        'Security group ID to attach to the load balancer.'
       )
   ).action(
     async (options: LoadBalancerCreateOptions, commandInstance: Command) => {
@@ -238,6 +256,27 @@ function buildLoadBalancerBackendGroupCommand(
 
   addContextOptions(
     command
+      .command('delete <lbId> <groupName>')
+      .description('Delete a backend group from a load balancer.')
+  ).action(
+    async (
+      lbId: string,
+      groupName: string,
+      options: LoadBalancerContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.deleteBackendGroup(lbId, groupName, options);
+      runtime.stdout.write(
+        renderLoadBalancerResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
       .command('create <lbId>')
       .description(
         'Create a new backend group on a load balancer. For NLB, only one backend group is allowed.'
@@ -300,6 +339,27 @@ function buildLoadBalancerBackendServerCommand(
 
   addContextOptions(
     command
+      .command('list <lbId> <groupName>')
+      .description('List all servers in a backend group.')
+  ).action(
+    async (
+      lbId: string,
+      groupName: string,
+      options: LoadBalancerContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.listBackendServers(lbId, groupName, options);
+      runtime.stdout.write(
+        renderLoadBalancerResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
       .command('add <lbId>')
       .description('Add a server to an existing backend group.')
       .requiredOption(
@@ -319,6 +379,42 @@ function buildLoadBalancerBackendServerCommand(
       commandInstance: Command
     ) => {
       const result = await service.addBackendServer(lbId, options);
+      runtime.stdout.write(
+        renderLoadBalancerResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('delete <lbId>')
+      .description('Delete a server from an existing backend group.')
+      .requiredOption(
+        '--backend-name <backendName>',
+        'Backend group name to remove the server from.'
+      )
+      .requiredOption(
+        '--server-name <serverName>',
+        'Server identifier to remove from the backend group.'
+      )
+      .option(
+        '--server-ip <serverIp>',
+        'Optional server IP to disambiguate duplicate server names.'
+      )
+      .option(
+        '--server-port <serverPort>',
+        'Optional server port to disambiguate duplicate server names.'
+      )
+  ).action(
+    async (
+      lbId: string,
+      options: LoadBalancerBackendServerDeleteOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.deleteBackendServer(lbId, options);
       runtime.stdout.write(
         renderLoadBalancerResult(
           result,

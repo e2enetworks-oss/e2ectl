@@ -8,6 +8,7 @@ import type {
   LoadBalancerCreateRequest,
   LoadBalancerDetails
 } from '../../../src/load-balancer/index.js';
+import type { VpcClient } from '../../../src/vpc/index.js';
 
 function createConfig(): ConfigFile {
   return {
@@ -55,6 +56,7 @@ function createAlbDetails(
         ],
         tcp_backend: [],
         lb_port: '80',
+        node_list_type: 'S',
         plan_name: 'LB-2'
       }
     ],
@@ -88,13 +90,16 @@ function createNlbDetails(): LoadBalancerDetails {
           }
         ],
         lb_port: '80',
+        node_list_type: 'S',
         plan_name: 'LB-2'
       }
     ]
   };
 }
 
-function createEmptyAlbDetails(): LoadBalancerDetails {
+function createEmptyAlbDetails(
+  overrides?: Partial<LoadBalancerDetails>
+): LoadBalancerDetails {
   return {
     id: 30,
     appliance_name: 'empty-alb',
@@ -107,13 +112,17 @@ function createEmptyAlbDetails(): LoadBalancerDetails {
         backends: [],
         tcp_backend: [],
         lb_port: '80',
+        node_list_type: 'S',
         plan_name: 'LB-2'
       }
-    ]
+    ],
+    ...overrides
   };
 }
 
-function createEmptyNlbDetails(): LoadBalancerDetails {
+function createEmptyNlbDetails(
+  overrides?: Partial<LoadBalancerDetails>
+): LoadBalancerDetails {
   return {
     id: 40,
     appliance_name: 'empty-nlb',
@@ -126,10 +135,88 @@ function createEmptyNlbDetails(): LoadBalancerDetails {
         backends: [],
         tcp_backend: [],
         lb_port: '80',
+        node_list_type: 'S',
+        plan_name: 'LB-2'
+      }
+    ],
+    ...overrides
+  };
+}
+
+function createAlbDetailsWithTwoGroups(): LoadBalancerDetails {
+  return createAlbDetails({
+    context: [
+      {
+        acl_list: [
+          {
+            acl_condition: 'path_beg',
+            acl_matching_path: '/web',
+            acl_name: 'acl-web'
+          },
+          {
+            acl_condition: 'path_beg',
+            acl_matching_path: '/api',
+            acl_name: 'acl-api'
+          }
+        ],
+        acl_map: [
+          {
+            acl_backend: 'web',
+            acl_condition_state: true,
+            acl_name: 'acl-web'
+          },
+          {
+            acl_backend: 'api',
+            acl_condition_state: true,
+            acl_name: 'acl-api'
+          }
+        ],
+        backends: [
+          {
+            name: 'web',
+            domain_name: 'example.com',
+            backend_mode: 'http',
+            balance: 'roundrobin',
+            backend_ssl: false,
+            http_check: false,
+            check_url: '/',
+            servers: [
+              {
+                backend_name: 'server-1',
+                backend_ip: '10.0.0.1',
+                backend_port: 8080
+              },
+              {
+                backend_name: 'server-2',
+                backend_ip: '10.0.0.5',
+                backend_port: 8080
+              }
+            ]
+          },
+          {
+            name: 'api',
+            domain_name: 'api.example.com',
+            backend_mode: 'http',
+            balance: 'leastconn',
+            backend_ssl: false,
+            http_check: true,
+            check_url: '/health',
+            servers: [
+              {
+                backend_name: 'api-1',
+                backend_ip: '10.0.0.9',
+                backend_port: 9000
+              }
+            ]
+          }
+        ],
+        tcp_backend: [],
+        lb_port: '80',
+        node_list_type: 'S',
         plan_name: 'LB-2'
       }
     ]
-  };
+  });
 }
 
 function createServiceFixture(options?: {
@@ -139,10 +226,13 @@ function createServiceFixture(options?: {
   confirm: ReturnType<typeof vi.fn>;
   createLoadBalancer: ReturnType<typeof vi.fn>;
   createLoadBalancerClient: ReturnType<typeof vi.fn>;
+  createVpcClient: ReturnType<typeof vi.fn>;
   deleteLoadBalancer: ReturnType<typeof vi.fn>;
   getLoadBalancer: ReturnType<typeof vi.fn>;
+  getVpc: ReturnType<typeof vi.fn>;
   lbClient: LoadBalancerClient;
   listLoadBalancers: ReturnType<typeof vi.fn>;
+  listLoadBalancerPlans: ReturnType<typeof vi.fn>;
   readConfig: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   service: LoadBalancerService;
@@ -164,7 +254,27 @@ function createServiceFixture(options?: {
   const updateLoadBalancer = vi.fn(() =>
     Promise.resolve({ message: 'Updated.' })
   );
-  const listLoadBalancerPlans = vi.fn(() => Promise.resolve([]));
+  const listLoadBalancerPlans = vi.fn(() =>
+    Promise.resolve([
+      {
+        committed_sku: [
+          {
+            committed_days: 90,
+            committed_sku_id: 901,
+            committed_sku_name: '90 Days',
+            committed_sku_price: 5000
+          }
+        ],
+        disk: 50,
+        hourly: 3,
+        name: 'LB-2',
+        price: 2000,
+        ram: 4,
+        template_id: 'plan-1',
+        vcpu: 2
+      }
+    ])
+  );
 
   const lbClient: LoadBalancerClient = {
     createLoadBalancer,
@@ -180,6 +290,25 @@ function createServiceFixture(options?: {
     capturedCredentials = creds;
     return lbClient;
   });
+  const getVpc = vi.fn(() =>
+    Promise.resolve({
+      ipv4_cidr: '10.10.0.0/16',
+      is_e2e_vpc: false,
+      name: 'prod-vpc',
+      network_id: 12345,
+      state: 'Active'
+    })
+  );
+  const vpcClient: VpcClient = {
+    attachNodeVpc: vi.fn(),
+    createVpc: vi.fn(),
+    deleteVpc: vi.fn(),
+    detachNodeVpc: vi.fn(),
+    getVpc,
+    listVpcPlans: vi.fn(),
+    listVpcs: vi.fn()
+  };
+  const createVpcClient = vi.fn(() => vpcClient);
 
   const readConfig = vi.fn(() => Promise.resolve(createConfig()));
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
@@ -187,6 +316,7 @@ function createServiceFixture(options?: {
   const service = new LoadBalancerService({
     confirm,
     createLoadBalancerClient,
+    createVpcClient,
     isInteractive: options?.isInteractive ?? true,
     store: { configPath: '/tmp/.e2ectl/config.json', read: readConfig }
   });
@@ -195,10 +325,13 @@ function createServiceFixture(options?: {
     confirm,
     createLoadBalancer,
     createLoadBalancerClient,
+    createVpcClient,
     deleteLoadBalancer,
     getLoadBalancer,
+    getVpc,
     lbClient,
     listLoadBalancers,
+    listLoadBalancerPlans,
     readConfig,
     receivedCredentials: () => capturedCredentials,
     service,
@@ -218,7 +351,7 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('list');
       expect(result.items).toHaveLength(1);
-      expect(result.items[0].appliance_name).toBe('alb-1');
+      expect(result.items[0]!.appliance_name).toBe('alb-1');
     });
   });
 
@@ -238,11 +371,11 @@ describe('LoadBalancerService', () => {
       });
 
       const body = createLoadBalancer.mock
-        .calls[0][0] as LoadBalancerCreateRequest;
+        .calls[0]![0] as LoadBalancerCreateRequest;
       expect(body.lb_mode).toBe('HTTP');
       expect(body.backends).toHaveLength(1);
       expect(body.tcp_backend).toHaveLength(0);
-      expect(body.backends[0].name).toBe('web');
+      expect(body.backends[0]!.name).toBe('web');
       expect(body.backends[0]?.servers?.[0]?.backend_ip).toBe('10.0.0.1');
     });
 
@@ -262,11 +395,11 @@ describe('LoadBalancerService', () => {
       });
 
       const body = createLoadBalancer.mock
-        .calls[0][0] as LoadBalancerCreateRequest;
+        .calls[0]![0] as LoadBalancerCreateRequest;
       expect(body.lb_mode).toBe('TCP');
       expect(body.tcp_backend).toHaveLength(1);
       expect(body.backends).toHaveLength(0);
-      expect(body.tcp_backend[0].backend_name).toBe('tcp-grp');
+      expect(body.tcp_backend[0]!.backend_name).toBe('tcp-grp');
     });
 
     it('applies default timeouts of 60', async () => {
@@ -276,15 +409,75 @@ describe('LoadBalancerService', () => {
         name: 'lb',
         plan: 'LB-2',
         mode: 'HTTP',
-        port: '80'
+        port: '80',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
       });
 
       const body = createLoadBalancer.mock
-        .calls[0][0] as LoadBalancerCreateRequest;
+        .calls[0]![0] as LoadBalancerCreateRequest;
       expect(body.client_timeout).toBe(60);
       expect(body.server_timeout).toBe(60);
       expect(body.connection_timeout).toBe(60);
       expect(body.http_keep_alive_timeout).toBe(60);
+    });
+
+    it('creates an internal LB by resolving the VPC into vpc_list[]', async () => {
+      const { service, createLoadBalancer, getVpc } = createServiceFixture();
+
+      await service.createLoadBalancer({
+        name: 'internal-alb',
+        plan: 'LB-2',
+        mode: 'HTTP',
+        networkId: '12345',
+        port: '80',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
+
+      expect(getVpc).toHaveBeenCalledWith(12345);
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.lb_type).toBe('internal');
+      expect(body.vpc_list).toEqual([
+        {
+          ipv4_cidr: '10.10.0.0/16',
+          network_id: 12345,
+          vpc_name: 'prod-vpc'
+        }
+      ]);
+    });
+
+    it('creates a committed LB with cn_id and cn_status', async () => {
+      const { service, createLoadBalancer, listLoadBalancerPlans } =
+        createServiceFixture();
+
+      const result = await service.createLoadBalancer({
+        committedPlan: '90 Days',
+        mode: 'HTTP',
+        name: 'committed-alb',
+        plan: 'LB-2',
+        port: '80',
+        postCommitBehavior: 'hourly-billing',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
+
+      expect(listLoadBalancerPlans).toHaveBeenCalled();
+      expect(result.billing).toEqual({
+        committed_plan_id: 901,
+        committed_plan_name: '90 Days',
+        post_commit_behavior: 'hourly_billing',
+        type: 'committed'
+      });
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.cn_id).toBe(901);
+      expect(body.cn_status).toBe('hourly_billing');
+      expect(body.plan_name).toBe('LB-2');
     });
 
     it('throws on invalid mode', async () => {
@@ -311,6 +504,43 @@ describe('LoadBalancerService', () => {
           port: 'abc'
         })
       ).rejects.toThrow('--port must be an integer');
+    });
+
+    it('rejects selecting both committed selectors', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          committedPlan: '90 Days',
+          committedPlanId: '901',
+          mode: 'HTTP',
+          name: 'lb',
+          plan: 'LB-2',
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'COMMITTED_PLAN_SELECTOR_CONFLICT' });
+    });
+
+    it('rejects post-commit behavior without a committed selector', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          mode: 'HTTP',
+          name: 'lb',
+          plan: 'LB-2',
+          port: '80',
+          postCommitBehavior: 'hourly-billing',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({
+        code: 'LOAD_BALANCER_POST_COMMIT_BEHAVIOR_REQUIRES_COMMITTED_PLAN'
+      });
     });
   });
 
@@ -387,7 +617,7 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('backend-group-list');
       expect(result.tcp_backends).toHaveLength(1);
-      expect(result.tcp_backends[0].backend_name).toBe('tcp-grp');
+      expect(result.tcp_backends[0]!.backend_name).toBe('tcp-grp');
       expect(result.backends).toHaveLength(0);
     });
   });
@@ -409,7 +639,7 @@ describe('LoadBalancerService', () => {
       expect(result.message).toContain('"api"');
 
       const body = updateLoadBalancer.mock
-        .calls[0][1] as LoadBalancerCreateRequest;
+        .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.backends).toHaveLength(1);
       expect(body.backends[0]?.name).toBe('api');
       expect(body.backends[0]?.servers).toHaveLength(0);
@@ -430,9 +660,58 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('backend-group-create');
       const body = updateLoadBalancer.mock
-        .calls[0][1] as LoadBalancerCreateRequest;
+        .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.backends[0]?.servers).toHaveLength(1);
       expect(body.backends[0]?.servers?.[0]?.backend_ip).toBe('10.0.0.5');
+    });
+
+    it('preserves internal-LB context when creating a backend group', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createEmptyAlbDetails({
+          lb_type: 'internal',
+          context: [
+            {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_port: '80',
+              node_list_type: 'S',
+              plan_name: 'LB-2',
+              ssl_context: { redirect_to_https: true },
+              tcp_backend: [],
+              vpc_list: [
+                {
+                  ipv4_cidr: '10.10.0.0/16',
+                  network_id: 12345,
+                  vpc_name: 'prod-vpc'
+                }
+              ]
+            }
+          ]
+        })
+      );
+
+      await service.createBackendGroup('30', {
+        name: 'api'
+      });
+
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.lb_type).toBe('internal');
+      expect(body.cn_id).toBe(901);
+      expect(body.cn_status).toBe('auto_renew');
+      expect(body.ssl_context).toEqual({ redirect_to_https: true });
+      expect(body.vpc_list).toEqual([
+        {
+          ipv4_cidr: '10.10.0.0/16',
+          network_id: 12345,
+          vpc_name: 'prod-vpc'
+        }
+      ]);
     });
 
     it('creates a new NLB backend group', async () => {
@@ -450,7 +729,7 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('backend-group-create');
       const body = updateLoadBalancer.mock
-        .calls[0][1] as LoadBalancerCreateRequest;
+        .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.tcp_backend).toHaveLength(1);
       expect(body.tcp_backend[0]?.backend_name).toBe('tcp-grp');
       expect(body.tcp_backend[0]?.port).toBe(8080);
@@ -490,6 +769,58 @@ describe('LoadBalancerService', () => {
     });
   });
 
+  describe('deleteBackendGroup', () => {
+    it('deletes an ALB backend group and removes stale ACL references', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      const result = await service.deleteBackendGroup('10', 'api', {});
+
+      expect(result.action).toBe('backend-group-delete');
+      expect(result.group_name).toBe('api');
+
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.backends.map((backend) => backend.name)).toEqual(['web']);
+      expect(body.acl_map).toEqual([
+        {
+          acl_backend: 'web',
+          acl_condition_state: true,
+          acl_name: 'acl-web'
+        }
+      ]);
+      expect(body.acl_list).toEqual([
+        {
+          acl_condition: 'path_beg',
+          acl_matching_path: '/web',
+          acl_name: 'acl-web'
+        }
+      ]);
+    });
+
+    it('throws LAST_BACKEND_GROUP_NOT_DELETABLE when ALB has only one backend group', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.deleteBackendGroup('10', 'web', {})
+      ).rejects.toMatchObject({
+        code: 'LAST_BACKEND_GROUP_NOT_DELETABLE'
+      });
+    });
+
+    it('throws LAST_BACKEND_GROUP_NOT_DELETABLE when NLB has only one backend group', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.deleteBackendGroup('20', 'tcp-grp', {})
+      ).rejects.toMatchObject({
+        code: 'LAST_BACKEND_GROUP_NOT_DELETABLE'
+      });
+    });
+  });
+
   describe('addBackendServer', () => {
     it('adds a server to an existing ALB backend group', async () => {
       const { service, updateLoadBalancer } = createServiceFixture();
@@ -503,7 +834,7 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('backend-server-add');
       const updatedBody = updateLoadBalancer.mock
-        .calls[0][1] as LoadBalancerCreateRequest;
+        .calls[0]![1] as LoadBalancerCreateRequest;
       const webGroup = updatedBody.backends?.find((b) => b.name === 'web');
       expect(webGroup?.servers).toHaveLength(2);
       expect(webGroup?.servers?.[1]?.backend_ip).toBe('10.0.0.5');
@@ -523,7 +854,7 @@ describe('LoadBalancerService', () => {
 
       expect(result.action).toBe('backend-server-add');
       const updatedBody = updateLoadBalancer.mock
-        .calls[0][1] as LoadBalancerCreateRequest;
+        .calls[0]![1] as LoadBalancerCreateRequest;
       expect(updatedBody.tcp_backend?.[0]?.servers).toHaveLength(2);
     });
 
@@ -569,6 +900,95 @@ describe('LoadBalancerService', () => {
           serverName: 'server-2'
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
+    });
+  });
+
+  describe('deleteBackendServer', () => {
+    it('deletes a server from an existing ALB backend group', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      const result = await service.deleteBackendServer('10', {
+        backendName: 'web',
+        serverName: 'server-2'
+      });
+
+      expect(result.action).toBe('backend-server-delete');
+      const updatedBody = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      const webGroup = updatedBody.backends?.find((b) => b.name === 'web');
+      expect(webGroup?.servers).toEqual([
+        {
+          backend_name: 'server-1',
+          backend_ip: '10.0.0.1',
+          backend_port: 8080
+        }
+      ]);
+    });
+
+    it('deletes a server from an existing NLB backend group', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue({
+        ...createNlbDetails(),
+        context: [
+          {
+            backends: [],
+            tcp_backend: [
+              {
+                backend_name: 'tcp-grp',
+                port: 8080,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-1',
+                    backend_ip: '10.0.0.2',
+                    backend_port: 8080
+                  },
+                  {
+                    backend_name: 'srv-2',
+                    backend_ip: '10.0.0.3',
+                    backend_port: 8080
+                  }
+                ]
+              }
+            ],
+            lb_port: '80',
+            node_list_type: 'S',
+            plan_name: 'LB-2'
+          }
+        ]
+      });
+
+      const result = await service.deleteBackendServer('20', {
+        backendName: 'tcp-grp',
+        serverName: 'srv-2'
+      });
+
+      expect(result.action).toBe('backend-server-delete');
+      const updatedBody = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(updatedBody.tcp_backend?.[0]?.servers).toEqual([
+        {
+          backend_name: 'srv-1',
+          backend_ip: '10.0.0.2',
+          backend_port: 8080
+        }
+      ]);
+    });
+
+    it('throws LAST_BACKEND_SERVER_NOT_DELETABLE when backend group has only one server', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.deleteBackendServer('10', {
+          backendName: 'web',
+          serverName: 'server-1'
+        })
+      ).rejects.toMatchObject({
+        code: 'LAST_BACKEND_SERVER_NOT_DELETABLE'
+      });
     });
   });
 });

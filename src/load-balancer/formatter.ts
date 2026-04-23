@@ -1,10 +1,10 @@
 import Table from 'cli-table3';
 
-import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
-import type { LoadBalancerBackend, LoadBalancerTcpBackend } from './types.js';
+import type { LoadBalancerCommittedPlan } from './types.js';
 import type {
   LoadBalancerBackendGroupListCommandResult,
+  LoadBalancerBackendServerListCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerListCommandResult,
   LoadBalancerPlansCommandResult
@@ -27,12 +27,7 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         : `${formatLoadBalancerListTable(result.items)}\n`;
 
     case 'create':
-      return (
-        `Created load balancer.\n` +
-        `Appliance ID: ${result.result.appliance_id}\n` +
-        `ID: ${result.result.id}\n` +
-        `\nNext: run ${formatCliCommand('load-balancer list')} to inspect status.\n`
-      );
+      return `${result.result.id}\n`;
 
     case 'delete':
       return result.cancelled
@@ -45,16 +40,25 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
     case 'backend-group-create':
       return `${result.message}\n`;
 
+    case 'backend-group-delete':
+      return `${result.message}\n`;
+
+    case 'backend-server-list':
+      return result.servers.length === 0
+        ? `No servers in backend group "${result.group_name}".\n`
+        : `${formatBackendServerListTable(result.servers)}\n`;
+
     case 'backend-server-add':
+      return `${result.message}\n`;
+
+    case 'backend-server-delete':
       return `${result.message}\n`;
 
     case 'plans':
       return result.items.length === 0
         ? 'No load balancer plans available.\n'
-        : `${formatLoadBalancerPlansTable(result.items)}\n`;
+        : `${formatLoadBalancerPlans(result.items)}\n`;
   }
-
-  return '';
 }
 
 function renderLoadBalancerJson(result: LoadBalancerCommandResult): string {
@@ -74,13 +78,20 @@ function normalizeLoadBalancerJson(
           status: item.status,
           lb_mode: item.lb_mode ?? null,
           lb_type: item.lb_type ?? null,
-          public_ip: item.public_ip ?? null
+          public_ip: item.public_ip ?? null,
+          private_ip: item.private_ip ?? null
         }))
       };
 
     case 'create':
       return {
         action: 'create',
+        billing: {
+          committed_plan_id: result.billing.committed_plan_id,
+          committed_plan_name: result.billing.committed_plan_name,
+          post_commit_behavior: result.billing.post_commit_behavior,
+          type: result.billing.type
+        },
         result: {
           appliance_id: result.result.appliance_id,
           id: result.result.id,
@@ -115,6 +126,22 @@ function normalizeLoadBalancerJson(
         message: result.message
       };
 
+    case 'backend-group-delete':
+      return {
+        action: 'backend-group-delete',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        message: result.message
+      };
+
+    case 'backend-server-list':
+      return {
+        action: 'backend-server-list',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        servers: result.servers as unknown as JsonValue
+      };
+
     case 'backend-server-add':
       return {
         action: 'backend-server-add',
@@ -122,25 +149,44 @@ function normalizeLoadBalancerJson(
         message: result.message
       };
 
+    case 'backend-server-delete':
+      return {
+        action: 'backend-server-delete',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        message: result.message,
+        server_name: result.server_name
+      };
+
     case 'plans':
       return {
         action: 'plans',
         items: result.items.map((item) => ({
-          id: item.id,
-          plan_name: item.plan_name,
-          lb_type: item.lb_type
+          committed_sku: (item.committed_sku ?? []).map((plan) => ({
+            committed_days: plan.committed_days ?? null,
+            committed_node_message: plan.committed_node_message ?? null,
+            committed_sku_id: plan.committed_sku_id,
+            committed_sku_name: plan.committed_sku_name,
+            committed_sku_price: plan.committed_sku_price,
+            committed_upto_date: plan.committed_upto_date ?? null
+          })),
+          disk: item.disk ?? null,
+          hourly: item.hourly ?? null,
+          name: item.name,
+          price: item.price ?? null,
+          ram: item.ram ?? null,
+          template_id: item.template_id,
+          vcpu: item.vcpu ?? null
         }))
       };
   }
-
-  return null;
 }
 
 function formatLoadBalancerListTable(
   items: LoadBalancerListCommandResult['items']
 ): string {
   const table = new Table({
-    head: ['ID', 'Name', 'Status', 'Mode', 'Type', 'Public IP']
+    head: ['ID', 'Name', 'Status', 'Mode', 'Type', 'Public IP', 'Private IP']
   });
 
   for (const item of items) {
@@ -150,7 +196,8 @@ function formatLoadBalancerListTable(
       item.status,
       item.lb_mode ?? '--',
       item.lb_type ?? '--',
-      item.public_ip ?? '--'
+      item.public_ip ?? '--',
+      item.private_ip ?? '--'
     ]);
   }
 
@@ -166,71 +213,127 @@ function renderBackendGroupListHuman(
     return `No backend groups configured for load balancer ${result.lb_id}.\n`;
   }
 
-  const lines: string[] = [];
+  const table = new Table({
+    head: [
+      'Backend Group',
+      'Backend Type',
+      'Routing Policy',
+      'Protocol',
+      'Health Check',
+      'Servers'
+    ]
+  });
 
   if (isTcp) {
-    for (const group of result.tcp_backends) {
-      lines.push(formatTcpBackendGroup(group));
+    for (const g of result.tcp_backends) {
+      table.push([
+        g.backend_name,
+        'TCP',
+        g.balance,
+        'TCP',
+        '--',
+        String(g.servers.length)
+      ]);
     }
   } else {
-    for (const group of result.backends) {
-      lines.push(formatAlbBackendGroup(group));
+    for (const g of result.backends) {
+      table.push([
+        g.name,
+        (g.backend_mode ?? 'http').toUpperCase(),
+        g.balance,
+        g.backend_ssl ? 'HTTPS' : 'HTTP',
+        g.http_check ? 'enabled' : 'disabled',
+        String(g.servers.length)
+      ]);
     }
   }
 
-  return lines.join('\n') + '\n';
+  return table.toString();
 }
 
-function formatAlbBackendGroup(group: LoadBalancerBackend): string {
-  const header =
-    `Backend Group: ${group.name}\n` +
-    `  Domain:    ${group.domain_name || '--'}\n` +
-    `  Algorithm: ${group.balance}\n` +
-    `  Health:    ${group.http_check ? `enabled (${group.check_url})` : 'disabled'}\n`;
-
-  const serverTable = new Table({
-    head: ['Server Name', 'IP', 'Port']
-  });
-
-  for (const s of group.servers) {
-    serverTable.push([s.backend_name, s.backend_ip, String(s.backend_port)]);
+function formatBackendServerListTable(
+  servers: LoadBalancerBackendServerListCommandResult['servers']
+): string {
+  const table = new Table({ head: ['Server Name', 'IP', 'Port'] });
+  for (const s of servers) {
+    table.push([s.backend_name, s.backend_ip, String(s.backend_port)]);
   }
-
-  return header + serverTable.toString();
+  return table.toString();
 }
 
-function formatTcpBackendGroup(group: LoadBalancerTcpBackend): string {
-  const header =
-    `Backend Group: ${group.backend_name}\n` +
-    `  Port:      ${group.port}\n` +
-    `  Algorithm: ${group.balance}\n`;
+function formatLoadBalancerPlans(
+  items: LoadBalancerPlansCommandResult['items']
+): string {
+  const basePlansSection = `Base Plans\n${formatLoadBalancerBasePlansTable(items)}\n`;
+  const committedSection = formatLoadBalancerCommittedPlansSection(items);
 
-  const serverTable = new Table({
-    head: ['Server Name', 'IP', 'Port']
-  });
-
-  for (const s of group.servers) {
-    serverTable.push([s.backend_name, s.backend_ip, String(s.backend_port)]);
-  }
-
-  return header + serverTable.toString();
+  return `${basePlansSection}\n${committedSection}`;
 }
 
-function formatLoadBalancerPlansTable(
+function formatLoadBalancerBasePlansTable(
   items: LoadBalancerPlansCommandResult['items']
 ): string {
   const table = new Table({
-    head: ['ID', 'Plan Name', 'Type', 'Active']
+    head: ['Plan', 'vCPU', 'RAM (GB)', 'Disk (GB)', 'Price/Hour', 'Price/Month']
   });
 
   for (const item of items) {
     table.push([
-      item.id,
-      item.plan_name,
-      item.lb_type,
-      item.is_active === false ? 'No' : 'Yes'
+      item.name,
+      formatPlanScalar(item.vcpu),
+      formatPlanScalar(item.ram),
+      formatPlanScalar(item.disk),
+      formatPlanPrice(item.hourly),
+      formatPlanPrice(item.price)
     ]);
   }
 
   return table.toString();
+}
+
+function formatLoadBalancerCommittedPlansSection(
+  items: LoadBalancerPlansCommandResult['items']
+): string {
+  const committedPlans = items.flatMap((item) =>
+    (item.committed_sku ?? []).map((plan) => ({
+      basePlanName: item.name,
+      plan
+    }))
+  );
+
+  if (committedPlans.length === 0) {
+    return 'Committed Options\nNo committed plans found.\n';
+  }
+
+  const table = new Table({
+    head: ['Base Plan', 'Plan ID', 'Name', 'Term (Days)', 'Total Price']
+  });
+
+  for (const item of committedPlans) {
+    table.push([
+      item.basePlanName,
+      String(item.plan.committed_sku_id),
+      item.plan.committed_sku_name,
+      formatCommittedPlanDays(item.plan),
+      formatPlanPrice(item.plan.committed_sku_price)
+    ]);
+  }
+
+  return `Committed Options\n${table.toString()}\n`;
+}
+
+function formatCommittedPlanDays(plan: LoadBalancerCommittedPlan): string {
+  return plan.committed_days === undefined ? '--' : String(plan.committed_days);
+}
+
+function formatPlanPrice(value: number | undefined): string {
+  if (value === undefined || value < 0) {
+    return '--';
+  }
+
+  return String(value);
+}
+
+function formatPlanScalar(value: number | undefined): string {
+  return value === undefined || value < 0 ? '--' : String(value);
 }

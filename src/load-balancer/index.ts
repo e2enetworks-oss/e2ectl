@@ -1,7 +1,11 @@
 export { buildLoadBalancerCommand } from './command.js';
 export { LoadBalancerApiClient, type LoadBalancerClient } from './client.js';
 export type {
+  LoadBalancerAclMapRule,
+  LoadBalancerAclRule,
   LoadBalancerBackend,
+  LoadBalancerCommittedPlan,
+  LoadBalancerCommittedStatus,
   LoadBalancerCreateRequest,
   LoadBalancerCreateResult,
   LoadBalancerDetails,
@@ -13,6 +17,7 @@ export type {
   LoadBalancerSummary,
   LoadBalancerTcpBackend,
   LoadBalancerUpdateRequest,
+  LoadBalancerVpcAttachment,
   LoadBalancerVpc
 } from './types.js';
 export type {
@@ -21,6 +26,9 @@ export type {
   LoadBalancerBackendGroupListCommandResult,
   LoadBalancerBackendServerAddCommandResult,
   LoadBalancerBackendServerAddOptions,
+  LoadBalancerBackendServerDeleteCommandResult,
+  LoadBalancerBackendServerDeleteOptions,
+  LoadBalancerBackendServerListCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerContextOptions,
   LoadBalancerCreateOptions,

@@ -21,7 +21,8 @@ describe('renderLoadBalancerResult', () => {
             status: 'RUNNING',
             lb_mode: 'HTTP',
             lb_type: 'external',
-            public_ip: '1.2.3.4'
+            public_ip: '1.2.3.4',
+            private_ip: '10.0.0.1'
           }
         ]
       };
@@ -30,6 +31,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('RUNNING');
       expect(output).toContain('HTTP');
       expect(output).toContain('1.2.3.4');
+      expect(output).toContain('10.0.0.1');
     });
 
     it('renders deterministic JSON output', () => {
@@ -42,7 +44,8 @@ describe('renderLoadBalancerResult', () => {
             status: 'RUNNING',
             lb_mode: 'TCP',
             lb_type: 'external',
-            public_ip: null
+            public_ip: null,
+            private_ip: '10.0.0.2'
           }
         ]
       };
@@ -56,6 +59,7 @@ describe('renderLoadBalancerResult', () => {
               id: 2,
               lb_mode: 'TCP',
               lb_type: 'external',
+              private_ip: '10.0.0.2',
               public_ip: null,
               status: 'RUNNING'
             }
@@ -69,6 +73,12 @@ describe('renderLoadBalancerResult', () => {
     it('renders confirmation with appliance id (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'create',
+        billing: {
+          committed_plan_id: null,
+          committed_plan_name: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
         result: {
           appliance_id: 99,
           id: 'lb-99',
@@ -77,13 +87,18 @@ describe('renderLoadBalancerResult', () => {
         }
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Created load balancer');
-      expect(output).toContain('99');
+      expect(output).toBe('lb-99\n');
     });
 
     it('renders JSON for create', () => {
       const result: LoadBalancerCommandResult = {
         action: 'create',
+        billing: {
+          committed_plan_id: 901,
+          committed_plan_name: '90 Days',
+          post_commit_behavior: 'auto_renew',
+          type: 'committed'
+        },
         result: {
           appliance_id: 99,
           id: 'lb-99',
@@ -92,8 +107,100 @@ describe('renderLoadBalancerResult', () => {
         }
       };
       const output = renderLoadBalancerResult(result, true);
-      const parsed = JSON.parse(output) as { action: string };
+      const parsed = JSON.parse(output) as {
+        action: string;
+        billing: { type: string };
+      };
       expect(parsed.action).toBe('create');
+      expect(parsed.billing.type).toBe('committed');
+    });
+  });
+
+  describe('plans', () => {
+    it('renders base plans and committed options in tables', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'plans',
+        items: [
+          {
+            committed_sku: [
+              {
+                committed_days: 90,
+                committed_sku_id: 901,
+                committed_sku_name: '90 Days',
+                committed_sku_price: 5000
+              }
+            ],
+            disk: 50,
+            hourly: 3,
+            name: 'LB-2',
+            price: 2000,
+            ram: 4,
+            template_id: 'plan-1',
+            vcpu: 2
+          }
+        ]
+      };
+
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Base Plans');
+      expect(output).toContain('Committed Options');
+      expect(output).toContain('90 Days');
+      expect(output).toContain('901');
+      expect(output).toContain('Price/Month');
+    });
+
+    it('renders committed options in deterministic JSON', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'plans',
+        items: [
+          {
+            committed_sku: [
+              {
+                committed_days: 90,
+                committed_node_message: 'Test message',
+                committed_sku_id: 901,
+                committed_sku_name: '90 Days',
+                committed_sku_price: 5000,
+                committed_upto_date: '2026-07-22'
+              }
+            ],
+            disk: 50,
+            hourly: 3,
+            name: 'LB-2',
+            price: 2000,
+            ram: 4,
+            template_id: 'plan-1',
+            vcpu: 2
+          }
+        ]
+      };
+
+      expect(renderLoadBalancerResult(result, true)).toBe(
+        stableStringify({
+          action: 'plans',
+          items: [
+            {
+              committed_sku: [
+                {
+                  committed_days: 90,
+                  committed_node_message: 'Test message',
+                  committed_sku_id: 901,
+                  committed_sku_name: '90 Days',
+                  committed_sku_price: 5000,
+                  committed_upto_date: '2026-07-22'
+                }
+              ],
+              disk: 50,
+              hourly: 3,
+              name: 'LB-2',
+              price: 2000,
+              ram: 4,
+              template_id: 'plan-1',
+              vcpu: 2
+            }
+          ]
+        }) + '\n'
+      );
     });
   });
 
@@ -162,10 +269,10 @@ describe('renderLoadBalancerResult', () => {
         tcp_backends: []
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Backend Group: web');
-      expect(output).toContain('example.com');
-      expect(output).toContain('srv-1');
-      expect(output).toContain('10.0.0.1');
+      expect(output).toContain('web');
+      expect(output).toContain('roundrobin');
+      expect(output).toContain('enabled');
+      expect(output).toContain('1');
     });
 
     it('renders NLB tcp backend groups', () => {
@@ -190,8 +297,8 @@ describe('renderLoadBalancerResult', () => {
         ]
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Backend Group: tcp-grp');
-      expect(output).toContain('8080');
+      expect(output).toContain('tcp-grp');
+      expect(output).toContain('leastconn');
     });
 
     it('renders JSON for backend-group-list', () => {
@@ -266,6 +373,42 @@ describe('renderLoadBalancerResult', () => {
       expect(parsed.action).toBe('backend-server-add');
       expect(parsed.lb_id).toBe('10');
       expect(parsed.message).toContain('srv-2');
+    });
+  });
+
+  describe('backend-server-delete', () => {
+    it('renders backend-server-delete message (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-delete',
+        group_name: 'web',
+        lb_id: '10',
+        message: 'Server "srv-2" deleted from backend group "web".',
+        server_name: 'srv-2'
+      };
+      expect(renderLoadBalancerResult(result, false)).toBe(
+        'Server "srv-2" deleted from backend group "web".\n'
+      );
+    });
+
+    it('renders JSON for backend-server-delete', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-delete',
+        group_name: 'web',
+        lb_id: '10',
+        message: 'Server "srv-2" deleted from backend group "web".',
+        server_name: 'srv-2'
+      };
+      const output = renderLoadBalancerResult(result, true);
+      const parsed = JSON.parse(output) as {
+        action: string;
+        group_name: string;
+        lb_id: string;
+        message: string;
+        server_name: string;
+      };
+      expect(parsed.action).toBe('backend-server-delete');
+      expect(parsed.group_name).toBe('web');
+      expect(parsed.server_name).toBe('srv-2');
     });
   });
 });
