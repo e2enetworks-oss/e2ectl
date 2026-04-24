@@ -58,6 +58,16 @@ describe('node formatter', () => {
     expect(output).toContain('node-b');
   });
 
+  it('renders create summaries without a table when no nodes were created', () => {
+    const output = formatNodeCreateResult({
+      node_create_response: [],
+      total_number_of_node_created: 0,
+      total_number_of_node_requested: 2
+    });
+
+    expect(output).toBe('Requested: 2\nCreated: 0');
+  });
+
   it('sorts node list json output by id for deterministic automation output', () => {
     const output = renderNodeResult(
       {
@@ -276,6 +286,40 @@ describe('node formatter', () => {
     expect(table).not.toContain('Software Version');
   });
 
+  it('renders populated catalog-os guidance for humans', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-os',
+        catalog: {
+          category_list: [
+            {
+              OS: 'Ubuntu',
+              category: ['GPU Optimized'],
+              version: [
+                {
+                  number_of_domains: null,
+                  os: 'Ubuntu',
+                  sub_category: 'Ubuntu',
+                  version: '24.04'
+                }
+              ]
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('GPU Optimized');
+    expect(output).toContain('Ubuntu');
+    expect(output).toContain('Use one row with:');
+    expect(output).toContain(
+      formatCliCommand(
+        'node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>'
+      )
+    );
+  });
+
   it('shows the software version column when the API returns populated values', () => {
     const table = formatNodeCatalogOsTable([
       {
@@ -290,6 +334,118 @@ describe('node formatter', () => {
 
     expect(table).toContain('Software Version');
     expect(table).toContain('2.15');
+  });
+
+  it('renders plan tables with null, text, and unavailable values cleanly', () => {
+    const planTable = formatNodeCatalogPlansTable([
+      {
+        available_inventory: false,
+        committed_options: [],
+        config: {
+          disk_gb: null,
+          family: 'General Purpose',
+          ram: null,
+          series: null,
+          vcpu: null
+        },
+        currency: null,
+        hourly: {
+          minimum_billing_amount: null,
+          price_per_hour: null,
+          price_per_month: null
+        },
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'PLAN-NULLS',
+        row: 1,
+        sku: 'SKU-NULLS'
+      },
+      {
+        available_inventory: true,
+        committed_options: [],
+        config: {
+          disk_gb: 50,
+          family: 'Burst',
+          ram: 'Burst',
+          series: 'C3',
+          vcpu: 2
+        },
+        currency: null,
+        hourly: {
+          minimum_billing_amount: null,
+          price_per_hour: 3.1,
+          price_per_month: null
+        },
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'PLAN-TEXT-RAM',
+        row: 2,
+        sku: 'SKU-TEXT'
+      }
+    ]);
+
+    const committedTable = formatNodeCatalogCommittedOptionsTable([
+      {
+        available_inventory: true,
+        committed_options: [
+          {
+            days: null,
+            id: 77,
+            name: 'Undefined price',
+            total_price: undefined as unknown as number | null
+          },
+          {
+            days: 30,
+            id: 78,
+            name: 'Currencyless price',
+            total_price: 1234
+          }
+        ],
+        config: {
+          disk_gb: null,
+          family: 'General Purpose',
+          ram: '8.00',
+          series: 'C3',
+          vcpu: null
+        },
+        currency: null,
+        hourly: {
+          minimum_billing_amount: 0,
+          price_per_hour: 3.1,
+          price_per_month: 2263
+        },
+        image: 'Ubuntu-24.04-Distro',
+        plan: 'PLAN-COMMITTED',
+        row: 3,
+        sku: 'SKU-COMMITTED'
+      }
+    ]);
+
+    expect(planTable).toContain('SKU-NULLS');
+    expect(planTable).toContain('SKU-TEXT');
+    expect(planTable).toContain('no');
+    expect(planTable).toContain('Burst GB');
+    expect(planTable).not.toContain('null');
+    expect(committedTable).toContain('SKU-COMMITTED');
+    expect(committedTable).toContain('77');
+    expect(committedTable).toContain('78');
+    expect(committedTable).toContain('1234');
+    expect(committedTable).not.toContain('undefined');
+  });
+
+  it('renders missing node detail fields as blank strings', () => {
+    const details = formatNodeDetails({
+      id: 102,
+      name: 'node-b',
+      plan: 'C3.4GB',
+      status: 'Stopped'
+    });
+
+    expect(details).toContain('Public IP: ');
+    expect(details).toContain('Private IP: ');
+    expect(details).toContain('Location: ');
+    expect(details).toContain('Created At: ');
+    expect(details).toContain('Disk: ');
+    expect(details).toContain('Memory: ');
+    expect(details).toContain('vCPUs: ');
   });
 
   it('renders config-first plan and committed-option tables', () => {
@@ -728,6 +884,172 @@ describe('node formatter', () => {
     );
   });
 
+  it('derives and sorts available families from items when summary is omitted', () => {
+    const output = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [
+          {
+            available_inventory: true,
+            committed_options: [],
+            config: {
+              disk_gb: 100,
+              family: 'Zeta',
+              ram: '8.00',
+              series: 'C3',
+              vcpu: 4
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 3.1,
+              price_per_month: 2263
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'PLAN-ZETA',
+            row: 1,
+            sku: 'SKU-ZETA'
+          },
+          {
+            available_inventory: true,
+            committed_options: [],
+            config: {
+              disk_gb: 50,
+              family: null,
+              ram: '4.00',
+              series: 'C3',
+              vcpu: 2
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 1.8,
+              price_per_month: 1321
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'PLAN-NO-FAMILY',
+            row: 2,
+            sku: 'SKU-NO-FAMILY'
+          },
+          {
+            available_inventory: true,
+            committed_options: [],
+            config: {
+              disk_gb: 75,
+              family: 'Alpha',
+              ram: '6.00',
+              series: 'C3',
+              vcpu: 3
+            },
+            currency: 'INR',
+            hourly: {
+              minimum_billing_amount: 0,
+              price_per_hour: 2.5,
+              price_per_month: 1825
+            },
+            image: 'Ubuntu-24.04-Distro',
+            plan: 'PLAN-ALPHA',
+            row: 3,
+            sku: 'SKU-ALPHA'
+          }
+        ],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Available Families: Alpha, Zeta');
+    expect(output).not.toContain('No plans found');
+  });
+
+  it('renders explicit and fallback empty catalog messages', () => {
+    const noCommittedOutput = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'committed',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: [],
+          empty_reason: 'no_committed'
+        }
+      },
+      false
+    );
+
+    const noPlansOutput = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        },
+        summary: {
+          available_families: [],
+          empty_reason: 'no_plans'
+        }
+      },
+      false
+    );
+
+    const fallbackFamilyOutput = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          family: 'GPU',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    const fallbackCommittedOutput = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'committed',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    expect(noCommittedOutput).toContain(
+      'No committed plan options found for the selected OS row.'
+    );
+    expect(noPlansOutput).toContain('No plans found for the selected OS row.');
+    expect(fallbackFamilyOutput).toContain(
+      'No configs were found for family GPU.'
+    );
+    expect(fallbackCommittedOutput).toContain(
+      'No committed plan options found for the selected OS row.'
+    );
+  });
+
   it('renders clean human summaries for node power and attachment actions', () => {
     const powerOutput = renderNodeResult(
       {
@@ -806,6 +1128,79 @@ describe('node formatter', () => {
         public_ip: '151.185.42.45'
       })}\n`
     );
+  });
+
+  it('renders remaining human delete and upgrade branches', () => {
+    const cancelledDeleteOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        node_id: 102,
+        reserve_public_ip_requested: false
+      },
+      false
+    );
+    const informativeDeleteOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        message: 'Queued for deletion',
+        node_id: 103,
+        reserve_public_ip_requested: false
+      },
+      false
+    );
+    const quietDeleteOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        node_id: 104,
+        reserve_public_ip_requested: false
+      },
+      false
+    );
+    const cancelledUpgradeOutput = renderNodeResult(
+      {
+        action: 'upgrade',
+        cancelled: true,
+        node_id: 105,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'PLAN-CANCELLED'
+        }
+      },
+      false
+    );
+    const minimalUpgradeOutput = renderNodeResult(
+      {
+        action: 'upgrade',
+        details: {
+          location: null,
+          new_node_image_id: null,
+          old_node_image_id: null,
+          vm_id: null
+        },
+        message: 'Upgrade queued',
+        node_id: 106,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'PLAN-MINIMAL'
+        }
+      },
+      false
+    );
+
+    expect(cancelledDeleteOutput).toBe('Deletion cancelled.\n');
+    expect(informativeDeleteOutput).toContain('Message: Queued for deletion');
+    expect(informativeDeleteOutput).not.toContain('Reserved Public IP');
+    expect(quietDeleteOutput).not.toContain('Message:');
+    expect(cancelledUpgradeOutput).toContain('Node upgrade cancelled.');
+    expect(cancelledUpgradeOutput).toContain('Target Plan: PLAN-CANCELLED');
+    expect(minimalUpgradeOutput).toContain('Message: Upgrade queued');
+    expect(minimalUpgradeOutput).not.toContain('VM ID:');
+    expect(minimalUpgradeOutput).not.toContain('Location:');
+    expect(minimalUpgradeOutput).not.toContain('Old Node Image ID:');
+    expect(minimalUpgradeOutput).not.toContain('New Node Image ID:');
   });
 
   it('renders deterministic cancelled output for public-ip detach', () => {
@@ -1129,6 +1524,56 @@ describe('node formatter', () => {
     );
   });
 
+  it('renders remaining human action branches', () => {
+    const securityGroupAttachOutput = renderNodeResult(
+      {
+        action: 'security-group-attach',
+        node_id: 101,
+        result: {
+          message: 'Security Group Attached Successfully'
+        },
+        security_group_ids: [44, 45]
+      },
+      false
+    );
+    const vpcDetachMinimalOutput = renderNodeResult(
+      {
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'VPC detached successfully.',
+          project_id: '46429'
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      },
+      false
+    );
+    const emptyListOutput = renderNodeResult(
+      {
+        action: 'list',
+        nodes: [],
+        total_count: 0,
+        total_page_number: 0
+      },
+      false
+    );
+
+    expect(securityGroupAttachOutput).toContain(
+      'Requested security-group attach for node 101.'
+    );
+    expect(vpcDetachMinimalOutput).toContain(
+      'Requested VPC detach for node 101.'
+    );
+    expect(vpcDetachMinimalOutput).not.toContain('Subnet ID:');
+    expect(vpcDetachMinimalOutput).not.toContain('Private IP:');
+    expect(emptyListOutput).toBe('No nodes found.\n');
+  });
+
   it('renders save-image output for humans', () => {
     const output = renderNodeResult(
       {
@@ -1149,6 +1594,126 @@ describe('node formatter', () => {
       'Requested save image for node 101 as node-a-image.'
     );
     expect(output).toContain('Image ID: img-455');
+  });
+
+  it('renders remaining deterministic json branches', () => {
+    const deleteJsonOutput = renderNodeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        node_id: 101,
+        reserve_public_ip_requested: false
+      },
+      true
+    );
+    const listJsonOutput = renderNodeResult(
+      {
+        action: 'list',
+        nodes: []
+      },
+      true
+    );
+    const cancelledUpgradeJsonOutput = renderNodeResult(
+      {
+        action: 'upgrade',
+        cancelled: true,
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'PLAN-CANCELLED'
+        }
+      },
+      true
+    );
+    const volumeAttachJsonOutput = renderNodeResult(
+      {
+        action: 'volume-attach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage attach queued.'
+        },
+        volume: {
+          id: 8801
+        }
+      },
+      true
+    );
+    const vpcDetachJsonOutput = renderNodeResult(
+      {
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'VPC detached successfully.',
+          project_id: null
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      },
+      true
+    );
+
+    expect(deleteJsonOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: '',
+        node_id: 101,
+        reserve_public_ip_requested: false
+      })}\n`
+    );
+    expect(listJsonOutput).toBe(
+      `${stableStringify({
+        action: 'list',
+        nodes: [],
+        total_count: null,
+        total_page_number: null
+      })}\n`
+    );
+    expect(cancelledUpgradeJsonOutput).toBe(
+      `${stableStringify({
+        action: 'upgrade',
+        cancelled: true,
+        node_id: 101,
+        requested: {
+          image: 'Ubuntu-24.04-Distro',
+          plan: 'PLAN-CANCELLED'
+        }
+      })}\n`
+    );
+    expect(volumeAttachJsonOutput).toBe(
+      `${stableStringify({
+        action: 'volume-attach',
+        node_id: 101,
+        node_vm_id: 100157,
+        result: {
+          message: 'Block Storage attach queued.'
+        },
+        volume: {
+          id: 8801
+        }
+      })}\n`
+    );
+    expect(vpcDetachJsonOutput).toBe(
+      `${stableStringify({
+        action: 'vpc-detach',
+        node_id: 101,
+        result: {
+          message: 'VPC detached successfully.',
+          project_id: null
+        },
+        vpc: {
+          id: 23082,
+          name: 'prod-vpc',
+          private_ip: null,
+          subnet_id: null
+        }
+      })}\n`
+    );
   });
 
   it('renders security-group action output for both humans and json', () => {
