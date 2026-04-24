@@ -4,6 +4,10 @@ import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
+interface JsonActionResult {
+  action: string;
+}
+
 function buildAlbContext(
   backends: object[],
   overrides?: {
@@ -548,6 +552,767 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
           }
         ]
       });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group create — NLB', async () => {
+    const nlbGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbGetResponse
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'backend',
+          'group',
+          'create',
+          '20',
+          '--name',
+          'grp',
+          '--server-ip',
+          '10.0.0.1',
+          '--server-name',
+          'srv-1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('created');
+      expect(result.stdout).toContain('grp');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group delete — NLB with multiple groups', async () => {
+    const nlbTwoGroupsGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp1',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    }
+                  ]
+                },
+                {
+                  backend_name: 'grp2',
+                  port: 3001,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-2',
+                      backend_ip: '10.0.0.2',
+                      backend_port: 3001
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbTwoGroupsGetResponse
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['load-balancer', 'backend', 'group', 'delete', '20', 'grp1'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('grp1');
+      expect(result.stdout).toContain('deleted');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend server list — ALB', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['load-balancer', 'backend', 'server', 'list', '10', 'web'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('server-1');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend server list — NLB', async () => {
+    const nlbGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    },
+                    {
+                      backend_name: 'srv-2',
+                      backend_ip: '10.0.0.2',
+                      backend_port: 3000
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbGetResponse
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['load-balancer', 'backend', 'server', 'list', '20', 'grp'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('srv-1');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend server add — NLB', async () => {
+    const nlbGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbGetResponse
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'backend',
+          'server',
+          'add',
+          '20',
+          '--backend-name',
+          'grp',
+          '--server-ip',
+          '10.0.0.3',
+          '--server-port',
+          '3000',
+          '--server-name',
+          'srv-3'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend server delete — NLB', async () => {
+    const nlbGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    },
+                    {
+                      backend_name: 'srv-2',
+                      backend_ip: '10.0.0.2',
+                      backend_port: 3000
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbGetResponse
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'backend',
+          'server',
+          'delete',
+          '20',
+          '--backend-name',
+          'grp',
+          '--server-name',
+          'srv-2'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('srv-2');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group create — fails when ALB group name already exists (BACKEND_GROUP_EXISTS)', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['load-balancer', 'backend', 'group', 'create', '10', '--name', 'web'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('already exists');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group create — fails when NLB already has a group (NLB_SINGLE_BACKEND_GROUP)', async () => {
+    const nlbOneGroupGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbOneGroupGetResponse
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'backend',
+          'group',
+          'create',
+          '20',
+          '--name',
+          'newgrp'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('already has a backend group');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group create — fails when --server-ip set but --server-name missing (MISSING_SERVER_NAME)', async () => {
+    const nlbNoGroupsGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbNoGroupsGetResponse
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'backend',
+          'group',
+          'create',
+          '20',
+          '--name',
+          'grp',
+          '--server-ip',
+          '10.0.0.1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('--server-name is required');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group list — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['--json', 'load-balancer', 'backend', 'group', 'list', '10'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-group-list');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend group delete — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbWithTwoGroupsGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['--json', 'load-balancer', 'backend', 'group', 'delete', '10', 'api'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-group-delete');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend server list — JSON output (NLB)', async () => {
+    const nlbGetResponse = {
+      code: 200,
+      data: {
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '1.2.3.4',
+        appliance_instance: [
+          {
+            context: {
+              acl_list: [],
+              acl_map: [],
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'grp',
+                  port: 3000,
+                  balance: 'roundrobin',
+                  servers: [
+                    {
+                      backend_name: 'srv-1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 3000
+                    }
+                  ]
+                }
+              ],
+              lb_port: '3000',
+              plan_name: 'LB-2',
+              cn_id: 901,
+              cn_status: 'auto_renew',
+              lb_type: 'external',
+              vpc_list: []
+            }
+          }
+        ]
+      },
+      errors: {},
+      message: 'OK'
+    };
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: nlbGetResponse
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['--json', 'load-balancer', 'backend', 'server', 'list', '20', 'grp'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-server-list');
     } finally {
       await server.close();
       await tempHome.cleanup();

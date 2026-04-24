@@ -435,4 +435,207 @@ describe('load-balancer create against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('creates an ALB and renders human output (without --json)', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'create',
+          '--name',
+          'my-alb',
+          '--plan',
+          'LB-2',
+          '--mode',
+          'HTTP',
+          '--port',
+          '80',
+          '--backend-name',
+          'web',
+          '--server-ip',
+          '10.0.0.1',
+          '--server-port',
+          '8080',
+          '--server-name',
+          'server-1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Load balancer created.');
+      expect(result.stdout).toContain('my-alb');
+      expect(result.stdout).toContain('Backend');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when --mode HTTPS but --ssl-certificate-id not provided', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'create',
+          '--name',
+          'test',
+          '--plan',
+          'LB-2',
+          '--mode',
+          'HTTPS',
+          '--port',
+          '443',
+          '--backend-name',
+          'web',
+          '--server-ip',
+          '10.0.0.1',
+          '--server-port',
+          '8080',
+          '--server-name',
+          's1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(
+        result.stderr.includes('ssl-certificate-id') ||
+          result.stderr.includes('HTTPS')
+      ).toBe(true);
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when both --committed-plan and --committed-plan-id are specified', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'create',
+          '--name',
+          'test',
+          '--plan',
+          'LB-2',
+          '--mode',
+          'HTTP',
+          '--port',
+          '80',
+          '--backend-name',
+          'web',
+          '--server-ip',
+          '10.0.0.1',
+          '--server-port',
+          '8080',
+          '--server-name',
+          's1',
+          '--committed-plan',
+          '90 Days',
+          '--committed-plan-id',
+          '901'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('Choose either');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when --post-commit-behavior is specified without a committed plan', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'load-balancer',
+          'create',
+          '--name',
+          'test',
+          '--plan',
+          'LB-2',
+          '--mode',
+          'HTTP',
+          '--port',
+          '80',
+          '--backend-name',
+          'web',
+          '--server-ip',
+          '10.0.0.1',
+          '--server-port',
+          '8080',
+          '--server-name',
+          's1',
+          '--post-commit-behavior',
+          'auto-renew'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('post-commit-behavior');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

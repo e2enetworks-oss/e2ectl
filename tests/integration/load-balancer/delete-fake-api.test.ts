@@ -51,4 +51,34 @@ describe('load-balancer delete against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('deletes a load balancer with --force and renders human output (without --json)', async () => {
+    const server = await startTestHttpServer({
+      'DELETE /myaccount/api/v1/appliances/42/': () => ({
+        body: buildDeleteResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['load-balancer', 'delete', '42', '--force'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Load balancer deleted.');
+      expect(result.stdout).toContain('42');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });
