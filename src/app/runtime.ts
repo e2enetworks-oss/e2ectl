@@ -11,6 +11,7 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import { DbaasApiClient, type DbaasClient } from '../dbaas/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import { ProjectApiClient, type ProjectClient } from '../project/index.js';
 import {
@@ -31,6 +32,7 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createDbaasClient?(credentials: ResolvedCredentials): DbaasClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
@@ -56,6 +58,10 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createDbaasClient: (credentials) =>
+      new DbaasApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)

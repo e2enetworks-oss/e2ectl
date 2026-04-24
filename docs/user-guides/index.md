@@ -22,6 +22,7 @@ The guides are split into two paths:
 
 - [Config](./config.md)
 - [Project](./project.md)
+- [DBaaS](./dbaas.md)
 - [Node](./node.md)
 - [Reserved IP](./reserved-ip.md)
 - [Volume](./volume.md)

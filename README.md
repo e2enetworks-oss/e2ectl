@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It helps operators and automation manage projects, nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, shared default context, and deterministic `--json` output.
+It helps operators and automation manage projects, DBaaS clusters, nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, shared default context, and deterministic `--json` output.
 
 ## Requirements
 
@@ -75,6 +75,7 @@ Command guides:
 
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
+- [DBaaS](./docs/user-guides/dbaas.md)
 - [Node](./docs/user-guides/node.md)
 - [Reserved IP](./docs/user-guides/reserved-ip.md)
 - [Volume](./docs/user-guides/volume.md)

@@ -8,6 +8,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
+      exclude: [
+        '**/*.d.ts',
+        '**/types/**',
+        '**/*types.ts',
+        '**/node_modules/**',
+        '**/dist/**'
+      ],
       reportsDirectory: 'coverage/unit',
       thresholds: {
         functions: 80,

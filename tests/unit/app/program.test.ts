@@ -11,6 +11,7 @@ describe('createProgram', () => {
     ).toEqual([
       'config',
       'project',
+      'dbaas',
       'node',
       'reserved-ip',
       'volume',
