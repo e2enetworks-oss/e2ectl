@@ -8,9 +8,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      exclude: [
-        '**/types.ts'
-      ],
+      exclude: ['**/types.ts'],
       reportsDirectory: 'coverage/unit',
       thresholds: {
         functions: 80,
