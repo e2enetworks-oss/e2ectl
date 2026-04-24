@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl image` lists, inspects, renames, and deletes saved images.
+`e2ectl image` lists, renames, and deletes saved images.
 
 Saved images are reusable images for your selected project and location. A common flow is to create one from an existing node with `e2ectl node action save-image`, then use that saved image for later node launches.
 

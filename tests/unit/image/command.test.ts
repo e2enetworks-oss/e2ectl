@@ -244,6 +244,7 @@ describe('image commands', () => {
 
     expect(imageCommand).toBeDefined();
     expect(imageCommand?.commands.map((c) => c.name())).toContain('list');
+    expect(imageCommand?.commands.map((c) => c.name())).not.toContain('get');
     expect(imageCommand?.commands.map((c) => c.name())).not.toContain('import');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('delete');
     expect(imageCommand?.commands.map((c) => c.name())).toContain('rename');

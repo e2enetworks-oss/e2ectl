@@ -1296,20 +1296,22 @@ function buildNodeCreatePayload(
   resolvedKeys: ResolvedSshKey[]
 ): NodeCreateRequest {
   const isSavedImage = input.savedImageTemplateId !== undefined;
+  const baseRequest = buildDefaultNodeCreateRequest({
+    ...(input.committedPlanId === null
+      ? {}
+      : {
+          cn_id: input.committedPlanId,
+          cn_status: COMMITTED_NODE_CREATE_STATUS
+        }),
+    image: input.image,
+    name: input.name,
+    plan: input.plan
+  });
 
   return {
-    ...buildDefaultNodeCreateRequest({
-      ...(input.committedPlanId === null
-        ? {}
-        : {
-            cn_id: input.committedPlanId,
-            cn_status: COMMITTED_NODE_CREATE_STATUS
-          }),
-      image: input.image,
-      name: input.name,
-      plan: input.plan
-    }),
+    ...baseRequest,
     ...(input.disk === null ? {} : { disk: input.disk }),
+    image: input.image,
     is_saved_image: isSavedImage,
     ...(isSavedImage
       ? { saved_image_template_id: String(input.savedImageTemplateId) }

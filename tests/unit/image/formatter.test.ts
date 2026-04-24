@@ -83,8 +83,9 @@ describe('image formatter', () => {
       },
       false
     );
-    expect(output).toContain('Deleted image 1001');
-    expect(output).toContain('Image deleted successfully');
+    expect(output).toBe(
+      'Deleted image 1001.\nMessage: Image deleted successfully\n'
+    );
   });
 
   it('renders human delete output when message is absent', () => {
@@ -92,7 +93,7 @@ describe('image formatter', () => {
       { action: 'delete', cancelled: false, id: '1001' },
       false
     );
-    expect(output).toBe('Deleted image 1001.\nMessage: \n');
+    expect(output).toBe('Deleted image 1001.\n');
   });
 
   it('renders human delete output for cancelled deletion', () => {
@@ -113,7 +114,25 @@ describe('image formatter', () => {
       },
       false
     );
-    expect(output).toContain('Renamed image 1001 to: new-name');
+    expect(output).toBe(
+      'Renamed image 1001.\n' +
+        'New Name: new-name\n' +
+        'Message: Image name changed successfully\n'
+    );
+  });
+
+  it('suppresses generic success messages for human rename output', () => {
+    const output = renderImageResult(
+      {
+        action: 'rename',
+        id: '1001',
+        message: 'Success',
+        name: 'new-name'
+      },
+      false
+    );
+
+    expect(output).toBe('Renamed image 1001.\nNew Name: new-name\n');
   });
 
   it('renders stable json list output with scaler_group_count', () => {

@@ -706,8 +706,14 @@ function renderJson(value: unknown): string {
 function formatNodeDeleteResult(
   result: Extract<NodeCommandResult, { action: 'delete' }>
 ): string {
+  if (result.cancelled) {
+    return 'Deletion cancelled.\n';
+  }
+
   const lines = [
-    result.cancelled ? 'Deletion cancelled.' : `Deleted node ${result.node_id}.`
+    `Requested deletion for node ${result.node_id}.`,
+    'The node may remain visible as Terminating for a short time.',
+    ...formatOptionalApiMessage(result.message)
   ];
 
   if (result.reserve_public_ip_requested) {
@@ -755,6 +761,17 @@ function formatNodeUpgradeResult(
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+function formatOptionalApiMessage(message: string | undefined): string[] {
+  const normalized = message?.trim();
+  if (normalized === undefined || normalized.length === 0) {
+    return [];
+  }
+
+  return normalized.toLowerCase() === 'success'
+    ? []
+    : [`Message: ${normalized}`];
 }
 
 function formatNodePublicIpDetachResult(

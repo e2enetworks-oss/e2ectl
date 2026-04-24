@@ -226,7 +226,9 @@ describe('node formatter', () => {
     );
 
     expect(humanOutput).toBe(
-      'Deleted node 101.\nReserved Public IP: requested.\n'
+      'Requested deletion for node 101.\n' +
+        'The node may remain visible as Terminating for a short time.\n' +
+        'Reserved Public IP: requested.\n'
     );
     expect(jsonOutput).toBe(
       `${stableStringify({

@@ -49,9 +49,19 @@ function renderImageHuman(result: ImageCommandResult): string {
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
-        : `Deleted image ${result.id}.\nMessage: ${result.message ?? ''}\n`;
-    case 'rename':
-      return `Renamed image ${result.id} to: ${result.name}\nMessage: ${result.message}\n`;
+        : formatImageMutationResult(
+            `Deleted image ${result.id}.`,
+            formatApiMessage(result.message)
+          );
+    case 'rename': {
+      const lines = [
+        `Renamed image ${result.id}.`,
+        `New Name: ${result.name}`,
+        ...formatApiMessage(result.message)
+      ];
+
+      return `${lines.join('\n')}\n`;
+    }
   }
 }
 
@@ -115,4 +125,22 @@ function sortImageItems(items: ImageItem[]): ImageItem[] {
 
     return leftKey.localeCompare(rightKey);
   });
+}
+
+function formatApiMessage(message: string | undefined): string[] {
+  const normalized = message?.trim();
+  if (normalized === undefined || normalized.length === 0) {
+    return [];
+  }
+
+  return normalized.toLowerCase() === 'success'
+    ? []
+    : [`Message: ${normalized}`];
+}
+
+function formatImageMutationResult(
+  headline: string,
+  trailingLines: string[]
+): string {
+  return `${[headline, ...trailingLines].join('\n')}\n`;
 }
