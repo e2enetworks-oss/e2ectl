@@ -587,4 +587,145 @@ describe('vpc formatter', () => {
     expect(output).toContain('Committed');
     expect(output).toContain('90 Days');
   });
+
+  it('renders deterministic json for get action with subnet details', () => {
+    const output = renderVpcResult(
+      {
+        action: 'get',
+        vpc: {
+          attached_vm_count: 1,
+          cidr: '10.20.0.0/23',
+          cidr_source: 'e2e',
+          created_at: '2026-03-13T08:00:00Z',
+          gateway_ip: '10.20.0.1',
+          id: 27835,
+          location: 'Delhi',
+          name: 'prod-vpc',
+          network_id: 27835,
+          project_name: 'default-project',
+          state: 'Active',
+          subnet_count: 1,
+          subnets: [
+            {
+              cidr: '10.20.0.0/24',
+              id: 991,
+              name: 'frontend',
+              total_ips: 251,
+              used_ips: 4
+            }
+          ]
+        }
+      },
+      true
+    );
+
+    const parsed = JSON.parse(output) as {
+      action: string;
+      vpc: { subnets: Array<{ id: number; name: string }> };
+    };
+    expect(parsed.action).toBe('get');
+    expect(parsed.vpc.subnets[0]?.id).toBe(991);
+    expect(parsed.vpc.subnets[0]?.name).toBe('frontend');
+  });
+
+  it('renders custom CIDR summary as bare "custom" when value is null', () => {
+    const output = renderVpcResult(
+      {
+        action: 'create',
+        billing: {
+          committed_plan_id: null,
+          post_commit_behavior: null,
+          type: 'hourly'
+        },
+        cidr: {
+          source: 'custom',
+          value: null
+        },
+        credit_sufficient: true,
+        vpc: {
+          id: 27836,
+          name: 'test-vpc',
+          network_id: 27836,
+          project_id: '46429',
+          vpc_id: 3957
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('CIDR: custom');
+    expect(output).not.toContain('CIDR: custom ');
+    expect(output).not.toContain('null');
+  });
+
+  it('renders deterministic json for cancelled VPC delete', () => {
+    const output = renderVpcResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '46429'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: true,
+        vpc: {
+          id: 27835,
+          name: 'prod-vpc',
+          project_id: '46429'
+        }
+      })}\n`
+    );
+  });
+
+  it('renders VPC get detail with null created_at', () => {
+    const output = renderVpcResult(
+      {
+        action: 'get',
+        vpc: {
+          attached_vm_count: 0,
+          cidr: '10.10.0.0/24',
+          cidr_source: 'custom',
+          created_at: null,
+          gateway_ip: null,
+          id: 27840,
+          location: null,
+          name: 'new-vpc',
+          network_id: 27840,
+          project_name: null,
+          state: 'Creating',
+          subnet_count: 0,
+          subnets: []
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('VPC ID: 27840');
+    expect(output).toContain('Created At: ');
+    expect(output).not.toContain('null');
+  });
+
+  it('renders price without currency suffix when currency is null', () => {
+    const table = formatVpcHourlyPlansTable([
+      {
+        currency: null,
+        location: 'Delhi',
+        name: 'VPC',
+        price_per_hour: 4.79,
+        price_per_month: 3500
+      }
+    ]);
+
+    expect(table).toContain('4.79');
+    expect(table).toContain('3500');
+    expect(table).not.toContain('null');
+  });
 });

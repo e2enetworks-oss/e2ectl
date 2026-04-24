@@ -311,4 +311,79 @@ describe('security-group formatter', () => {
     expect(emptyListOutput).toBe('No security groups found.\n');
     expect(cancelledDeleteOutput).toBe('Deletion cancelled.\n');
   });
+
+  it('renders deterministic json for cancelled delete', () => {
+    const output = renderSecurityGroupResult(
+      {
+        action: 'delete',
+        cancelled: true,
+        security_group: {
+          id: 57358,
+          name: 'web-sg'
+        }
+      },
+      true
+    );
+
+    expect(output).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: true,
+        security_group: {
+          id: 57358,
+          name: 'web-sg'
+        }
+      })}\n`
+    );
+  });
+
+  it('renders create human output with non-default security group', () => {
+    const output = renderSecurityGroupResult(
+      {
+        action: 'create',
+        message: 'Security Group created.',
+        security_group: {
+          description: '',
+          id: 57361,
+          is_default: false,
+          label_id: null,
+          name: 'custom-sg',
+          resource_type: null,
+          rule_count: 0
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Default: no');
+  });
+
+  it('sorts rule table rows by id when both rules have non-null ids', () => {
+    const table = formatSecurityGroupRuleTable([
+      {
+        description: 'http',
+        id: 285097,
+        network: 'any',
+        network_cidr: '--',
+        network_size: null,
+        port_range: '80',
+        protocol_name: 'Custom_TCP',
+        rule_type: 'Inbound',
+        vpc_id: null
+      },
+      {
+        description: 'ssh',
+        id: 285096,
+        network: 'any',
+        network_cidr: '--',
+        network_size: null,
+        port_range: '22',
+        protocol_name: 'Custom_TCP',
+        rule_type: 'Inbound',
+        vpc_id: null
+      }
+    ]);
+
+    expect(table.indexOf('22')).toBeLessThan(table.indexOf('80'));
+  });
 });

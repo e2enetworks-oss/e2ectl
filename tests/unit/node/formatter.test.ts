@@ -1048,6 +1048,25 @@ describe('node formatter', () => {
     expect(fallbackCommittedOutput).toContain(
       'No committed plan options found for the selected OS row.'
     );
+
+    const fallbackHourlyOutput = renderNodeResult(
+      {
+        action: 'catalog-plans',
+        items: [],
+        query: {
+          billing_type: 'hourly',
+          category: 'Ubuntu',
+          display_category: 'Linux Virtual Node',
+          os: 'Ubuntu',
+          osversion: '24.04'
+        }
+      },
+      false
+    );
+
+    expect(fallbackHourlyOutput).toContain(
+      'No plans found for the selected OS row.'
+    );
   });
 
   it('renders clean human summaries for node power and attachment actions', () => {
