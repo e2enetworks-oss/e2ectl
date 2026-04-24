@@ -406,6 +406,46 @@ describe('load-balancer commands', () => {
     expect(stdout.buffer).toContain('42');
   });
 
+  it('lists load balancer plans', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'load-balancer',
+      'plans',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('LB-2');
+    expect(stdout.buffer).toContain('Base Plans');
+  });
+
+  it('deletes a load balancer with interactive confirmation', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture({
+      confirmResult: true,
+      isInteractive: true
+    });
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'load-balancer',
+      'delete',
+      '42',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(lbStub.deleteLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('Load balancer deleted.');
+  });
+
   it('lists backend groups via backend group list', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -666,26 +706,26 @@ describe('load-balancer commands', () => {
     expect(stdout.buffer).toContain('10.0.0.1');
   });
 
-  it('backend sub-command with no sub-command prints help without throwing', async () => {
+  it('load-balancer with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
-    await seedProfile(runtime);
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'load-balancer',
-        'backend',
-        '--alias',
-        'prod'
-      ])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'load-balancer'])
+    ).resolves.not.toThrow();
+  });
+
+  it('backend sub-command with no sub-command prints help without throwing', async () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+
+    await expect(
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'load-balancer', 'backend'])
     ).resolves.not.toThrow();
   });
 
   it('backend group sub-command with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
-    await seedProfile(runtime);
     const program = createProgram(runtime);
 
     await expect(
@@ -694,16 +734,13 @@ describe('load-balancer commands', () => {
         CLI_COMMAND_NAME,
         'load-balancer',
         'backend',
-        'group',
-        '--alias',
-        'prod'
+        'group'
       ])
     ).resolves.not.toThrow();
   });
 
   it('backend server sub-command with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
-    await seedProfile(runtime);
     const program = createProgram(runtime);
 
     await expect(
@@ -712,9 +749,7 @@ describe('load-balancer commands', () => {
         CLI_COMMAND_NAME,
         'load-balancer',
         'backend',
-        'server',
-        '--alias',
-        'prod'
+        'server'
       ])
     ).resolves.not.toThrow();
   });

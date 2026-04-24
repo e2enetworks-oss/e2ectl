@@ -287,4 +287,189 @@ describe('LoadBalancerApiClient', () => {
       query: { reserve_ip_required: 'true' }
     });
   });
+
+  it('fetches multiple pages when total_page_number > 1', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock
+      .mockResolvedValueOnce({
+        code: 200,
+        data: [{ id: 1, name: 'lb-1', status: 'RUNNING' }],
+        errors: {},
+        message: 'OK',
+        total_page_number: 2
+      })
+      .mockResolvedValueOnce({
+        code: 200,
+        data: [{ id: 2, name: 'lb-2', status: 'RUNNING' }],
+        errors: {},
+        message: 'OK',
+        total_page_number: 2
+      });
+
+    const result = await client.listLoadBalancers();
+
+    expect(transport.getMock).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(2);
+    expect(result[0]!.appliance_name).toBe('lb-1');
+    expect(result[1]!.appliance_name).toBe('lb-2');
+  });
+
+  it('stops at first page when data length is less than page size', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: Array.from({ length: 3 }, (_, i) => ({
+        id: i + 1,
+        name: `lb-${i + 1}`,
+        status: 'RUNNING'
+      })),
+      errors: {},
+      message: 'OK'
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(transport.getMock).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(3);
+  });
+
+  it('normalizes public_ip "[]" to null', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [{ id: 1, name: 'lb-1', status: 'RUNNING', public_ip: '[]' }],
+      errors: {},
+      message: 'OK',
+      total_page_number: 1
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(result[0]!.public_ip).toBeNull();
+  });
+
+  it('normalizes empty string public_ip to null', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [
+        {
+          id: 1,
+          name: 'lb-1',
+          status: 'RUNNING',
+          node_detail: { public_ip: '' }
+        }
+      ],
+      errors: {},
+      message: 'OK',
+      total_page_number: 1
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(result[0]!.public_ip).toBeNull();
+  });
+
+  it('returns empty array when listLoadBalancerPlans response has no appliance_config', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue(envelope([]));
+
+    const result = await client.listLoadBalancerPlans();
+
+    expect(result).toEqual([]);
+  });
+
+  it('resolves lb_mode and lb_type from context when not on root item', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope({
+        id: 99,
+        name: 'my-lb',
+        status: 'RUNNING',
+        appliance_instance: [
+          {
+            context: {
+              backends: [],
+              tcp_backend: [],
+              lb_mode: 'HTTP',
+              lb_type: 'internal',
+              lb_port: '80',
+              plan_name: 'LB-2'
+            }
+          }
+        ]
+      })
+    );
+
+    const result = await client.getLoadBalancer('99');
+
+    expect(result.lb_mode).toBe('HTTP');
+    expect(result.lb_type).toBe('internal');
+  });
+
+  it('normalizes lb_mode to TCP when context has a non-empty tcp_backend', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [
+        {
+          id: 1,
+          name: 'nlb-1',
+          status: 'RUNNING',
+          appliance_instance: [
+            {
+              context: {
+                tcp_backend: [{ backend_name: 'grp', port: 80 }]
+              }
+            }
+          ]
+        }
+      ],
+      errors: {},
+      message: 'OK',
+      total_page_number: 1
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(result[0]!.lb_mode).toBe('TCP');
+  });
+
+  it('normalizes explicit null public_ip from node_detail to null', async () => {
+    const transport = new StubTransport();
+    const client = new LoadBalancerApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [
+        {
+          id: 1,
+          name: 'lb-1',
+          status: 'RUNNING',
+          node_detail: { public_ip: null }
+        }
+      ],
+      errors: {},
+      message: 'OK',
+      total_page_number: 1
+    });
+
+    const result = await client.listLoadBalancers();
+
+    expect(result[0]!.public_ip).toBeNull();
+  });
 });
