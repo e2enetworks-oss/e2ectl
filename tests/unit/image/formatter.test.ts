@@ -46,6 +46,18 @@ describe('image formatter', () => {
     expect(alphaPos).toBeLessThan(zebraPos);
   });
 
+  it('sorts items with null image_name before named items', () => {
+    const table = formatImageTable([
+      makeItem({ image_id: '1001', image_name: null as unknown as string }),
+      makeItem({ image_id: '2000', image_name: 'named' }),
+      makeItem({ image_id: '3000', image_name: null as unknown as string })
+    ]);
+
+    expect(table).toContain('named');
+    expect(table).toContain('1001');
+    expect(table).toContain('3000');
+  });
+
   it('renders human list output', () => {
     const output = renderImageResult(
       { action: 'list', items: [makeItem()] },
@@ -73,6 +85,14 @@ describe('image formatter', () => {
     );
     expect(output).toContain('Deleted image 1001');
     expect(output).toContain('Image deleted successfully');
+  });
+
+  it('renders human delete output when message is absent', () => {
+    const output = renderImageResult(
+      { action: 'delete', cancelled: false, id: '1001' },
+      false
+    );
+    expect(output).toBe('Deleted image 1001.\nMessage: \n');
   });
 
   it('renders human delete output for cancelled deletion', () => {
@@ -118,6 +138,37 @@ describe('image formatter', () => {
     expect(output).toBe(
       `${stableStringify({ action: 'delete', cancelled: true, id: '1001' })}\n`
     );
+  });
+
+  it('renders deterministic json for confirmed delete with message', () => {
+    const output = renderImageResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        id: '1001',
+        message: 'Image deleted successfully'
+      },
+      true
+    );
+    const parsed = JSON.parse(output) as {
+      action: string;
+      cancelled: boolean;
+      id: string;
+      message: string;
+    };
+    expect(parsed.action).toBe('delete');
+    expect(parsed.cancelled).toBe(false);
+    expect(parsed.id).toBe('1001');
+    expect(parsed.message).toBe('Image deleted successfully');
+  });
+
+  it('renders deterministic json for confirmed delete with no message', () => {
+    const output = renderImageResult(
+      { action: 'delete', cancelled: false, id: '1001' },
+      true
+    );
+    const parsed = JSON.parse(output) as { message: string };
+    expect(parsed.message).toBe('');
   });
 
   it('renders deterministic json for rename', () => {

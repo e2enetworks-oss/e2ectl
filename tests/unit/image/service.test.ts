@@ -141,6 +141,45 @@ describe('ImageService', () => {
     });
   });
 
+  it('falls back to name field when image_name is absent', async () => {
+    const { listImages, service } = createServiceFixture();
+
+    listImages.mockResolvedValue([
+      {
+        creation_time: '01-Jan-2025 10:00:00',
+        image_id: '1003',
+        name: 'fallback-name',
+        image_size: '10GB',
+        image_state: 'READY',
+        os_distribution: 'Ubuntu 20.04',
+        running_vms: 0
+      }
+    ]);
+
+    const result = await service.listImages({});
+
+    expect(result.items[0]?.image_name).toBe('fallback-name');
+  });
+
+  it('defaults image_name to empty string when both image_name and name are absent', async () => {
+    const { listImages, service } = createServiceFixture();
+
+    listImages.mockResolvedValue([
+      {
+        creation_time: '01-Jan-2025 10:00:00',
+        image_id: '1004',
+        image_size: '10GB',
+        image_state: 'READY',
+        os_distribution: 'Ubuntu 20.04',
+        running_vms: 0
+      }
+    ]);
+
+    const result = await service.listImages({});
+
+    expect(result.items[0]?.image_name).toBe('');
+  });
+
   it('deletes an image after confirmation', async () => {
     const { confirm, deleteImage, service } = createServiceFixture({
       confirmResult: true
