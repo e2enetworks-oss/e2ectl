@@ -1239,7 +1239,7 @@ describe('LoadBalancerService', () => {
         createServiceFixture();
       getLoadBalancer.mockResolvedValue(
         createEmptyAlbDetails({
-          lb_type: undefined,
+          lb_type: 'unrecognized-type',
           context: [
             {
               backends: [],
@@ -1262,12 +1262,10 @@ describe('LoadBalancerService', () => {
       expect(body.lb_type).toBe('internal');
     });
 
-    it('falls back to HTTP lb_mode when lb_mode is undefined', async () => {
+    it('falls back to HTTP lb_mode when lb_mode is an empty string', async () => {
       const { service, getLoadBalancer, updateLoadBalancer } =
         createServiceFixture();
-      getLoadBalancer.mockResolvedValue(
-        createEmptyAlbDetails({ lb_mode: undefined })
-      );
+      getLoadBalancer.mockResolvedValue(createEmptyAlbDetails({ lb_mode: '' }));
 
       await service.createBackendGroup('30', { name: 'api' });
 

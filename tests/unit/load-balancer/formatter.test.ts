@@ -679,24 +679,21 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('Flex');
     });
 
-    it('renders "--" for undefined plan price fields', () => {
+    it('renders "--" for absent optional plan fields', () => {
       const result: LoadBalancerCommandResult = {
         action: 'plans',
         items: [
           {
             committed_sku: [],
             name: 'LB-2',
-            price: undefined as unknown as number,
-            template_id: 'plan-1',
-            hourly: undefined,
-            vcpu: undefined,
-            ram: undefined,
-            disk: undefined
+            price: 2000,
+            template_id: 'plan-1'
           }
         ]
       };
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain('LB-2');
+      expect(output).toContain('--');
     });
   });
 
