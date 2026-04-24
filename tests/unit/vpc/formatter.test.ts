@@ -11,6 +11,21 @@ describe('vpc formatter', () => {
   it('renders stable VPC list tables', () => {
     const table = formatVpcListTable([
       {
+        attached_vm_count: 0,
+        cidr: '10.10.0.0/24',
+        cidr_source: 'custom',
+        created_at: null,
+        gateway_ip: null,
+        id: 27834,
+        location: null,
+        name: 'custom-vpc',
+        network_id: 27834,
+        project_name: null,
+        state: 'Creating',
+        subnet_count: 2,
+        subnets: []
+      },
+      {
         attached_vm_count: 2,
         cidr: '10.20.0.0/23',
         cidr_source: 'e2e',
@@ -27,6 +42,8 @@ describe('vpc formatter', () => {
       }
     ]);
 
+    expect(table).toContain('custom-vpc');
+    expect(table).toContain('Custom');
     expect(table).toContain('prod-vpc');
     expect(table).toContain('27835');
     expect(table).toContain('E2E');
@@ -34,6 +51,13 @@ describe('vpc formatter', () => {
 
   it('renders separate hourly and committed plan tables', () => {
     const hourlyTable = formatVpcHourlyPlansTable([
+      {
+        currency: null,
+        location: null,
+        name: 'Basic',
+        price_per_hour: null,
+        price_per_month: 1200
+      },
       {
         currency: 'INR',
         location: 'Delhi',
@@ -52,6 +76,8 @@ describe('vpc formatter', () => {
       }
     ]);
 
+    expect(hourlyTable).toContain('Basic');
+    expect(hourlyTable).toContain('1200');
     expect(hourlyTable).toContain('4.79 INR');
     expect(hourlyTable).toContain('3500 INR');
     expect(committedTable).toContain('90 Days');
@@ -361,6 +387,47 @@ describe('vpc formatter', () => {
     );
   });
 
+  it('renders delete output with fallback blank messages and nullable metadata', () => {
+    const humanOutput = renderVpcResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        vpc: {
+          id: 27837,
+          name: null,
+          project_id: null
+        }
+      },
+      false
+    );
+    const jsonOutput = renderVpcResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        vpc: {
+          id: 27837,
+          name: null,
+          project_id: null
+        }
+      },
+      true
+    );
+
+    expect(humanOutput).toBe('Deleted VPC 27837.\nMessage: \n');
+    expect(jsonOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: '',
+        vpc: {
+          id: 27837,
+          name: null,
+          project_id: null
+        }
+      })}\n`
+    );
+  });
+
   it('sorts VPC list json output deterministically', () => {
     const output = renderVpcResult(
       {
@@ -406,6 +473,60 @@ describe('vpc formatter', () => {
     expect(output).toContain('"name": "alpha-vpc"');
     expect(output.indexOf('"name": "alpha-vpc"')).toBeLessThan(
       output.indexOf('"name": "zeta-vpc"')
+    );
+  });
+
+  it('sorts VPC plans json output deterministically across hourly and committed sections', () => {
+    const output = renderVpcResult(
+      {
+        action: 'plans',
+        committed: {
+          default_post_commit_behavior: 'auto-renew',
+          items: [
+            {
+              currency: 'INR',
+              id: 91,
+              name: '90 Days',
+              term_days: 90,
+              total_price: 7800
+            },
+            {
+              currency: null,
+              id: 31,
+              name: '30 Days',
+              term_days: 30,
+              total_price: 3000
+            }
+          ],
+          supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+        },
+        hourly: {
+          items: [
+            {
+              currency: 'INR',
+              location: 'Mumbai',
+              name: 'VPC',
+              price_per_hour: 4.99,
+              price_per_month: 3600
+            },
+            {
+              currency: null,
+              location: null,
+              name: 'Basic',
+              price_per_hour: 1,
+              price_per_month: null
+            }
+          ]
+        }
+      },
+      true
+    );
+
+    expect(output.indexOf('"name": "30 Days"')).toBeLessThan(
+      output.indexOf('"name": "90 Days"')
+    );
+    expect(output.indexOf('"name": "Basic"')).toBeLessThan(
+      output.indexOf('"name": "VPC"')
     );
   });
 

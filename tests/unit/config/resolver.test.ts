@@ -72,6 +72,26 @@ describe('resolveCredentials', () => {
     expect(result.alias).toBeUndefined();
   });
 
+  it('returns project-scoped environment credentials without adding an alias when no profile is involved', () => {
+    const result = resolveCredentials({
+      config: { profiles: {} },
+      env: {
+        E2E_API_KEY: 'api-env',
+        E2E_AUTH_TOKEN: 'auth-env',
+        E2E_PROJECT_ID: '790',
+        E2E_LOCATION: 'Delhi'
+      }
+    });
+
+    expect(result).toEqual({
+      api_key: 'api-env',
+      auth_token: 'auth-env',
+      location: 'Delhi',
+      project_id: '790',
+      source: 'env'
+    });
+  });
+
   it('throws an actionable error when auth is incomplete', () => {
     expect(() =>
       resolveCredentials({
@@ -82,6 +102,29 @@ describe('resolveCredentials', () => {
         }
       })
     ).toThrowError(/Unable to resolve MyAccount authentication/);
+  });
+
+  it('omits config-path details when auth resolution fails without a config file path', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        alias: 'prod',
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod'
+            }
+          }
+        },
+        env: {}
+      })
+    );
+
+    expect(error.code).toBe('MISSING_AUTH_CREDENTIALS');
+    expect(error.details).toEqual([
+      'Missing required auth values: auth_token',
+      'Resolved profile alias: prod',
+      'Expected environment variables: E2E_AUTH_TOKEN'
+    ]);
   });
 
   it('throws an actionable error when context is missing', () => {
@@ -100,6 +143,29 @@ describe('resolveCredentials', () => {
         env: {}
       })
     ).toThrowError(/Unable to resolve MyAccount project context/);
+  });
+
+  it('omits config-path details when context resolution fails without a config file path', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        config: {
+          profiles: {}
+        },
+        env: {
+          E2E_API_KEY: 'api-env',
+          E2E_AUTH_TOKEN: 'auth-env'
+        },
+        location: 'Delhi'
+      })
+    );
+
+    expect(error.code).toBe('MISSING_REQUEST_CONTEXT');
+    expect(error.details).toEqual([
+      'Missing required context values: project_id',
+      'No profile alias was provided and no default profile exists.',
+      'Expected environment variables: E2E_PROJECT_ID',
+      'Command flags: --project-id <unset>, --location Delhi'
+    ]);
   });
 
   it('throws when the requested alias does not exist', () => {
@@ -217,6 +283,122 @@ describe('resolveCredentials', () => {
     ]);
     expect(error.suggestion).toContain('Fix the saved default profile');
   });
+
+  it('includes flag details when a stale default alias still leaves auth unresolved', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        config: {
+          profiles: {},
+          default: 'missing'
+        },
+        configPath: '/tmp/config.json',
+        env: {},
+        location: 'Delhi',
+        projectId: '46429'
+      })
+    );
+
+    expect(error.code).toBe('INVALID_DEFAULT_PROFILE');
+    expect(error.details).toEqual(
+      expect.arrayContaining([
+        'Missing required auth values without a valid default profile: api_key, auth_token',
+        'Command flags: --project-id 46429, --location Delhi',
+        'Config path: /tmp/config.json'
+      ])
+    );
+  });
+
+  it('reports resolved aliases and config paths when saved auth is incomplete', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        alias: 'prod',
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod'
+            }
+          }
+        },
+        configPath: '/tmp/config.json',
+        env: {}
+      })
+    );
+
+    expect(error.code).toBe('MISSING_AUTH_CREDENTIALS');
+    expect(error.details).toEqual([
+      'Missing required auth values: auth_token',
+      'Resolved profile alias: prod',
+      'Expected environment variables: E2E_AUTH_TOKEN',
+      'Config path: /tmp/config.json'
+    ]);
+  });
+
+  it('reports resolved aliases, flags, and config paths when project context is incomplete', () => {
+    const error = captureCliError(() =>
+      resolveCredentials({
+        alias: 'prod',
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod',
+              default_project_id: '123'
+            }
+          }
+        },
+        configPath: '/tmp/config.json',
+        env: {},
+        projectId: '123'
+      })
+    );
+
+    expect(error.code).toBe('MISSING_REQUEST_CONTEXT');
+    expect(error.details).toEqual([
+      'Missing required context values: location',
+      'Resolved profile alias: prod',
+      'Expected environment variables: E2E_LOCATION',
+      'Command flags: --project-id 123, --location <unset>',
+      'Config path: /tmp/config.json'
+    ]);
+  });
+
+  it('validates numeric project ids and supported locations after resolution', () => {
+    const projectError = captureCliError(() =>
+      resolveCredentials({
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod',
+              default_project_id: 'abc',
+              default_location: 'Delhi'
+            }
+          },
+          default: 'prod'
+        },
+        env: {}
+      })
+    );
+    const locationError = captureCliError(() =>
+      resolveCredentials({
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod',
+              default_project_id: '123',
+              default_location: 'Atlantis'
+            }
+          },
+          default: 'prod'
+        },
+        env: {}
+      })
+    );
+
+    expect(projectError.code).toBe('INVALID_PROJECT_ID');
+    expect(locationError.code).toBe('INVALID_LOCATION');
+  });
 });
 
 describe('resolveAccountCredentials', () => {
@@ -239,6 +421,28 @@ describe('resolveAccountCredentials', () => {
       api_key: 'api-prod',
       auth_token: 'auth-prod',
       source: 'profile'
+    });
+  });
+
+  it('returns account-scoped environment credentials with optional context and no alias', () => {
+    const result = resolveAccountCredentials({
+      config: {
+        profiles: {}
+      },
+      env: {
+        E2E_API_KEY: 'api-env',
+        E2E_AUTH_TOKEN: 'auth-env',
+        E2E_PROJECT_ID: '123',
+        E2E_LOCATION: 'Chennai'
+      }
+    });
+
+    expect(result).toEqual({
+      api_key: 'api-env',
+      auth_token: 'auth-env',
+      location: 'Chennai',
+      project_id: '123',
+      source: 'env'
     });
   });
 
@@ -286,6 +490,91 @@ describe('resolveAccountCredentials', () => {
       auth_token: 'auth-env',
       source: 'env'
     });
+  });
+
+  it('retains optional context only when the values are non-empty and valid', () => {
+    const resultWithProjectOnly = resolveAccountCredentials({
+      config: {
+        profiles: {
+          prod: {
+            api_key: 'api-prod',
+            auth_token: 'auth-prod',
+            default_project_id: '123',
+            default_location: '   '
+          }
+        },
+        default: 'prod'
+      },
+      env: {}
+    });
+    const resultWithFullContext = resolveAccountCredentials({
+      config: {
+        profiles: {
+          prod: {
+            api_key: 'api-prod',
+            auth_token: 'auth-prod',
+            default_project_id: '123',
+            default_location: 'Delhi'
+          }
+        },
+        default: 'prod'
+      },
+      env: {}
+    });
+
+    expect(resultWithProjectOnly).toEqual({
+      alias: 'prod',
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      project_id: '123',
+      source: 'profile'
+    });
+    expect(resultWithFullContext).toEqual({
+      alias: 'prod',
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      project_id: '123',
+      location: 'Delhi',
+      source: 'profile'
+    });
+  });
+
+  it('validates optional account context when both values are present', () => {
+    const invalidProject = captureCliError(() =>
+      resolveAccountCredentials({
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod',
+              default_project_id: 'bad-id',
+              default_location: 'Delhi'
+            }
+          },
+          default: 'prod'
+        },
+        env: {}
+      })
+    );
+    const invalidLocation = captureCliError(() =>
+      resolveAccountCredentials({
+        config: {
+          profiles: {
+            prod: {
+              api_key: 'api-prod',
+              auth_token: 'auth-prod',
+              default_project_id: '123',
+              default_location: 'Atlantis'
+            }
+          },
+          default: 'prod'
+        },
+        env: {}
+      })
+    );
+
+    expect(invalidProject.code).toBe('INVALID_PROJECT_ID');
+    expect(invalidLocation.code).toBe('INVALID_LOCATION');
   });
 });
 

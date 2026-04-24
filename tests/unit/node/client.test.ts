@@ -429,6 +429,64 @@ describe('NodeApiClient', () => {
       }
     });
   });
+
+  it('returns node list without pagination metadata when API omits it', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([
+        {
+          id: 101,
+          name: 'node-a',
+          plan: 'C3.8GB',
+          status: 'Running'
+        }
+      ])
+    );
+
+    const result = await client.listNodes();
+
+    expect(result).toEqual({
+      nodes: [
+        {
+          id: 101,
+          name: 'node-a',
+          plan: 'C3.8GB',
+          status: 'Running'
+        }
+      ]
+    });
+    expect(result).not.toHaveProperty('total_count');
+    expect(result).not.toHaveProperty('total_page_number');
+  });
+
+  it('maps null for missing optional fields in upgrade response', async () => {
+    const transport = new StubTransport();
+    const client = new NodeApiClient(transport);
+
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {},
+        {
+          message: 'Node upgrade initiated'
+        }
+      )
+    );
+
+    const result = await client.upgradeNode('101', {
+      image: 'Ubuntu-24.04-Distro',
+      plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
+    });
+
+    expect(result).toEqual({
+      location: null,
+      message: 'Node upgrade initiated',
+      new_node_image_id: null,
+      old_node_image_id: null,
+      vm_id: null
+    });
+  });
 });
 
 function envelope<TData>(

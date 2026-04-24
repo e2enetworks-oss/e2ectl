@@ -11,6 +11,15 @@ describe('volume formatter', () => {
   it('renders stable volume list tables', () => {
     const table = formatVolumeListTable([
       {
+        attached: false,
+        attachment: null,
+        id: 25549,
+        name: 'archive-01',
+        size_gb: null,
+        size_label: null,
+        status: 'Available'
+      },
+      {
         attached: true,
         attachment: {
           node_id: 301,
@@ -25,6 +34,7 @@ describe('volume formatter', () => {
       }
     ]);
 
+    expect(table).toContain('archive-01');
     expect(table).toContain('data-01');
     expect(table).toContain('250 GB');
     expect(table).toContain('node-b');
@@ -32,6 +42,14 @@ describe('volume formatter', () => {
 
   it('renders grouped plan and committed option tables', () => {
     const plansTable = formatVolumePlansTable([
+      {
+        available: false,
+        committed_options: [],
+        currency: null,
+        hourly_price: 2.5,
+        iops: 4000,
+        size_gb: 200
+      },
       {
         available: true,
         committed_options: [],
@@ -45,16 +63,18 @@ describe('volume formatter', () => {
       {
         id: 31,
         name: '30 Days Committed',
-        savings_percent: 18.78,
+        savings_percent: null,
         term_days: 30,
         total_price: 1000
       }
     ]);
 
+    expect(plansTable).toContain('2.5');
+    expect(plansTable).toContain('no');
     expect(plansTable).toContain('250');
     expect(plansTable).toContain('1.71 INR');
     expect(committedTable).toContain('30 Days Committed');
-    expect(committedTable).toContain('18.78');
+    expect(committedTable).toContain('1000');
   });
 
   it('renders human plan guidance for discovery-first volume creation', () => {
@@ -337,6 +357,63 @@ describe('volume formatter', () => {
           id: 25550,
           name: 'data-01'
         }
+      })}\n`
+    );
+  });
+
+  it('renders deterministic json with blank delete messages and null attachments', () => {
+    const output = renderVolumeResult(
+      {
+        action: 'list',
+        items: [
+          {
+            attached: true,
+            attachment: {
+              node_id: null,
+              vm_id: 9001,
+              vm_name: null
+            },
+            id: 25553,
+            name: 'beta',
+            size_gb: 200,
+            size_label: '200 GB',
+            status: 'Attached'
+          },
+          {
+            attached: false,
+            attachment: null,
+            id: 25552,
+            name: 'Alpha',
+            size_gb: 100,
+            size_label: '100 GB',
+            status: 'Available'
+          }
+        ],
+        total_count: 2,
+        total_page_number: 1
+      },
+      true
+    );
+    const deleteOutput = renderVolumeResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        volume_id: 25552
+      },
+      true
+    );
+
+    expect(output.indexOf('"name": "Alpha"')).toBeLessThan(
+      output.indexOf('"name": "beta"')
+    );
+    expect(output).toContain('"attachment": null');
+    expect(output).toContain('"node_id": null');
+    expect(deleteOutput).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: '',
+        volume_id: 25552
       })}\n`
     );
   });

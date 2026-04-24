@@ -10,6 +10,26 @@ describe('security-group formatter', () => {
   it('renders stable security-group list tables', () => {
     const table = formatSecurityGroupListTable([
       {
+        description: 'db ingress',
+        id: 57359,
+        is_all_traffic_rule: false,
+        is_default: false,
+        name: 'db-sg',
+        rules: [
+          {
+            description: 'mysql',
+            id: null,
+            network: 'any',
+            network_cidr: '--',
+            network_size: null,
+            port_range: '3306',
+            protocol_name: 'Custom_TCP',
+            rule_type: 'Inbound',
+            vpc_id: null
+          }
+        ]
+      },
+      {
         description: 'web ingress',
         id: 57358,
         is_all_traffic_rule: false,
@@ -19,6 +39,7 @@ describe('security-group formatter', () => {
       }
     ]);
 
+    expect(table).toContain('db-sg');
     expect(table).toContain('web-sg');
     expect(table).toContain('57358');
     expect(table).toContain('yes');
@@ -26,6 +47,17 @@ describe('security-group formatter', () => {
 
   it('renders rule tables with descriptions', () => {
     const table = formatSecurityGroupRuleTable([
+      {
+        description: '',
+        id: null,
+        network: 'internal',
+        network_cidr: '10.0.0.0/24',
+        network_size: null,
+        port_range: 'All',
+        protocol_name: 'All',
+        rule_type: 'Outbound',
+        vpc_id: null
+      },
       {
         description: 'ssh',
         id: 285096,
@@ -39,6 +71,7 @@ describe('security-group formatter', () => {
       }
     ]);
 
+    expect(table).toContain('10.0.0.0/24');
     expect(table).toContain('Custom_TCP');
     expect(table).toContain('22');
     expect(table).toContain('ssh');
@@ -66,6 +99,44 @@ describe('security-group formatter', () => {
     expect(output).toContain('ID: 57358');
     expect(output).toContain('Rules: 2');
     expect(output).toContain(formatCliCommand('security-group list'));
+  });
+
+  it('renders fallback delete and create output when optional values are blank', () => {
+    const deleteHuman = renderSecurityGroupResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        security_group: {
+          id: 57358,
+          name: null
+        }
+      },
+      false
+    );
+    const deleteJson = renderSecurityGroupResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        security_group: {
+          id: 57358,
+          name: null
+        }
+      },
+      true
+    );
+
+    expect(deleteHuman).toBe('Deleted security group 57358.\nMessage: \n');
+    expect(deleteJson).toBe(
+      `${stableStringify({
+        action: 'delete',
+        cancelled: false,
+        message: '',
+        security_group: {
+          id: 57358,
+          name: null
+        }
+      })}\n`
+    );
   });
 
   it('sorts list json output for deterministic automation output', () => {
@@ -138,6 +209,39 @@ describe('security-group formatter', () => {
     expect(output).toContain('ID: 57358');
     expect(output).toContain('Rules');
     expect(output).toContain('No rules found.');
+  });
+
+  it('renders security-group details with rules and all-traffic/default flags', () => {
+    const output = renderSecurityGroupResult(
+      {
+        action: 'get',
+        security_group: {
+          description: 'all traffic',
+          id: 57360,
+          is_all_traffic_rule: true,
+          is_default: true,
+          name: 'all-sg',
+          rules: [
+            {
+              description: '',
+              id: null,
+              network: 'any',
+              network_cidr: '--',
+              network_size: null,
+              port_range: 'All',
+              protocol_name: 'All',
+              rule_type: 'Outbound',
+              vpc_id: null
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Default: yes');
+    expect(output).toContain('All Traffic Rule: yes');
+    expect(output).toContain('Rules');
   });
 
   it('renders update output for humans and deterministic json', () => {

@@ -64,6 +64,11 @@ describe('node catalog helpers', () => {
   it('accepts explicit hourly and committed billing types', () => {
     expect(normalizeNodeCatalogBillingType('hourly')).toBe('hourly');
     expect(normalizeNodeCatalogBillingType('committed')).toBe('committed');
+    expect(normalizeNodeCatalogBillingType('all')).toBe('all');
+  });
+
+  it('rejects unsupported billing types', () => {
+    expect(() => normalizeNodeCatalogBillingType('weekly')).toThrow(CliError);
   });
 
   it('normalizes an optional family filter and rejects blank values', () => {
@@ -106,6 +111,77 @@ describe('node catalog helpers', () => {
         id: 91,
         name: '90 Days',
         total_price: 7800
+      }
+    ]);
+  });
+
+  it('falls back through sku sources, normalizes sparse numeric fields, and keeps unavailable inventory flags', () => {
+    const items = normalizeNodeCatalogPlanItems(
+      [
+        samplePlan({
+          available_inventory_status: false,
+          currency: undefined,
+          image: 'ubuntu-fallback',
+          name: '   ',
+          plan: 'c3.fallback',
+          specs: {
+            committed_sku: [
+              {
+                committed_days: 60,
+                committed_sku_id: 0,
+                committed_sku_name: 'invalid',
+                committed_sku_price: 6000
+              },
+              {
+                committed_days: 30,
+                committed_sku_id: 31,
+                committed_sku_name: ' 30 Days ',
+                committed_sku_price: 3000
+              }
+            ],
+            cpu: 3.5 as unknown as number,
+            disk_space: undefined,
+            family: ' GPU ',
+            minimum_billing_amount: Number.NaN,
+            price_per_hour: undefined,
+            price_per_month: Number.NaN,
+            ram: 'not-a-number',
+            series: '  C3  ',
+            sku_name: '   '
+          }
+        })
+      ],
+      'all'
+    );
+
+    expect(items).toEqual([
+      {
+        available_inventory: false,
+        committed_options: [
+          {
+            days: 30,
+            id: 31,
+            name: '30 Days',
+            total_price: 3000
+          }
+        ],
+        config: {
+          disk_gb: null,
+          family: 'GPU',
+          ram: 'not-a-number',
+          series: 'C3',
+          vcpu: null
+        },
+        currency: null,
+        hourly: {
+          minimum_billing_amount: null,
+          price_per_hour: null,
+          price_per_month: null
+        },
+        image: 'ubuntu-fallback',
+        plan: 'c3.fallback',
+        row: 1,
+        sku: 'c3.fallback'
       }
     ]);
   });
@@ -180,6 +256,53 @@ describe('node catalog helpers', () => {
     expect(items[0]?.config.family).toBe('GPU');
   });
 
+  it('sorts plans with missing numeric fields after concrete values and falls back to plan/image ordering', () => {
+    const items = normalizeNodeCatalogPlanItems(
+      [
+        samplePlan({
+          image: 'ubuntu-b',
+          name: 'fallback-b',
+          plan: 'plan-b',
+          specs: {
+            cpu: undefined,
+            disk_space: undefined,
+            ram: undefined,
+            sku_name: undefined
+          }
+        }),
+        samplePlan({
+          image: 'ubuntu-a',
+          name: 'fallback-a',
+          plan: 'plan-a',
+          specs: {
+            cpu: undefined,
+            disk_space: undefined,
+            ram: undefined,
+            sku_name: undefined
+          }
+        }),
+        samplePlan({
+          image: 'ubuntu-small',
+          name: 'small',
+          plan: 'small',
+          specs: {
+            cpu: 2,
+            disk_space: 40,
+            ram: '4',
+            sku_name: 'small'
+          }
+        })
+      ],
+      'all'
+    );
+
+    expect(items.map((item) => item.sku)).toEqual([
+      'small',
+      'fallback-a',
+      'fallback-b'
+    ]);
+  });
+
   it('reports no-family-match when the requested family does not exist', () => {
     const summary = summarizeNodeCatalogPlans([samplePlan()], [], 'all', 'GPU');
 
@@ -236,6 +359,19 @@ describe('node catalog helpers', () => {
     expect(summary).toEqual({
       available_families: ['General Purpose', 'GPU'],
       empty_reason: 'no_plans'
+    });
+  });
+
+  it('returns a null empty reason when items are present', () => {
+    const summary = summarizeNodeCatalogPlans(
+      [samplePlan()],
+      normalizeNodeCatalogPlanItems([samplePlan()], 'all'),
+      'all'
+    );
+
+    expect(summary).toEqual({
+      available_families: ['General Purpose'],
+      empty_reason: null
     });
   });
 });
