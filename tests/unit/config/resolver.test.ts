@@ -2,7 +2,7 @@ import {
   resolveAccountCredentials,
   resolveCredentials
 } from '../../../src/config/resolver.js';
-import type { ConfigFile } from '../../../src/config/index.js';
+import type { ConfigFile, ProfileConfig } from '../../../src/config/index.js';
 import { CliError, EXIT_CODES } from '../../../src/core/errors.js';
 
 describe('resolveCredentials', () => {
@@ -112,7 +112,7 @@ describe('resolveCredentials', () => {
           profiles: {
             prod: {
               api_key: 'api-prod'
-            }
+            } as ProfileConfig
           }
         },
         env: {}
@@ -316,7 +316,7 @@ describe('resolveCredentials', () => {
           profiles: {
             prod: {
               api_key: 'api-prod'
-            }
+            } as ProfileConfig
           }
         },
         configPath: '/tmp/config.json',

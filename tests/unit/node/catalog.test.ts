@@ -120,7 +120,7 @@ describe('node catalog helpers', () => {
       [
         samplePlan({
           available_inventory_status: false,
-          currency: undefined,
+          currency: undefined as unknown as string,
           image: 'ubuntu-fallback',
           name: '   ',
           plan: 'c3.fallback',
@@ -140,10 +140,10 @@ describe('node catalog helpers', () => {
               }
             ],
             cpu: 3.5 as unknown as number,
-            disk_space: undefined,
+            disk_space: undefined as unknown as number,
             family: ' GPU ',
             minimum_billing_amount: Number.NaN,
-            price_per_hour: undefined,
+            price_per_hour: undefined as unknown as number,
             price_per_month: Number.NaN,
             ram: 'not-a-number',
             series: '  C3  ',
@@ -264,10 +264,10 @@ describe('node catalog helpers', () => {
           name: 'fallback-b',
           plan: 'plan-b',
           specs: {
-            cpu: undefined,
-            disk_space: undefined,
-            ram: undefined,
-            sku_name: undefined
+            cpu: undefined as unknown as number,
+            disk_space: undefined as unknown as number,
+            ram: undefined as unknown as string,
+            sku_name: undefined as unknown as string
           }
         }),
         samplePlan({
@@ -275,10 +275,10 @@ describe('node catalog helpers', () => {
           name: 'fallback-a',
           plan: 'plan-a',
           specs: {
-            cpu: undefined,
-            disk_space: undefined,
-            ram: undefined,
-            sku_name: undefined
+            cpu: undefined as unknown as number,
+            disk_space: undefined as unknown as number,
+            ram: undefined as unknown as string,
+            sku_name: undefined as unknown as string
           }
         }),
         samplePlan({

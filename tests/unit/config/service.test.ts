@@ -69,31 +69,31 @@ function createServiceFixture(
       };
       return Promise.resolve(structuredClone(config));
     }),
-    updateProfile: vi.fn(
-      (alias: string, patch: Partial<ProfileConfig>) => {
-        config = {
-          ...(config.default === undefined ? {} : { default: config.default }),
-          profiles: {
-            ...config.profiles,
-            [alias]: {
-              ...config.profiles[alias],
-              ...patch
-            }
-          }
-        };
-        return Promise.resolve(structuredClone(config));
-      }
-    ),
+    updateProfile: vi.fn((alias: string, patch: Partial<ProfileConfig>) => {
+      config = {
+        ...(config.default === undefined ? {} : { default: config.default }),
+        profiles: {
+          ...config.profiles,
+          [alias]: {
+            ...config.profiles[alias],
+            ...patch
+          } as ProfileConfig
+        }
+      };
+      return Promise.resolve(structuredClone(config));
+    }),
     write: vi.fn((nextConfig: ConfigFile) => {
       config = structuredClone(nextConfig);
       return Promise.resolve();
     })
   };
 
-  const validator = vi.fn(
-    () => Promise.resolve(validateResults.shift() ?? { valid: true })
+  const validator = vi.fn(() =>
+    Promise.resolve(validateResults.shift() ?? { valid: true })
   );
-  const confirm = vi.fn(() => Promise.resolve(confirmResponses.shift() ?? true));
+  const confirm = vi.fn(() =>
+    Promise.resolve(confirmResponses.shift() ?? true)
+  );
   const prompt = vi.fn(() => Promise.resolve(promptResponses.shift() ?? ''));
   const service = new ConfigService({
     confirm,
