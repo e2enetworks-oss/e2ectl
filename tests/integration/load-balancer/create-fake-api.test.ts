@@ -5,6 +5,37 @@ import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
+function buildPlansResponse() {
+  return {
+    code: 200,
+    data: [
+      {
+        appliance_config: [
+          {
+            committed_sku: [
+              {
+                committed_days: 90,
+                committed_sku_id: 901,
+                committed_sku_name: '90 Days',
+                committed_sku_price: 5000
+              }
+            ],
+            disk: 50,
+            hourly: 3,
+            name: 'LB-2',
+            price: 2000,
+            ram: 4,
+            template_id: 'plan-1',
+            vcpu: 2
+          }
+        ]
+      }
+    ],
+    errors: {},
+    message: 'OK'
+  };
+}
+
 function buildCreateResponse() {
   return {
     code: 200,
@@ -22,6 +53,9 @@ function buildCreateResponse() {
 describe('load-balancer create against a fake MyAccount API', () => {
   it('creates an ALB and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      }),
       'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
         body: buildCreateResponse()
       })
@@ -101,8 +135,8 @@ describe('load-balancer create against a fake MyAccount API', () => {
           }
         }) + '\n'
       );
-      expect(server.requests).toHaveLength(1);
-      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+      expect(server.requests).toHaveLength(2);
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
         acl_list: [],
         acl_map: [],
         backends: [
@@ -157,6 +191,9 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
   it('creates an NLB with TCP mode', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      }),
       'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
         body: buildCreateResponse()
       })
@@ -200,8 +237,8 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');
-      expect(server.requests).toHaveLength(1);
-      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+      expect(server.requests).toHaveLength(2);
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
         acl_list: [],
         acl_map: [],
         backends: [],
@@ -438,6 +475,9 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
   it('creates an ALB and renders human output (without --json)', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      }),
       'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
         body: buildCreateResponse()
       })
@@ -591,6 +631,9 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
   it('fails when --post-commit-behavior is specified without a committed plan', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      }),
       'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
         body: buildCreateResponse()
       })
