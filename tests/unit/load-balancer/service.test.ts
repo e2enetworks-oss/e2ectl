@@ -1287,6 +1287,34 @@ describe('LoadBalancerService', () => {
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.lb_mode).toBe('HTTP');
     });
+
+    it('uses lb_port 443 for HTTPS LB when context.lb_port is missing', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createEmptyAlbDetails({
+          lb_mode: 'HTTPS',
+          context: [
+            {
+              backends: [],
+              tcp_backend: [],
+              node_list_type: 'S',
+              plan_name: 'LB-2'
+            }
+          ]
+        })
+      );
+
+      await service.createBackendGroup('30', {
+        name: 'api',
+        backendProtocol: 'HTTP'
+      });
+
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.lb_port).toBe('443');
+    });
+
   });
 
   describe('deleteBackendGroup', () => {
@@ -1537,6 +1565,51 @@ describe('LoadBalancerService', () => {
           serverName: 'server-2'
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
+    });
+
+    it('uses tcp_backend[0].port for TCP LB when context.lb_port is missing', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue({
+        id: 20,
+        appliance_name: 'my-nlb',
+        status: 'RUNNING',
+        lb_mode: 'TCP',
+        lb_type: 'external',
+        public_ip: '5.6.7.8',
+        context: [
+          {
+            backends: [],
+            tcp_backend: [
+              {
+                backend_name: 'tcp-grp',
+                port: 8080,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-1',
+                    backend_ip: '10.0.0.2',
+                    backend_port: 8080
+                  }
+                ]
+              }
+            ],
+            node_list_type: 'S',
+            plan_name: 'LB-2'
+          }
+        ]
+      } satisfies LoadBalancerDetails);
+
+      await service.addBackendServer('20', {
+        backendName: 'tcp-grp',
+        serverIp: '10.0.0.3',
+        serverPort: '8080',
+        serverName: 'srv-2'
+      });
+
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.lb_port).toBe('8080');
     });
   });
 

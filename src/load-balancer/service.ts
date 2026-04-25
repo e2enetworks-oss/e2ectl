@@ -472,22 +472,17 @@ export class LoadBalancerService {
 
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
-    const context = lb.context?.[0];
+    const {
+      aclList: existingAclList,
+      aclMap: existingAclMap,
+      backends: currentBackends,
+      context,
+      isNlb,
+      lbPort,
+      planName,
+      tcpBackends: currentTcpBackends
+    } = resolveLoadBalancerMutationContext(lb, lbId);
 
-    if (context === undefined) {
-      throw new CliError(
-        `Load balancer ${lbId} returned no configuration context.`,
-        {
-          code: 'LOAD_BALANCER_CONTEXT_MISSING',
-          exitCode: EXIT_CODES.network,
-          suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
-        }
-      );
-    }
-
-    const currentBackends = context.backends ?? [];
-    const currentTcpBackends = context.tcp_backend ?? [];
-    const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
     const albBackendProtocol = isNlb
       ? null
       : assertAlbBackendProtocol(options.backendProtocol);
@@ -515,15 +510,6 @@ export class LoadBalancerService {
         }
       );
     }
-
-    const { aclList: existingAclList, aclMap: existingAclMap } =
-      getContextAclData(context);
-    const ctx = context as {
-      lb_port?: string;
-      plan_name?: string;
-    };
-    const lbPort = ctx.lb_port !== undefined ? ctx.lb_port : '80';
-    const planName = ctx.plan_name !== undefined ? ctx.plan_name : '';
 
     // Build initial server list (optional)
     const servers: LoadBalancerServer[] = [];
@@ -639,22 +625,16 @@ export class LoadBalancerService {
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
-    const context = lb.context?.[0];
-
-    if (context === undefined) {
-      throw new CliError(
-        `Load balancer ${lbId} returned no configuration context.`,
-        {
-          code: 'LOAD_BALANCER_CONTEXT_MISSING',
-          exitCode: EXIT_CODES.network,
-          suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
-        }
-      );
-    }
-
-    const currentBackends = context.backends ?? [];
-    const currentTcpBackends = context.tcp_backend ?? [];
-    const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
+    const {
+      aclList: existingAclList,
+      aclMap: existingAclMap,
+      backends: currentBackends,
+      context,
+      isNlb,
+      lbPort,
+      planName,
+      tcpBackends: currentTcpBackends
+    } = resolveLoadBalancerMutationContext(lb, lbId);
 
     if (isNlb) {
       const exists = currentTcpBackends.some(
@@ -678,10 +658,6 @@ export class LoadBalancerService {
         );
       }
 
-      const { aclList: existingAclList, aclMap: existingAclMap } =
-        getContextAclData(context);
-      const ctx = context as { lb_port?: string; plan_name?: string };
-
       await client.updateLoadBalancer(
         lbId,
         buildLoadBalancerUpdateRequest(lb, context, {
@@ -689,8 +665,8 @@ export class LoadBalancerService {
           acl_map: existingAclMap,
           backends: currentBackends,
           lb_mode: 'TCP',
-          lb_port: ctx.lb_port ?? '80',
-          plan_name: ctx.plan_name ?? '',
+          lb_port: lbPort,
+          plan_name: planName,
           tcp_backend: currentTcpBackends.filter(
             (g) => g.backend_name !== groupName
           )
@@ -719,15 +695,12 @@ export class LoadBalancerService {
       const remainingBackends = currentBackends.filter(
         (g) => g.name !== groupName
       );
-      const { aclList: existingAclList, aclMap: existingAclMap } =
-        getContextAclData(context);
       const { aclList: filteredAclList, aclMap: filteredAclMap } =
         filterAclForRemainingBackends(
           existingAclList,
           existingAclMap,
           remainingBackends
         );
-      const ctx = context as { lb_port?: string; plan_name?: string };
 
       await client.updateLoadBalancer(
         lbId,
@@ -736,8 +709,8 @@ export class LoadBalancerService {
           acl_map: filteredAclMap,
           backends: remainingBackends,
           lb_mode: normalizeExistingMode(lb.lb_mode, 'HTTP'),
-          lb_port: ctx.lb_port ?? '80',
-          plan_name: ctx.plan_name ?? '',
+          lb_port: lbPort,
+          plan_name: planName,
           tcp_backend: currentTcpBackends
         })
       );
@@ -807,37 +780,22 @@ export class LoadBalancerService {
 
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
-    const context = lb.context?.[0];
-
-    if (context === undefined) {
-      throw new CliError(
-        `Load balancer ${lbId} returned no configuration context.`,
-        {
-          code: 'LOAD_BALANCER_CONTEXT_MISSING',
-          exitCode: EXIT_CODES.network,
-          suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
-        }
-      );
-    }
-
-    const currentBackends = context.backends ?? [];
-    const currentTcpBackends = context.tcp_backend ?? [];
-    const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
+    const {
+      aclList: existingAclList,
+      aclMap: existingAclMap,
+      backends: currentBackends,
+      context,
+      isNlb,
+      lbPort,
+      planName,
+      tcpBackends: currentTcpBackends
+    } = resolveLoadBalancerMutationContext(lb, lbId);
 
     const server: LoadBalancerServer = {
       backend_name: options.serverName,
       backend_ip: serverIp,
       backend_port: serverPort
     };
-
-    const { aclList: existingAclList, aclMap: existingAclMap } =
-      getContextAclData(context);
-    const ctx = context as {
-      lb_port?: string;
-      plan_name?: string;
-    };
-    const lbPort = ctx.lb_port !== undefined ? ctx.lb_port : '80';
-    const planName = ctx.plan_name !== undefined ? ctx.plan_name : '';
 
     if (isNlb) {
       const existingGroup = currentTcpBackends.find(
@@ -932,30 +890,16 @@ export class LoadBalancerService {
 
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
-    const context = lb.context?.[0];
-
-    if (context === undefined) {
-      throw new CliError(
-        `Load balancer ${lbId} returned no configuration context.`,
-        {
-          code: 'LOAD_BALANCER_CONTEXT_MISSING',
-          exitCode: EXIT_CODES.network,
-          suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
-        }
-      );
-    }
-
-    const currentBackends = context.backends ?? [];
-    const currentTcpBackends = context.tcp_backend ?? [];
-    const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
-    const { aclList: existingAclList, aclMap: existingAclMap } =
-      getContextAclData(context);
-    const ctx = context as {
-      lb_port?: string;
-      plan_name?: string;
-    };
-    const lbPort = ctx.lb_port !== undefined ? ctx.lb_port : '80';
-    const planName = ctx.plan_name !== undefined ? ctx.plan_name : '';
+    const {
+      aclList: existingAclList,
+      aclMap: existingAclMap,
+      backends: currentBackends,
+      context,
+      isNlb,
+      lbPort,
+      planName,
+      tcpBackends: currentTcpBackends
+    } = resolveLoadBalancerMutationContext(lb, lbId);
 
     if (isNlb) {
       const existingGroup = currentTcpBackends.find(
@@ -1353,6 +1297,57 @@ function getContextAclData(
     aclList: context.acl_list ?? [],
     aclMap: context.acl_map ?? []
   };
+}
+
+interface ResolvedLoadBalancerMutationContext {
+  aclList: LoadBalancerAclRule[];
+  aclMap: LoadBalancerAclMapRule[];
+  backends: LoadBalancerBackend[];
+  context: LoadBalancerContextPayload;
+  isNlb: boolean;
+  lbPort: string;
+  planName: string;
+  tcpBackends: LoadBalancerTcpBackend[];
+}
+
+function inferLbPort(
+  contextLbPort: string | undefined,
+  lbMode: string | undefined,
+  tcpBackends: LoadBalancerTcpBackend[]
+): string {
+  if (contextLbPort !== undefined) return contextLbPort;
+  const mode = lbMode?.toUpperCase();
+  if (mode === 'HTTPS' || mode === 'BOTH') return '443';
+  if (mode === 'TCP') {
+    const port = tcpBackends[0]?.port;
+    return port !== undefined ? String(port) : '80';
+  }
+  return '80';
+}
+
+function resolveLoadBalancerMutationContext(
+  lb: LoadBalancerDetails,
+  lbId: string
+): ResolvedLoadBalancerMutationContext {
+  const context = lb.context?.[0];
+  if (context === undefined) {
+    throw new CliError(
+      `Load balancer ${lbId} returned no configuration context.`,
+      {
+        code: 'LOAD_BALANCER_CONTEXT_MISSING',
+        exitCode: EXIT_CODES.network,
+        suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
+      }
+    );
+  }
+  const backends = context.backends ?? [];
+  const tcpBackends = context.tcp_backend ?? [];
+  const isNlb = tcpBackends.length > 0 || lb.lb_mode === 'TCP';
+  const { aclList, aclMap } = getContextAclData(context);
+  const ctx = context as { lb_port?: string; plan_name?: string };
+  const lbPort = inferLbPort(ctx.lb_port, lb.lb_mode, tcpBackends);
+  const planName = ctx.plan_name ?? '';
+  return { aclList, aclMap, backends, context, isNlb, lbPort, planName, tcpBackends };
 }
 
 function filterAclForRemainingBackends(
