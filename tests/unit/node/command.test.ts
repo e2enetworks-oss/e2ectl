@@ -407,6 +407,9 @@ describe('node commands', () => {
 
     const runtime: CliRuntime = {
       confirm,
+      createImageClient: vi.fn(() => {
+        throw new Error('Image client should not be created for this test.');
+      }) as unknown as CliRuntime['createImageClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
@@ -765,6 +768,83 @@ describe('node commands', () => {
         image: 'Ubuntu-24.04-Distro',
         name: 'new-node',
         plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi',
+        sshKeyIds: []
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
+  it('maps --saved-image-template-id into node create service options', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'image-node',
+        '--plan',
+        'plan-123',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--saved-image-template-id',
+        '1448',
+        '--alias',
+        'prod'
+      ]);
+    } finally {
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'image-node',
+        plan: 'plan-123',
+        savedImageTemplateId: '1448',
+        sshKeyIds: []
+      });
+      createNodeSpy.mockRestore();
+    }
+  });
+
+  it('passes create context overrides through to the node service', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const createNodeSpy = vi.spyOn(NodeService.prototype, 'createNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'create',
+        '--name',
+        'ctx-node',
+        '--plan',
+        'plan-ctx',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--alias',
+        'prod',
+        '--location',
+        'Chennai',
+        '--project-id',
+        '46429'
+      ]);
+    } finally {
+      expect(createNodeSpy).toHaveBeenCalledWith({
+        alias: 'prod',
+        billingType: 'hourly',
+        image: 'Ubuntu-24.04-Distro',
+        location: 'Chennai',
+        name: 'ctx-node',
+        plan: 'plan-ctx',
+        projectId: '46429',
         sshKeyIds: []
       });
       createNodeSpy.mockRestore();
@@ -1190,6 +1270,23 @@ describe('node commands', () => {
     );
   });
 
+  it('renders catalog help when the catalog namespace is called without a subcommand', async () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    const nodeCommand = program.commands.find((c) => c.name() === 'node');
+    const catalogCommand = nodeCommand?.commands.find(
+      (c) => c.name() === 'catalog'
+    );
+
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'node', 'catalog']);
+
+    expect(catalogCommand?.helpInformation()).toContain(
+      'Discover valid OS, plan, and image combinations for node creation.'
+    );
+    expect(catalogCommand?.helpInformation()).toContain('plans');
+    expect(catalogCommand?.helpInformation()).toContain('os');
+  });
+
   it('requests power-on through the node action subtree', async () => {
     const { nodeStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -1286,6 +1383,44 @@ describe('node commands', () => {
         }
       })
     );
+  });
+
+  it('passes upgrade context overrides and force through to the node service', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const upgradeNodeSpy = vi.spyOn(NodeService.prototype, 'upgradeNode');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'upgrade',
+        '101',
+        '--plan',
+        'plan-ctx',
+        '--image',
+        'Ubuntu-24.04-Distro',
+        '--alias',
+        'prod',
+        '--location',
+        'Chennai',
+        '--project-id',
+        '46429',
+        '--force'
+      ]);
+    } finally {
+      expect(upgradeNodeSpy).toHaveBeenCalledWith('101', {
+        alias: 'prod',
+        force: true,
+        image: 'Ubuntu-24.04-Distro',
+        location: 'Chennai',
+        plan: 'plan-ctx',
+        projectId: '46429'
+      });
+      upgradeNodeSpy.mockRestore();
+    }
   });
 
   it('requests save-image with the provided name', async () => {
@@ -1548,6 +1683,107 @@ describe('node commands', () => {
     );
   });
 
+  it('passes ssh-key action context overrides through to the node service', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const attachSshKeysSpy = vi.spyOn(NodeService.prototype, 'attachSshKeys');
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'action',
+        'ssh-key',
+        'attach',
+        '101',
+        '--ssh-key-id',
+        '12',
+        '--alias',
+        'prod',
+        '--location',
+        'Chennai',
+        '--project-id',
+        '46429'
+      ]);
+    } finally {
+      expect(attachSshKeysSpy).toHaveBeenCalledWith('101', {
+        alias: 'prod',
+        location: 'Chennai',
+        projectId: '46429',
+        sshKeyIds: ['12']
+      });
+      attachSshKeysSpy.mockRestore();
+    }
+  });
+
+  it('passes security-group action context overrides through to the node service', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    const attachSecurityGroupsSpy = vi.spyOn(
+      NodeService.prototype,
+      'attachSecurityGroups'
+    );
+    const detachSecurityGroupsSpy = vi.spyOn(
+      NodeService.prototype,
+      'detachSecurityGroups'
+    );
+
+    try {
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'action',
+        'security-group',
+        'attach',
+        '101',
+        '--security-group-id',
+        '44',
+        '--alias',
+        'prod',
+        '--location',
+        'Chennai',
+        '--project-id',
+        '46429'
+      ]);
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'node',
+        'action',
+        'security-group',
+        'detach',
+        '101',
+        '--security-group-id',
+        '45',
+        '--alias',
+        'prod',
+        '--location',
+        'Chennai',
+        '--project-id',
+        '46429'
+      ]);
+    } finally {
+      expect(attachSecurityGroupsSpy).toHaveBeenCalledWith('101', {
+        alias: 'prod',
+        location: 'Chennai',
+        projectId: '46429',
+        securityGroupIds: ['44']
+      });
+      expect(detachSecurityGroupsSpy).toHaveBeenCalledWith('101', {
+        alias: 'prod',
+        location: 'Chennai',
+        projectId: '46429',
+        securityGroupIds: ['45']
+      });
+      attachSecurityGroupsSpy.mockRestore();
+      detachSecurityGroupsSpy.mockRestore();
+    }
+  });
+
   it('requires force outside an interactive terminal for public-ip detach after resolving node details', async () => {
     const { confirm, nodeStub, reservedIpStub, runtime } = createRuntimeFixture(
       {
@@ -1790,5 +2026,76 @@ describe('node commands', () => {
     expect(nodeCommand?.helpInformation()).toContain('action');
     expect(nodeCommand?.helpInformation()).toContain('catalog');
     expect(nodeCommand?.helpInformation()).toContain('create');
+  });
+
+  it('renders help when action namespaces are called without a concrete subcommand', async () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    const nodeCommand = program.commands.find(
+      (command) => command.name() === 'node'
+    );
+    const actionCommand = nodeCommand?.commands.find(
+      (command) => command.name() === 'action'
+    );
+    const publicIpCommand = actionCommand?.commands.find(
+      (command) => command.name() === 'public-ip'
+    );
+    const sshKeyCommand = actionCommand?.commands.find(
+      (command) => command.name() === 'ssh-key'
+    );
+    const volumeCommand = actionCommand?.commands.find(
+      (command) => command.name() === 'volume'
+    );
+    const securityGroupCommand = actionCommand?.commands.find(
+      (command) => command.name() === 'security-group'
+    );
+    const vpcCommand = actionCommand?.commands.find(
+      (command) => command.name() === 'vpc'
+    );
+
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'node']);
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'node', 'action']);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'public-ip'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'ssh-key'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'volume'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'security-group'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'node',
+      'action',
+      'vpc'
+    ]);
+
+    expect(actionCommand?.helpInformation()).toContain('save-image');
+    expect(publicIpCommand?.helpInformation()).toContain('detach');
+    expect(sshKeyCommand?.helpInformation()).toContain('attach');
+    expect(volumeCommand?.helpInformation()).toContain('detach');
+    expect(securityGroupCommand?.helpInformation()).toContain('attach');
+    expect(vpcCommand?.helpInformation()).toContain('detach');
   });
 });

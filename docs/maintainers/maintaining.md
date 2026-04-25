@@ -178,7 +178,7 @@ Cleanup behavior:
 
 - cleanup still tries the built CLI first for supported delete and detach flows
 - it falls back to direct clients only when CLI cleanup fails
-- saved image cleanup uses a cleanup-only direct client path because there is no public `e2ectl` image delete command
+- saved image cleanup should use `e2ectl image delete` first and fall back to the cleanup-only direct client path only if CLI cleanup fails
 - already-gone cleanup responses are treated as successful so interrupted smoke runs can be replayed safely
 
 ## Promotion Checklist

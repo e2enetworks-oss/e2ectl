@@ -35,4 +35,26 @@ describe('formatError', () => {
     expect(message).toContain('Details:');
     expect(message).toContain('Next step: Set E2E_API_KEY and E2E_AUTH_TOKEN.');
   });
+
+  it('formats AppError without details or suggestion', () => {
+    const message = formatError(
+      new AppError('Something went wrong.', {
+        code: 'GENERAL'
+      })
+    );
+
+    expect(message).toBe('Error: Something went wrong.\n');
+  });
+
+  it('formats a plain Error as an unexpected error', () => {
+    const message = formatError(new Error('connection refused'));
+
+    expect(message).toBe('Unexpected error: connection refused\n');
+  });
+
+  it('formats an unknown non-Error value as a generic unexpected error', () => {
+    const message = formatError('not an error object');
+
+    expect(message).toBe('Unexpected error: an unknown failure occurred.\n');
+  });
 });

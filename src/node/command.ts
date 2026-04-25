@@ -32,9 +32,10 @@ interface NodeCreateCommandOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
   disk?: string;
-  image: string;
+  image?: string;
   name: string;
   plan: string;
+  savedImageTemplateId?: string;
   sshKeyId?: string[] | string;
 }
 
@@ -90,11 +91,18 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a new node from an exact catalog plan and image. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
+        `Create a new node from an exact catalog plan and catalog image. To launch from a saved image, still pass the catalog \`--image\` and add \`--saved-image-template-id\`. Use committed billing only after selecting a committed plan id from \`${formatCliCommand('node catalog plans')}\`. E1 and E1WC plans also require --disk.`
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
-      .requiredOption('--image <image>', 'MyAccount image identifier.')
+      .option(
+        '--image <image>',
+        'Catalog image identifier returned by node catalog plans.'
+      )
+      .option(
+        '--saved-image-template-id <savedImageTemplateId>',
+        'Saved image template ID (template_id) returned by image list.'
+      )
       .addOption(
         new Option(
           '--billing-type <billingType>',
@@ -137,9 +145,12 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
           : {
               projectId: options.projectId
             }),
-        image: options.image,
+        ...(options.image === undefined ? {} : { image: options.image }),
         name: options.name,
         plan: options.plan,
+        ...(options.savedImageTemplateId === undefined
+          ? {}
+          : { savedImageTemplateId: options.savedImageTemplateId }),
         sshKeyIds: toOptionArray(options.sshKeyId)
       });
       runtime.stdout.write(

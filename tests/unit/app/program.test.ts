@@ -13,6 +13,7 @@ describe('createProgram', () => {
       'project',
       'load-balancer',
       'node',
+      'image',
       'reserved-ip',
       'volume',
       'vpc',

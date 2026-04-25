@@ -24,6 +24,9 @@ describe('runCli', () => {
     return {
       runtime: {
         confirm: vi.fn(() => Promise.resolve(false)),
+        createImageClient: vi.fn(() => {
+          throw new Error('Image client should not be created for this test.');
+        }),
         createNodeClient: vi.fn(() => {
           throw new Error('Node client should not be created for this test.');
         }),

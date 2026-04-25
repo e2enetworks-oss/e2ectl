@@ -11,6 +11,7 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import { ImageApiClient, type ImageClient } from '../image/index.js';
 import {
   LoadBalancerApiClient,
   type LoadBalancerClient
@@ -35,6 +36,7 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createImageClient(credentials: ResolvedCredentials): ImageClient;
   createLoadBalancerClient(
     credentials: ResolvedCredentials
   ): LoadBalancerClient;
@@ -63,6 +65,10 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createImageClient: (credentials) =>
+      new ImageApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createLoadBalancerClient: (credentials) =>
       new LoadBalancerApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)

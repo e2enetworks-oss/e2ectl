@@ -92,6 +92,23 @@ e2ectl node create \
 
 The exact `plan`, `image`, and committed-plan identifiers should come from the current catalog output for the branch you are operating on.
 
+## Recipe: Create A Node From A Saved Image
+
+```bash
+# 1. Find the template_id of the saved image
+e2ectl --json image list > images.json
+
+# 2. Create using the same --plan and --image as a regular node create,
+#    plus --saved-image-template-id from the Template ID column
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --image <image> \
+  --saved-image-template-id <template-id>
+```
+
+`--image` is the catalog image identifier (e.g. `Ubuntu-24.04-Distro`), the same value used for a regular node create. `--saved-image-template-id` is the integer `template_id` from `image list` output.
+
 ## Recipe: Keep Cleanup Explicit
 
 Destructive commands should stay obvious and targeted:

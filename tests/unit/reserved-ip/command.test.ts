@@ -147,6 +147,9 @@ describe('reserved-ip commands', () => {
 
     const runtime: CliRuntime = {
       confirm: vi.fn(() => Promise.resolve(true)),
+      createImageClient: vi.fn(() => {
+        throw new Error('Image client should not be created for this test.');
+      }) as unknown as CliRuntime['createImageClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeClient;
@@ -363,6 +366,42 @@ describe('reserved-ip commands', () => {
     );
   });
 
+  it('passes reserve-node context overrides through credential resolution', async () => {
+    const { getNode, receivedCredentials, reservedIpStub, runtime } =
+      createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'reserve',
+      'node',
+      '101',
+      '--alias',
+      'prod',
+      '--location',
+      'Chennai',
+      '--project-id',
+      '67890'
+    ]);
+
+    expect(receivedCredentials()).toMatchObject({
+      alias: 'prod',
+      location: 'Chennai',
+      project_id: '67890'
+    });
+    expect(getNode).toHaveBeenCalledWith('101');
+    expect(reservedIpStub.reserveNodePublicIp).toHaveBeenCalledWith(
+      '164.52.198.55',
+      {
+        type: 'live-reserve',
+        vm_id: 100157
+      }
+    );
+  });
+
   it('attaches reserved IPs to nodes through the targeted command shape', async () => {
     const { reservedIpStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -480,6 +519,87 @@ describe('reserved-ip commands', () => {
     );
   });
 
+  it('renders human get/create/reserve/attach/detach/delete output when json mode is off', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'get',
+      '164.52.198.54',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'create',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'reserve',
+      'node',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'attach',
+      'node',
+      '164.52.198.54',
+      '--node-id',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'detach',
+      'node',
+      '164.52.198.54',
+      '--node-id',
+      '101',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'delete',
+      '164.52.198.54',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('Reserved IP: 164.52.198.54');
+    expect(stdout.buffer).toContain('Created reserved IP: 164.52.198.54');
+    expect(stdout.buffer).toContain(
+      'Reserved current public IP 164.52.198.55 from node 101.'
+    );
+    expect(stdout.buffer).toContain(
+      'Attached reserved IP 164.52.198.54 to node 101.'
+    );
+    expect(stdout.buffer).toContain(
+      'Detached reserved IP 164.52.198.54 from node 101.'
+    );
+    expect(stdout.buffer).toContain('Deleted reserved IP 164.52.198.54.');
+  });
+
   it('detaches reserved IPs from nodes through the targeted command shape', async () => {
     const { reservedIpStub, runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -579,6 +699,54 @@ describe('reserved-ip commands', () => {
 
     expect(output).toContain('Detach a reserved IP from a node.');
     expect(output).toContain('--node-id <nodeId>');
+  });
+
+  it('renders reserved-ip namespace help when intermediate commands are called without a subcommand', async () => {
+    const { runtime } = createRuntimeFixture();
+    const program = createProgram(runtime);
+    const reservedIpCommand = program.commands.find(
+      (command) => command.name() === 'reserved-ip'
+    );
+    const reserveCommand = reservedIpCommand?.commands.find(
+      (command) => command.name() === 'reserve'
+    );
+    const attachCommand = reservedIpCommand?.commands.find(
+      (command) => command.name() === 'attach'
+    );
+    const detachCommand = reservedIpCommand?.commands.find(
+      (command) => command.name() === 'detach'
+    );
+
+    await program.parseAsync(['node', CLI_COMMAND_NAME, 'reserved-ip']);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'reserve'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'attach'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'reserved-ip',
+      'detach'
+    ]);
+
+    expect(reservedIpCommand?.helpInformation()).toContain('create');
+    expect(reserveCommand?.helpInformation()).toContain(
+      'node [options] <nodeId>'
+    );
+    expect(attachCommand?.helpInformation()).toContain(
+      'node [options] <ipAddress>'
+    );
+    expect(detachCommand?.helpInformation()).toContain(
+      'node [options] <ipAddress>'
+    );
   });
 
   it('rejects the removed --from-node flag', async () => {
