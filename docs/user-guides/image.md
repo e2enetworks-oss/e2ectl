@@ -6,6 +6,7 @@
 
 Saved images are reusable images for your selected project and location. A common flow is to create one from an existing node with `e2ectl node action save-image`, then use that saved image for later node launches.
 
+
 ## Before You Start
 
 - Decide whether you need a saved image (`e2ectl image`) or a catalog image (`e2ectl node catalog plans`). They use different identifiers.
