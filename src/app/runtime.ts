@@ -34,7 +34,7 @@ export interface OutputWriter {
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
   createImageClient(credentials: ResolvedCredentials): ImageClient;
-  createDbaasClient?(credentials: ResolvedCredentials): DbaasClient;
+  createDbaasClient(credentials: ResolvedCredentials): DbaasClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;

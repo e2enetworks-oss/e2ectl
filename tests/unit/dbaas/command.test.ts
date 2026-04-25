@@ -7,6 +7,7 @@ import { stableStringify } from '../../../src/core/json.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { DbaasClient } from '../../../src/dbaas/index.js';
+import type { ImageClient } from '../../../src/image/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createDbaasClientStub() {
@@ -155,6 +156,9 @@ describe('dbaas commands', () => {
 
     const runtime: CliRuntime = {
       confirm: vi.fn(() => Promise.resolve(true)),
+      createImageClient: vi.fn(() => {
+        throw new Error('Image client should not be created for this test.');
+      }) as unknown as (_: ResolvedCredentials) => ImageClient,
       createDbaasClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;

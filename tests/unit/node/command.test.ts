@@ -410,6 +410,9 @@ describe('node commands', () => {
       createImageClient: vi.fn(() => {
         throw new Error('Image client should not be created for this test.');
       }) as unknown as CliRuntime['createImageClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;

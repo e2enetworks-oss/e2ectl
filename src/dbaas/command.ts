@@ -20,13 +20,7 @@ interface GlobalOptions {
 export function buildDbaasCommand(runtime: CliRuntime): Command {
   const service = new DbaasService({
     confirm: (message) => runtime.confirm(message),
-    createDbaasClient: (credentials) => {
-      if (runtime.createDbaasClient === undefined) {
-        throw new Error('DBaaS client support is unavailable in this runtime.');
-      }
-
-      return runtime.createDbaasClient(credentials);
-    },
+    createDbaasClient: (credentials) => runtime.createDbaasClient(credentials),
     isInteractive: runtime.isInteractive,
     store: runtime.store
   });
