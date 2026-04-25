@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { Command } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
@@ -22,6 +24,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createDbaasClient: (credentials) => runtime.createDbaasClient(credentials),
     isInteractive: runtime.isInteractive,
+    readPasswordFile: async (path) => await readFile(path, 'utf8'),
+    readPasswordFromStdin: readAllFromStdin,
     store: runtime.store
   });
   const command = new Command('dbaas').description(
@@ -94,9 +98,13 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         '--database-name <databaseName>',
         'Initial database name.'
       )
-      .requiredOption(
+      .option(
         '--password <password>',
         'Initial admin password that matches the frontend DBaaS policy.'
+      )
+      .option(
+        '--password-file <path>',
+        'Read the initial admin password from a file, or - to read from stdin.'
       )
       .option(
         '--username <username>',
@@ -118,9 +126,13 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     command
       .command('reset-password <dbaasId>')
       .description('Reset the admin password for a supported DBaaS cluster.')
-      .requiredOption(
+      .option(
         '--password <password>',
         'New admin password that matches the frontend DBaaS policy.'
+      )
+      .option(
+        '--password-file <path>',
+        'Read the new admin password from a file, or - to read from stdin.'
       )
   ).action(
     async (
@@ -164,4 +176,15 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
   });
 
   return command;
+}
+
+async function readAllFromStdin(): Promise<string> {
+  process.stdin.setEncoding('utf8');
+
+  let buffer = '';
+  for await (const chunk of process.stdin) {
+    buffer += chunk;
+  }
+
+  return buffer;
 }

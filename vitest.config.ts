@@ -8,7 +8,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      exclude: ['**/types.ts'],
+      exclude: ['**/types.ts', 'scripts/**', 'tests/**'],
       reportsDirectory: 'coverage/unit',
       thresholds: {
         branches: 85,

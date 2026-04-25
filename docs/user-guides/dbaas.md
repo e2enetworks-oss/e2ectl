@@ -45,15 +45,17 @@ e2ectl dbaas create \
   --db-version 8.0 \
   --plan <plan-name> \
   --database-name <database-name> \
-  --password <password>
+  --password-file /secure/path/dbaas-password.txt
 ```
+
+Use `--password-file -` to read the password from stdin. `--password <password>` is still supported for one-off interactive use, but it can leave the password in shell history.
 
 If you want a different admin user, also pass `--username <username>`. To create without a public endpoint, add `--no-public-ip`.
 
 ### Reset The Admin Password
 
 ```bash
-e2ectl dbaas reset-password <dbaas-id> --password <new-password>
+e2ectl dbaas reset-password <dbaas-id> --password-file /secure/path/dbaas-password.txt
 ```
 
 ### Delete A DBaaS Cluster
@@ -75,7 +77,7 @@ e2ectl dbaas create \
   --db-version 16 \
   --plan "Balanced Small" \
   --database-name analytics \
-  --password <password>
+  --password-file /secure/path/dbaas-password.txt
 ```
 
 List clusters in machine-readable form so later steps can consume ids:
@@ -88,6 +90,7 @@ e2ectl --json dbaas list
 
 - Use `dbaas plans --json` when automation needs the exact engine and template-plan rows before creating a cluster.
 - Use `dbaas list --json` when later steps need the numeric DBaaS id for `reset-password` or `delete`.
+- Prefer `--password-file <path>` or `--password-file -` over `--password <password>` so DBaaS admin passwords do not end up in shell history or CI logs.
 - In non-interactive environments, pass `--force` to `dbaas delete`.
 
 ## Related Guides

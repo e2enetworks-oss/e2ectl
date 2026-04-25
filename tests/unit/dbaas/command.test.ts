@@ -307,6 +307,14 @@ describe('dbaas commands', () => {
     expect(help).toContain('reset-password');
   });
 
+  it('shows safer DBaaS password file options in create help', async () => {
+    const help = await renderHelp(['dbaas', 'create', '--help']);
+
+    expect(help).toContain('--password <password>');
+    expect(help).toContain('--password-file <path>');
+    expect(help).toContain('or - to read from stdin');
+  });
+
   it('creates DBaaS clusters through the command surface in json mode', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);

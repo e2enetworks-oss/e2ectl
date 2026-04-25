@@ -52,7 +52,8 @@ export interface DbaasCreateOptions extends DbaasContextOptions {
   databaseName: string;
   dbVersion: string;
   name: string;
-  password: string;
+  password?: string;
+  passwordFile?: string;
   plan: string;
   publicIp?: boolean;
   type: string;
@@ -60,7 +61,8 @@ export interface DbaasCreateOptions extends DbaasContextOptions {
 }
 
 export interface DbaasResetPasswordOptions extends DbaasContextOptions {
-  password: string;
+  password?: string;
+  passwordFile?: string;
 }
 
 export interface DbaasDeleteOptions extends DbaasContextOptions {
@@ -189,7 +191,14 @@ export interface DbaasServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createDbaasClient(credentials: ResolvedCredentials): DbaasClient;
   isInteractive: boolean;
+  readPasswordFile(path: string): Promise<string>;
+  readPasswordFromStdin(): Promise<string>;
   store: DbaasStore;
+}
+
+interface DbaasPasswordOptions {
+  password?: string;
+  passwordFile?: string;
 }
 
 interface NormalizedDbaasCreateInput {
@@ -209,7 +218,8 @@ export class DbaasService {
   async createDbaas(
     options: DbaasCreateOptions
   ): Promise<DbaasCreateCommandResult> {
-    const input = normalizeDbaasCreateInput(options);
+    const password = await this.loadPassword(options);
+    const input = normalizeDbaasCreateInput(options, password);
     const client = await this.createClient(options);
     const catalog = await client.listPlans();
     const software = resolveSoftware(catalog, input.type, input.version);
@@ -401,7 +411,7 @@ export class DbaasService {
       'DBaaS ID',
       'the first argument'
     );
-    const password = normalizePassword(options.password, '--password');
+    const password = await this.loadPassword(options);
     const client = await this.createClient(options);
     const detail = await client.getDbaas(normalizedDbaasId);
     const summary = summarizeSupportedCluster(detail);
@@ -449,6 +459,29 @@ export class DbaasService {
     return this.dependencies.createDbaasClient(credentials);
   }
 
+  private async loadPassword(options: DbaasPasswordOptions): Promise<string> {
+    const source = normalizePasswordSource(options);
+
+    try {
+      const content =
+        source.kind === 'value'
+          ? source.value
+          : source.path === '-'
+            ? await this.dependencies.readPasswordFromStdin()
+            : await this.dependencies.readPasswordFile(source.path);
+
+      return normalizePassword(content, source.label);
+    } catch (error: unknown) {
+      if (error instanceof CliError) {
+        throw error;
+      }
+
+      throw source.kind === 'file'
+        ? wrapPasswordReadError(source.path, error)
+        : error;
+    }
+  }
+
   private async fetchAllDbaasClusters(
     client: DbaasClient,
     requestedType: SupportedDatabaseType | null
@@ -488,7 +521,8 @@ export class DbaasService {
 }
 
 function normalizeDbaasCreateInput(
-  options: DbaasCreateOptions
+  options: DbaasCreateOptions,
+  password: string
 ): NormalizedDbaasCreateInput {
   const name = normalizeDbaasName(options.name, 'Name', '--name');
   const databaseName = normalizeDatabaseName(options.databaseName);
@@ -498,7 +532,7 @@ function normalizeDbaasCreateInput(
     databaseName,
     name,
     type: normalizeDatabaseType(options.type),
-    password: normalizePassword(options.password, '--password'),
+    password,
     plan: normalizeRequiredString(options.plan, 'Plan', '--plan'),
     publicIp: options.publicIp ?? true,
     username,
@@ -508,6 +542,68 @@ function normalizeDbaasCreateInput(
       '--db-version'
     )
   };
+}
+
+function normalizePasswordSource(
+  options: DbaasPasswordOptions
+):
+  | { kind: 'value'; label: string; value: string }
+  | { kind: 'file'; label: string; path: string } {
+  const hasPassword = options.password !== undefined;
+  const hasPasswordFile = options.passwordFile !== undefined;
+
+  if (hasPassword && hasPasswordFile) {
+    throw new CliError('Use only one password source.', {
+      code: 'DUPLICATE_DBAAS_PASSWORD_SOURCE',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Pass either --password-file <path> or --password <password>, not both.'
+    });
+  }
+
+  if (hasPassword) {
+    return {
+      kind: 'value',
+      label: '--password',
+      value: options.password!
+    };
+  }
+
+  if (hasPasswordFile) {
+    return {
+      kind: 'file',
+      label: '--password-file',
+      path: normalizeRequiredString(
+        options.passwordFile!,
+        'Password file',
+        '--password-file'
+      )
+    };
+  }
+
+  throw new CliError('Password is required.', {
+    code: 'MISSING_DBAAS_PASSWORD',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Pass --password-file <path>, pipe a password with --password-file -, or pass --password <password>.'
+  });
+}
+
+function wrapPasswordReadError(passwordFile: string, error: unknown): CliError {
+  return new CliError(
+    passwordFile === '-'
+      ? 'Could not read DBaaS password from stdin.'
+      : `Could not read DBaaS password file: ${passwordFile}`,
+    {
+      code: 'DBAAS_PASSWORD_READ_FAILED',
+      cause: error,
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        passwordFile === '-'
+          ? `Pipe the password into the command, for example: printf '%s' '<password>' | ${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file -')}`
+          : 'Verify that the file exists, is readable, and contains only the DBaaS admin password.'
+    }
+  );
 }
 
 function buildCreateRequest(

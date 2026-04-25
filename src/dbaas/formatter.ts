@@ -149,7 +149,7 @@ function renderTemplatePlansHuman(
   return (
     `${title}\n${formatDbaasTemplatePlansTable(result.items)}\n\n` +
     'Create with one of these plan names:\n' +
-    `${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password <password>')}\n`
+    `${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file <path>')}\n`
   );
 }
 

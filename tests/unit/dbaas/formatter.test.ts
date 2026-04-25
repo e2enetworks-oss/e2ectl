@@ -151,7 +151,7 @@ describe('dbaas formatter', () => {
     expect(templateOutput).toContain('Balanced Small');
     expect(templateOutput).toContain(
       formatCliCommand(
-        'dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password <password>'
+        'dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file <path>'
       )
     );
   });

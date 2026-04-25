@@ -87,6 +87,8 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   getDbaas: ReturnType<typeof vi.fn>;
   listDbaas: ReturnType<typeof vi.fn>;
   listPlans: ReturnType<typeof vi.fn>;
+  readPasswordFile: ReturnType<typeof vi.fn>;
+  readPasswordFromStdin: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   resetPassword: ReturnType<typeof vi.fn>;
   service: DbaasService;
@@ -97,6 +99,8 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   const getDbaas = vi.fn();
   const listDbaas = vi.fn();
   const listPlans = vi.fn();
+  const readPasswordFile = vi.fn();
+  const readPasswordFromStdin = vi.fn();
   const resetPassword = vi.fn();
   let credentials: ResolvedCredentials | undefined;
 
@@ -118,6 +122,8 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
     confirm,
     createDbaasClient,
     isInteractive: options?.isInteractive ?? true,
+    readPasswordFile,
+    readPasswordFromStdin,
     store: {
       configPath: '/tmp/e2ectl-config.json',
       read: () => Promise.resolve(createConfig())
@@ -132,6 +138,8 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
     getDbaas,
     listDbaas,
     listPlans,
+    readPasswordFile,
+    readPasswordFromStdin,
     receivedCredentials: () => credentials,
     resetPassword,
     service
@@ -530,6 +538,49 @@ describe('DbaasService', () => {
       },
       message: 'Password reset request processed successfully.'
     });
+  });
+
+  it('reads reset passwords from stdin when --password-file - is used', async () => {
+    const { getDbaas, readPasswordFromStdin, resetPassword, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    readPasswordFromStdin.mockResolvedValue('ValidPassword1!A\n');
+    resetPassword.mockResolvedValue({
+      cluster_id: 7869,
+      message: 'Password reset request processed successfully.',
+      name: 'customer-db'
+    });
+
+    await service.resetPassword('7869', {
+      alias: 'prod',
+      passwordFile: '-'
+    });
+
+    expect(readPasswordFromStdin).toHaveBeenCalledOnce();
+    expect(resetPassword).toHaveBeenCalledWith(7869, {
+      password: 'ValidPassword1!A',
+      username: 'admin'
+    });
+  });
+
+  it('rejects ambiguous DBaaS password sources', async () => {
+    const { createDbaas, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        passwordFile: '-',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Use only one password source.');
+
+    expect(createDbaas).not.toHaveBeenCalled();
   });
 
   it('fails clearly when a supported DBaaS cluster has no resettable username', async () => {

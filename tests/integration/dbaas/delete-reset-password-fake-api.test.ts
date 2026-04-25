@@ -107,6 +107,55 @@ describe('dbaas delete and reset-password against a fake MyAccount API', () => {
     }
   });
 
+  it('resets passwords from stdin when --password-file - is used', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: mysqlClusterBody(),
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'PUT /myaccount/api/v1/rds/cluster/7869/reset-password/': () => ({
+        body: {
+          code: 200,
+          data: {
+            cluster_id: 7869,
+            name: 'customer-db'
+          },
+          errors: {},
+          message: 'Password reset request processed successfully.'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['dbaas', 'reset-password', '7869', '--password-file', '-'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          },
+          stdin: 'ValidPassword1!A\n'
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
+        password: 'ValidPassword1!A',
+        username: 'admin'
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('deletes supported DBaaS clusters with --force', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
