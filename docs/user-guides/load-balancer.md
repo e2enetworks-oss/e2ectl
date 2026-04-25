@@ -275,7 +275,7 @@ Creates a new load balancer.
 | Flag                                | Required | Description                                                                  |
 | ----------------------------------- | -------- | ---------------------------------------------------------------------------- |
 | `--name <name>`                     | Yes      | Load balancer name                                                           |
-| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.       |
+| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.    |
 | `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                |
 | `--port <port>`                     | Yes      | Frontend listener port                                                       |
 | `--backend-name <name>`             | Yes      | Initial backend group name                                                   |

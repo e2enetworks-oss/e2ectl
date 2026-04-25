@@ -1314,7 +1314,6 @@ describe('LoadBalancerService', () => {
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.lb_port).toBe('443');
     });
-
   });
 
   describe('deleteBackendGroup', () => {

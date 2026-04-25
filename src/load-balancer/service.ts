@@ -1350,7 +1350,16 @@ function resolveLoadBalancerMutationContext(
   const { aclList, aclMap } = getContextAclData(context);
   const lbPort = inferLbPort(context.lb_port, lb.lb_mode, tcpBackends);
   const planName = context.plan_name ?? '';
-  return { aclList, aclMap, backends, context, isNlb, lbPort, planName, tcpBackends };
+  return {
+    aclList,
+    aclMap,
+    backends,
+    context,
+    isNlb,
+    lbPort,
+    planName,
+    tcpBackends
+  };
 }
 
 function filterAclForRemainingBackends(
