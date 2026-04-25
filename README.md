@@ -1,10 +1,10 @@
 # e2ectl
 
-[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/develop/graph/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/tree/develop) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](./docs/user-guides/index.md) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Verify](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml/badge.svg?branch=develop)](https://github.com/e2enetworks-oss/e2ectl/actions/workflows/verify.yml) [![Coverage](https://codecov.io/gh/e2enetworks-oss/e2ectl/branch/main/graph/badge.svg)](https://github.com/e2enetworks-oss/e2ectl/tree/main) [![Release](https://img.shields.io/github/v/release/e2enetworks-oss/e2ectl)](https://github.com/e2enetworks-oss/e2ectl/releases/latest) [![Docs](https://img.shields.io/badge/docs-blue)](./docs/user-guides/index.md) ![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white) ![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 `e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It helps operators and automation manage projects, DBaaS clusters, nodes, reserved IPs, volumes, VPCs, security groups, and SSH keys with saved profiles, shared default context, and deterministic `--json` output.
+It provides a unified CLI to manage E2E MyAccount resources—compute nodes, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
 
 ## Requirements
 
@@ -55,7 +55,7 @@ e2ectl node create \
   --image <image>
 ```
 
-If the selected plan is `E1` or `E1WC`, also pass `--disk <size-gb>`. For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quickstart.md) and the [first-node workflow](./docs/user-guides/workflows/first-node.md).
+For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quickstart.md) and the [first-node workflow](./docs/user-guides/workflows/first-node.md).
 
 ## Common Workflows
 
@@ -77,6 +77,7 @@ Command guides:
 - [Project](./docs/user-guides/project.md)
 - [DBaaS](./docs/user-guides/dbaas.md)
 - [Node](./docs/user-guides/node.md)
+- [Image](./docs/user-guides/image.md)
 - [Reserved IP](./docs/user-guides/reserved-ip.md)
 - [Volume](./docs/user-guides/volume.md)
 - [VPC](./docs/user-guides/vpc.md)

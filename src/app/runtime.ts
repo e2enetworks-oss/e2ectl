@@ -11,6 +11,7 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import { ImageApiClient, type ImageClient } from '../image/index.js';
 import { DbaasApiClient, type DbaasClient } from '../dbaas/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import { ProjectApiClient, type ProjectClient } from '../project/index.js';
@@ -32,6 +33,7 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createImageClient(credentials: ResolvedCredentials): ImageClient;
   createDbaasClient?(credentials: ResolvedCredentials): DbaasClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
@@ -58,6 +60,10 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createImageClient: (credentials) =>
+      new ImageApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createDbaasClient: (credentials) =>
       new DbaasApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)

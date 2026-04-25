@@ -13,6 +13,7 @@ describe('createProgram', () => {
       'project',
       'dbaas',
       'node',
+      'image',
       'reserved-ip',
       'volume',
       'vpc',

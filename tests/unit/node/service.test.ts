@@ -952,6 +952,25 @@ describe('NodeService', () => {
     expect(createNode).not.toHaveBeenCalled();
   });
 
+  it('rejects E1 disk sizes below the default size that do not match downsize increments', async () => {
+    const { createNode, createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        disk: '130',
+        image: 'Ubuntu-24.04-Distro',
+        name: 'demo-node',
+        plan: 'E1-2vCPU-6RAM-0DISK-E1.6GB-Ubuntu-24.04-Delhi'
+      })
+    ).rejects.toMatchObject({
+      message: 'Disk size below 150 GB must be a multiple of 25 GB.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
+    expect(createNode).not.toHaveBeenCalled();
+  });
+
   it('maps committed create options to cn_id and auto_renew status', async () => {
     const { createNode, service } = createServiceFixture();
 
@@ -1114,6 +1133,52 @@ describe('NodeService', () => {
       message:
         'Committed plan ID can only be used with --billing-type committed.'
     });
+  });
+
+  it('creates a saved-image node request with is_saved_image true', async () => {
+    const { createNode, service } = createServiceFixture();
+
+    await service.createNode({
+      alias: 'prod',
+      image: 'Ubuntu-24.04-Distro',
+      name: 'image-node',
+      plan: 'plan-123',
+      savedImageTemplateId: '1448'
+    });
+
+    expect(createNode).toHaveBeenCalledWith({
+      backups: false,
+      default_public_ip: false,
+      disable_password: true,
+      enable_bitninja: false,
+      image: 'Ubuntu-24.04-Distro',
+      is_ipv6_availed: false,
+      is_saved_image: true,
+      label: 'default',
+      name: 'image-node',
+      number_of_instances: 1,
+      plan: 'plan-123',
+      saved_image_template_id: '1448',
+      ssh_keys: [],
+      start_scripts: []
+    });
+  });
+
+  it('requires --image for node create', async () => {
+    const { createNodeClient, service } = createServiceFixture();
+
+    await expect(
+      service.createNode({
+        alias: 'prod',
+        name: 'demo-node',
+        plan: 'plan-123'
+      })
+    ).rejects.toMatchObject({
+      message:
+        '--image is required for node create, including saved-image launches.'
+    });
+
+    expect(createNodeClient).not.toHaveBeenCalled();
   });
 
   it('groups catalog plans by config and keeps committed options nested', async () => {

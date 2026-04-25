@@ -295,6 +295,153 @@ describe('ReservedIpApiClient', () => {
       message: 'IP Released 164.52.198.54'
     });
   });
+
+  it('falls back to response.message when delete result has no data.message', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.deleteMock.mockResolvedValue(
+      envelope(
+        {},
+        {
+          message: 'IP Released Successfully'
+        }
+      )
+    );
+
+    const result = await client.deleteReservedIp('164.52.198.54');
+
+    expect(result).toEqual({
+      message: 'IP Released Successfully'
+    });
+  });
+
+  it('falls back to ip_address field when IP field is missing in action response', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          ip_address: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(result.ip_address).toBe('164.52.198.54');
+  });
+
+  it('falls back to ipAddress param when both IP and ip_address are missing', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(result.ip_address).toBe('164.52.198.54');
+  });
+
+  it('maps action response status to null when status is absent', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.54',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(result.status).toBeNull();
+  });
+
+  it('maps action response vm_name to null when vm_name is absent', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(result.vm_name).toBeNull();
+  });
+
+  it('maps action response message to response.message when data.message is absent', async () => {
+    const transport = new StubTransport();
+    const client = new ReservedIpApiClient(transport);
+
+    transport.postMock.mockResolvedValue(
+      envelope(
+        {
+          IP: '164.52.198.54',
+          status: 'Assigned',
+          vm_id: 100157,
+          vm_name: 'node-a'
+        },
+        {
+          message: 'IP assigned successfully.'
+        }
+      )
+    );
+
+    const result = await client.attachReservedIpToNode('164.52.198.54', {
+      type: 'attach',
+      vm_id: 100157
+    });
+
+    expect(result.message).toBe('IP assigned successfully.');
+  });
 });
 
 function envelope<TData>(

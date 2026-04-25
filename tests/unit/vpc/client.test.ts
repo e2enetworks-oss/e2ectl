@@ -260,6 +260,39 @@ describe('VpcApiClient', () => {
       }
     });
   });
+
+  it('returns VPC list without pagination metadata when API omits it', async () => {
+    const transport = new StubTransport();
+    const client = new VpcApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([
+        {
+          ipv4_cidr: '10.20.0.0/23',
+          is_e2e_vpc: true,
+          name: 'prod-vpc',
+          network_id: 27835,
+          state: 'Active'
+        }
+      ])
+    );
+
+    const result = await client.listVpcs(1, 100);
+
+    expect(result).toEqual({
+      items: [
+        {
+          ipv4_cidr: '10.20.0.0/23',
+          is_e2e_vpc: true,
+          name: 'prod-vpc',
+          network_id: 27835,
+          state: 'Active'
+        }
+      ]
+    });
+    expect(result).not.toHaveProperty('total_count');
+    expect(result).not.toHaveProperty('total_page_number');
+  });
 });
 
 function envelope<TData>(
