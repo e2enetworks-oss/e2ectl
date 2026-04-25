@@ -7,6 +7,7 @@ import type {
   LoadBalancerClient,
   LoadBalancerDetails
 } from '../../../src/load-balancer/index.js';
+import type { ImageClient } from '../../../src/image/index.js';
 import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
@@ -159,6 +160,9 @@ describe('load-balancer commands', () => {
 
     const runtime: CliRuntime = {
       confirm,
+      createImageClient: vi.fn() as unknown as (
+        c: ResolvedCredentials
+      ) => ImageClient,
       createLoadBalancerClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return lbStub.stub;

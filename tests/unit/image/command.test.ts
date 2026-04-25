@@ -4,6 +4,7 @@ import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { ImageClient } from '../../../src/image/index.js';
+import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function makeImageSummary(overrides = {}) {
@@ -88,6 +89,11 @@ describe('image commands', () => {
       createVpcClient: vi.fn(() => {
         throw new Error('VPC client should not be created for this test.');
       }) as unknown as CliRuntime['createVpcClient'],
+      createLoadBalancerClient: vi.fn(() => {
+        throw new Error(
+          'Load balancer client should not be created for this test.'
+        );
+      }) as unknown as (_: ResolvedCredentials) => LoadBalancerClient,
       credentialValidator: { validate: vi.fn() },
       isInteractive: true,
       prompt: vi.fn(() => Promise.resolve('')),
