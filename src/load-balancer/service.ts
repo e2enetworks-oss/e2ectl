@@ -370,7 +370,7 @@ export class LoadBalancerService {
       lb_type: lbType,
       lb_mode: mode,
       lb_port: String(port),
-      plan_name: billing.basePlanName ?? assertNonEmpty(options.plan, '--plan'),
+      plan_name: billing.basePlanName,
       node_list_type: 'D',
       backends,
       tcp_backend: tcpBackend,
@@ -412,8 +412,7 @@ export class LoadBalancerService {
         frontend_port: port,
         mode,
         name: assertNonEmpty(options.name, '--name'),
-        plan_name:
-          billing.basePlanName ?? assertNonEmpty(options.plan, '--plan'),
+        plan_name: billing.basePlanName,
         type: lbType
       },
       result
@@ -1053,7 +1052,7 @@ interface LoadBalancerCreateBillingSelectionOptions {
 }
 
 interface ResolvedLoadBalancerCreateBilling {
-  basePlanName: string | null;
+  basePlanName: string;
   committedPlanId: number | null;
   committedPlanName: string | null;
   postCommitBehavior: LoadBalancerCommittedStatus | null;
@@ -1349,9 +1348,8 @@ function resolveLoadBalancerMutationContext(
   const tcpBackends = context.tcp_backend ?? [];
   const isNlb = tcpBackends.length > 0 || lb.lb_mode === 'TCP';
   const { aclList, aclMap } = getContextAclData(context);
-  const ctx = context as { lb_port?: string; plan_name?: string };
-  const lbPort = inferLbPort(ctx.lb_port, lb.lb_mode, tcpBackends);
-  const planName = ctx.plan_name ?? '';
+  const lbPort = inferLbPort(context.lb_port, lb.lb_mode, tcpBackends);
+  const planName = context.plan_name ?? '';
   return { aclList, aclMap, backends, context, isNlb, lbPort, planName, tcpBackends };
 }
 
