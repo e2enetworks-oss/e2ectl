@@ -60,6 +60,32 @@ Fixes:
 - use `e2ectl volume plans` before volume create
 - use `e2ectl vpc plans` before VPC create
 
+## Load Balancer Errors
+
+### 412 during `load-balancer create`
+
+Symptom: `MyAccount API request failed: Precondition Failed` with "Unable to fire Load Balancer vm instance".
+
+Cause: The `--plan` value does not match any base plan name exactly.
+
+Fix: Run `e2ectl load-balancer plans` and copy the plan name from the Plan column (for example `E2E-LB-2`). The plan name is case-sensitive and must match exactly.
+
+### NLB_SINGLE_BACKEND_GROUP
+
+Symptom: `NLB <id> already has a backend group. NLB supports only one backend group.`
+
+Cause: You ran `backend group create` on an NLB that already has a backend group. NLBs support exactly one backend group.
+
+Fix: Use `e2ectl load-balancer backend server add <lbId>` to add a server to the existing group instead of creating a new one.
+
+### LAST_BACKEND_GROUP_NOT_DELETABLE
+
+Symptom: `Backend group "<name>" is the last backend group on load balancer <id>. Keep at least one backend group attached.`
+
+Cause: You tried to delete the only remaining backend group on a load balancer. The API requires at least one backend group to exist.
+
+Fix: Either add another backend group first (`backend group create`), or delete the entire load balancer with `e2ectl load-balancer delete <lbId> --force` if you no longer need it.
+
 ## Attachment And Identifier Mix-Ups
 
 Symptoms:

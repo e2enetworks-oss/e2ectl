@@ -61,6 +61,7 @@ For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quic
 
 - Create your first operator-ready node: [First node workflow](./docs/user-guides/workflows/first-node.md)
 - Add networking, storage, and access resources to an existing node: [Networking and storage workflow](./docs/user-guides/workflows/networking-and-storage.md)
+- Provision a load balancer with backend groups: [Load Balancer guide](./docs/user-guides/load-balancer.md)
 - Script repeatable runs with `--json` and `--no-input`: [Automation cookbook](./docs/user-guides/automation.md)
 
 ## Documentation Map

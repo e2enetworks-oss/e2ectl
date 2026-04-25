@@ -17,7 +17,7 @@ Two load balancer types are supported:
 
 - Configure a profile with your API key and auth token: `e2ectl config set`
 - List available plans first: `e2ectl load-balancer plans`
-- Pick the base plan name you want to create with (for example `ELB-2`).
+- Pick the base plan name you want to create with (for example `E2E-LB-2`).
 - If you want committed billing, note the committed option shown under that base plan.
 - Use `e2ectl load-balancer plans --json` when you need the committed plan ID.
 - For backend servers, have the server IP address and port ready.
@@ -59,7 +59,7 @@ Creates an Application Load Balancer that listens on port 80 with one backend gr
 ```
 e2ectl load-balancer create \
   --name my-alb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --mode HTTP \
   --port 80 \
   --backend-name web \
@@ -75,7 +75,7 @@ e2ectl load-balancer create \
 ```
 e2ectl load-balancer create \
   --name my-https-alb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --mode HTTPS \
   --port 443 \
   --ssl-certificate-id <certId> \
@@ -92,7 +92,7 @@ Creates a Network Load Balancer that passes TCP traffic through on port 80.
 ```
 e2ectl load-balancer create \
   --name my-nlb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --mode TCP \
   --port 80 \
   --backend-name tcp-group \
@@ -109,7 +109,7 @@ Use `--vpc <networkId>` to attach the load balancer to a VPC — it will be acce
 ```
 e2ectl load-balancer create \
   --name internal-alb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --mode HTTP \
   --port 80 \
   --vpc <networkId> \
@@ -130,7 +130,7 @@ e2ectl load-balancer plans
 ```
 e2ectl load-balancer create \
   --name committed-alb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --committed-plan "90 Days" \
   --post-commit-behavior auto-renew \
   --mode HTTP \
@@ -146,7 +146,7 @@ If you prefer deterministic scripting, use the committed plan ID from `load-bala
 ```
 e2ectl load-balancer create \
   --name committed-alb \
-  --plan ELB-2 \
+  --plan E2E-LB-2 \
   --committed-plan-id 901 \
   --post-commit-behavior hourly-billing \
   --mode HTTP \
@@ -275,7 +275,7 @@ Creates a new load balancer.
 | Flag                                | Required | Description                                                                  |
 | ----------------------------------- | -------- | ---------------------------------------------------------------------------- |
 | `--name <name>`                     | Yes      | Load balancer name                                                           |
-| `--plan <plan>`                     | Yes      | Base plan name (for example `ELB-2`). Run `load-balancer plans` first.       |
+| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.       |
 | `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                |
 | `--port <port>`                     | Yes      | Frontend listener port                                                       |
 | `--backend-name <name>`             | Yes      | Initial backend group name                                                   |

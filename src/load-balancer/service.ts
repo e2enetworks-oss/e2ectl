@@ -250,7 +250,12 @@ export class LoadBalancerService {
     if (requiresSslCert && !options.sslCertificateId) {
       throw new CliError(
         `--ssl-certificate-id is required when --mode is ${mode}.`,
-        { code: 'MISSING_SSL_CERTIFICATE_ID', exitCode: EXIT_CODES.usage }
+        {
+          code: 'MISSING_SSL_CERTIFICATE_ID',
+          exitCode: EXIT_CODES.usage,
+          suggestion:
+            'Get your SSL certificate ID from MyAccount > SSL Certificates, then pass it with --ssl-certificate-id.'
+        }
       );
     }
     const sslCertificateId = requiresSslCert
@@ -1082,6 +1087,19 @@ async function resolveCreateBillingSelection(
     );
   }
 
+  const plans = await client.listLoadBalancerPlans();
+  const basePlan = findBasePlan(plans, requestedBasePlan);
+  if (basePlan === undefined) {
+    throw new CliError(
+      `Load balancer plan "${requestedBasePlan}" was not found.`,
+      {
+        code: 'LOAD_BALANCER_PLAN_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand('load-balancer plans')} to list valid base plans and committed options.`
+      }
+    );
+  }
+
   if (
     options.committedPlan === undefined &&
     options.committedPlanId === undefined
@@ -1097,25 +1115,12 @@ async function resolveCreateBillingSelection(
     }
 
     return {
-      basePlanName: null,
+      basePlanName: basePlan.name,
       committedPlanId: null,
       committedPlanName: null,
       postCommitBehavior: null,
       type: 'hourly'
     };
-  }
-
-  const plans = await client.listLoadBalancerPlans();
-  const basePlan = findBasePlan(plans, requestedBasePlan);
-  if (basePlan === undefined) {
-    throw new CliError(
-      `Load balancer plan "${requestedBasePlan}" was not found.`,
-      {
-        code: 'LOAD_BALANCER_PLAN_NOT_FOUND',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('load-balancer plans')} to list valid base plans and committed options.`
-      }
-    );
   }
 
   const committedPlans = basePlan.committed_sku ?? [];

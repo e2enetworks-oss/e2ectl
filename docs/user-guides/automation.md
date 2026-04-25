@@ -109,6 +109,46 @@ e2ectl node create \
 
 `--image` is the catalog image identifier (e.g. `Ubuntu-24.04-Distro`), the same value used for a regular node create. `--saved-image-template-id` is the integer `template_id` from `image list` output.
 
+## Recipe: Provision And Inspect A Load Balancer
+
+```bash
+# 1. Discover available plans
+e2ectl --json load-balancer plans > lb-plans.json
+
+# 2. Create an ALB (plan name from plans output)
+e2ectl load-balancer create \
+  --name my-alb \
+  --plan E2E-LB-2 \
+  --mode HTTP \
+  --port 80 \
+  --backend-name web \
+  --server-ip 10.0.0.1 \
+  --server-port 8080 \
+  --server-name server-1
+
+# 3. List load balancers and capture the id
+e2ectl --json load-balancer list > lbs.json
+# { "action": "list", "items": [{ "id": 42, "appliance_name": "my-alb", ... }] }
+
+LB_ID=42
+
+# 4. Inspect backend groups
+e2ectl --json load-balancer backend group list "$LB_ID"
+# { "action": "backend-group-list", "backends": [...], "tcp_backends": [...] }
+
+# 5. Add a second server to an existing group
+e2ectl load-balancer backend server add "$LB_ID" \
+  --backend-name web \
+  --server-ip 10.0.0.2 \
+  --server-port 8080 \
+  --server-name server-2
+
+# 6. Delete when done
+e2ectl load-balancer delete "$LB_ID" --force
+```
+
+The `--json` flag on `load-balancer list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
+
 ## Recipe: Keep Cleanup Explicit
 
 Destructive commands should stay obvious and targeted:
@@ -134,4 +174,5 @@ Prefer recording the ids you create so teardown steps know exactly what to delet
 - [Quickstart](./quickstart.md)
 - [Config](./config.md)
 - [Node](./node.md)
+- [Load Balancer](./load-balancer.md)
 - [Troubleshooting](./troubleshooting.md)
