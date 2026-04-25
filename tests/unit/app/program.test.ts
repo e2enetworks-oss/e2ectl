@@ -12,6 +12,7 @@ describe('createProgram', () => {
       'config',
       'project',
       'node',
+      'image',
       'reserved-ip',
       'volume',
       'vpc',

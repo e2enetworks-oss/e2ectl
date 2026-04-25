@@ -62,6 +62,9 @@ describe('config commands', () => {
       prompt,
       runtime: {
         confirm,
+        createImageClient: vi.fn(() => {
+          throw new Error('Image client should not be created for this test.');
+        }) as unknown as CliRuntime['createImageClient'],
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
         createProjectClient: vi.fn(() => {

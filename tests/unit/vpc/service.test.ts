@@ -19,7 +19,11 @@ function createConfig(): ConfigFile {
   };
 }
 
-function createServiceFixture(): {
+function createServiceFixture(options?: {
+  confirmResult?: boolean;
+  isInteractive?: boolean;
+}): {
+  confirm: ReturnType<typeof vi.fn>;
   createVpc: ReturnType<typeof vi.fn>;
   createVpcClient: ReturnType<typeof vi.fn>;
   deleteVpc: ReturnType<typeof vi.fn>;
@@ -34,6 +38,7 @@ function createServiceFixture(): {
   const getVpc = vi.fn();
   const listVpcPlans = vi.fn();
   const listVpcs = vi.fn();
+  const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
   const client: VpcClient = {
@@ -50,9 +55,9 @@ function createServiceFixture(): {
     return client;
   });
   const service = new VpcService({
-    confirm: vi.fn(() => Promise.resolve(true)),
+    confirm,
     createVpcClient,
-    isInteractive: true,
+    isInteractive: options?.isInteractive ?? true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
       read: () => Promise.resolve(createConfig())
@@ -60,6 +65,7 @@ function createServiceFixture(): {
   });
 
   return {
+    confirm,
     createVpc,
     createVpcClient,
     deleteVpc,
@@ -593,5 +599,366 @@ describe('VpcService.listVpcs — concurrency', () => {
       // Each underlying client was called exactly once.
       expect(fixture.listVpcs).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+describe('VpcService.createVpc — edge cases', () => {
+  it('creates e2e hourly VPCs without a custom CIDR and preserves null project ids', async () => {
+    const { createVpc, service } = createServiceFixture();
+
+    createVpc.mockResolvedValue({
+      is_credit_sufficient: false,
+      network_id: 27836,
+      project_id: null,
+      vpc_id: 3957,
+      vpc_name: 'e2e-vpc'
+    });
+
+    const result = await service.createVpc({
+      alias: 'prod',
+      billingType: 'hourly',
+      cidrSource: 'e2e',
+      name: 'e2e-vpc'
+    });
+
+    expect(createVpc).toHaveBeenCalledWith({
+      is_e2e_vpc: true,
+      vpc_name: 'e2e-vpc'
+    });
+    expect(result).toEqual({
+      action: 'create',
+      billing: {
+        committed_plan_id: null,
+        post_commit_behavior: null,
+        type: 'hourly'
+      },
+      cidr: {
+        source: 'e2e',
+        value: null
+      },
+      credit_sufficient: false,
+      vpc: {
+        id: 27836,
+        name: 'e2e-vpc',
+        network_id: 27836,
+        project_id: null,
+        vpc_id: 3957
+      }
+    });
+  });
+
+  it('defaults committed post-commit behavior to auto-renew when omitted', async () => {
+    const { createVpc, service } = createServiceFixture();
+
+    createVpc.mockResolvedValue({
+      is_credit_sufficient: true,
+      network_id: 27837,
+      project_id: '46429',
+      vpc_id: 3958,
+      vpc_name: 'committed-vpc'
+    });
+
+    const result = await service.createVpc({
+      alias: 'prod',
+      billingType: 'committed',
+      cidr: '10.30.0.0/23',
+      cidrSource: 'custom',
+      committedPlanId: '91',
+      name: 'committed-vpc'
+    });
+
+    expect(createVpc).toHaveBeenCalledWith({
+      cn_id: 91,
+      cn_status: 'auto_renew',
+      ipv4: '10.30.0.0/23',
+      is_e2e_vpc: false,
+      vpc_name: 'committed-vpc'
+    });
+    expect(result.billing).toEqual({
+      committed_plan_id: 91,
+      post_commit_behavior: 'auto-renew',
+      type: 'committed'
+    });
+  });
+
+  it.each([
+    [
+      'rejects committed plan ids on hourly billing',
+      {
+        billingType: 'hourly',
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        options: { committedPlanId: '91' }
+      }
+    ],
+    [
+      'rejects post-commit behavior on hourly billing',
+      {
+        billingType: 'hourly',
+        code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
+        options: { postCommitBehavior: 'auto-renew' }
+      }
+    ],
+    [
+      'rejects invalid billing types',
+      {
+        billingType: 'weekly',
+        code: 'INVALID_BILLING_TYPE',
+        options: {}
+      }
+    ],
+    [
+      'rejects invalid cidr sources',
+      {
+        billingType: 'hourly',
+        code: 'INVALID_CIDR_SOURCE',
+        options: { cidrSource: 'platform' }
+      }
+    ],
+    [
+      'rejects invalid post-commit behaviors',
+      {
+        billingType: 'committed',
+        code: 'INVALID_POST_COMMIT_BEHAVIOR',
+        options: {
+          committedPlanId: '91',
+          postCommitBehavior: 'pause'
+        }
+      }
+    ],
+    [
+      'rejects invalid committed plan ids',
+      {
+        billingType: 'committed',
+        code: 'INVALID_NUMERIC_VALUE',
+        options: { committedPlanId: 'plan-91' }
+      }
+    ],
+    [
+      'rejects blank committed plan ids',
+      {
+        billingType: 'committed',
+        code: 'EMPTY_REQUIRED_VALUE',
+        options: { committedPlanId: '   ' }
+      }
+    ],
+    [
+      'rejects blank names',
+      {
+        billingType: 'hourly',
+        code: 'EMPTY_REQUIRED_VALUE',
+        options: { name: '   ' }
+      }
+    ]
+  ])('%s', async (_title, scenario) => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createVpc({
+        alias: 'prod',
+        billingType: scenario.billingType,
+        cidrSource: 'custom',
+        cidr: '10.10.0.0/23',
+        name: 'vpc-a',
+        ...(scenario.options ?? {})
+      })
+    ).rejects.toMatchObject({
+      code: scenario.code
+    });
+  });
+
+  it.each([
+    ['rejects cidr on e2e source', '10.10.0.0/23', 'UNEXPECTED_CIDR'],
+    ['rejects malformed cidr prefixes', '10.10.0.0/x', 'INVALID_CIDR'],
+    ['rejects out-of-range cidr prefixes', '10.10.0.0/40', 'INVALID_CIDR'],
+    ['rejects non-network cidr addresses', '10.10.0.1/23', 'INVALID_CIDR'],
+    ['rejects extra cidr separators', '10.10.0.0/23/1', 'INVALID_CIDR']
+  ])('%s', async (_title, cidr, code) => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createVpc({
+        alias: 'prod',
+        billingType: 'hourly',
+        cidr,
+        cidrSource: cidr === '10.10.0.0/23' ? 'e2e' : 'custom',
+        name: 'vpc-a'
+      })
+    ).rejects.toMatchObject({
+      code
+    });
+  });
+});
+
+describe('VpcService.deleteVpc — edge cases', () => {
+  it('returns a cancelled result when the delete confirmation is declined', async () => {
+    const { confirm, deleteVpc, service } = createServiceFixture({
+      confirmResult: false
+    });
+
+    const result = await service.deleteVpc('27835', { alias: 'prod' });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete VPC 27835? This cannot be undone.'
+    );
+    expect(deleteVpc).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: true,
+      vpc: {
+        id: 27835,
+        name: null,
+        project_id: null
+      }
+    });
+  });
+
+  it('requires --force when deleting a VPC in a non-interactive terminal', async () => {
+    const { confirm, deleteVpc, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.deleteVpc('27835', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a VPC requires confirmation in an interactive terminal.'
+    });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(deleteVpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-numeric VPC ids before calling the API client', async () => {
+    const { deleteVpc, service } = createServiceFixture();
+
+    await expect(
+      service.deleteVpc('abc', { alias: 'prod', force: true })
+    ).rejects.toMatchObject({
+      code: 'INVALID_VPC_ID',
+      message: 'VPC ID must be numeric.'
+    });
+    expect(deleteVpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('VpcService summary normalization', () => {
+  it('normalizes null optional fields and sparse subnet metadata in list/detail responses', async () => {
+    const { getVpc, listVpcPlans, listVpcs, service } = createServiceFixture();
+
+    getVpc.mockResolvedValue({
+      created_at: null,
+      gateway_ip: null,
+      ipv4_cidr: '10.50.0.0/24',
+      is_e2e_vpc: false,
+      location: null,
+      name: 'sparse-vpc',
+      network_id: 3001,
+      project_name: null,
+      state: 'Active',
+      subnets: [
+        {
+          cidr: '10.50.0.0/25',
+          id: 11,
+          subnet_name: 'front',
+          totalIPs: undefined,
+          usedIPs: undefined
+        }
+      ],
+      vm_count: undefined
+    });
+    listVpcs.mockResolvedValueOnce({
+      items: [
+        {
+          created_at: null,
+          ipv4_cidr: '10.51.0.0/24',
+          is_e2e_vpc: false,
+          name: 'list-vpc',
+          network_id: 3002,
+          state: 'Active',
+          subnets: []
+        }
+      ],
+      total_count: undefined,
+      total_page_number: 1
+    });
+    listVpcPlans.mockResolvedValue([
+      {
+        committed_sku: [
+          {
+            committed_days: 90,
+            committed_sku_id: 91,
+            committed_sku_name: '90 Days',
+            committed_sku_price: 7800
+          },
+          {
+            committed_days: 30,
+            committed_sku_id: undefined,
+            committed_sku_name: 'broken',
+            committed_sku_price: 1200
+          }
+        ],
+        currency: null,
+        location: null,
+        name: 'VPC',
+        price_per_hour: null,
+        price_per_month: null
+      }
+    ]);
+
+    const getResult = await service.getVpc('3001', { alias: 'prod' });
+    const listResult = await service.listVpcs({ alias: 'prod' });
+    const plansResult = await service.listVpcPlans({ alias: 'prod' });
+
+    expect(getResult.vpc).toEqual({
+      attached_vm_count: 0,
+      cidr: '10.50.0.0/24',
+      cidr_source: 'custom',
+      created_at: null,
+      gateway_ip: null,
+      id: 3001,
+      location: null,
+      name: 'sparse-vpc',
+      network_id: 3001,
+      project_name: null,
+      state: 'Active',
+      subnet_count: 1,
+      subnets: [
+        {
+          cidr: '10.50.0.0/25',
+          id: 11,
+          name: 'front',
+          total_ips: null,
+          used_ips: null
+        }
+      ]
+    });
+    expect(listResult.total_count).toBe(1);
+    expect(plansResult).toEqual({
+      action: 'plans',
+      committed: {
+        default_post_commit_behavior: 'auto-renew',
+        items: [
+          {
+            currency: null,
+            id: 91,
+            name: '90 Days',
+            term_days: 90,
+            total_price: 7800
+          }
+        ],
+        supported_post_commit_behaviors: ['auto-renew', 'hourly-billing']
+      },
+      hourly: {
+        items: [
+          {
+            currency: null,
+            location: null,
+            name: 'VPC',
+            price_per_hour: null,
+            price_per_month: null
+          }
+        ]
+      }
+    });
   });
 });

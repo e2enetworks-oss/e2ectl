@@ -1,4 +1,57 @@
-import { parseImportedProfiles } from '../../../src/config/import-file.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+import {
+  parseImportedProfiles,
+  readImportedProfiles
+} from '../../../src/config/import-file.js';
+import { CliError } from '../../../src/core/errors.js';
+
+async function writeTmpFile(payload: unknown): Promise<string> {
+  const filePath = path.join(
+    process.cwd(),
+    '.tmp',
+    `import-file-${Math.random().toString(36).slice(2)}.json`
+  );
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(payload), 'utf8');
+  return filePath;
+}
+
+describe('readImportedProfiles', () => {
+  it('reads and parses a valid credential file from disk', async () => {
+    const filePath = await writeTmpFile({
+      prod: { api_auth_token: 'auth-token', api_key: 'api-key' }
+    });
+
+    const result = await readImportedProfiles(filePath);
+
+    expect(result).toEqual({
+      prod: { api_key: 'api-key', auth_token: 'auth-token' }
+    });
+  });
+
+  it('throws IMPORT_FILE_NOT_FOUND when the file does not exist', async () => {
+    await expect(
+      readImportedProfiles('/tmp/does-not-exist-abc123.json')
+    ).rejects.toMatchObject({
+      code: 'IMPORT_FILE_NOT_FOUND'
+    });
+  });
+
+  it('re-throws CliErrors from the parser without wrapping', async () => {
+    const filePath = await writeTmpFile({
+      '  ': { api_key: 'k', api_auth_token: 't' }
+    });
+
+    await expect(readImportedProfiles(filePath)).rejects.toBeInstanceOf(
+      CliError
+    );
+    await expect(readImportedProfiles(filePath)).rejects.toMatchObject({
+      code: 'INVALID_IMPORT_ALIAS'
+    });
+  });
+});
 
 describe('import-file parser', () => {
   it('parses the downloaded credential file shape', () => {
