@@ -14,12 +14,6 @@ All notable changes to this project will be documented in this file.
 - Saved-image node launches via `e2ectl node create --saved-image-template-id`, while keeping catalog `--plan` and `--image` validation explicit.
 - Saved-image user documentation covering discovery, reuse, automation, and first-node workflows.
 
-### Changed
-
-- Expanded unit and fake-API integration coverage for image commands, saved-image node creation, config rendering, MyAccount transport failures, and VPC/volume edge cases.
-- Updated coverage reporting to ignore type-only files and use the 85% branch/function/line/statement threshold set.
-- Ignored local `.gstack/` state in Git and Prettier checks.
-
 ### Fixed
 
 - Cleaned README badge links and saved-image guide formatting.
