@@ -310,16 +310,16 @@ Lists all backend groups for a load balancer. Columns: Backend Group, Routing Po
 
 Creates a backend group on an existing load balancer. At least one server must be provided at creation time.
 
-| Flag                            | Required | Description                                        |
-| ------------------------------- | -------- | -------------------------------------------------- |
-| `--name <name>`                 | Yes      | Backend group name                                 |
-| `--server-ip <ip>`              | Yes      | Initial server IP address                          |
-| `--server-name <name>`          | Yes      | Initial server identifier                          |
+| Flag                            | Required | Description                                           |
+| ------------------------------- | -------- | ----------------------------------------------------- |
+| `--name <name>`                 | Yes      | Backend group name                                    |
+| `--server-ip <ip>`              | Yes      | Initial server IP address                             |
+| `--server-name <name>`          | Yes      | Initial server identifier                             |
 | `--server-port <port>`          | No       | Initial server port. Defaults to the LB frontend port |
-| `--backend-protocol <protocol>` | No       | `HTTP` (default) or `HTTPS` for ALB backend groups |
-| `--algorithm <algo>`            | No       | `roundrobin` (default), `leastconn`, or `source`   |
-| `--http-check`                  | No       | Enable health checks for a new ALB backend group   |
-| `--backend-port <port>`         | No       | Port for a new NLB backend group                   |
+| `--backend-protocol <protocol>` | No       | `HTTP` (default) or `HTTPS` for ALB backend groups    |
+| `--algorithm <algo>`            | No       | `roundrobin` (default), `leastconn`, or `source`      |
+| `--http-check`                  | No       | Enable health checks for a new ALB backend group      |
+| `--backend-port <port>`         | No       | Port for a new NLB backend group                      |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
