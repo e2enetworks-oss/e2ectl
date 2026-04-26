@@ -105,7 +105,11 @@ describe('load-balancer backend-group create against a fake MyAccount API', () =
           '--name',
           'mygroup',
           '--backend-protocol',
-          'HTTP'
+          'HTTP',
+          '--server-ip',
+          '10.0.0.5',
+          '--server-name',
+          'srv-1'
         ],
         {
           env: {
@@ -164,7 +168,11 @@ describe('load-balancer backend-group create against a fake MyAccount API', () =
           '--name',
           'mygroup',
           '--backend-port',
-          '8080'
+          '8080',
+          '--server-ip',
+          '10.0.0.5',
+          '--server-name',
+          'srv-1'
         ],
         {
           env: {

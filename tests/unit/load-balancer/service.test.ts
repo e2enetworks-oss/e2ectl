@@ -1028,32 +1028,6 @@ describe('LoadBalancerService', () => {
   });
 
   describe('createBackendGroup', () => {
-    it('creates a new ALB backend group (no server provided)', async () => {
-      const { service, getLoadBalancer, updateLoadBalancer } =
-        createServiceFixture();
-      getLoadBalancer.mockResolvedValue(createEmptyAlbDetails());
-
-      const result = await service.createBackendGroup('30', {
-        name: 'api',
-        algorithm: 'leastconn',
-        backendProtocol: 'HTTPS'
-      });
-
-      expect(result.action).toBe('backend-group-create');
-      expect(result.lb_id).toBe('30');
-      expect(result.message).toContain('"api"');
-      expect(result.group.protocol).toBe('HTTPS');
-
-      const body = updateLoadBalancer.mock
-        .calls[0]![1] as LoadBalancerCreateRequest;
-      expect(body.backends).toHaveLength(1);
-      expect(body.backends[0]?.name).toBe('api');
-      expect(body.backends[0]?.servers).toHaveLength(0);
-      expect(body.backends[0]?.balance).toBe('leastconn');
-      expect(body.backends[0]?.backend_mode).toBe('https');
-      expect(body.backends[0]?.backend_ssl).toBe(true);
-    });
-
     it('creates a new ALB backend group with initial server', async () => {
       const { service, getLoadBalancer, updateLoadBalancer } =
         createServiceFixture();
@@ -1104,7 +1078,9 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api'
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
       });
 
       const body = updateLoadBalancer.mock
@@ -1148,7 +1124,11 @@ describe('LoadBalancerService', () => {
       // default getLoadBalancer returns ALB with 'web' group
 
       await expect(
-        service.createBackendGroup('10', { name: 'web' })
+        service.createBackendGroup('10', {
+          name: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_EXISTS' });
     });
 
@@ -1159,7 +1139,9 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createBackendGroup('20', {
           name: 'new-group',
-          backendPort: '9000'
+          backendPort: '9000',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
         })
       ).rejects.toMatchObject({ code: 'NLB_SINGLE_BACKEND_GROUP' });
     });
@@ -1172,11 +1154,15 @@ describe('LoadBalancerService', () => {
       } as LoadBalancerDetails);
 
       await expect(
-        service.createBackendGroup('10', { name: 'api' })
+        service.createBackendGroup('10', {
+          name: 'api',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
 
-    it('throws MISSING_SERVER_NAME when serverIp is set but serverName is empty', async () => {
+    it('throws MISSING_REQUIRED_OPTION when serverName is empty', async () => {
       const { service, getLoadBalancer } = createServiceFixture();
       getLoadBalancer.mockResolvedValue(createEmptyAlbDetails());
 
@@ -1186,7 +1172,7 @@ describe('LoadBalancerService', () => {
           serverIp: '10.0.0.1',
           serverName: ''
         })
-      ).rejects.toMatchObject({ code: 'MISSING_SERVER_NAME' });
+      ).rejects.toMatchObject({ code: 'MISSING_REQUIRED_OPTION' });
     });
 
     it('preserves numeric timeout values from context during update', async () => {
@@ -1210,7 +1196,11 @@ describe('LoadBalancerService', () => {
         })
       );
 
-      await service.createBackendGroup('30', { name: 'api' });
+      await service.createBackendGroup('30', {
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1227,7 +1217,11 @@ describe('LoadBalancerService', () => {
         createEmptyAlbDetails({ lb_type: 'unknown-type' })
       );
 
-      await service.createBackendGroup('30', { name: 'api' });
+      await service.createBackendGroup('30', {
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1255,7 +1249,11 @@ describe('LoadBalancerService', () => {
         })
       );
 
-      await service.createBackendGroup('30', { name: 'api' });
+      await service.createBackendGroup('30', {
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1267,7 +1265,11 @@ describe('LoadBalancerService', () => {
         createServiceFixture();
       getLoadBalancer.mockResolvedValue(createEmptyAlbDetails({ lb_mode: '' }));
 
-      await service.createBackendGroup('30', { name: 'api' });
+      await service.createBackendGroup('30', {
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1281,7 +1283,11 @@ describe('LoadBalancerService', () => {
         createEmptyAlbDetails({ lb_mode: 'INVALID' })
       );
 
-      await service.createBackendGroup('30', { name: 'api' });
+      await service.createBackendGroup('30', {
+        name: 'api',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
 
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1307,7 +1313,9 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        backendProtocol: 'HTTP'
+        backendProtocol: 'HTTP',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
       });
 
       const body = updateLoadBalancer.mock

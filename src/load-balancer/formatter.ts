@@ -6,7 +6,6 @@ import type {
   LoadBalancerBackendGroupCreateCommandResult,
   LoadBalancerBackendGroupListCommandResult,
   LoadBalancerCreateCommandResult,
-  LoadBalancerBackendServerListCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerListCommandResult,
   LoadBalancerPlansCommandResult
@@ -51,7 +50,7 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
     case 'backend-server-list':
       return result.servers.length === 0
         ? `No servers in backend group "${result.group_name}".\n`
-        : `${formatBackendServerListTable(result.servers)}\n`;
+        : `${formatServerList(result.servers)}\n`;
 
     case 'backend-server-add':
       return `${result.message}\n${formatFieldTable([
@@ -264,7 +263,7 @@ function renderBackendGroupListHuman(
         g.balance,
         'TCP',
         `Port: ${g.port}`,
-        String(g.servers.length)
+        formatServerList(g.servers)
       ]);
     }
   } else {
@@ -274,7 +273,7 @@ function renderBackendGroupListHuman(
         g.balance,
         g.backend_ssl ? 'HTTPS' : 'HTTP',
         g.http_check ? 'enabled' : 'disabled',
-        String(g.servers.length)
+        formatServerList(g.servers)
       ]);
     }
   }
@@ -336,14 +335,13 @@ function renderBackendGroupCreateHuman(
   return `${result.message}\n${formatFieldTable(rows)}\n`;
 }
 
-function formatBackendServerListTable(
-  servers: LoadBalancerBackendServerListCommandResult['servers']
+function formatServerList(
+  servers: { backend_name: string; backend_ip: string; backend_port: number }[]
 ): string {
-  const table = new Table({ head: ['Server Name', 'IP', 'Port'] });
-  for (const s of servers) {
-    table.push([s.backend_name, s.backend_ip, String(s.backend_port)]);
-  }
-  return table.toString();
+  if (servers.length === 0) return '--';
+  return servers
+    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
+    .join('\n');
 }
 
 function formatLoadBalancerPlans(

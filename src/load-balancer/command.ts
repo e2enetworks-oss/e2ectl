@@ -304,11 +304,14 @@ function buildLoadBalancerBackendGroupCommand(
       )
       .option('--http-check', 'Enable HTTP health checks (ALB only).')
       .option('--backend-port <backendPort>', 'NLB backend group port.')
-      .option('--server-ip <serverIp>', 'Optional initial server IP address.')
-      .option('--server-port <serverPort>', 'Optional initial server port.')
+      .requiredOption('--server-ip <serverIp>', 'Initial server IP address.')
       .option(
+        '--server-port <serverPort>',
+        'Initial server port. Defaults to the load balancer frontend port.'
+      )
+      .requiredOption(
         '--server-name <serverName>',
-        'Optional initial server identifier. Required when --server-ip is set.'
+        'Initial server identifier.'
       )
   ).action(
     async (
@@ -344,27 +347,6 @@ function buildLoadBalancerBackendServerCommand(
   command.helpCommand(
     'help [command]',
     'Show help for a load-balancer backend server command'
-  );
-
-  addContextOptions(
-    command
-      .command('list <lbId> <groupName>')
-      .description('List all servers in a backend group.')
-  ).action(
-    async (
-      lbId: string,
-      groupName: string,
-      options: LoadBalancerContextOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.listBackendServers(lbId, groupName, options);
-      runtime.stdout.write(
-        renderLoadBalancerResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
   );
 
   addContextOptions(

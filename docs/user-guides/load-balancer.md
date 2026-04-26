@@ -159,7 +159,7 @@ e2ectl load-balancer create \
 
 ### List Backend Groups
 
-Shows all backend groups for a load balancer with their routing policy, protocol, health check status, and server count.
+Shows all backend groups for a load balancer with their routing policy, protocol, health check status, and the servers in each group (formatted as `name (ip:port)`).
 
 ```
 e2ectl load-balancer backend group list <lbId>
@@ -169,29 +169,17 @@ e2ectl load-balancer backend group list <lbId>
 e2ectl load-balancer backend group list <lbId> --json
 ```
 
-### List Servers in a Backend Group
-
-Shows all servers within a specific backend group.
-
-```
-e2ectl load-balancer backend server list <lbId> <groupName>
-```
-
-```
-e2ectl load-balancer backend server list <lbId> <groupName> --json
-```
-
 ### Create a New Backend Group
 
-For ALBs, this adds another backend group. For NLBs, only one backend group is allowed.
+For ALBs, this adds another backend group. For NLBs, only one backend group is allowed. Each new backend group requires at least one server at creation time.
 
 ```
 e2ectl load-balancer backend group create <lbId> \
   --name api \
-  --backend-protocol HTTPS \
   --server-ip 10.0.0.9 \
-  --server-port 9090 \
   --server-name api-server-1 \
+  --server-port 9090 \
+  --backend-protocol HTTPS \
   --algorithm leastconn \
   --http-check
 ```
@@ -312,7 +300,7 @@ Deletes a load balancer. Prompts for confirmation unless `--force` is passed.
 
 ### `e2ectl load-balancer backend group list <lbId>`
 
-Lists all backend groups for a load balancer. Columns: Backend Group, Routing Policy, Protocol, Health Check, Servers.
+Lists all backend groups for a load balancer. Columns: Backend Group, Routing Policy, Protocol, Health Check, Servers. The Servers column shows each server as `name (ip:port)`, one per line.
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
@@ -320,15 +308,15 @@ Lists all backend groups for a load balancer. Columns: Backend Group, Routing Po
 
 ### `e2ectl load-balancer backend group create <lbId>`
 
-Creates a backend group on an existing load balancer.
+Creates a backend group on an existing load balancer. At least one server must be provided at creation time.
 
 | Flag                            | Required | Description                                        |
 | ------------------------------- | -------- | -------------------------------------------------- |
 | `--name <name>`                 | Yes      | Backend group name                                 |
+| `--server-ip <ip>`              | Yes      | Initial server IP address                          |
+| `--server-name <name>`          | Yes      | Initial server identifier                          |
+| `--server-port <port>`          | No       | Initial server port. Defaults to the LB frontend port |
 | `--backend-protocol <protocol>` | No       | `HTTP` (default) or `HTTPS` for ALB backend groups |
-| `--server-ip <ip>`              | No       | Optional first backend server IP address           |
-| `--server-port <port>`          | No       | Optional first backend server port                 |
-| `--server-name <name>`          | No\*     | Required when `--server-ip` is set                 |
 | `--algorithm <algo>`            | No       | `roundrobin` (default), `leastconn`, or `source`   |
 | `--http-check`                  | No       | Enable health checks for a new ALB backend group   |
 | `--backend-port <port>`         | No       | Port for a new NLB backend group                   |
@@ -342,14 +330,6 @@ Creates a backend group on an existing load balancer.
 Removes a backend group and all its servers from the load balancer.
 
 The command refuses to delete the last remaining backend group on the load balancer. For ALBs, it also cleans up stale ACL mappings that pointed at the deleted backend group.
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend server list <lbId> <groupName>`
-
-Lists all servers within a specific backend group. Columns: Server Name, IP, Port.
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 

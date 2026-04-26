@@ -688,28 +688,6 @@ describe('load-balancer commands', () => {
     );
   });
 
-  it('lists backend servers via backend server list', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'server',
-      'list',
-      '10',
-      'web',
-      '--alias',
-      'prod'
-    ]);
-
-    expect(stdout.buffer).toContain('server-1');
-    expect(stdout.buffer).toContain('10.0.0.1');
-  });
-
   it('load-balancer with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);

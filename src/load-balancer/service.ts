@@ -68,9 +68,9 @@ export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerConte
   backendProtocol?: string;
   httpCheck?: boolean;
   backendPort?: string;
-  serverIp?: string;
+  serverIp: string;
   serverPort?: string;
-  serverName?: string;
+  serverName: string;
 }
 
 export interface LoadBalancerBackendServerAddOptions extends LoadBalancerContextOptions {
@@ -515,32 +515,19 @@ export class LoadBalancerService {
       );
     }
 
-    // Build initial server list (optional)
-    const servers: LoadBalancerServer[] = [];
-    if (options.serverIp !== undefined && options.serverIp.trim().length > 0) {
-      if (
-        options.serverName === undefined ||
-        options.serverName.trim().length === 0
-      ) {
-        throw new CliError(
-          '--server-name is required when --server-ip is set.',
-          {
-            code: 'MISSING_SERVER_NAME',
-            exitCode: EXIT_CODES.usage
-          }
-        );
-      }
-      const serverIp = assertServerIp(options.serverIp);
-      const serverPort = assertPort(
-        options.serverPort ?? lbPort,
-        '--server-port'
-      );
-      servers.push({
-        backend_name: options.serverName,
+    const serverIp = assertServerIp(options.serverIp);
+    const serverPort = assertPort(
+      options.serverPort ?? lbPort,
+      '--server-port'
+    );
+    const serverName = assertNonEmpty(options.serverName, '--server-name');
+    const servers: LoadBalancerServer[] = [
+      {
+        backend_name: serverName,
         backend_ip: serverIp,
         backend_port: serverPort
-      });
-    }
+      }
+    ];
 
     if (isNlb) {
       // For NLB: backendPort is required (use backendPort ?? serverPort)
@@ -1404,7 +1391,7 @@ function removeServerFromGroup(
       {
         code: 'BACKEND_SERVER_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand(`load-balancer backend server list ${lbId} ${backendName}`)} to inspect the current servers.`
+        suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current backend groups and their servers.`
       }
     );
   }
