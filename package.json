@@ -1,6 +1,6 @@
 {
   "name": "@e2enetworks-oss/e2ectl",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Command-line interface for managing E2E Networks MyAccount resources from the terminal.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {

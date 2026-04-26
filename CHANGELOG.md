@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.4.0...v0.5.0) (2026-04-26)
+
+### Added
+
+- Saved image workflows:
+  - `e2ectl image list`
+  - `e2ectl image rename`
+  - `e2ectl image delete`
+  - `e2ectl node action save-image`
+- Saved-image node launches via `e2ectl node create --saved-image-template-id`, while keeping catalog `--plan` and `--image` validation explicit.
+- Saved-image user documentation covering discovery, reuse, automation, and first-node workflows.
+
+### Fixed
+
+- Cleaned README badge links and saved-image guide formatting.
+- Tightened test type assertions for undefined values.
+- Hardened volume and VPC service/formatter edge cases.
+
 ## [0.4.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.3.0...v0.4.0) (2026-04-16)
 
 
