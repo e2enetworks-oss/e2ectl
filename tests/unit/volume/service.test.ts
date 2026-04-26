@@ -20,7 +20,11 @@ function createConfig(): ConfigFile {
   };
 }
 
-function createServiceFixture(): {
+function createServiceFixture(options?: {
+  confirmResult?: boolean;
+  isInteractive?: boolean;
+}): {
+  confirm: ReturnType<typeof vi.fn>;
   createVolume: ReturnType<typeof vi.fn>;
   createVolumeClient: ReturnType<typeof vi.fn>;
   deleteVolume: ReturnType<typeof vi.fn>;
@@ -35,6 +39,7 @@ function createServiceFixture(): {
   const getVolume = vi.fn();
   const listVolumePlans = vi.fn();
   const listVolumes = vi.fn();
+  const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
   let credentials: ResolvedCredentials | undefined;
 
   const client: VolumeClient = {
@@ -53,9 +58,9 @@ function createServiceFixture(): {
     }
   );
   const service = new VolumeService({
-    confirm: vi.fn(() => Promise.resolve(true)),
+    confirm,
     createVolumeClient,
-    isInteractive: true,
+    isInteractive: options?.isInteractive ?? true,
     store: {
       configPath: '/tmp/e2ectl-config.json',
       read: () => Promise.resolve(createConfig())
@@ -63,6 +68,7 @@ function createServiceFixture(): {
   });
 
   return {
+    confirm,
     createVolume,
     createVolumeClient,
     deleteVolume,
@@ -903,5 +909,686 @@ describe('VolumeService.listVolumes — pagination', () => {
       });
       expect(fixtures[index]!.listVolumes).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+describe('VolumeService.deleteVolume — edge cases', () => {
+  it('returns a cancelled result when the confirmation prompt is declined', async () => {
+    const { confirm, deleteVolume, service } = createServiceFixture({
+      confirmResult: false
+    });
+
+    const result = await service.deleteVolume('22', { alias: 'prod' });
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Delete volume 22? This cannot be undone.'
+    );
+    expect(deleteVolume).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'delete',
+      cancelled: true,
+      volume_id: 22
+    });
+  });
+
+  it('requires --force when delete runs in a non-interactive terminal', async () => {
+    const { confirm, deleteVolume, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.deleteVolume('22', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message:
+        'Deleting a volume requires confirmation in an interactive terminal.'
+    });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('rethrows non-timeout delete failures without attempting reconciliation', async () => {
+    const { deleteVolume, listVolumes, service } = createServiceFixture();
+    const error = new AppError('Delete failed.', {
+      code: 'API_REQUEST_FAILED',
+      exitCode: EXIT_CODES.network
+    });
+
+    deleteVolume.mockRejectedValue(error);
+
+    await expect(
+      service.deleteVolume('22', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toBe(error);
+    expect(listVolumes).not.toHaveBeenCalled();
+  });
+});
+
+describe('VolumeService.listVolumePlans — edge cases', () => {
+  it('rejects a requested size that does not exist in the selected location', async () => {
+    const { listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      service.listVolumePlans({
+        alias: 'prod',
+        size: '500'
+      })
+    ).rejects.toMatchObject({
+      code: 'VOLUME_PLAN_NOT_FOUND',
+      message: 'No volume plan matches 500 GB in the selected location.'
+    });
+  });
+
+  it('rejects an unavailable requested size when --available-only is set', async () => {
+    const { listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: false,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      service.listVolumePlans({
+        alias: 'prod',
+        availableOnly: true,
+        size: '250'
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAVAILABLE_VOLUME_PLAN',
+      message: 'Volume size 250 GB is currently unavailable in inventory.'
+    });
+  });
+
+  it('rejects invalid or conflicting plan data from the API before returning plans', async () => {
+    const { listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: 'broken',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      service.listVolumePlans({ alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE',
+      message: 'Volume plan discovery returned an invalid size value.'
+    });
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [
+          {
+            committed_days: 30,
+            committed_sku_id: 31,
+            committed_sku_name: '30 Days',
+            committed_sku_price: 1000
+          }
+        ],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      },
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [
+          {
+            committed_days: 60,
+            committed_sku_id: 31,
+            committed_sku_name: '60 Days',
+            committed_sku_price: 1800
+          }
+        ],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      service.listVolumePlans({ alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE',
+      message:
+        'Volume plan discovery returned conflicting committed plan details for plan id 31.'
+    });
+  });
+
+  it('merges identical committed options and preserves null pricing fields safely', async () => {
+    const { listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [
+          {
+            committed_days: 30,
+            committed_sku_id: 31,
+            committed_sku_name: '30 Days',
+            committed_sku_price: 1000
+          }
+        ],
+        currency: undefined,
+        iops: 5000,
+        name: '250 GB',
+        price: Number.NaN
+      },
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [
+          {
+            committed_days: 30,
+            committed_sku_id: 31,
+            committed_sku_name: '30 Days',
+            committed_sku_price: 1000
+          }
+        ],
+        currency: undefined,
+        iops: 5000,
+        name: '250 GB',
+        price: Number.NaN
+      }
+    ]);
+
+    const result = await service.listVolumePlans({ alias: 'prod' });
+
+    expect(result.items).toEqual([
+      {
+        available: true,
+        committed_options: [
+          {
+            id: 31,
+            name: '30 Days',
+            savings_percent: null,
+            term_days: 30,
+            total_price: 1000
+          }
+        ],
+        currency: null,
+        hourly_price: null,
+        iops: 5000,
+        size_gb: 250
+      }
+    ]);
+  });
+});
+
+describe('VolumeService.createVolume — edge cases', () => {
+  it('creates hourly volumes without committed-plan metadata', async () => {
+    const { createVolume, listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.5,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 7000,
+        name: '500 GB',
+        price: '6'
+      }
+    ]);
+    createVolume.mockResolvedValue({
+      id: 55,
+      image_name: 'data-hourly'
+    });
+
+    const result = await service.createVolume({
+      alias: 'prod',
+      billingType: 'hourly',
+      name: ' data-hourly ',
+      size: '500'
+    });
+
+    expect(createVolume).toHaveBeenCalledWith({
+      iops: 7000,
+      name: 'data-hourly',
+      size: 500
+    });
+    expect(result).toEqual({
+      action: 'create',
+      billing: {
+        committed_plan: null,
+        post_commit_behavior: null,
+        type: 'hourly'
+      },
+      requested: {
+        name: 'data-hourly',
+        size_gb: 500
+      },
+      resolved_plan: {
+        available: true,
+        currency: 'INR',
+        hourly_price: 4.11,
+        iops: 7000,
+        size_gb: 500
+      },
+      volume: {
+        id: 55,
+        name: 'data-hourly'
+      }
+    });
+  });
+
+  it('defaults committed post-commit behavior to auto-renew when omitted', async () => {
+    const { createVolume, listVolumePlans, service } = createServiceFixture();
+
+    listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 1,
+        committed_sku: [
+          {
+            committed_days: 60,
+            committed_sku_id: 91,
+            committed_sku_name: undefined,
+            committed_sku_price: 2000
+          }
+        ],
+        currency: undefined,
+        iops: 15000,
+        name: '1 TB',
+        price: ''
+      }
+    ]);
+    createVolume.mockResolvedValue({
+      id: 88,
+      image_name: 'data-committed'
+    });
+
+    const result = await service.createVolume({
+      alias: 'prod',
+      billingType: 'committed',
+      committedPlanId: '91',
+      name: 'data-committed',
+      size: '1000'
+    });
+
+    expect(createVolume).toHaveBeenCalledWith({
+      cn_id: 91,
+      cn_status: 'auto_renew',
+      iops: 15000,
+      name: 'data-committed',
+      size: 1000
+    });
+    expect(result.billing).toEqual({
+      committed_plan: {
+        id: 91,
+        name: '60 Days Committed',
+        savings_percent: null,
+        term_days: 60,
+        total_price: 2000
+      },
+      post_commit_behavior: 'auto-renew',
+      type: 'committed'
+    });
+    expect(result.resolved_plan).toEqual({
+      available: true,
+      currency: null,
+      hourly_price: null,
+      iops: 15000,
+      size_gb: 1000
+    });
+  });
+
+  it.each([
+    [
+      'rejects committed plan ids on hourly billing',
+      {
+        billingType: 'hourly',
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        options: { committedPlanId: '31' }
+      }
+    ],
+    [
+      'rejects post-commit behavior on hourly billing',
+      {
+        billingType: 'hourly',
+        code: 'UNEXPECTED_POST_COMMIT_BEHAVIOR',
+        options: { postCommitBehavior: 'auto-renew' }
+      }
+    ],
+    [
+      'rejects invalid billing types',
+      {
+        billingType: 'weekly',
+        code: 'INVALID_BILLING_TYPE',
+        options: {}
+      }
+    ],
+    [
+      'rejects invalid post-commit behavior values',
+      {
+        billingType: 'committed',
+        code: 'INVALID_POST_COMMIT_BEHAVIOR',
+        options: {
+          committedPlanId: '31',
+          postCommitBehavior: 'pause'
+        }
+      }
+    ],
+    [
+      'rejects empty names',
+      {
+        billingType: 'hourly',
+        code: 'EMPTY_REQUIRED_VALUE',
+        options: { name: '   ' }
+      }
+    ],
+    [
+      'rejects blank sizes',
+      {
+        billingType: 'hourly',
+        code: 'EMPTY_REQUIRED_VALUE',
+        options: { size: '   ' }
+      }
+    ],
+    [
+      'rejects non-numeric sizes',
+      {
+        billingType: 'hourly',
+        code: 'INVALID_NUMERIC_VALUE',
+        options: { size: '25GB' }
+      }
+    ],
+    [
+      'rejects zero sizes',
+      {
+        billingType: 'hourly',
+        code: 'INVALID_NUMERIC_VALUE',
+        options: { size: '0' }
+      }
+    ],
+    [
+      'rejects blank committed plan ids',
+      {
+        billingType: 'committed',
+        code: 'EMPTY_REQUIRED_VALUE',
+        options: { committedPlanId: '   ' }
+      }
+    ],
+    [
+      'rejects non-numeric committed plan ids',
+      {
+        billingType: 'committed',
+        code: 'INVALID_NUMERIC_VALUE',
+        options: { committedPlanId: 'plan-31' }
+      }
+    ]
+  ])('%s', async (_title, scenario) => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createVolume({
+        alias: 'prod',
+        billingType: scenario.billingType,
+        name: 'vol-a',
+        size: '250',
+        ...(scenario.options ?? {})
+      })
+    ).rejects.toMatchObject({
+      code: scenario.code
+    });
+  });
+
+  it('rejects missing, ambiguous, unavailable, and invalid committed plan selections', async () => {
+    const missing = createServiceFixture();
+    missing.listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      missing.service.createVolume({
+        alias: 'prod',
+        billingType: 'hourly',
+        name: 'vol-a',
+        size: '500'
+      })
+    ).rejects.toMatchObject({
+      code: 'VOLUME_PLAN_NOT_FOUND'
+    });
+
+    const ambiguous = createServiceFixture();
+    ambiguous.listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      },
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 6000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      ambiguous.service.createVolume({
+        alias: 'prod',
+        billingType: 'hourly',
+        name: 'vol-a',
+        size: '250'
+      })
+    ).rejects.toMatchObject({
+      code: 'AMBIGUOUS_VOLUME_PLAN'
+    });
+
+    const unavailable = createServiceFixture();
+    unavailable.listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: false,
+        bs_size: 0.25,
+        committed_sku: [],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      unavailable.service.createVolume({
+        alias: 'prod',
+        billingType: 'hourly',
+        name: 'vol-a',
+        size: '250'
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAVAILABLE_VOLUME_PLAN'
+    });
+
+    const invalidCommitted = createServiceFixture();
+    invalidCommitted.listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: [
+          {
+            committed_days: 30,
+            committed_sku_id: 31,
+            committed_sku_name: '30 Days',
+            committed_sku_price: 1000
+          }
+        ],
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 5
+      }
+    ]);
+
+    await expect(
+      invalidCommitted.service.createVolume({
+        alias: 'prod',
+        billingType: 'committed',
+        committedPlanId: '99',
+        name: 'vol-a',
+        size: '250'
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_COMMITTED_PLAN_ID'
+    });
+  });
+});
+
+describe('VolumeService normalization details', () => {
+  it('normalizes optional list/detail fields when attachment and size metadata are missing', async () => {
+    const { getVolume, listVolumes, service } = createServiceFixture();
+
+    listVolumes.mockResolvedValueOnce({
+      items: [
+        {
+          block_id: 41,
+          name: 'list-no-size',
+          size_string: undefined,
+          status: 'Available',
+          vm_detail: undefined
+        }
+      ],
+      total_count: undefined,
+      total_page_number: 1
+    });
+    getVolume.mockResolvedValue({
+      block_id: 42,
+      is_block_storage_exporting_to_eos: undefined,
+      name: 'detail-with-tb',
+      size_string: '1.5 TB',
+      snapshot_exist: undefined,
+      status: 'Detached',
+      vm_detail: {
+        node_id: null,
+        vm_id: null,
+        vm_name: '   '
+      }
+    });
+
+    const listResult = await service.listVolumes({ alias: 'prod' });
+    const getResult = await service.getVolume('42', { alias: 'prod' });
+
+    expect(listResult.total_count).toBe(1);
+    expect(listResult.items[0]).toEqual({
+      attached: false,
+      attachment: null,
+      id: 41,
+      name: 'list-no-size',
+      size_gb: null,
+      size_label: null,
+      status: 'Available'
+    });
+    expect(getResult.volume).toEqual({
+      attached: false,
+      attachment: null,
+      exporting_to_eos: false,
+      id: 42,
+      name: 'detail-with-tb',
+      size_gb: 1500,
+      size_label: '1.5 TB',
+      snapshot_exists: false,
+      status: 'Detached'
+    });
+  });
+
+  it('handles invalid volume ids, invalid size labels, and non-numeric plan prices defensively', async () => {
+    const invalidIdFixture = createServiceFixture();
+    await expect(
+      invalidIdFixture.service.getVolume('abc', { alias: 'prod' })
+    ).rejects.toMatchObject({
+      code: 'INVALID_VOLUME_ID'
+    });
+
+    const listFixture = createServiceFixture();
+    listFixture.listVolumes.mockResolvedValueOnce({
+      items: [
+        {
+          block_id: 43,
+          name: 'invalid-size',
+          size_string: '500 MB',
+          status: 'Available',
+          vm_detail: {}
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+    const listResult = await listFixture.service.listVolumes({ alias: 'prod' });
+
+    expect(listResult.items[0]?.size_gb).toBeNull();
+
+    const plansFixture = createServiceFixture();
+    plansFixture.listVolumePlans.mockResolvedValue([
+      {
+        available_inventory_status: true,
+        bs_size: 0.25,
+        committed_sku: undefined,
+        currency: 'INR',
+        iops: 5000,
+        name: '250 GB',
+        price: 'not-a-number'
+      }
+    ]);
+    const plansResult = await plansFixture.service.listVolumePlans({
+      alias: 'prod'
+    });
+
+    expect(plansResult.items).toEqual([
+      {
+        available: true,
+        committed_options: [],
+        currency: 'INR',
+        hourly_price: null,
+        iops: 5000,
+        size_gb: 250
+      }
+    ]);
   });
 });

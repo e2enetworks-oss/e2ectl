@@ -508,6 +508,221 @@ describe('MyAccountApiTransport', () => {
     ]);
   });
 
+  it('supports the DELETE convenience helper and explicit request methods', async () => {
+    const fetchFn = vi.fn<FetchLike>(() =>
+      Promise.resolve(
+        createFetchResponse(
+          envelope({
+            deleted: true
+          })
+        )
+      )
+    );
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    const deleteResult =
+      await transport.delete<ApiEnvelope<{ deleted: boolean }>>('/volumes/22/');
+    const putResult = await transport.request<
+      ApiEnvelope<{ deleted: boolean }>
+    >({
+      method: 'PUT',
+      path: '/volumes/22/'
+    });
+
+    expect(deleteResult.data).toEqual({ deleted: true });
+    expect(putResult.data).toEqual({ deleted: true });
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      1,
+      'https://api.e2enetworks.com/myaccount/api/v1/volumes/22/?apikey=api-key&project_id=123&location=Delhi',
+      expect.objectContaining({
+        method: 'DELETE'
+      })
+    );
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      'https://api.e2enetworks.com/myaccount/api/v1/volumes/22/?apikey=api-key&project_id=123&location=Delhi',
+      expect.objectContaining({
+        method: 'PUT'
+      })
+    );
+  });
+
+  it('does not retry POST requests when they fail with an abort timeout', async () => {
+    const abortError = Object.assign(new Error('aborted'), {
+      name: 'AbortError'
+    });
+    const fetchFn = vi.fn<FetchLike>(() => Promise.reject(abortError));
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    await expect(
+      transport.post<ApiEnvelope<Record<string, never>>>('/nodes/', {
+        body: {
+          name: 'node-a'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'API_TIMEOUT',
+      details: expect.arrayContaining([
+        expect.stringContaining(
+          'Request URL: https://api.e2enetworks.com/myaccount/api/v1/nodes/'
+        )
+      ])
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry POST requests when they fail with a network error', async () => {
+    const fetchFn = vi.fn<FetchLike>(() =>
+      Promise.reject(new Error('socket hang up'))
+    );
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn
+    });
+
+    await expect(
+      transport.post<ApiEnvelope<Record<string, never>>>('/nodes/', {
+        body: {
+          name: 'node-a'
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'API_NETWORK_ERROR',
+      details: expect.arrayContaining([
+        expect.stringContaining('Reason: socket hang up')
+      ])
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns empty text bodies into invalid-response errors', async () => {
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            text: () => Promise.resolve('   ')
+          })
+        )
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
+        includeProjectContext: false
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE'
+    });
+  });
+
+  it('truncates long non-json response previews in fallback API errors', async () => {
+    const preview = `${'X'.repeat(170)} end`;
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            ok: false,
+            status: 502,
+            statusText: 'Bad Gateway',
+            json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+            text: () => Promise.resolve(preview)
+          })
+        )
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<Record<string, never>>>('/iam/multi-crn/', {
+        includeProjectContext: false
+      })
+    ).rejects.toMatchObject({
+      details: expect.arrayContaining([
+        expect.stringMatching(/^Response preview: X{157}\.\.\.$/)
+      ])
+    });
+  });
+
+  it('uses parser errors to explain invalid custom success parsing', async () => {
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse({
+            items: []
+          })
+        )
+    });
+
+    await expect(
+      transport.get('/volumes/', {
+        parseResponse: () => {
+          throw new Error('Expected at least one item.');
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE',
+      details: expect.arrayContaining(['Reason: Expected at least one item.'])
+    });
+
+    await expect(
+      transport.get('/volumes/', {
+        parseResponse: () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw 'broken-parser';
+        }
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE'
+    });
+  });
+
+  it('treats status_code failures with string errors as actionable API failures', async () => {
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            json: () =>
+              Promise.resolve({
+                errors: 'Node quota reached',
+                status_code: 429
+              }),
+            status: 429,
+            statusText: 'Too Many Requests'
+          })
+        )
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<Record<string, never>>>('/nodes/')
+    ).rejects.toMatchObject({
+      code: 'API_REQUEST_FAILED',
+      details: expect.arrayContaining([
+        'API status_code: 429',
+        'Errors: "Node quota reached"'
+      ]),
+      message: 'MyAccount API request failed: Node quota reached'
+    });
+  });
+
+  it('surfaces json parser failures when text() is unavailable', async () => {
+    const transport = new MyAccountApiTransport(credentials, {
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            json: () =>
+              Promise.reject(new SyntaxError('Unexpected end of JSON'))
+          })
+        )
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<Record<string, never>>>('/nodes/')
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE',
+      details: expect.arrayContaining(['Reason: Unexpected end of JSON'])
+    });
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });

@@ -159,6 +159,70 @@ describe('reserved-ip formatter', () => {
     expect(output).toContain('Message: IP reserved successfully.');
   });
 
+  it('renders attach, detach, get, and reserve output with fallback placeholders', () => {
+    const attachOutput = renderReservedIpResult(
+      {
+        action: 'attach-node',
+        message: 'IP assigned successfully.',
+        node_id: 101,
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: null,
+          vm_id: null,
+          vm_name: null
+        }
+      },
+      false
+    );
+    const detachOutput = renderReservedIpResult(
+      {
+        action: 'detach-node',
+        message: 'IP detached successfully.',
+        node_id: 101,
+        reserved_ip: {
+          ip_address: '164.52.198.54',
+          status: null,
+          vm_id: null,
+          vm_name: null
+        }
+      },
+      false
+    );
+    const getOutput = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          bought_at: null,
+          project_name: null,
+          reserve_id: null,
+          status: null
+        }
+      },
+      false
+    );
+    const reserveOutput = renderReservedIpResult(
+      {
+        action: 'reserve-node',
+        ip_address: '164.52.198.55',
+        message: 'IP reserved successfully.',
+        node_id: 101,
+        status: null
+      },
+      false
+    );
+
+    expect(attachOutput).toContain('Status: --');
+    expect(attachOutput).toContain('Attached VM: --');
+    expect(detachOutput).toContain('Status: --');
+    expect(detachOutput).toContain('Attached VM: --');
+    expect(getOutput).toContain('Status: --');
+    expect(getOutput).toContain('Project: --');
+    expect(getOutput).toContain('Bought At: --');
+    expect(getOutput).toContain('Reserve ID: --');
+    expect(reserveOutput).toContain('Status: --');
+  });
+
   it('renders attach-node output in deterministic json mode', () => {
     const output = renderReservedIpResult(
       {
@@ -478,5 +542,154 @@ describe('reserved-ip formatter', () => {
     expect(output.indexOf('"ip_address": "164.52.198.54"')).toBeLessThan(
       output.indexOf('"ip_address": "216.48.184.202"')
     );
+  });
+
+  it('renders attachment tables with placeholder values for null fields', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          floating_ip_attached_nodes: [
+            {
+              id: null,
+              ip_address_private: null,
+              ip_address_public: null,
+              name: null,
+              security_group_status: null,
+              status_name: null,
+              vm_id: null
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Floating Attached Nodes (1)');
+    expect(output).toContain('--');
+  });
+
+  it('renders create and delete output with fallback placeholders when metadata is missing', () => {
+    const createOutput = renderReservedIpResult(
+      {
+        action: 'create',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          appliance_type: null,
+          project_name: null,
+          reserve_id: null,
+          reserved_type: null,
+          status: null
+        },
+        source: 'default-network'
+      },
+      false
+    );
+    const deleteOutput = renderReservedIpResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        ip_address: '164.52.198.54'
+      },
+      false
+    );
+
+    expect(createOutput).toContain('Status: --');
+    expect(createOutput).toContain('Type: --');
+    expect(createOutput).toContain('Project: --');
+    expect(createOutput).toContain('Reserve ID: --');
+    expect(deleteOutput).toBe(
+      'Deleted reserved IP 164.52.198.54.\nMessage: \n'
+    );
+  });
+
+  it('sorts attachment rows with null ids after concrete ids and sorts tie-breaks by reserve id', () => {
+    const getOutput = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          floating_ip_attached_nodes: [
+            {
+              id: null,
+              ip_address_private: '10.0.0.8',
+              ip_address_public: '164.52.198.60',
+              name: 'node-null',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: null
+            },
+            {
+              id: 101,
+              ip_address_private: '10.0.0.5',
+              ip_address_public: '164.52.198.55',
+              name: 'node-a',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: 100157
+            }
+          ]
+        }
+      },
+      false
+    );
+    const listOutput = renderReservedIpResult(
+      {
+        action: 'list',
+        items: [
+          {
+            ...sampleReservedIpItem(),
+            reserve_id: null
+          },
+          {
+            ...sampleReservedIpItem(),
+            reserve_id: 12661
+          }
+        ]
+      },
+      true
+    );
+
+    expect(getOutput.indexOf('101')).toBeLessThan(
+      getOutput.indexOf('node-null')
+    );
+    expect(listOutput.indexOf('"reserve_id": 12661')).toBeLessThan(
+      listOutput.indexOf('"reserve_id": null')
+    );
+  });
+
+  it('sorts attachment rows by name when ids and vm ids are both null', () => {
+    const output = renderReservedIpResult(
+      {
+        action: 'get',
+        reserved_ip: {
+          ...sampleReservedIpItem(),
+          floating_ip_attached_nodes: [
+            {
+              id: null,
+              ip_address_private: '10.0.0.9',
+              ip_address_public: '164.52.198.62',
+              name: 'zeta',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: null
+            },
+            {
+              id: null,
+              ip_address_private: '10.0.0.8',
+              ip_address_public: '164.52.198.61',
+              name: 'alpha',
+              security_group_status: 'Updated',
+              status_name: 'Running',
+              vm_id: null
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output.indexOf('alpha')).toBeLessThan(output.indexOf('zeta'));
   });
 });

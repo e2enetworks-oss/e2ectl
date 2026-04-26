@@ -9,10 +9,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: 'coverage/unit',
+      exclude: ['**/types.ts', 'scripts/**', 'tests/**'],
       thresholds: {
-        functions: 80,
-        lines: 80,
-        statements: 80
+        branches: 85,
+        functions: 85,
+        lines: 85,
+        statements: 85
       }
     }
   }

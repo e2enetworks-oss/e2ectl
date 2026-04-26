@@ -11,6 +11,7 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import { ImageApiClient, type ImageClient } from '../image/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import { ProjectApiClient, type ProjectClient } from '../project/index.js';
 import {
@@ -31,6 +32,7 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createImageClient(credentials: ResolvedCredentials): ImageClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
@@ -56,6 +58,10 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createImageClient: (credentials) =>
+      new ImageApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
