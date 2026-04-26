@@ -9,9 +9,11 @@ export interface DbaasSoftwareSummary {
 
 export interface DbaasCommittedSku {
   committed_days?: number;
+  committed_node_message?: string;
   committed_sku_id?: number;
   committed_sku_name?: string;
   committed_sku_price?: number;
+  committed_upto_date?: string;
 }
 
 export interface DbaasTemplatePlan {
@@ -72,7 +74,19 @@ export interface DbaasListResult {
   total_page_number?: number;
 }
 
+export type DbaasCommittedRenewal = 'auto_renew' | 'hourly_billing';
+
+export interface DbaasVpcEntry {
+  ipv4_cidr: string;
+  network_id: number;
+  subnet_id?: number;
+  target: 'vpcs';
+  vpc_name: string;
+}
+
 export interface DbaasCreateRequest {
+  cn_id?: number;
+  cn_status?: DbaasCommittedRenewal;
   database: {
     dbaas_number: number;
     name: string;
@@ -83,6 +97,7 @@ export interface DbaasCreateRequest {
   public_ip_required: boolean;
   software_id: number;
   template_id: number;
+  vpcs?: DbaasVpcEntry[];
 }
 
 export interface DbaasCreateResult {
@@ -105,4 +120,12 @@ export interface DbaasResetPasswordResult {
   cluster_id?: number;
   message: string;
   name?: string;
+}
+
+export interface DbaasVpcAttachRequest {
+  vpcs: DbaasVpcEntry[];
+}
+
+export interface DbaasVpcAttachResult {
+  message?: string;
 }

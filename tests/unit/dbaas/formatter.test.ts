@@ -1,8 +1,8 @@
 import { formatCliCommand } from '../../../src/app/metadata.js';
 import { stableStringify } from '../../../src/core/json.js';
 import {
-  formatDbaasEnginePlansTable,
   formatDbaasListTable,
+  formatDbaasListTypesTable,
   formatDbaasTemplatePlansTable,
   renderDbaasResult
 } from '../../../src/dbaas/formatter.js';
@@ -28,7 +28,7 @@ describe('dbaas formatter', () => {
   });
 
   it('renders engine and template plan tables', () => {
-    const engineTable = formatDbaasEnginePlansTable([
+    const engineTable = formatDbaasListTypesTable([
       {
         description: null,
         engine: 'Relational',
@@ -40,6 +40,7 @@ describe('dbaas formatter', () => {
     const templateTable = formatDbaasTemplatePlansTable([
       {
         available: true,
+        committed_sku: [],
         currency: 'INR',
         disk: '100 GB',
         name: 'General Purpose Small',
@@ -52,8 +53,8 @@ describe('dbaas formatter', () => {
       }
     ]);
 
-    expect(engineTable).toContain('Relational');
-    expect(engineTable).toContain('301');
+    expect(engineTable).toContain('MySQL');
+    expect(engineTable).toContain('8.0');
     expect(templateTable).toContain('General Purpose Small');
     expect(templateTable).toContain('901');
     expect(templateTable).toContain('12 INR');
@@ -95,10 +96,9 @@ describe('dbaas formatter', () => {
   it('renders plans guidance for both engine discovery and template selection', () => {
     const engineOutput = renderDbaasResult(
       {
-        action: 'plans',
+        action: 'list-types',
         filters: {
-          type: null,
-          version: null
+          type: null
         },
         items: [
           {
@@ -109,7 +109,6 @@ describe('dbaas formatter', () => {
             version: '16'
           }
         ],
-        mode: 'engines',
         total_count: 1
       },
       false
@@ -124,6 +123,7 @@ describe('dbaas formatter', () => {
         items: [
           {
             available: true,
+            committed_sku: [],
             currency: 'INR',
             disk: '100 GB',
             name: 'Balanced Small',
@@ -135,13 +135,12 @@ describe('dbaas formatter', () => {
             version: '16'
           }
         ],
-        mode: 'templates',
         total_count: 1
       },
       false
     );
 
-    expect(engineOutput).toContain('Supported DBaaS engines (1)');
+    expect(engineOutput).toContain('Supported DBaaS engine types (1)');
     expect(engineOutput).toContain(
       formatCliCommand(
         'dbaas plans --type <database-type> --db-version <version>'
@@ -220,5 +219,162 @@ describe('dbaas formatter', () => {
         message: 'Password reset request processed successfully.'
       })}\n`
     );
+  });
+
+  it('renders non-cancelled delete output with and without a cluster summary', () => {
+    const deletedWithSummary = renderDbaasResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        dbaas: {
+          connection_string: null,
+          database_name: 'appdb',
+          id: 7869,
+          name: 'customer-db',
+          type: 'MySQL',
+          username: 'admin',
+          version: '8.0'
+        },
+        dbaas_id: 7869,
+        message: 'Deleted customer-db.'
+      },
+      false
+    );
+    const deletedWithoutSummary = renderDbaasResult(
+      {
+        action: 'delete',
+        cancelled: false,
+        dbaas: null,
+        dbaas_id: 7869
+      },
+      false
+    );
+
+    expect(deletedWithSummary).toBe(
+      'Deleted DBaaS 7869 (customer-db, MySQL 8.0).\n'
+    );
+    expect(deletedWithoutSummary).toBe('Deleted DBaaS 7869.\n');
+  });
+
+  it('renders list-types in json mode', () => {
+    const json = renderDbaasResult(
+      {
+        action: 'list-types',
+        filters: {
+          type: null
+        },
+        items: [
+          {
+            description: 'Relational DB',
+            engine: 'Relational',
+            software_id: 401,
+            type: 'PostgreSQL',
+            version: '16'
+          }
+        ],
+        total_count: 1
+      },
+      true
+    );
+
+    const parsed = JSON.parse(json) as {
+      action: string;
+      items: Array<{ software_id: number; engine: string }>;
+    };
+    expect(parsed.action).toBe('list-types');
+    expect(parsed.items[0]?.software_id).toBe(401);
+    expect(parsed.items[0]?.engine).toBe('Relational');
+  });
+
+  it('renders template plans in json mode', () => {
+    const json = renderDbaasResult(
+      {
+        action: 'plans',
+        filters: {
+          type: 'PostgreSQL',
+          version: '16'
+        },
+        items: [
+          {
+            available: true,
+            committed_sku: [],
+            currency: null,
+            disk: '100 GB',
+            name: 'Balanced Small',
+            price_per_hour: null,
+            ram: '8',
+            template_id: 990,
+            type: 'PostgreSQL',
+            vcpu: '2',
+            version: '16'
+          }
+        ],
+        total_count: 1
+      },
+      true
+    );
+
+    const parsed = JSON.parse(json) as {
+      action: string;
+      items: Array<{ available: boolean; price_per_hour: null }>;
+    };
+    expect(parsed.action).toBe('plans');
+    expect(parsed.items[0]?.available).toBe(true);
+    expect(parsed.items[0]?.price_per_hour).toBeNull();
+  });
+
+  it('formats template plan prices as empty string when price is null', () => {
+    const table = formatDbaasTemplatePlansTable([
+      {
+        available: true,
+        committed_sku: [],
+        currency: null,
+        disk: '50 GB',
+        name: 'Free Tier',
+        price_per_hour: null,
+        ram: '2',
+        template_id: 1,
+        type: 'MySQL',
+        vcpu: '1',
+        version: '8.0'
+      }
+    ]);
+
+    expect(table).toContain('Free Tier');
+    expect(table).not.toContain('null');
+  });
+
+  it('renders empty list-types output', () => {
+    const output = renderDbaasResult(
+      {
+        action: 'list-types',
+        filters: {
+          type: null
+        },
+        items: [],
+        total_count: 0
+      },
+      false
+    );
+
+    expect(output).toBe('No supported DBaaS engine types found.\n');
+  });
+
+  it('renders empty template plans output', () => {
+    const output = renderDbaasResult(
+      {
+        action: 'plans',
+        filters: {
+          type: 'PostgreSQL',
+          version: '16'
+        },
+        items: [],
+        mode: 'templates',
+        total_count: 0
+      },
+      false
+    );
+
+    expect(output).toContain('No DBaaS plans found.');
   });
 });

@@ -112,6 +112,32 @@ describe('DbaasApiClient', () => {
     });
   });
 
+  it('lists DBaaS clusters and omits pagination fields absent from the response', async () => {
+    const transport = new StubTransport();
+    const client = new DbaasApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([
+        {
+          id: 7869,
+          name: 'customer-db',
+          software: {
+            engine: 'Relational',
+            id: 301,
+            name: 'MySQL',
+            version: '8.0'
+          }
+        }
+      ])
+    );
+
+    const result = await client.listDbaas(1, 100, {});
+
+    expect(result.items).toHaveLength(1);
+    expect(result.total_count).toBeUndefined();
+    expect(result.total_page_number).toBeUndefined();
+  });
+
   it('lists DBaaS plans with an optional software id filter', async () => {
     const transport = new StubTransport();
     const client = new DbaasApiClient(transport);

@@ -13,7 +13,9 @@ import type {
   DbaasListResult,
   DbaasPlanCatalog,
   DbaasResetPasswordRequest,
-  DbaasResetPasswordResult
+  DbaasResetPasswordResult,
+  DbaasVpcAttachRequest,
+  DbaasVpcAttachResult
 } from './types.js';
 
 type DbaasListApiResponse = ApiResponse<
@@ -26,12 +28,17 @@ type DbaasListApiResponse = ApiResponse<
 
 const DBAAS_CLUSTERS_PATH = '/rds/cluster/';
 const DBAAS_PLANS_PATH = '/rds/plans/';
+const DBAAS_VPC_ATTACH_SUFFIX = 'vpc-attach/';
 
 export interface DbaasListFilters {
   softwareType?: string;
 }
 
 export interface DbaasClient {
+  attachVpc(
+    dbaasId: number,
+    body: DbaasVpcAttachRequest
+  ): Promise<DbaasVpcAttachResult>;
   createDbaas(body: DbaasCreateRequest): Promise<DbaasCreateResult>;
   deleteDbaas(dbaasId: number): Promise<DbaasDeleteResult>;
   getDbaas(dbaasId: number): Promise<DbaasClusterDetail>;
@@ -49,6 +56,21 @@ export interface DbaasClient {
 
 export class DbaasApiClient implements DbaasClient {
   constructor(private readonly transport: MyAccountTransport) {}
+
+  async attachVpc(
+    dbaasId: number,
+    body: DbaasVpcAttachRequest
+  ): Promise<DbaasVpcAttachResult> {
+    const response = await this.transport.request<
+      ApiEnvelope<DbaasVpcAttachResult>
+    >({
+      body,
+      method: 'PUT',
+      path: `${buildDbaasPath(dbaasId)}${DBAAS_VPC_ATTACH_SUFFIX}`
+    });
+
+    return response.data;
+  }
 
   async createDbaas(body: DbaasCreateRequest): Promise<DbaasCreateResult> {
     const response = await this.transport.post<ApiEnvelope<DbaasCreateResult>>(

@@ -6,14 +6,17 @@ import {
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { DbaasClient } from './client.js';
+import type { VpcClient } from '../vpc/client.js';
 import type {
   DbaasClusterDetail,
   DbaasClusterSummary,
+  DbaasCommittedRenewal,
   DbaasCreateRequest,
   DbaasCreateResult,
   DbaasPlanCatalog,
   DbaasSoftwareSummary,
-  DbaasTemplatePlan
+  DbaasTemplatePlan,
+  DbaasVpcEntry
 } from './types.js';
 
 const DBAAS_LIST_PAGE_SIZE = 100;
@@ -23,6 +26,11 @@ const DBAAS_USERNAME_REGEX = /^[a-z0-9]+$/;
 const DBAAS_PASSWORD_REGEX =
   /^(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z])(?=.*[#?!@$%^&|,.:<>{}()]).{16,30}$/;
 type SupportedDatabaseType = 'MariaDB' | 'MySQL' | 'PostgreSQL';
+export type DbaasCreateBillingType = 'hourly' | 'committed';
+const DBAAS_CREATE_BILLING_TYPES: readonly DbaasCreateBillingType[] = [
+  'hourly',
+  'committed'
+];
 
 const SUPPORTED_DATABASE_TYPES: ReadonlyArray<{
   aliases: readonly string[];
@@ -39,9 +47,18 @@ export interface DbaasContextOptions {
   projectId?: string;
 }
 
-export interface DbaasPlansOptions extends DbaasContextOptions {
-  dbVersion?: string;
+export interface DbaasListTypesOptions extends DbaasContextOptions {
   type?: string;
+}
+
+export interface DbaasPlansOptions extends DbaasContextOptions {
+  dbVersion: string;
+  type: string;
+}
+
+export interface DbaasSkusOptions extends DbaasContextOptions {
+  dbVersion: string;
+  type: string;
 }
 
 export interface DbaasListOptions extends DbaasContextOptions {
@@ -49,6 +66,9 @@ export interface DbaasListOptions extends DbaasContextOptions {
 }
 
 export interface DbaasCreateOptions extends DbaasContextOptions {
+  billingType?: string;
+  committedPlanId?: string;
+  committedRenewal?: string;
   databaseName: string;
   dbVersion: string;
   name: string;
@@ -56,8 +76,10 @@ export interface DbaasCreateOptions extends DbaasContextOptions {
   passwordFile?: string;
   plan: string;
   publicIp?: boolean;
+  subnetId?: string;
   type: string;
   username?: string;
+  vpcId?: string;
 }
 
 export interface DbaasResetPasswordOptions extends DbaasContextOptions {
@@ -67,6 +89,11 @@ export interface DbaasResetPasswordOptions extends DbaasContextOptions {
 
 export interface DbaasDeleteOptions extends DbaasContextOptions {
   force?: boolean;
+}
+
+export interface DbaasAttachVpcOptions extends DbaasContextOptions {
+  subnetId?: string;
+  vpcId: string;
 }
 
 export interface DbaasListItem {
@@ -79,7 +106,7 @@ export interface DbaasListItem {
   version: string;
 }
 
-export interface DbaasPlansEngineItem {
+export interface DbaasListTypeItem {
   description: string | null;
   engine: string;
   software_id: number;
@@ -87,8 +114,19 @@ export interface DbaasPlansEngineItem {
   version: string;
 }
 
+export interface DbaasCommittedSkuItem {
+  committed_days: number | null;
+  committed_sku_id: number;
+  committed_sku_name: string;
+  committed_sku_price: number | null;
+  currency: string | null;
+  plan_name: string;
+  template_id: number;
+}
+
 export interface DbaasPlansTemplateItem {
   available: boolean;
+  committed_sku: DbaasCommittedSkuItem[];
   currency: string | null;
   disk: string;
   name: string;
@@ -120,25 +158,32 @@ export interface DbaasListCommandResult {
   total_page_number: number;
 }
 
-export interface DbaasPlansEngineCommandResult {
-  action: 'plans';
+export interface DbaasListTypesCommandResult {
+  action: 'list-types';
   filters: {
     type: SupportedDatabaseType | null;
-    version: string | null;
   };
-  items: DbaasPlansEngineItem[];
-  mode: 'engines';
+  items: DbaasListTypeItem[];
   total_count: number;
 }
 
-export interface DbaasPlansTemplateCommandResult {
+export interface DbaasPlansCommandResult {
   action: 'plans';
   filters: {
     type: SupportedDatabaseType;
     version: string;
   };
   items: DbaasPlansTemplateItem[];
-  mode: 'templates';
+  total_count: number;
+}
+
+export interface DbaasSkusCommandResult {
+  action: 'skus';
+  filters: {
+    type: SupportedDatabaseType;
+    version: string;
+  };
+  items: DbaasCommittedSkuItem[];
   total_count: number;
 }
 
@@ -146,6 +191,8 @@ export interface DbaasCreateCommandResult {
   action: 'create';
   dbaas: DbaasSummaryItem;
   requested: {
+    billing_type: DbaasCreateBillingType;
+    committed_plan_id?: number;
     database_name: string;
     name: string;
     plan: string;
@@ -154,6 +201,7 @@ export interface DbaasCreateCommandResult {
     type: SupportedDatabaseType;
     username: string;
     version: string;
+    vpc_id?: number;
   };
 }
 
@@ -171,16 +219,25 @@ export interface DbaasDeleteCommandResult {
   message?: string;
 }
 
-export type DbaasPlansCommandResult =
-  | DbaasPlansEngineCommandResult
-  | DbaasPlansTemplateCommandResult;
+export interface DbaasVpcAttachCommandResult {
+  action: 'vpc-attach';
+  dbaas_id: number;
+  vpc: {
+    id: number;
+    name: string;
+    subnet_id: number | null;
+  };
+}
 
 export type DbaasCommandResult =
   | DbaasCreateCommandResult
   | DbaasDeleteCommandResult
   | DbaasListCommandResult
+  | DbaasListTypesCommandResult
   | DbaasPlansCommandResult
-  | DbaasResetPasswordCommandResult;
+  | DbaasResetPasswordCommandResult
+  | DbaasSkusCommandResult
+  | DbaasVpcAttachCommandResult;
 
 interface DbaasStore {
   readonly configPath: string;
@@ -190,6 +247,7 @@ interface DbaasStore {
 export interface DbaasServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createDbaasClient(credentials: ResolvedCredentials): DbaasClient;
+  createVpcClient?: (credentials: ResolvedCredentials) => VpcClient;
   isInteractive: boolean;
   readPasswordFile(path: string): Promise<string>;
   readPasswordFromStdin(): Promise<string>;
@@ -202,14 +260,19 @@ interface DbaasPasswordOptions {
 }
 
 interface NormalizedDbaasCreateInput {
+  billingType: DbaasCreateBillingType;
+  committedPlanId: number | null;
+  committedRenewal: DbaasCommittedRenewal;
   databaseName: string;
   name: string;
   password: string;
   plan: string;
   publicIp: boolean;
+  subnetId: number | null;
   type: SupportedDatabaseType;
   username: string;
   version: string;
+  vpcId: number | null;
 }
 
 export class DbaasService {
@@ -220,13 +283,28 @@ export class DbaasService {
   ): Promise<DbaasCreateCommandResult> {
     const password = await this.loadPassword(options);
     const input = normalizeDbaasCreateInput(options, password);
-    const client = await this.createClient(options);
+    const credentials = await this.resolveCredentials(options);
+    const client = this.dependencies.createDbaasClient(credentials);
     const catalog = await client.listPlans();
     const software = resolveSoftware(catalog, input.type, input.version);
     const softwareCatalog = await client.listPlans(software.id);
     const templatePlan = resolveTemplatePlan(softwareCatalog, input.plan);
+
+    let vpcEntry: DbaasVpcEntry | undefined;
+    if (input.vpcId !== null) {
+      const vpcClient = this.requireVpcClient(credentials);
+      const vpc = await vpcClient.getVpc(input.vpcId);
+      vpcEntry = {
+        ipv4_cidr: vpc.ipv4_cidr,
+        network_id: vpc.network_id,
+        target: 'vpcs',
+        vpc_name: vpc.name,
+        ...(input.subnetId === null ? {} : { subnet_id: input.subnetId })
+      };
+    }
+
     const createResult = await client.createDbaas(
-      buildCreateRequest(input, software.id, templatePlan.template_id)
+      buildCreateRequest(input, software.id, templatePlan.template_id, vpcEntry)
     );
     const dbaasId = extractCreatedDbaasId(createResult);
     const detail = await client.getDbaas(dbaasId);
@@ -236,6 +314,10 @@ export class DbaasService {
       action: 'create',
       dbaas: summary,
       requested: {
+        billing_type: input.billingType,
+        ...(input.committedPlanId === null
+          ? {}
+          : { committed_plan_id: input.committedPlanId }),
         database_name: input.databaseName,
         name: input.name,
         plan: templatePlan.name,
@@ -243,7 +325,8 @@ export class DbaasService {
         template_id: templatePlan.template_id,
         type: input.type,
         username: input.username,
-        version: input.version
+        version: input.version,
+        ...(input.vpcId === null ? {} : { vpc_id: input.vpcId })
       }
     };
   }
@@ -327,61 +410,38 @@ export class DbaasService {
     };
   }
 
+  async listTypes(
+    options: DbaasListTypesOptions
+  ): Promise<DbaasListTypesCommandResult> {
+    const requestedType =
+      options.type === undefined ? null : normalizeDatabaseType(options.type);
+    const client = await this.createClient(options);
+    const catalog = await client.listPlans();
+    const allItems = summarizeEngineTypes(catalog.database_engines);
+    const items =
+      requestedType === null
+        ? allItems
+        : allItems.filter((item) => item.type === requestedType);
+
+    return {
+      action: 'list-types',
+      filters: { type: requestedType },
+      items,
+      total_count: items.length
+    };
+  }
+
   async listPlans(
     options: DbaasPlansOptions
   ): Promise<DbaasPlansCommandResult> {
-    if (options.dbVersion !== undefined && options.type === undefined) {
-      throw new CliError('--db-version requires --type.', {
-        code: 'INVALID_DBAAS_PLAN_FILTERS',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('dbaas plans --type <database-type> --db-version <version>')}.`
-      });
-    }
-
-    const requestedType =
-      options.type === undefined ? null : normalizeDatabaseType(options.type);
-    const requestedVersion =
-      options.dbVersion === undefined
-        ? null
-        : normalizeRequiredString(
-            options.dbVersion,
-            'DB version',
-            '--db-version'
-          );
+    const requestedType = normalizeDatabaseType(options.type);
+    const requestedVersion = normalizeRequiredString(
+      options.dbVersion,
+      'DB version',
+      '--db-version'
+    );
     const client = await this.createClient(options);
     const catalog = await client.listPlans();
-    const engines = summarizeEnginePlans(catalog.database_engines);
-
-    if (requestedType === null) {
-      return {
-        action: 'plans',
-        filters: {
-          type: null,
-          version: null
-        },
-        items: engines,
-        mode: 'engines',
-        total_count: engines.length
-      };
-    }
-
-    if (requestedVersion === null) {
-      const filteredItems = engines.filter(
-        (item) => item.type === requestedType
-      );
-
-      return {
-        action: 'plans',
-        filters: {
-          type: requestedType,
-          version: null
-        },
-        items: filteredItems,
-        mode: 'engines',
-        total_count: filteredItems.length
-      };
-    }
-
     const software = resolveSoftware(catalog, requestedType, requestedVersion);
     const softwareCatalog = await client.listPlans(software.id);
     const items = summarizeTemplatePlans(
@@ -392,12 +452,32 @@ export class DbaasService {
 
     return {
       action: 'plans',
-      filters: {
-        type: requestedType,
-        version: requestedVersion
-      },
+      filters: { type: requestedType, version: requestedVersion },
       items,
-      mode: 'templates',
+      total_count: items.length
+    };
+  }
+
+  async listSkus(options: DbaasSkusOptions): Promise<DbaasSkusCommandResult> {
+    const requestedType = normalizeDatabaseType(options.type);
+    const requestedVersion = normalizeRequiredString(
+      options.dbVersion,
+      'DB version',
+      '--db-version'
+    );
+    const client = await this.createClient(options);
+    const catalog = await client.listPlans();
+    const software = resolveSoftware(catalog, requestedType, requestedVersion);
+    const softwareCatalog = await client.listPlans(software.id);
+    const items = extractCommittedSkus(
+      requestedType,
+      softwareCatalog.template_plans
+    );
+
+    return {
+      action: 'skus',
+      filters: { type: requestedType, version: requestedVersion },
+      items,
       total_count: items.length
     };
   }
@@ -440,23 +520,77 @@ export class DbaasService {
     };
   }
 
+  async attachVpc(
+    dbaasId: string,
+    options: DbaasAttachVpcOptions
+  ): Promise<DbaasVpcAttachCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const vpcId = normalizeRequiredNumericId(
+      options.vpcId,
+      'VPC ID',
+      '--vpc-id'
+    );
+    const subnetId =
+      options.subnetId === undefined
+        ? null
+        : normalizeRequiredNumericId(
+            options.subnetId,
+            'Subnet ID',
+            '--subnet-id'
+          );
+    const credentials = await this.resolveCredentials(options);
+    const vpcClient = this.requireVpcClient(credentials);
+    const vpc = await vpcClient.getVpc(vpcId);
+    const vpcEntry: DbaasVpcEntry = {
+      ipv4_cidr: vpc.ipv4_cidr,
+      network_id: vpc.network_id,
+      target: 'vpcs',
+      vpc_name: vpc.name,
+      ...(subnetId === null ? {} : { subnet_id: subnetId })
+    };
+    const dbaasClient = this.dependencies.createDbaasClient(credentials);
+    await dbaasClient.attachVpc(normalizedDbaasId, { vpcs: [vpcEntry] });
+
+    return {
+      action: 'vpc-attach',
+      dbaas_id: normalizedDbaasId,
+      vpc: { id: vpcId, name: vpc.name, subnet_id: subnetId }
+    };
+  }
+
+  private async resolveCredentials(
+    options: DbaasContextOptions
+  ): Promise<ResolvedCredentials> {
+    return resolveStoredCredentials(this.dependencies.store, {
+      ...(options.alias === undefined ? {} : { alias: options.alias }),
+      ...(options.location === undefined ? {} : { location: options.location }),
+      ...(options.projectId === undefined
+        ? {}
+        : { projectId: options.projectId })
+    });
+  }
+
   private async createClient(
     options: DbaasContextOptions
   ): Promise<DbaasClient> {
-    const credentials = await resolveStoredCredentials(
-      this.dependencies.store,
-      {
-        ...(options.alias === undefined ? {} : { alias: options.alias }),
-        ...(options.location === undefined
-          ? {}
-          : { location: options.location }),
-        ...(options.projectId === undefined
-          ? {}
-          : { projectId: options.projectId })
-      }
-    );
-
+    const credentials = await this.resolveCredentials(options);
     return this.dependencies.createDbaasClient(credentials);
+  }
+
+  private requireVpcClient(credentials: ResolvedCredentials): VpcClient {
+    if (this.dependencies.createVpcClient === undefined) {
+      throw new CliError('VPC operations are not available in this context.', {
+        code: 'DBAAS_VPC_CLIENT_UNAVAILABLE',
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Ensure the CLI runtime provides a VPC client.'
+      });
+    }
+
+    return this.dependencies.createVpcClient(credentials);
   }
 
   private async loadPassword(options: DbaasPasswordOptions): Promise<string> {
@@ -527,21 +661,125 @@ function normalizeDbaasCreateInput(
   const name = normalizeDbaasName(options.name, 'Name', '--name');
   const databaseName = normalizeDatabaseName(options.databaseName);
   const username = normalizeUsername(options.username ?? 'admin');
+  const billingType = normalizeCreateBillingType(options.billingType);
+  const committedPlanId = normalizeCommittedPlanId(
+    billingType,
+    options.committedPlanId
+  );
+  const committedRenewal = normalizeCommittedRenewal(options.committedRenewal);
+  const vpcId =
+    options.vpcId === undefined
+      ? null
+      : normalizeRequiredNumericId(options.vpcId, 'VPC ID', '--vpc-id');
+  const subnetId =
+    options.subnetId === undefined
+      ? null
+      : normalizeRequiredNumericId(
+          options.subnetId,
+          'Subnet ID',
+          '--subnet-id'
+        );
 
   return {
+    billingType,
+    committedPlanId,
+    committedRenewal,
     databaseName,
     name,
     type: normalizeDatabaseType(options.type),
     password,
     plan: normalizeRequiredString(options.plan, 'Plan', '--plan'),
     publicIp: options.publicIp ?? true,
+    subnetId,
     username,
     version: normalizeRequiredString(
       options.dbVersion,
       'DB version',
       '--db-version'
-    )
+    ),
+    vpcId
   };
+}
+
+function normalizeCreateBillingType(
+  value: string | undefined
+): DbaasCreateBillingType {
+  if (value === undefined) {
+    return 'hourly';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (
+    DBAAS_CREATE_BILLING_TYPES.includes(normalized as DbaasCreateBillingType)
+  ) {
+    return normalized as DbaasCreateBillingType;
+  }
+
+  throw new CliError(
+    `Billing type must be one of: ${DBAAS_CREATE_BILLING_TYPES.join(', ')}.`,
+    {
+      code: 'INVALID_DBAAS_BILLING_TYPE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass --billing-type ${DBAAS_CREATE_BILLING_TYPES.join(' or --billing-type ')}.`
+    }
+  );
+}
+
+function normalizeCommittedPlanId(
+  billingType: DbaasCreateBillingType,
+  committedPlanId: string | undefined
+): number | null {
+  if (billingType === 'committed') {
+    if (committedPlanId === undefined) {
+      throw new CliError(
+        'Committed plan ID is required when --billing-type committed is used.',
+        {
+          code: 'MISSING_COMMITTED_PLAN_ID',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatCliCommand('dbaas skus --type <database-type> --db-version <version>')} first, then pass a SKU ID with --committed-plan-id.`
+        }
+      );
+    }
+
+    return normalizeRequiredNumericId(
+      committedPlanId,
+      'Committed plan ID',
+      '--committed-plan-id'
+    );
+  }
+
+  if (committedPlanId !== undefined) {
+    throw new CliError(
+      '--committed-plan-id can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_COMMITTED_PLAN_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --committed-plan-id, or add --billing-type committed.'
+      }
+    );
+  }
+
+  return null;
+}
+
+function normalizeCommittedRenewal(
+  value: string | undefined
+): DbaasCommittedRenewal {
+  if (value === undefined || value === 'auto-renew') {
+    return 'auto_renew';
+  }
+
+  if (value === 'hourly') {
+    return 'hourly_billing';
+  }
+
+  throw new CliError('Committed renewal must be auto-renew or hourly.', {
+    code: 'INVALID_DBAAS_COMMITTED_RENEWAL',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Pass --committed-renewal auto-renew to renew automatically, or --committed-renewal hourly to switch to hourly billing after the term.'
+  });
 }
 
 function normalizePasswordSource(
@@ -609,9 +847,13 @@ function wrapPasswordReadError(passwordFile: string, error: unknown): CliError {
 function buildCreateRequest(
   input: NormalizedDbaasCreateInput,
   softwareId: number,
-  templateId: number
+  templateId: number,
+  vpcEntry?: DbaasVpcEntry
 ): DbaasCreateRequest {
   return {
+    ...(input.committedPlanId === null
+      ? {}
+      : { cn_id: input.committedPlanId, cn_status: input.committedRenewal }),
     database: {
       dbaas_number: 1,
       name: input.databaseName,
@@ -621,13 +863,14 @@ function buildCreateRequest(
     name: input.name,
     public_ip_required: input.publicIp,
     software_id: softwareId,
-    template_id: templateId
+    template_id: templateId,
+    ...(vpcEntry === undefined ? {} : { vpcs: [vpcEntry] })
   };
 }
 
-function summarizeEnginePlans(
+function summarizeEngineTypes(
   databaseEngines: DbaasSoftwareSummary[]
-): DbaasPlansEngineItem[] {
+): DbaasListTypeItem[] {
   const items = databaseEngines.flatMap((software) => {
     const type = normalizeSupportedDatabaseTypeOrNull(software.name);
     if (type === null) {
@@ -663,6 +906,23 @@ function summarizeTemplatePlans(
   return [...templatePlans]
     .map((plan) => ({
       available: plan.available_inventory_status,
+      committed_sku: (plan.committed_sku ?? []).flatMap((sku) => {
+        if (sku.committed_sku_id === undefined) {
+          return [];
+        }
+
+        return [
+          {
+            committed_days: sku.committed_days ?? null,
+            committed_sku_id: sku.committed_sku_id,
+            committed_sku_name: sku.committed_sku_name ?? '',
+            committed_sku_price: sku.committed_sku_price ?? null,
+            currency: normalizeOptionalString(plan.currency),
+            plan_name: plan.name,
+            template_id: plan.template_id
+          }
+        ];
+      }),
       currency: normalizeOptionalString(plan.currency),
       disk: plan.disk,
       name: plan.name,
@@ -689,6 +949,31 @@ function summarizeTemplatePlans(
     });
 }
 
+function extractCommittedSkus(
+  type: SupportedDatabaseType,
+  templatePlans: DbaasTemplatePlan[]
+): DbaasCommittedSkuItem[] {
+  return templatePlans.flatMap((plan) =>
+    (plan.committed_sku ?? []).flatMap((sku) => {
+      if (sku.committed_sku_id === undefined) {
+        return [];
+      }
+
+      return [
+        {
+          committed_days: sku.committed_days ?? null,
+          committed_sku_id: sku.committed_sku_id,
+          committed_sku_name: sku.committed_sku_name ?? '',
+          committed_sku_price: sku.committed_sku_price ?? null,
+          currency: normalizeOptionalString(plan.currency),
+          plan_name: plan.name,
+          template_id: plan.template_id
+        }
+      ];
+    })
+  );
+}
+
 function resolveSoftware(
   catalog: DbaasPlanCatalog,
   requestedType: SupportedDatabaseType,
@@ -704,7 +989,7 @@ function resolveSoftware(
     return firstMatch;
   }
 
-  const availableVersions = summarizeEnginePlans(catalog.database_engines)
+  const availableVersions = summarizeEngineTypes(catalog.database_engines)
     .filter((item) => item.type === requestedType)
     .map((item) => item.version);
   const versionsSummary =
@@ -716,7 +1001,7 @@ function resolveSoftware(
       code: 'DBAAS_VERSION_NOT_FOUND',
       details: [`Available versions: ${versionsSummary}`],
       exitCode: EXIT_CODES.usage,
-      suggestion: `Run ${formatCliCommand(`dbaas plans --type ${typeToFlagValue(requestedType)}`)} to inspect valid versions.`
+      suggestion: `Run ${formatCliCommand(`dbaas list-types --type ${typeToFlagValue(requestedType)}`)} to inspect valid versions.`
     }
   );
 }

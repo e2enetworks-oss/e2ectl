@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
 import { formatCliCommand } from '../app/metadata.js';
@@ -8,11 +8,14 @@ import type { CliRuntime } from '../app/index.js';
 import { renderDbaasResult } from './formatter.js';
 import {
   DbaasService,
+  type DbaasAttachVpcOptions,
   type DbaasCreateOptions,
   type DbaasDeleteOptions,
   type DbaasListOptions,
+  type DbaasListTypesOptions,
   type DbaasPlansOptions,
-  type DbaasResetPasswordOptions
+  type DbaasResetPasswordOptions,
+  type DbaasSkusOptions
 } from './service.js';
 
 interface GlobalOptions {
@@ -23,6 +26,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
   const service = new DbaasService({
     confirm: (message) => runtime.confirm(message),
     createDbaasClient: (credentials) => runtime.createDbaasClient(credentials),
+    createVpcClient: (credentials) => runtime.createVpcClient(credentials),
     isInteractive: runtime.isInteractive,
     readPasswordFile: async (path) => await readFile(path, 'utf8'),
     readPasswordFromStdin: readAllFromStdin,
@@ -36,20 +40,58 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
-      .command('plans')
+      .command('list-types')
       .description(
-        'Discover supported DBaaS engines, versions, and template plans before creation.'
+        'List supported DBaaS engine types and versions available for your account.'
       )
       .option(
         '--type <databaseType>',
+        'Filter by database type: maria, sql, or postgres.'
+      )
+  ).action(async (options: DbaasListTypesOptions, commandInstance: Command) => {
+    const result = await service.listTypes(options);
+    runtime.stdout.write(
+      renderDbaasResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  });
+
+  addContextOptions(
+    command
+      .command('plans')
+      .description(
+        `List hourly template plans and committed SKU options for a specific engine version. Run ${formatCliCommand('dbaas list-types')} first to find valid --type and --db-version values.`
+      )
+      .requiredOption(
+        '--type <databaseType>',
         'Database type: maria, sql, or postgres.'
       )
-      .option(
-        '--db-version <version>',
-        'Database engine version. Requires --type.'
-      )
+      .requiredOption('--db-version <version>', 'Database engine version.')
   ).action(async (options: DbaasPlansOptions, commandInstance: Command) => {
     const result = await service.listPlans(options);
+    runtime.stdout.write(
+      renderDbaasResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  });
+
+  addContextOptions(
+    command
+      .command('skus')
+      .description(
+        `List committed SKU options for a specific engine version. Use the SKU ID with ${formatCliCommand('dbaas create --billing-type committed --committed-plan-id <id>')}.`
+      )
+      .requiredOption(
+        '--type <databaseType>',
+        'Database type: maria, sql, or postgres.'
+      )
+      .requiredOption('--db-version <version>', 'Database engine version.')
+  ).action(async (options: DbaasSkusOptions, commandInstance: Command) => {
+    const result = await service.listSkus(options);
     runtime.stdout.write(
       renderDbaasResult(
         result,
@@ -82,7 +124,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a DBaaS cluster. Inspect ${formatCliCommand('dbaas plans')} first so the CLI can resolve the backend software and template ids safely.`
+        `Create a DBaaS cluster. Run ${formatCliCommand('dbaas list-types')} then ${formatCliCommand('dbaas plans --type <type> --db-version <version>')} first to discover plan names and committed SKU IDs.`
       )
       .requiredOption('--name <name>', 'DBaaS cluster name.')
       .requiredOption(
@@ -112,6 +154,34 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'admin'
       )
       .option('--no-public-ip', 'Create the DBaaS without a public endpoint.')
+      .addOption(
+        new Option(
+          '--billing-type <billingType>',
+          'Billing type: hourly (default) or committed.'
+        )
+          .choices(['hourly', 'committed'])
+          .default('hourly')
+      )
+      .option(
+        '--committed-plan-id <committedPlanId>',
+        `Committed SKU ID from ${formatCliCommand('dbaas skus')} output. Requires --billing-type committed.`
+      )
+      .addOption(
+        new Option(
+          '--committed-renewal <committedRenewal>',
+          'What happens when the committed term ends: auto-renew (default) or hourly.'
+        )
+          .choices(['auto-renew', 'hourly'])
+          .default('auto-renew')
+      )
+      .option(
+        '--vpc-id <vpcId>',
+        'Attach the cluster to this VPC at creation. Use the network_id from vpc list.'
+      )
+      .option(
+        '--subnet-id <subnetId>',
+        'Optional subnet ID within the VPC. Only for non-default VPCs.'
+      )
   ).action(async (options: DbaasCreateOptions, commandInstance: Command) => {
     const result = await service.createDbaas(options);
     runtime.stdout.write(
@@ -121,6 +191,36 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       )
     );
   });
+
+  addContextOptions(
+    command
+      .command('attach <dbaasId>')
+      .description(
+        'Attach a VPC to an existing DBaaS cluster. The cluster must be in Running state.'
+      )
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'VPC network_id to attach. Use the network_id from vpc list.'
+      )
+      .option(
+        '--subnet-id <subnetId>',
+        'Optional subnet ID within the VPC. Only for non-default VPCs.'
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasAttachVpcOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.attachVpc(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   addContextOptions(
     command

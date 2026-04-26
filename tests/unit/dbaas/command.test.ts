@@ -11,6 +11,7 @@ import type { ImageClient } from '../../../src/image/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createDbaasClientStub() {
+  const attachVpc = vi.fn(() => Promise.resolve({}));
   const createDbaas = vi.fn(() =>
     Promise.resolve({
       id: 7869,
@@ -122,6 +123,7 @@ function createDbaasClientStub() {
   );
 
   const stub: DbaasClient = {
+    attachVpc,
     createDbaas,
     deleteDbaas,
     getDbaas,
@@ -131,6 +133,7 @@ function createDbaasClientStub() {
   };
 
   return {
+    attachVpc,
     createDbaas,
     deleteDbaas,
     getDbaas,
@@ -345,6 +348,34 @@ describe('dbaas commands', () => {
     expect(stdout.buffer).toContain('"action": "create"');
     expect(stdout.buffer).toContain('"template_id": 901');
     expect(stdout.buffer).toContain('"type": "MySQL"');
+  });
+
+  it('lists plans through the plans subcommand', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'dbaas',
+      'plans',
+      '--alias',
+      'prod',
+      '--type',
+      'sql',
+      '--db-version',
+      '8.0'
+    ]);
+
+    expect(stdout.buffer).toContain('General Purpose Small');
+  });
+
+  it('outputs help when dbaas is invoked with no subcommand', async () => {
+    const help = await renderHelp(['dbaas']);
+
+    expect(help).toContain('dbaas');
+    expect(help).toContain('plans');
   });
 
   it('resets passwords and deletes DBaaS clusters through the command surface', async () => {

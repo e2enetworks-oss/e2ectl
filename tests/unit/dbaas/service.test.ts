@@ -80,6 +80,7 @@ function createPostgresCluster() {
 }
 
 function createServiceFixture(options?: { isInteractive?: boolean }): {
+  attachVpc: ReturnType<typeof vi.fn>;
   confirm: ReturnType<typeof vi.fn>;
   createDbaas: ReturnType<typeof vi.fn>;
   createDbaasClient: ReturnType<typeof vi.fn>;
@@ -104,7 +105,10 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   const resetPassword = vi.fn();
   let credentials: ResolvedCredentials | undefined;
 
+  const attachVpc = vi.fn();
+
   const client: DbaasClient = {
+    attachVpc,
     createDbaas,
     deleteDbaas,
     getDbaas,
@@ -131,6 +135,7 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   });
 
   return {
+    attachVpc,
     confirm,
     createDbaas,
     createDbaasClient,
@@ -304,6 +309,7 @@ describe('DbaasService', () => {
         version: '8.0'
       },
       requested: {
+        billing_type: 'hourly',
         database_name: 'appdb',
         name: 'customer-db',
         plan: 'General Purpose Small',
@@ -316,7 +322,7 @@ describe('DbaasService', () => {
     });
   });
 
-  it('lists supported engine versions before fetching template plans', async () => {
+  it('lists supported DBaaS engine types across all families', async () => {
     const { listPlans, service } = createServiceFixture();
 
     listPlans.mockResolvedValue({
@@ -338,13 +344,13 @@ describe('DbaasService', () => {
       template_plans: []
     });
 
-    const result = await service.listPlans({ alias: 'prod' });
+    const result = await service.listTypes({ alias: 'prod' });
 
+    expect(listPlans).toHaveBeenCalledOnce();
     expect(result).toEqual({
-      action: 'plans',
+      action: 'list-types',
       filters: {
-        type: null,
-        version: null
+        type: null
       },
       items: [
         {
@@ -355,7 +361,6 @@ describe('DbaasService', () => {
           version: '16'
         }
       ],
-      mode: 'engines',
       total_count: 1
     });
   });
@@ -412,6 +417,7 @@ describe('DbaasService', () => {
       items: [
         {
           available: true,
+          committed_sku: [],
           currency: 'INR',
           disk: '100 GB',
           name: 'Balanced Small',
@@ -423,12 +429,11 @@ describe('DbaasService', () => {
           version: '16'
         }
       ],
-      mode: 'templates',
       total_count: 1
     });
   });
 
-  it('lists supported versions for one requested database type', async () => {
+  it('lists supported DBaaS engine types for one database family', async () => {
     const { listPlans, service } = createServiceFixture();
 
     listPlans.mockResolvedValue({
@@ -455,16 +460,15 @@ describe('DbaasService', () => {
       template_plans: []
     });
 
-    const result = await service.listPlans({
+    const result = await service.listTypes({
       alias: 'prod',
       type: 'postgres'
     });
 
     expect(result).toEqual({
-      action: 'plans',
+      action: 'list-types',
       filters: {
-        type: 'PostgreSQL',
-        version: null
+        type: 'PostgreSQL'
       },
       items: [
         {
@@ -482,7 +486,6 @@ describe('DbaasService', () => {
           version: '15'
         }
       ],
-      mode: 'engines',
       total_count: 2
     });
   });
@@ -685,15 +688,23 @@ describe('DbaasService', () => {
     expect(createDbaasClient).not.toHaveBeenCalled();
   });
 
-  it('rejects db-version plan lookups without a database type', async () => {
+  it('rejects committed billing when --committed-plan-id is not provided', async () => {
     const { createDbaasClient, service } = createServiceFixture();
 
     await expect(
-      service.listPlans({
+      service.createDbaas({
         alias: 'prod',
-        dbVersion: '16'
+        billingType: 'committed',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
       })
-    ).rejects.toThrow('--db-version requires --type.');
+    ).rejects.toThrow(
+      'Committed plan ID is required when --billing-type committed is used.'
+    );
 
     expect(createDbaasClient).not.toHaveBeenCalled();
   });
@@ -854,5 +865,401 @@ describe('DbaasService', () => {
     );
 
     expect(createDbaas).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when multiple available plans match the requested plan name', async () => {
+    const { createDbaas, listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          },
+          {
+            available_inventory_status: true,
+            cpu: '4',
+            currency: 'INR',
+            disk: '200 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 24,
+            ram: '8',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 902
+          }
+        ]
+      });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      'Multiple available DBaaS plans match "General Purpose Small".'
+    );
+
+    expect(createDbaas).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when MariaDB version is not supported', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans.mockResolvedValue({
+      database_engines: [
+        { engine: 'Relational', id: 201, name: 'MariaDB', version: '10.11' }
+      ],
+      template_plans: []
+    });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'mydb',
+        dbVersion: '10.6',
+        name: 'my-cluster',
+        password: 'ValidPassword1!A',
+        plan: 'Small',
+        type: 'maria'
+      })
+    ).rejects.toThrow('No supported MariaDB engine matches version 10.6.');
+  });
+
+  it('fails clearly when PostgreSQL version is not supported', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans.mockResolvedValue({
+      database_engines: [
+        { engine: 'Relational', id: 401, name: 'PostgreSQL', version: '16' }
+      ],
+      template_plans: []
+    });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'mydb',
+        dbVersion: '14',
+        name: 'my-cluster',
+        password: 'ValidPassword1!A',
+        plan: 'Small',
+        type: 'postgres'
+      })
+    ).rejects.toThrow('No supported PostgreSQL engine matches version 14.');
+  });
+
+  it('fails clearly when neither password nor password-file is provided', async () => {
+    const { createDbaasClient, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Password is required.');
+
+    expect(createDbaasClient).not.toHaveBeenCalled();
+  });
+
+  it('reads the create password from a file when --password-file path is used', async () => {
+    const { createDbaas, getDbaas, listPlans, readPasswordFile, service } =
+      createServiceFixture();
+
+    readPasswordFile.mockResolvedValue('ValidPassword1!A\n');
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+    createDbaas.mockResolvedValue({ id: 7869, name: 'customer-db' });
+    getDbaas.mockResolvedValue(createMysqlCluster());
+
+    await service.createDbaas({
+      alias: 'prod',
+      databaseName: 'appdb',
+      dbVersion: '8.0',
+      name: 'customer-db',
+      passwordFile: '/secure/path/pass.txt',
+      plan: 'General Purpose Small',
+      type: 'sql'
+    });
+
+    expect(readPasswordFile).toHaveBeenCalledWith('/secure/path/pass.txt');
+    expect(createDbaas).toHaveBeenCalled();
+  });
+
+  it('rejects a cluster that is not a supported engine in delete', async () => {
+    const { deleteDbaas, getDbaas, service } = createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      id: 9999,
+      master_node: { cluster_id: 9999 },
+      name: 'yugabyte-db',
+      software: {
+        engine: 'Distributed',
+        id: 999,
+        name: 'YugaByte',
+        version: '2.0'
+      },
+      status: 'Running'
+    });
+
+    await expect(
+      service.deleteDbaas('9999', { alias: 'prod', force: true })
+    ).rejects.toThrow(
+      'DBaaS 9999 is not one of the supported engines (MariaDB, MySQL, PostgreSQL).'
+    );
+
+    expect(deleteDbaas).not.toHaveBeenCalled();
+  });
+
+  it('uses cluster_id from create response when id field is absent', async () => {
+    const { createDbaas, getDbaas, listPlans, service } =
+      createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+    createDbaas.mockResolvedValue({ cluster_id: 7869, name: 'customer-db' });
+    getDbaas.mockResolvedValue(createMysqlCluster());
+
+    const result = await service.createDbaas({
+      alias: 'prod',
+      databaseName: 'appdb',
+      dbVersion: '8.0',
+      name: 'customer-db',
+      password: 'ValidPassword1!A',
+      plan: 'General Purpose Small',
+      type: 'sql'
+    });
+
+    expect(getDbaas).toHaveBeenCalledWith(7869);
+    expect(result.dbaas.id).toBe(7869);
+  });
+
+  it('rejects names with invalid characters', async () => {
+    const { createDbaasClient, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'my cluster!',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Name must match ^[a-zA-Z0-9-_]{1,128}$.');
+
+    expect(createDbaasClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects database names longer than 64 characters', async () => {
+    const { createDbaasClient, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'a'.repeat(65),
+        dbVersion: '8.0',
+        name: 'my-cluster',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Database name must be 64 characters or fewer.');
+
+    expect(createDbaasClient).not.toHaveBeenCalled();
+  });
+
+  it('rejects usernames with uppercase or special characters', async () => {
+    const { createDbaasClient, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'my-cluster',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql',
+        username: 'Admin-User'
+      })
+    ).rejects.toThrow(
+      'Username must contain only lowercase letters and digits, up to 80 characters.'
+    );
+
+    expect(createDbaasClient).not.toHaveBeenCalled();
+  });
+
+  it('sorts list items by id as the final tie-breaker', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          ...createMysqlCluster(),
+          id: 200,
+          name: 'same-name'
+        },
+        {
+          ...createMysqlCluster(),
+          id: 100,
+          name: 'same-name'
+        }
+      ],
+      total_count: 2,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.id).toBe(100);
+    expect(result.items[1]?.id).toBe(200);
+  });
+
+  it('builds connection strings without a database name for PostgreSQL', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          ...createPostgresCluster(),
+          master_node: {
+            ...createPostgresCluster().master_node,
+            database: {
+              database: '',
+              id: 12,
+              pg_detail: {},
+              username: 'admin'
+            }
+          }
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.connection_string).toBe(
+      'psql -h pg.example.com -p 5432 -U admin'
+    );
+  });
+
+  it('returns null connection string when cluster has no host', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          ...createMysqlCluster(),
+          master_node: {
+            cluster_id: 7869,
+            database: {
+              database: 'appdb',
+              id: 11,
+              pg_detail: {},
+              username: 'admin'
+            },
+            domain: null,
+            port: null,
+            private_ip_address: null,
+            public_ip_address: null,
+            public_port: null
+          }
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.connection_string).toBeNull();
   });
 });
