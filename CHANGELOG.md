@@ -4,21 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [0.5.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.4.0...v0.5.0) (2026-04-26)
 
+### Added
 
-### Features
+- Saved image workflows:
+  - `e2ectl image list`
+  - `e2ectl image rename`
+  - `e2ectl image delete`
+  - `e2ectl node action save-image`
+- Saved-image node launches via `e2ectl node create --saved-image-template-id`, while keeping catalog `--plan` and `--image` validation explicit.
+- Saved-image user documentation covering discovery, reuse, automation, and first-node workflows.
 
-* add saved image CLI workflows and saved-image node launches ([9f045da](https://github.com/e2enetworks-oss/e2ectl/commit/9f045da8659371c0fc79a69917262204931a5f8d))
-* enhance volume and VPC services with edge case handling and improved test coverage ([7f0624b](https://github.com/e2enetworks-oss/e2ectl/commit/7f0624b2a5b4a1d7b1059b624114d7e21e5ca3bb))
+### Changed
 
+- Expanded unit and fake-API integration coverage for image commands, saved-image node creation, config rendering, MyAccount transport failures, and VPC/volume edge cases.
+- Updated coverage reporting to ignore type-only files and use the 85% branch/function/line/statement threshold set.
+- Ignored local `.gstack/` state in Git and Prettier checks.
 
-### Fixes
+### Fixed
 
-* add blank line for improved readability in image user guide ([3ffe84f](https://github.com/e2enetworks-oss/e2ectl/commit/3ffe84fc67b02761c98fc2ebad11499b01d5f660))
-* add type assertions for undefined values in tests to ensure type safety ([8e851a8](https://github.com/e2enetworks-oss/e2ectl/commit/8e851a8e8b36c9c65411d3df43aa5d8fadbd3bea))
-* remove unnecessary blank line in image user guide ([15a084c](https://github.com/e2enetworks-oss/e2ectl/commit/15a084c3b71f65f9cef89fe89ee8b542a228113a))
-* stop ignoring local planning files ([627ee85](https://github.com/e2enetworks-oss/e2ectl/commit/627ee85d70b8cabcc4d5105cb803de0b83b776a3))
-* update badge link to point to the develop branch in README.md ([76a7b19](https://github.com/e2enetworks-oss/e2ectl/commit/76a7b192781072dcb74dc77af4890cf93c028399))
-* update coverage thresholds to 85% for branches, functions, lines, and statements ([715f18f](https://github.com/e2enetworks-oss/e2ectl/commit/715f18f8d0a667b32342bdf83da83a97306d29cf))
+- Cleaned README badge links and saved-image guide formatting.
+- Tightened test type assertions for undefined values.
+- Hardened volume and VPC service/formatter edge cases.
 
 ## [0.4.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.3.0...v0.4.0) (2026-04-16)
 
