@@ -316,7 +316,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('web');
       expect(output).toContain('roundrobin');
       expect(output).toContain('enabled');
-      expect(output).toContain('1');
+      expect(output).toContain('srv-1 (10.0.0.1:8080)');
       expect(output).not.toContain('Backend Type');
     });
 
@@ -344,6 +344,7 @@ describe('renderLoadBalancerResult', () => {
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain('tcp-grp');
       expect(output).toContain('leastconn');
+      expect(output).toContain('srv-1 (10.0.0.2:8080)');
     });
 
     it('renders JSON for backend-group-list', () => {
@@ -537,56 +538,6 @@ describe('renderLoadBalancerResult', () => {
       expect(parsed.group_name).toBe('api');
       expect(parsed.lb_id).toBe('10');
       expect(parsed.message).toBe('Backend group "api" deleted.');
-    });
-  });
-
-  describe('backend-server-list', () => {
-    it('renders "No servers" when list is empty', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'backend-server-list',
-        lb_id: '10',
-        group_name: 'web',
-        servers: []
-      };
-      const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('No servers in backend group "web".');
-    });
-
-    it('renders a server table when servers exist', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'backend-server-list',
-        lb_id: '10',
-        group_name: 'web',
-        servers: [
-          { backend_name: 'srv-1', backend_ip: '10.0.0.1', backend_port: 8080 }
-        ]
-      };
-      const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('srv-1');
-      expect(output).toContain('10.0.0.1');
-      expect(output).toContain('8080');
-    });
-
-    it('renders JSON for backend-server-list', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'backend-server-list',
-        lb_id: '10',
-        group_name: 'web',
-        servers: [
-          { backend_name: 'srv-1', backend_ip: '10.0.0.1', backend_port: 8080 }
-        ]
-      };
-      const output = renderLoadBalancerResult(result, true);
-      const parsed = JSON.parse(output) as {
-        action: string;
-        group_name: string;
-        lb_id: string;
-        servers: unknown[];
-      };
-      expect(parsed.action).toBe('backend-server-list');
-      expect(parsed.group_name).toBe('web');
-      expect(parsed.lb_id).toBe('10');
-      expect(parsed.servers).toHaveLength(1);
     });
   });
 

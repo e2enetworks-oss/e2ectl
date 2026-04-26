@@ -28,7 +28,6 @@ export type {
   LoadBalancerBackendServerAddOptions,
   LoadBalancerBackendServerDeleteCommandResult,
   LoadBalancerBackendServerDeleteOptions,
-  LoadBalancerBackendServerListCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerContextOptions,
   LoadBalancerCreateOptions,

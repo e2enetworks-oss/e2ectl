@@ -587,7 +587,10 @@ describe('LoadBalancerService', () => {
           name: 'lb',
           plan: 'LB-2',
           mode: 'FTP',
-          port: '80'
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
         })
       ).rejects.toThrow('Invalid --mode');
     });
@@ -600,7 +603,10 @@ describe('LoadBalancerService', () => {
           name: 'lb',
           plan: 'LB-2',
           mode: 'HTTP',
-          port: 'abc'
+          port: 'abc',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
         })
       ).rejects.toThrow('--port must be an integer');
     });
@@ -981,49 +987,6 @@ describe('LoadBalancerService', () => {
       expect(result.tcp_backends).toHaveLength(1);
       expect(result.tcp_backends[0]!.backend_name).toBe('tcp-grp');
       expect(result.backends).toHaveLength(0);
-    });
-  });
-
-  describe('listBackendServers', () => {
-    it('returns servers from an ALB backend group', async () => {
-      const { service } = createServiceFixture();
-
-      const result = await service.listBackendServers('10', 'web', {});
-
-      expect(result.action).toBe('backend-server-list');
-      expect(result.lb_id).toBe('10');
-      expect(result.group_name).toBe('web');
-      expect(result.servers).toHaveLength(1);
-      expect(result.servers[0]!.backend_name).toBe('server-1');
-    });
-
-    it('returns servers from an NLB backend group', async () => {
-      const { service, getLoadBalancer } = createServiceFixture();
-      getLoadBalancer.mockResolvedValue(createNlbDetails());
-
-      const result = await service.listBackendServers('20', 'tcp-grp', {});
-
-      expect(result.action).toBe('backend-server-list');
-      expect(result.group_name).toBe('tcp-grp');
-      expect(result.servers).toHaveLength(1);
-      expect(result.servers[0]!.backend_name).toBe('srv-1');
-    });
-
-    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
-      const { service } = createServiceFixture();
-
-      await expect(
-        service.listBackendServers('10', 'nonexistent', {})
-      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
-    });
-
-    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on NLB', async () => {
-      const { service, getLoadBalancer } = createServiceFixture();
-      getLoadBalancer.mockResolvedValue(createNlbDetails());
-
-      await expect(
-        service.listBackendServers('20', 'nonexistent', {})
-      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
   });
 

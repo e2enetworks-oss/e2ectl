@@ -47,11 +47,6 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         ['Backend Group', result.group_name]
       ])}\n`;
 
-    case 'backend-server-list':
-      return result.servers.length === 0
-        ? `No servers in backend group "${result.group_name}".\n`
-        : `${formatServerList(result.servers)}\n`;
-
     case 'backend-server-add':
       return `${result.message}\n${formatFieldTable([
         ['Load Balancer ID', result.lb_id]
@@ -165,14 +160,6 @@ function normalizeLoadBalancerJson(
         group_name: result.group_name,
         lb_id: result.lb_id,
         message: result.message
-      };
-
-    case 'backend-server-list':
-      return {
-        action: 'backend-server-list',
-        group_name: result.group_name,
-        lb_id: result.lb_id,
-        servers: result.servers as unknown as JsonValue
       };
 
     case 'backend-server-add':

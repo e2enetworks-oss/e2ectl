@@ -45,10 +45,10 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   networkId?: string;
   postCommitBehavior?: string;
   vpc?: string;
-  backendName?: string;
-  serverIp?: string;
+  backendName: string;
+  serverIp: string;
   serverPort?: string;
-  serverName?: string;
+  serverName: string;
   algorithm?: string;
   backendProtocol?: string;
   httpCheck?: boolean;
@@ -134,13 +134,6 @@ export interface LoadBalancerBackendGroupDeleteCommandResult {
   message: string;
 }
 
-export interface LoadBalancerBackendServerListCommandResult {
-  action: 'backend-server-list';
-  lb_id: string;
-  group_name: string;
-  servers: LoadBalancerServer[];
-}
-
 export interface LoadBalancerBackendServerAddCommandResult {
   action: 'backend-server-add';
   lb_id: string;
@@ -185,7 +178,6 @@ export type LoadBalancerCommandResult =
   | LoadBalancerBackendGroupListCommandResult
   | LoadBalancerBackendGroupCreateCommandResult
   | LoadBalancerBackendGroupDeleteCommandResult
-  | LoadBalancerBackendServerListCommandResult
   | LoadBalancerBackendServerAddCommandResult
   | LoadBalancerBackendServerDeleteCommandResult;
 
@@ -280,8 +272,8 @@ export class LoadBalancerService {
         options.serverPort ?? options.port,
         '--server-port'
       );
-      const serverIp = assertServerIp(options.serverIp!);
-      const serverName = assertNonEmpty(options.serverName!, '--server-name');
+      const serverIp = assertServerIp(options.serverIp);
+      const serverName = assertNonEmpty(options.serverName, '--server-name');
       const server: LoadBalancerServer = {
         backend_name: serverName,
         backend_ip: serverIp,
@@ -291,7 +283,7 @@ export class LoadBalancerService {
       if (isAlb) {
         backends.push({
           target: 'networkMappingNode',
-          name: options.backendName!,
+          name: options.backendName,
           backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
           domain_name: 'localhost',
           balance: algorithm,
@@ -307,7 +299,7 @@ export class LoadBalancerService {
         backendSummary = {
           backend_port: null,
           health_check: options.httpCheck ?? false,
-          name: options.backendName!,
+          name: options.backendName,
           protocol: albBackendProtocol!,
           routing_policy: algorithm,
           servers: [server]
@@ -318,7 +310,7 @@ export class LoadBalancerService {
           '--backend-port'
         );
         tcpBackend.push({
-          backend_name: options.backendName!,
+          backend_name: options.backendName,
           port: backendPort,
           balance: algorithm,
           servers: [{ ...server, target: 'backend' }]
@@ -326,7 +318,7 @@ export class LoadBalancerService {
         backendSummary = {
           backend_port: backendPort,
           health_check: null,
-          name: options.backendName!,
+          name: options.backendName,
           protocol: 'TCP',
           routing_policy: algorithm,
           servers: [server]
@@ -712,52 +704,6 @@ export class LoadBalancerService {
       lb_id: lbId,
       group_name: groupName,
       message: `Backend group "${groupName}" deleted.`
-    };
-  }
-
-  async listBackendServers(
-    lbId: string,
-    groupName: string,
-    options: LoadBalancerContextOptions
-  ): Promise<LoadBalancerBackendServerListCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const context = lb.context?.[0];
-
-    const currentBackends = context?.backends ?? [];
-    const currentTcpBackends = context?.tcp_backend ?? [];
-    const isNlb = currentTcpBackends.length > 0 || lb.lb_mode === 'TCP';
-
-    let servers: LoadBalancerServer[];
-
-    if (isNlb) {
-      const group = currentTcpBackends.find(
-        (g) => g.backend_name === groupName
-      );
-      if (group === undefined) {
-        throw new CliError(
-          `Backend group "${groupName}" not found on load balancer ${lbId}.`,
-          { code: 'BACKEND_GROUP_NOT_FOUND', exitCode: EXIT_CODES.usage }
-        );
-      }
-      servers = group.servers;
-    } else {
-      const group = currentBackends.find((g) => g.name === groupName);
-      if (group === undefined) {
-        throw new CliError(
-          `Backend group "${groupName}" not found on load balancer ${lbId}.`,
-          { code: 'BACKEND_GROUP_NOT_FOUND', exitCode: EXIT_CODES.usage }
-        );
-      }
-      servers = group.servers;
-    }
-
-    return {
-      action: 'backend-server-list',
-      lb_id: lbId,
-      group_name: groupName,
-      servers
     };
   }
 

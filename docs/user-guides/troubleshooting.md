@@ -86,6 +86,14 @@ Cause: You tried to delete the only remaining backend group on a load balancer. 
 
 Fix: Either add another backend group first (`backend group create`), or delete the entire load balancer with `e2ectl load-balancer delete <lbId> --force` if you no longer need it.
 
+### LAST_BACKEND_SERVER_NOT_DELETABLE
+
+Symptom: `Server "<name>" is the last server in backend group "<group>". Keep at least one server attached.`
+
+Cause: You tried to delete the only remaining server in a backend group. The API requires at least one server per backend group.
+
+Fix: Either add another server first (`backend server add`), or delete the entire backend group with `e2ectl load-balancer backend group delete <lbId> <groupName>` if you no longer need the group.
+
 ## Attachment And Identifier Mix-Ups
 
 Symptoms:

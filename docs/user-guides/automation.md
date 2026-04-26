@@ -134,7 +134,25 @@ LB_ID=42
 
 # 4. Inspect backend groups
 e2ectl --json load-balancer backend group list "$LB_ID"
-# { "action": "backend-group-list", "backends": [...], "tcp_backends": [...] }
+# ALB response shape:
+# {
+#   "action": "backend-group-list",
+#   "lb_id": 42,
+#   "lb_mode": "HTTP",
+#   "backends": [
+#     {
+#       "name": "web",
+#       "balance": "roundrobin",
+#       "protocol": "HTTP",
+#       "http_check": false,
+#       "servers": [
+#         { "backend_name": "server-1", "backend_ip": "10.0.0.1", "backend_port": 8080 }
+#       ]
+#     }
+#   ],
+#   "tcp_backends": []
+# }
+# NLB response: "backends" is [], "tcp_backends" contains the backend group with the same server shape.
 
 # 5. Add a second server to an existing group
 e2ectl load-balancer backend server add "$LB_ID" \
@@ -148,6 +166,8 @@ e2ectl load-balancer delete "$LB_ID" --force
 ```
 
 The `--json` flag on `load-balancer list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
+
+The `--json` flag on `load-balancer backend group list` returns `action`, `lb_id`, `lb_mode`, `backends` (ALB groups), and `tcp_backends` (NLB groups). Each server inside a group has `backend_name`, `backend_ip`, and `backend_port`.
 
 ## Recipe: Keep Cleanup Explicit
 
