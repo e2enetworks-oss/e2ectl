@@ -276,6 +276,7 @@ Creates a new load balancer.
 | `--backend-protocol <protocol>`     | No       | `HTTP` (default) or `HTTPS` for the initial ALB backend group                |
 | `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                         |
 | `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                          |
+| `--billing-type <type>`             | No       | `hourly` (default) or `committed`. Use `committed` with `--committed-plan` or `--committed-plan-id`. |
 | `--committed-plan <name>`           | No       | Committed plan name under the selected base plan                             |
 | `--committed-plan-id <id>`          | No       | Committed plan ID under the selected base plan                               |
 | `--post-commit-behavior <behavior>` | No       | `auto-renew` or `hourly-billing` after the committed term ends               |

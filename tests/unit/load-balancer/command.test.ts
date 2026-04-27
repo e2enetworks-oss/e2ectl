@@ -320,6 +320,49 @@ describe('load-balancer commands', () => {
     expect(stdout.buffer).toContain('lb-42');
   });
 
+  it('passes --billing-type committed through Commander to the service', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'load-balancer',
+      'create',
+      '--alias',
+      'prod',
+      '--name',
+      'my-alb',
+      '--plan',
+      'LB-2',
+      '--mode',
+      'HTTP',
+      '--port',
+      '80',
+      '--billing-type',
+      'committed',
+      '--committed-plan',
+      '90 Days',
+      '--backend-name',
+      'web',
+      '--server-ip',
+      '10.0.0.1',
+      '--server-name',
+      'server-1'
+    ]);
+
+    expect(lbStub.listLoadBalancerPlans).toHaveBeenCalled();
+    expect(lbStub.createLoadBalancer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cn_id: 901,
+        cn_status: 'auto_renew'
+      })
+    );
+    expect(stdout.buffer).toContain('Committed');
+    expect(stdout.buffer).toContain('90 Days');
+  });
+
   it('creates an internal LB when --vpc is provided', async () => {
     const { runtime, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
