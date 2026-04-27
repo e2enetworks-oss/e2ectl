@@ -592,7 +592,7 @@ describe('LoadBalancerService', () => {
           serverIp: '10.0.0.1',
           serverName: 'srv-1'
         })
-      ).rejects.toThrow('Invalid --mode');
+      ).rejects.toThrow('Invalid --frontend-protocol');
     });
 
     it('throws on invalid port', async () => {
@@ -1095,7 +1095,7 @@ describe('LoadBalancerService', () => {
         serverName: 'server-1'
       });
 
-      expect(result.action).toBe('backend-group-create');
+      expect(result.action).toBe('backend-group-add');
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.backends[0]?.servers).toHaveLength(1);
@@ -1166,7 +1166,7 @@ describe('LoadBalancerService', () => {
         serverName: 'srv-1'
       });
 
-      expect(result.action).toBe('backend-group-create');
+      expect(result.action).toBe('backend-group-add');
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.tcp_backend).toHaveLength(1);
@@ -1387,7 +1387,7 @@ describe('LoadBalancerService', () => {
 
       const result = await service.deleteBackendGroup('10', 'api', {});
 
-      expect(result.action).toBe('backend-group-delete');
+      expect(result.action).toBe('backend-group-remove');
       expect(result.group_name).toBe('api');
 
       const body = updateLoadBalancer.mock
@@ -1527,7 +1527,7 @@ describe('LoadBalancerService', () => {
 
       const result = await service.deleteBackendGroup('20', 'tcp-grp-2', {});
 
-      expect(result.action).toBe('backend-group-delete');
+      expect(result.action).toBe('backend-group-remove');
       expect(result.group_name).toBe('tcp-grp-2');
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
@@ -1686,7 +1686,7 @@ describe('LoadBalancerService', () => {
         serverName: 'server-2'
       });
 
-      expect(result.action).toBe('backend-server-delete');
+      expect(result.action).toBe('backend-server-remove');
       const updatedBody = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
       const webGroup = updatedBody.backends?.find((b) => b.name === 'web');
@@ -1738,7 +1738,7 @@ describe('LoadBalancerService', () => {
         serverName: 'srv-2'
       });
 
-      expect(result.action).toBe('backend-server-delete');
+      expect(result.action).toBe('backend-server-remove');
       const updatedBody = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(updatedBody.tcp_backend?.[0]?.servers).toEqual([
@@ -1872,7 +1872,7 @@ describe('LoadBalancerService', () => {
         serverPort: '8080'
       });
 
-      expect(result.action).toBe('backend-server-delete');
+      expect(result.action).toBe('backend-server-remove');
       const body = updateLoadBalancer.mock
         .calls[0]![1] as LoadBalancerCreateRequest;
       const webGroup = body.backends?.find((b) => b.name === 'web');

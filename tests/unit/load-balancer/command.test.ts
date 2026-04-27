@@ -116,7 +116,7 @@ function createLbClientStub(): {
   };
 }
 
-describe('load-balancer commands', () => {
+describe('lb commands', () => {
   function createRuntimeFixture(options?: {
     confirmResult?: boolean;
     isInteractive?: boolean;
@@ -232,7 +232,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'list',
       '--alias',
       'prod'
@@ -250,7 +250,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'create',
       '--alias',
       'prod',
@@ -258,18 +258,14 @@ describe('load-balancer commands', () => {
       'my-alb',
       '--plan',
       'LB-2',
-      '--mode',
+      '--frontend-protocol',
       'HTTP',
       '--port',
       '80',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-ip',
-      '10.0.0.1',
-      '--server-port',
-      '8080',
-      '--server-name',
-      'server-1'
+      '--backend-server',
+      'server-1:10.0.0.1:8080'
     ]);
 
     expect(stdout.buffer).toContain('Load balancer created.');
@@ -286,7 +282,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'create',
       '--alias',
       'prod',
@@ -294,18 +290,16 @@ describe('load-balancer commands', () => {
       'my-alb',
       '--plan',
       'LB-2',
-      '--mode',
+      '--frontend-protocol',
       'HTTP',
       '--port',
       '80',
       '--committed-plan',
       '90 Days',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-ip',
-      '10.0.0.1',
-      '--server-name',
-      'server-1'
+      '--backend-server',
+      'server-1:10.0.0.1:80'
     ]);
 
     expect(lbStub.listLoadBalancerPlans).toHaveBeenCalled();
@@ -328,7 +322,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'create',
       '--alias',
       'prod',
@@ -336,7 +330,7 @@ describe('load-balancer commands', () => {
       'my-alb',
       '--plan',
       'LB-2',
-      '--mode',
+      '--frontend-protocol',
       'HTTP',
       '--port',
       '80',
@@ -344,12 +338,10 @@ describe('load-balancer commands', () => {
       'committed',
       '--committed-plan',
       '90 Days',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-ip',
-      '10.0.0.1',
-      '--server-name',
-      'server-1'
+      '--backend-server',
+      'server-1:10.0.0.1:80'
     ]);
 
     expect(lbStub.listLoadBalancerPlans).toHaveBeenCalled();
@@ -371,7 +363,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'create',
       '--alias',
       'prod',
@@ -379,18 +371,16 @@ describe('load-balancer commands', () => {
       'internal-alb',
       '--plan',
       'LB-2',
-      '--mode',
+      '--frontend-protocol',
       'HTTP',
       '--port',
       '80',
       '--vpc',
       '12345',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-ip',
-      '10.0.0.1',
-      '--server-name',
-      'server-1'
+      '--backend-server',
+      'server-1:10.0.0.1:80'
     ]);
 
     expect(lbStub.createLoadBalancer).toHaveBeenCalledWith(
@@ -407,7 +397,7 @@ describe('load-balancer commands', () => {
     );
   });
 
-  it('rejects invalid --mode with usage error', async () => {
+  it('rejects invalid --frontend-protocol with usage error', async () => {
     const { runtime } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -416,7 +406,7 @@ describe('load-balancer commands', () => {
       program.parseAsync([
         'node',
         CLI_COMMAND_NAME,
-        'load-balancer',
+        'lb',
         'create',
         '--alias',
         'prod',
@@ -424,7 +414,7 @@ describe('load-balancer commands', () => {
         'my-lb',
         '--plan',
         'LB-2',
-        '--mode',
+        '--frontend-protocol',
         'FTP',
         '--port',
         '80'
@@ -440,7 +430,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'delete',
       '42',
       '--alias',
@@ -461,7 +451,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'plans',
       '--alias',
       'prod'
@@ -482,7 +472,7 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
+      'lb',
       'delete',
       '42',
       '--alias',
@@ -493,7 +483,7 @@ describe('load-balancer commands', () => {
     expect(stdout.buffer).toContain('Load balancer deleted.');
   });
 
-  it('lists backend groups via backend group list', async () => {
+  it('gets load balancer details', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -501,20 +491,88 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'group',
-      'list',
+      'lb',
+      'get',
       '10',
       '--alias',
       'prod'
     ]);
 
-    expect(stdout.buffer).toContain('web');
-    expect(stdout.buffer).toContain('Backend Group');
+    expect(stdout.buffer).toContain('Load balancer details.');
+    expect(stdout.buffer).toContain('my-alb');
   });
 
-  it('creates a new backend group via backend group create', async () => {
+  it('updates LB-level settings via lb update', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'lb',
+      'update',
+      '10',
+      '--alias',
+      'prod',
+      '--name',
+      'new-name',
+      '--frontend-protocol',
+      'HTTPS',
+      '--ssl-certificate-id',
+      '123'
+    ]);
+
+    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('Updated.');
+  });
+
+  it('attaches a reserved IP via lb network reserve-ip attach', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'lb',
+      'network',
+      'reserve-ip',
+      'attach',
+      '10',
+      '203.0.113.10',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('Updated.');
+  });
+
+  it('attaches a VPC via lb network vpc attach', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'lb',
+      'network',
+      'vpc',
+      'attach',
+      '10',
+      '--vpc',
+      '12345',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('Updated.');
+  });
+
+  it('creates a new backend group via backend-group add', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     // Return ALB with no existing group named 'api'
@@ -539,10 +597,9 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'group',
-      'create',
+      'lb',
+      'backend-group',
+      'add',
       '10',
       '--alias',
       'prod',
@@ -550,21 +607,42 @@ describe('load-balancer commands', () => {
       'web',
       '--backend-protocol',
       'HTTPS',
-      '--server-ip',
-      '10.0.0.5',
-      '--server-port',
-      '8080',
-      '--server-name',
-      'server-2'
+      '--backend-server',
+      'server-2:10.0.0.5:8080'
     ]);
 
-    expect(stdout.buffer).toContain('Backend group "web" created.');
+    expect(stdout.buffer).toContain('Backend group "web" added.');
     expect(stdout.buffer).toContain('Protocol');
     expect(stdout.buffer).toContain('HTTPS');
     expect(stdout.buffer).toContain('server-2');
   });
 
-  it('adds a server to an existing backend group via backend server add', async () => {
+  it('updates a backend group via backend-group update', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'lb',
+      'backend-group',
+      'update',
+      '10',
+      'web',
+      '--alias',
+      'prod',
+      '--backend-protocol',
+      'HTTPS',
+      '--algorithm',
+      'leastconn'
+    ]);
+
+    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('Backend group "web" updated.');
+  });
+
+  it('adds a server to an existing backend group via backend-server add', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -572,28 +650,53 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'server',
+      'lb',
+      'backend-server',
       'add',
       '10',
       '--alias',
       'prod',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-ip',
-      '10.0.0.5',
-      '--server-port',
-      '8080',
-      '--server-name',
-      'server-2'
+      '--backend-server',
+      'server-2:10.0.0.5:8080'
     ]);
 
     expect(stdout.buffer).toContain('server-2');
     expect(stdout.buffer).toContain('web');
   });
 
-  it('deletes a backend group via backend group delete', async () => {
+  it('updates a backend server via backend-server update', async () => {
+    const { runtime, stdout, lbStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'lb',
+      'backend-server',
+      'update',
+      '10',
+      '--alias',
+      'prod',
+      '--backend-group',
+      'web',
+      '--backend-server-name',
+      'server-1',
+      '--ip',
+      '10.0.0.30',
+      '--port',
+      '8081'
+    ]);
+
+    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
+    expect(stdout.buffer).toContain(
+      'Server "server-1" updated in backend group "web".'
+    );
+  });
+
+  it('deletes a backend group via backend-group remove', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     lbStub.getLoadBalancer.mockResolvedValue({
@@ -653,20 +756,19 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'group',
-      'delete',
+      'lb',
+      'backend-group',
+      'remove',
       '10',
       'api',
       '--alias',
       'prod'
     ]);
 
-    expect(stdout.buffer).toContain('Backend group "api" deleted.');
+    expect(stdout.buffer).toContain('Backend group "api" removed.');
   });
 
-  it('deletes a server from an existing backend group via backend server delete', async () => {
+  it('deletes a server from an existing backend group via backend-server remove', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     lbStub.getLoadBalancer.mockResolvedValue({
@@ -713,39 +815,38 @@ describe('load-balancer commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      'load-balancer',
-      'backend',
-      'server',
-      'delete',
+      'lb',
+      'backend-server',
+      'remove',
       '10',
       '--alias',
       'prod',
-      '--backend-name',
+      '--backend-group',
       'web',
-      '--server-name',
+      '--backend-server-name',
       'server-2'
     ]);
 
     expect(stdout.buffer).toContain(
-      'Server "server-2" deleted from backend group "web".'
+      'Server "server-2" removed from backend group "web".'
     );
   });
 
-  it('load-balancer with no sub-command prints help without throwing', async () => {
+  it('lb with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync(['node', CLI_COMMAND_NAME, 'load-balancer'])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb'])
     ).resolves.not.toThrow();
   });
 
-  it('backend sub-command with no sub-command prints help without throwing', async () => {
+  it('network sub-command with no sub-command prints help without throwing', async () => {
     const { runtime } = createRuntimeFixture();
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync(['node', CLI_COMMAND_NAME, 'load-balancer', 'backend'])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'network'])
     ).resolves.not.toThrow();
   });
 
@@ -754,13 +855,7 @@ describe('load-balancer commands', () => {
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'load-balancer',
-        'backend',
-        'group'
-      ])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend-group'])
     ).resolves.not.toThrow();
   });
 
@@ -769,13 +864,7 @@ describe('load-balancer commands', () => {
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'load-balancer',
-        'backend',
-        'server'
-      ])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend-server'])
     ).resolves.not.toThrow();
   });
 });

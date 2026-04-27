@@ -24,12 +24,21 @@ export type {
   LoadBalancerBackendGroupCreateOptions,
   LoadBalancerBackendGroupCreateCommandResult,
   LoadBalancerBackendGroupListCommandResult,
+  LoadBalancerBackendGroupUpdateCommandResult,
   LoadBalancerBackendServerAddCommandResult,
   LoadBalancerBackendServerAddOptions,
   LoadBalancerBackendServerDeleteCommandResult,
   LoadBalancerBackendServerDeleteOptions,
+  LoadBalancerBackendServerUpdateCommandResult,
+  LoadBalancerBackendServerUpdateOptions,
   LoadBalancerCommandResult,
   LoadBalancerContextOptions,
   LoadBalancerCreateOptions,
-  LoadBalancerDeleteOptions
+  LoadBalancerDeleteOptions,
+  LoadBalancerGetCommandResult,
+  LoadBalancerNetworkCommandResult,
+  LoadBalancerUpdateCommandResult,
+  LoadBalancerUpdateOptions,
+  LoadBalancerVpcAttachOptions,
+  LoadBalancerVpcDetachOptions
 } from './service.js';

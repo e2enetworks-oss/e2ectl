@@ -113,61 +113,39 @@ e2ectl node create \
 
 ```bash
 # 1. Discover available plans
-e2ectl --json load-balancer plans > lb-plans.json
+e2ectl --json lb plans > lb-plans.json
 
 # 2. Create an ALB (plan name from plans output)
-e2ectl load-balancer create \
+e2ectl lb create \
   --name my-alb \
   --plan E2E-LB-2 \
-  --mode HTTP \
+  --frontend-protocol HTTP \
   --port 80 \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+  --backend-group web \
+  --backend-protocol HTTP \
+  --backend-server server-1:10.0.0.1:8080
 
 # 3. List load balancers and capture the id
-e2ectl --json load-balancer list > lbs.json
+e2ectl --json lb list > lbs.json
 # { "action": "list", "items": [{ "id": 42, "appliance_name": "my-alb", ... }] }
 
 LB_ID=42
 
-# 4. Inspect backend groups
-e2ectl --json load-balancer backend group list "$LB_ID"
-# ALB response shape:
-# {
-#   "action": "backend-group-list",
-#   "lb_id": 42,
-#   "lb_mode": "HTTP",
-#   "backends": [
-#     {
-#       "name": "web",
-#       "balance": "roundrobin",
-#       "protocol": "HTTP",
-#       "http_check": false,
-#       "servers": [
-#         { "backend_name": "server-1", "backend_ip": "10.0.0.1", "backend_port": 8080 }
-#       ]
-#     }
-#   ],
-#   "tcp_backends": []
-# }
-# NLB response: "backends" is [], "tcp_backends" contains the backend group with the same server shape.
+# 4. Inspect backend groups and servers in the full LB detail
+e2ectl --json lb get "$LB_ID" > lb-detail.json
 
 # 5. Add a second server to an existing group
-e2ectl load-balancer backend server add "$LB_ID" \
-  --backend-name web \
-  --server-ip 10.0.0.2 \
-  --server-port 8080 \
-  --server-name server-2
+e2ectl lb backend-server add "$LB_ID" \
+  --backend-group web \
+  --backend-server server-2:10.0.0.2:8080
 
 # 6. Delete when done
-e2ectl load-balancer delete "$LB_ID" --force
+e2ectl lb delete "$LB_ID" --force
 ```
 
-The `--json` flag on `load-balancer list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
+The `--json` flag on `lb list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
 
-The `--json` flag on `load-balancer backend group list` returns `action`, `lb_id`, `lb_mode`, `backends` (ALB groups), and `tcp_backends` (NLB groups). Each server inside a group has `backend_name`, `backend_ip`, and `backend_port`.
+The `--json` flag on `lb get` returns the backend load balancer detail object. For ALBs, backend groups live under `context[0].backends`; for NLBs, they live under `context[0].tcp_backend`. Each server inside a group has `backend_name`, `backend_ip`, and `backend_port`.
 
 ## Recipe: Keep Cleanup Explicit
 

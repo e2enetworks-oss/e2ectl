@@ -36,7 +36,7 @@ function buildPlansResponse() {
   };
 }
 
-describe('load-balancer plans against a fake MyAccount API', () => {
+describe('lb plans against a fake MyAccount API', () => {
   it('emits committed plan data in deterministic JSON', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliance-type/': () => ({
@@ -48,7 +48,7 @@ describe('load-balancer plans against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['--json', 'load-balancer', 'plans'], {
+      const result = await runBuiltCli(['--json', 'lb', 'plans'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -100,7 +100,7 @@ describe('load-balancer plans against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['load-balancer', 'plans'], {
+      const result = await runBuiltCli(['lb', 'plans'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`

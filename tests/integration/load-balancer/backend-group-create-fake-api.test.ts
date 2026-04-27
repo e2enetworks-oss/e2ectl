@@ -77,8 +77,8 @@ function buildEmptyNlbGetResponse() {
   };
 }
 
-describe('load-balancer backend-group create against a fake MyAccount API', () => {
-  it('ALB backend group create — PUT body has backends entry and empty tcp_backend', async () => {
+describe('lb backend-group create against a fake MyAccount API', () => {
+  it('ALB backend-group add — PUT body has backends entry and empty tcp_backend', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -97,19 +97,16 @@ describe('load-balancer backend-group create against a fake MyAccount API', () =
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '10',
           '--name',
           'mygroup',
           '--backend-protocol',
           'HTTP',
-          '--server-ip',
-          '10.0.0.5',
-          '--server-name',
-          'srv-1'
+          '--backend-server',
+          'srv-1:10.0.0.5:80'
         ],
         {
           env: {
@@ -141,7 +138,7 @@ describe('load-balancer backend-group create against a fake MyAccount API', () =
     }
   });
 
-  it('NLB backend group create — PUT body has tcp_backend entry and empty backends', async () => {
+  it('NLB backend-group add — PUT body has tcp_backend entry and empty backends', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -160,19 +157,14 @@ describe('load-balancer backend-group create against a fake MyAccount API', () =
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '20',
           '--name',
           'mygroup',
-          '--backend-port',
-          '8080',
-          '--server-ip',
-          '10.0.0.5',
-          '--server-name',
-          'srv-1'
+          '--backend-server',
+          'srv-1:10.0.0.5:80'
         ],
         {
           env: {

@@ -35,7 +35,7 @@ function buildListResponse() {
   };
 }
 
-describe('load-balancer list against a fake MyAccount API', () => {
+describe('lb list against a fake MyAccount API', () => {
   it('fetches load balancers and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/': () => ({
@@ -47,7 +47,7 @@ describe('load-balancer list against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['--json', 'load-balancer', 'list'], {
+      const result = await runBuiltCli(['--json', 'lb', 'list'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -95,7 +95,7 @@ describe('load-balancer list against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['load-balancer', 'list'], {
+      const result = await runBuiltCli(['lb', 'list'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`

@@ -192,8 +192,8 @@ function buildAlbWithTwoGroupsGetResponse() {
   };
 }
 
-describe('load-balancer backend commands against a fake MyAccount API', () => {
-  it('backend group list — GET and renders groups', async () => {
+describe('lb backend commands against a fake MyAccount API', () => {
+  it('lb get — GET and renders details', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -204,26 +204,23 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(
-        ['load-balancer', 'backend', 'group', 'list', '10'],
-        {
-          env: {
-            HOME: tempHome.path,
-            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
-          }
+      const result = await runBuiltCli(['lb', 'get', '10'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
         }
-      );
+      });
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('web');
-      expect(result.stdout).toContain('1');
+      expect(result.stdout).toContain('my-alb');
+      expect(result.stdout).toContain('Backend Groups');
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
   });
 
-  it('backend group create — GET then PUT for new group', async () => {
+  it('backend-group add — GET then PUT for new group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -242,21 +239,16 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '10',
           '--name',
           'web',
           '--backend-protocol',
           'HTTPS',
-          '--server-ip',
-          '10.0.0.5',
-          '--server-port',
-          '8080',
-          '--server-name',
-          'server-2'
+          '--backend-server',
+          'server-2:10.0.0.5:8080'
         ],
         {
           env: {
@@ -269,7 +261,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('web');
-      expect(result.stdout).toContain('created');
+      expect(result.stdout).toContain('added');
       expect(result.stdout).toContain('Protocol');
       expect(result.stdout).toContain('HTTPS');
       expect(receivedPutBodies).toHaveLength(1);
@@ -285,7 +277,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
             balance: 'roundrobin',
             check_url: '/',
             domain_name: 'localhost',
-            http_check: false,
+            http_check: true,
             name: 'web',
             servers: [
               {
@@ -326,7 +318,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend server add — GET then PUT adding server to existing group', async () => {
+  it('backend-server add — GET then PUT adding server to existing group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -345,19 +337,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'server',
+          'lb',
+          'backend-server',
           'add',
           '10',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.5',
-          '--server-port',
-          '8080',
-          '--server-name',
-          'server-2'
+          '--backend-server',
+          'server-2:10.0.0.5:8080'
         ],
         {
           env: {
@@ -430,7 +417,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group delete — GET then PUT removing group and stale ACLs', async () => {
+  it('backend-group remove — GET then PUT removing group and stale ACLs', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -448,7 +435,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['load-balancer', 'backend', 'group', 'delete', '10', 'api'],
+        ['lb', 'backend-group', 'remove', '10', 'api'],
         {
           env: {
             HOME: tempHome.path,
@@ -459,7 +446,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');
-      expect(result.stdout).toContain('Backend group "api" deleted.');
+      expect(result.stdout).toContain('Backend group "api" removed.');
       expect(receivedPutBodies).toHaveLength(1);
       expect(
         JSON.parse((receivedPutBodies[0] as { body: string }).body)
@@ -490,7 +477,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend server delete — GET then PUT removing one server from group', async () => {
+  it('backend-server remove — GET then PUT removing one server from group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -509,14 +496,13 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'server',
-          'delete',
+          'lb',
+          'backend-server',
+          'remove',
           '10',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-name',
+          '--backend-server-name',
           'server-2'
         ],
         {
@@ -530,7 +516,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain(
-        'Server "server-2" deleted from backend group "web".'
+        'Server "server-2" removed from backend group "web".'
       );
       expect(receivedPutBodies).toHaveLength(1);
       expect(
@@ -558,7 +544,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group create — NLB', async () => {
+  it('backend-group add — NLB', async () => {
     const nlbGetResponse = {
       code: 200,
       data: {
@@ -604,17 +590,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '20',
           '--name',
           'grp',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-name',
-          'srv-1'
+          '--backend-server',
+          'srv-1:10.0.0.5:80'
         ],
         {
           env: {
@@ -625,7 +608,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       );
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('created');
+      expect(result.stdout).toContain('added');
       expect(result.stdout).toContain('grp');
     } finally {
       await server.close();
@@ -633,7 +616,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group delete — NLB with multiple groups', async () => {
+  it('backend-group remove — NLB with multiple groups', async () => {
     const nlbTwoGroupsGetResponse = {
       code: 200,
       data: {
@@ -703,7 +686,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['load-balancer', 'backend', 'group', 'delete', '20', 'grp1'],
+        ['lb', 'backend-group', 'remove', '20', 'grp1'],
         {
           env: {
             HOME: tempHome.path,
@@ -714,14 +697,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('grp1');
-      expect(result.stdout).toContain('deleted');
+      expect(result.stdout).toContain('removed');
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
   });
 
-  it('backend server add — NLB', async () => {
+  it('backend-server add — NLB', async () => {
     const nlbGetResponse = {
       code: 200,
       data: {
@@ -780,19 +763,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'server',
+          'lb',
+          'backend-server',
           'add',
           '20',
-          '--backend-name',
+          '--backend-group',
           'grp',
-          '--server-ip',
-          '10.0.0.3',
-          '--server-port',
-          '3000',
-          '--server-name',
-          'srv-3'
+          '--backend-server',
+          'srv-2:10.0.0.5:8080'
         ],
         {
           env: {
@@ -809,7 +787,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend server delete — NLB', async () => {
+  it('backend-server remove — NLB', async () => {
     const nlbGetResponse = {
       code: 200,
       data: {
@@ -873,14 +851,13 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'server',
-          'delete',
+          'lb',
+          'backend-server',
+          'remove',
           '20',
-          '--backend-name',
+          '--backend-group',
           'grp',
-          '--server-name',
+          '--backend-server-name',
           'srv-2'
         ],
         {
@@ -899,7 +876,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group create — fails when ALB group name already exists (BACKEND_GROUP_EXISTS)', async () => {
+  it('backend-group add — fails when ALB group name already exists (BACKEND_GROUP_EXISTS)', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -912,17 +889,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '10',
           '--name',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-name',
-          'srv-1'
+          '--backend-server',
+          'srv-1:10.0.0.5:80'
         ],
         {
           env: {
@@ -940,7 +914,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group create — fails when NLB already has a group (NLB_SINGLE_BACKEND_GROUP)', async () => {
+  it('backend-group add — fails when NLB already has a group (NLB_SINGLE_BACKEND_GROUP)', async () => {
     const nlbOneGroupGetResponse = {
       code: 200,
       data: {
@@ -996,17 +970,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '20',
           '--name',
           'newgrp',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-name',
-          'srv-1'
+          '--backend-server',
+          'srv-1:10.0.0.5:80'
         ],
         {
           env: {
@@ -1024,7 +995,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend group create — fails when --server-name is missing (required option)', async () => {
+  it('backend-group add — fails when --backend-server is missing (required option)', async () => {
     const nlbNoGroupsGetResponse = {
       code: 200,
       data: {
@@ -1067,15 +1038,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
-          'backend',
-          'group',
-          'create',
+          'lb',
+          'backend-group',
+          'add',
           '20',
           '--name',
           'grp',
-          '--server-ip',
-          '10.0.0.1'
+          '--backend-server',
+          ':10.0.0.1:80'
         ],
         {
           env: {
@@ -1086,14 +1056,14 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       );
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain('--server-name');
+      expect(result.stderr).toContain('--backend-server name');
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
   });
 
-  it('backend group list — JSON output', async () => {
+  it('lb get — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1104,26 +1074,23 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(
-        ['--json', 'load-balancer', 'backend', 'group', 'list', '10'],
-        {
-          env: {
-            HOME: tempHome.path,
-            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
-          }
+      const result = await runBuiltCli(['--json', 'lb', 'get', '10'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
         }
-      );
+      });
 
       expect(result.exitCode).toBe(0);
       const parsed = JSON.parse(result.stdout) as JsonActionResult;
-      expect(parsed.action).toBe('backend-group-list');
+      expect(parsed.action).toBe('get');
     } finally {
       await server.close();
       await tempHome.cleanup();
     }
   });
 
-  it('backend group delete — JSON output', async () => {
+  it('backend-group remove — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbWithTwoGroupsGetResponse()
@@ -1138,7 +1105,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['--json', 'load-balancer', 'backend', 'group', 'delete', '10', 'api'],
+        ['--json', 'lb', 'backend-group', 'remove', '10', 'api'],
         {
           env: {
             HOME: tempHome.path,
@@ -1149,7 +1116,7 @@ describe('load-balancer backend commands against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(0);
       const parsed = JSON.parse(result.stdout) as JsonActionResult;
-      expect(parsed.action).toBe('backend-group-delete');
+      expect(parsed.action).toBe('backend-group-remove');
     } finally {
       await server.close();
       await tempHome.cleanup();

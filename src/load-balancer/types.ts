@@ -169,6 +169,7 @@ export interface LoadBalancerDetails {
         scaler_id?: string | null;
         scaler_port?: string | null;
         security_group_id?: number | null;
+        ssl_certificate_id?: number | null;
         ssl_context?: Record<string, unknown>;
         vpc_list?: LoadBalancerVpcAttachment[];
         [key: string]: unknown;

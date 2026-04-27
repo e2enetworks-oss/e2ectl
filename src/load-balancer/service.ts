@@ -41,21 +41,26 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   committedPlanId?: string;
   name: string;
   plan: string;
-  mode: string;
+  frontendProtocol?: string;
   port: string;
   networkId?: string;
   postCommitBehavior?: string;
   vpc?: string;
-  backendName: string;
-  serverIp: string;
-  serverPort?: string;
-  serverName: string;
+  subnet?: string;
+  backendGroup?: string;
+  backendServer?: string[];
   algorithm?: string;
   backendProtocol?: string;
-  httpCheck?: boolean;
-  backendPort?: string;
+  reserveIp?: string;
   securityGroupId?: string;
   sslCertificateId?: string;
+  backendName?: string;
+  backendPort?: string;
+  httpCheck?: boolean;
+  mode?: string;
+  serverIp?: string;
+  serverName?: string;
+  serverPort?: string;
 }
 
 export interface LoadBalancerDeleteOptions extends LoadBalancerContextOptions {
@@ -63,34 +68,72 @@ export interface LoadBalancerDeleteOptions extends LoadBalancerContextOptions {
   reservePublicIp?: boolean;
 }
 
+export interface LoadBalancerUpdateOptions extends LoadBalancerContextOptions {
+  frontendProtocol?: string;
+  name?: string;
+  redirectHttpToHttps?: boolean;
+  sslCertificateId?: string;
+}
+
+export interface LoadBalancerVpcAttachOptions extends LoadBalancerContextOptions {
+  subnet?: string;
+  vpc: string;
+}
+
+export interface LoadBalancerVpcDetachOptions extends LoadBalancerContextOptions {
+  vpc: string;
+}
+
 export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerContextOptions {
   name: string;
   algorithm?: string;
   backendProtocol?: string;
-  httpCheck?: boolean;
   backendPort?: string;
-  serverIp: string;
+  backendServer?: string[];
+  httpCheck?: boolean;
+  serverIp?: string;
+  serverName?: string;
   serverPort?: string;
-  serverName: string;
+}
+
+export interface LoadBalancerBackendGroupUpdateOptions extends LoadBalancerContextOptions {
+  algorithm?: string;
+  backendProtocol?: string;
 }
 
 export interface LoadBalancerBackendServerAddOptions extends LoadBalancerContextOptions {
-  backendName: string;
-  serverIp: string;
-  serverPort: string;
-  serverName: string;
+  backendGroup?: string;
+  backendServer?: string;
+  backendName?: string;
+  serverIp?: string;
+  serverName?: string;
+  serverPort?: string;
+}
+
+export interface LoadBalancerBackendServerUpdateOptions extends LoadBalancerContextOptions {
+  backendGroup: string;
+  backendServerName: string;
+  ip?: string;
+  port?: string;
 }
 
 export interface LoadBalancerBackendServerDeleteOptions extends LoadBalancerContextOptions {
-  backendName: string;
+  backendGroup?: string;
+  backendServerName?: string;
+  backendName?: string;
   serverIp?: string;
-  serverName: string;
+  serverName?: string;
   serverPort?: string;
 }
 
 export interface LoadBalancerListCommandResult {
   action: 'list';
   items: LoadBalancerSummary[];
+}
+
+export interface LoadBalancerGetCommandResult {
+  action: 'get';
+  item: LoadBalancerDetails;
 }
 
 export interface LoadBalancerCreateCommandResult {
@@ -113,6 +156,12 @@ export interface LoadBalancerDeleteCommandResult {
   message?: string;
 }
 
+export interface LoadBalancerUpdateCommandResult {
+  action: 'update';
+  lb_id: string;
+  message: string;
+}
+
 export interface LoadBalancerBackendGroupListCommandResult {
   action: 'backend-group-list';
   lb_id: string;
@@ -122,14 +171,21 @@ export interface LoadBalancerBackendGroupListCommandResult {
 }
 
 export interface LoadBalancerBackendGroupCreateCommandResult {
-  action: 'backend-group-create';
+  action: 'backend-group-add';
   group: LoadBalancerCreatedBackendSummary;
   lb_id: string;
   message: string;
 }
 
+export interface LoadBalancerBackendGroupUpdateCommandResult {
+  action: 'backend-group-update';
+  group_name: string;
+  lb_id: string;
+  message: string;
+}
+
 export interface LoadBalancerBackendGroupDeleteCommandResult {
-  action: 'backend-group-delete';
+  action: 'backend-group-remove';
   lb_id: string;
   group_name: string;
   message: string;
@@ -137,16 +193,36 @@ export interface LoadBalancerBackendGroupDeleteCommandResult {
 
 export interface LoadBalancerBackendServerAddCommandResult {
   action: 'backend-server-add';
-  lb_id: string;
-  message: string;
-}
-
-export interface LoadBalancerBackendServerDeleteCommandResult {
-  action: 'backend-server-delete';
   group_name: string;
   lb_id: string;
   message: string;
   server_name: string;
+}
+
+export interface LoadBalancerBackendServerUpdateCommandResult {
+  action: 'backend-server-update';
+  group_name: string;
+  lb_id: string;
+  message: string;
+  server_name: string;
+}
+
+export interface LoadBalancerBackendServerDeleteCommandResult {
+  action: 'backend-server-remove';
+  group_name: string;
+  lb_id: string;
+  message: string;
+  server_name: string;
+}
+
+export interface LoadBalancerNetworkCommandResult {
+  action:
+    | 'network-reserve-ip-attach'
+    | 'network-reserve-ip-detach'
+    | 'network-vpc-attach'
+    | 'network-vpc-detach';
+  lb_id: string;
+  message: string;
 }
 
 export interface LoadBalancerPlansCommandResult {
@@ -173,14 +249,19 @@ export interface LoadBalancerCreatedBackendSummary {
 
 export type LoadBalancerCommandResult =
   | LoadBalancerListCommandResult
+  | LoadBalancerGetCommandResult
   | LoadBalancerCreateCommandResult
   | LoadBalancerDeleteCommandResult
+  | LoadBalancerUpdateCommandResult
   | LoadBalancerPlansCommandResult
   | LoadBalancerBackendGroupListCommandResult
   | LoadBalancerBackendGroupCreateCommandResult
+  | LoadBalancerBackendGroupUpdateCommandResult
   | LoadBalancerBackendGroupDeleteCommandResult
   | LoadBalancerBackendServerAddCommandResult
-  | LoadBalancerBackendServerDeleteCommandResult;
+  | LoadBalancerBackendServerUpdateCommandResult
+  | LoadBalancerBackendServerDeleteCommandResult
+  | LoadBalancerNetworkCommandResult;
 
 interface LoadBalancerStore {
   readonly configPath: string;
@@ -214,6 +295,17 @@ export class LoadBalancerService {
     return { action: 'list', items };
   }
 
+  async getLoadBalancer(
+    lbId: string,
+    options: LoadBalancerContextOptions
+  ): Promise<LoadBalancerGetCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+    const item = await client.getLoadBalancer(lbId);
+
+    return { action: 'get', item };
+  }
+
   async listPlans(
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerPlansCommandResult> {
@@ -226,11 +318,26 @@ export class LoadBalancerService {
   async createLoadBalancer(
     options: LoadBalancerCreateOptions
   ): Promise<LoadBalancerCreateCommandResult> {
+    const legacyOptions = options;
     const requestedVpcId = options.networkId ?? options.vpc;
-    const mode = assertLoadBalancerMode(options.mode);
+    const mode = assertFrontendProtocol(
+      options.frontendProtocol ?? legacyOptions.mode
+    );
+    if (requestedVpcId !== undefined && options.reserveIp !== undefined) {
+      throw new CliError('--reserve-ip cannot be used with --vpc.', {
+        code: 'RESERVE_IP_REQUIRES_EXTERNAL_LB',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Create either an external load balancer with --reserve-ip or an internal load balancer with --vpc.'
+      });
+    }
     const networkId = requestedVpcId
       ? normalizeRequiredNumericId(requestedVpcId, 'Network ID', '--vpc')
       : null;
+    const subnetId =
+      options.subnet === undefined
+        ? null
+        : normalizeRequiredNumericId(options.subnet, 'Subnet ID', '--subnet');
     const lbType: LoadBalancerVpc =
       networkId !== null ? 'internal' : 'external';
     const port = assertPort(options.port, '--port');
@@ -242,12 +349,11 @@ export class LoadBalancerService {
     const requiresSslCert = (SSL_MODES as string[]).includes(mode);
     if (requiresSslCert && !options.sslCertificateId) {
       throw new CliError(
-        `--ssl-certificate-id is required when --mode is ${mode}.`,
+        `--ssl-certificate-id is required when --frontend-protocol is ${mode}.`,
         {
           code: 'MISSING_SSL_CERTIFICATE_ID',
           exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Get your SSL certificate ID from MyAccount > SSL Certificates, then pass it with --ssl-certificate-id.'
+          suggestion: `Run ${formatCliCommand('ssl list')} to discover certificate IDs, then pass one with --ssl-certificate-id.`
         }
       );
     }
@@ -260,38 +366,49 @@ export class LoadBalancerService {
       : null;
 
     const isAlb = (ALB_MODES as string[]).includes(mode);
+    if (!isAlb && options.backendProtocol !== undefined) {
+      throw new CliError(
+        '--backend-protocol is only valid for ALB protocols.',
+        {
+          code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
+          exitCode: EXIT_CODES.usage,
+          suggestion:
+            'Remove --backend-protocol when --frontend-protocol is TCP.'
+        }
+      );
+    }
     const albBackendProtocol = isAlb
       ? assertAlbBackendProtocol(options.backendProtocol)
       : null;
+    const backendGroup = assertNonEmpty(
+      options.backendGroup ?? legacyOptions.backendName,
+      '--backend-group'
+    );
+    const servers = parseBackendServerSpecs(
+      options.backendServer ??
+        legacyBackendServerList(
+          legacyOptions.serverName,
+          legacyOptions.serverIp,
+          legacyOptions.serverPort ?? options.port
+        )
+    );
 
     const backends: LoadBalancerBackend[] = [];
     const tcpBackend: LoadBalancerTcpBackend[] = [];
     let backendSummary: LoadBalancerCreatedBackendSummary;
 
     {
-      const serverPort = assertPort(
-        options.serverPort ?? options.port,
-        '--server-port'
-      );
-      const serverIp = assertServerIp(options.serverIp);
-      const serverName = assertNonEmpty(options.serverName, '--server-name');
-      const server: LoadBalancerServer = {
-        backend_name: serverName,
-        backend_ip: serverIp,
-        backend_port: serverPort
-      };
-
       if (isAlb) {
         backends.push({
           target: 'networkMappingNode',
-          name: options.backendName,
+          name: backendGroup,
           backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
           domain_name: 'localhost',
           balance: algorithm,
           backend_ssl: albBackendProtocol === 'HTTPS',
-          http_check: options.httpCheck ?? false,
+          http_check: true,
           check_url: '/',
-          servers: [{ ...server, target: 'backend' }],
+          servers: servers.map((server) => ({ ...server, target: 'backend' })),
           checkbox_enable: true,
           scaler_port: null,
           scaler_id: null,
@@ -299,30 +416,26 @@ export class LoadBalancerService {
         });
         backendSummary = {
           backend_port: null,
-          health_check: options.httpCheck ?? false,
-          name: options.backendName,
+          health_check: true,
+          name: backendGroup,
           protocol: albBackendProtocol!,
           routing_policy: algorithm,
-          servers: [server]
+          servers
         };
       } else {
-        const backendPort = assertPort(
-          options.backendPort ?? options.serverPort ?? options.port,
-          '--backend-port'
-        );
         tcpBackend.push({
-          backend_name: options.backendName,
-          port: backendPort,
+          backend_name: backendGroup,
+          port,
           balance: algorithm,
-          servers: [{ ...server, target: 'backend' }]
+          servers: servers.map((server) => ({ ...server, target: 'backend' }))
         });
         backendSummary = {
-          backend_port: backendPort,
+          backend_port: port,
           health_check: null,
-          name: options.backendName,
+          name: backendGroup,
           protocol: 'TCP',
           routing_policy: algorithm,
-          servers: [server]
+          servers
         };
       }
     }
@@ -347,7 +460,8 @@ export class LoadBalancerService {
         : [
             await resolveVpcAttachment(
               this.dependencies.createVpcClient(credentials),
-              networkId
+              networkId,
+              subnetId
             )
           ];
 
@@ -380,7 +494,7 @@ export class LoadBalancerService {
       default_backend: '',
       enable_bitninja: false,
       is_ipv6_attached: false,
-      lb_reserve_ip: '',
+      lb_reserve_ip: options.reserveIp ?? '',
       ssl_certificate_id: sslCertificateId,
       ssl_context: { redirect_to_https: false },
       vpc_list: vpcList ?? [],
@@ -445,6 +559,108 @@ export class LoadBalancerService {
     };
   }
 
+  async updateLoadBalancer(
+    lbId: string,
+    options: LoadBalancerUpdateOptions
+  ): Promise<LoadBalancerUpdateCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const currentMode = mutation.isNlb
+      ? 'TCP'
+      : normalizeExistingMode(lb.lb_mode, 'HTTP');
+
+    let nextMode = currentMode;
+    if (options.frontendProtocol !== undefined) {
+      nextMode = assertFrontendProtocol(options.frontendProtocol);
+      if (currentMode === 'TCP' && nextMode !== 'TCP') {
+        throw new CliError(
+          'Cannot change an NLB from TCP to an ALB protocol.',
+          {
+            code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
+            exitCode: EXIT_CODES.usage
+          }
+        );
+      }
+      if (currentMode !== 'TCP' && nextMode === 'TCP') {
+        throw new CliError('Cannot change an ALB to TCP.', {
+          code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
+          exitCode: EXIT_CODES.usage
+        });
+      }
+    }
+
+    if (options.sslCertificateId !== undefined && currentMode === 'TCP') {
+      throw new CliError('--ssl-certificate-id is only valid for ALB.', {
+        code: 'SSL_UPDATE_REQUIRES_ALB',
+        exitCode: EXIT_CODES.usage
+      });
+    }
+
+    if (
+      (nextMode === 'HTTPS' || nextMode === 'BOTH') &&
+      !hasSslCertificate(options, mutation.context)
+    ) {
+      throw new CliError(
+        `--ssl-certificate-id is required when --frontend-protocol is ${nextMode}.`,
+        {
+          code: 'MISSING_SSL_CERTIFICATE_ID',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatCliCommand('ssl list')} to discover certificate IDs.`
+        }
+      );
+    }
+
+    if ((options.redirectHttpToHttps ?? false) && nextMode !== 'BOTH') {
+      throw new CliError(
+        '--redirect-http-to-https is only valid with --frontend-protocol BOTH.',
+        {
+          code: 'REDIRECT_REQUIRES_BOTH_PROTOCOL',
+          exitCode: EXIT_CODES.usage
+        }
+      );
+    }
+
+    const sslCertificateId =
+      options.sslCertificateId === undefined
+        ? getContextSslCertificateId(mutation.context)
+        : normalizeRequiredNumericId(
+            options.sslCertificateId,
+            'SSL certificate ID',
+            '--ssl-certificate-id'
+          );
+    const sslContext = {
+      ...(mutation.context.ssl_context ?? {}),
+      ...(sslCertificateId === null
+        ? {}
+        : { ssl_certificate_id: sslCertificateId }),
+      redirect_to_https:
+        options.redirectHttpToHttps ??
+        Boolean(mutation.context.ssl_context?.['redirect_to_https'])
+    };
+
+    const body = buildLoadBalancerUpdateRequest(lb, mutation.context, {
+      acl_list: mutation.aclList,
+      acl_map: mutation.aclMap,
+      backends: mutation.backends,
+      lb_mode: nextMode,
+      lb_port: mutation.lbPort,
+      plan_name: mutation.planName,
+      ssl_certificate_id: sslCertificateId,
+      ssl_context: sslContext,
+      tcp_backend: mutation.tcpBackends,
+      ...(options.name === undefined ? {} : { lb_name: options.name })
+    });
+    const result = await client.updateLoadBalancer(lbId, body);
+
+    return {
+      action: 'update',
+      lb_id: lbId,
+      message: result.message
+    };
+  }
+
   async listBackendGroups(
     lbId: string,
     options: LoadBalancerContextOptions
@@ -467,6 +683,7 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendGroupCreateOptions
   ): Promise<LoadBalancerBackendGroupCreateCommandResult> {
+    const legacyOptions = options;
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
 
@@ -486,6 +703,15 @@ export class LoadBalancerService {
     const albBackendProtocol = isNlb
       ? null
       : assertAlbBackendProtocol(options.backendProtocol);
+    if (isNlb && options.backendProtocol !== undefined) {
+      throw new CliError(
+        '--backend-protocol is only valid for ALB backend groups.',
+        {
+          code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
+          exitCode: EXIT_CODES.usage
+        }
+      );
+    }
 
     // NLB guard: only one backend group allowed
     if (isNlb && currentTcpBackends.length > 0) {
@@ -494,7 +720,7 @@ export class LoadBalancerService {
         {
           code: 'NLB_SINGLE_BACKEND_GROUP',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`load-balancer backend server add ${lbId}`)} to add a server to the existing group.`
+          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId}`)} to add a server to the existing group.`
         }
       );
     }
@@ -502,33 +728,28 @@ export class LoadBalancerService {
     // ALB guard: group name must be unique
     if (!isNlb && currentBackends.some((g) => g.name === options.name)) {
       throw new CliError(
-        `Backend group "${options.name}" already exists on load balancer ${lbId}. Use \`backend server add\` to add a server to it.`,
+        `Backend group "${options.name}" already exists on load balancer ${lbId}. Use \`lb backend-server add\` to add a server to it.`,
         {
           code: 'BACKEND_GROUP_EXISTS',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`load-balancer backend server add ${lbId}`)} to add a server to the existing group.`
+          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId}`)} to add a server to the existing group.`
         }
       );
     }
 
-    const serverIp = assertServerIp(options.serverIp);
-    const serverPort = assertPort(
-      options.serverPort ?? lbPort,
-      '--server-port'
+    const servers = parseBackendServerSpecs(
+      options.backendServer ??
+        legacyBackendServerList(
+          legacyOptions.serverName,
+          legacyOptions.serverIp,
+          legacyOptions.serverPort ?? lbPort
+        )
     );
-    const serverName = assertNonEmpty(options.serverName, '--server-name');
-    const servers: LoadBalancerServer[] = [
-      {
-        backend_name: serverName,
-        backend_ip: serverIp,
-        backend_port: serverPort
-      }
-    ];
 
     if (isNlb) {
       // For NLB: backendPort is required (use backendPort ?? serverPort)
       const backendPort = assertPort(
-        options.backendPort ?? options.serverPort ?? lbPort,
+        options.backendPort ?? lbPort,
         '--backend-port'
       );
       const newTcpGroup: LoadBalancerTcpBackend = {
@@ -552,7 +773,7 @@ export class LoadBalancerService {
       );
 
       return {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: backendPort,
           health_check: null,
@@ -562,7 +783,7 @@ export class LoadBalancerService {
           servers
         },
         lb_id: lbId,
-        message: `Backend group "${options.name}" created.`
+        message: `Backend group "${options.name}" added.`
       };
     } else {
       const newAlbGroup: LoadBalancerBackend = {
@@ -571,7 +792,7 @@ export class LoadBalancerService {
         backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
         balance: algorithm,
         backend_ssl: albBackendProtocol === 'HTTPS',
-        http_check: options.httpCheck ?? false,
+        http_check: true,
         check_url: '/',
         servers
       };
@@ -589,19 +810,110 @@ export class LoadBalancerService {
         })
       );
       return {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: null,
-          health_check: options.httpCheck ?? false,
+          health_check: true,
           name: options.name,
           protocol: albBackendProtocol!,
           routing_policy: algorithm,
           servers
         },
         lb_id: lbId,
-        message: `Backend group "${options.name}" created.`
+        message: `Backend group "${options.name}" added.`
       };
     }
+  }
+
+  async updateBackendGroup(
+    lbId: string,
+    groupName: string,
+    options: LoadBalancerBackendGroupUpdateOptions
+  ): Promise<LoadBalancerBackendGroupUpdateCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const algorithm =
+      options.algorithm === undefined
+        ? undefined
+        : assertAlgorithm(options.algorithm);
+
+    if (mutation.isNlb) {
+      if (options.backendProtocol !== undefined) {
+        throw new CliError(
+          '--backend-protocol is only valid for ALB backend groups.',
+          {
+            code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
+            exitCode: EXIT_CODES.usage
+          }
+        );
+      }
+      const exists = mutation.tcpBackends.some(
+        (g) => g.backend_name === groupName
+      );
+      if (!exists) {
+        throwBackendGroupNotFound(lbId, groupName);
+      }
+      await client.updateLoadBalancer(
+        lbId,
+        buildLoadBalancerUpdateRequest(lb, mutation.context, {
+          acl_list: mutation.aclList,
+          acl_map: mutation.aclMap,
+          backends: mutation.backends,
+          lb_mode: 'TCP',
+          lb_port: mutation.lbPort,
+          plan_name: mutation.planName,
+          tcp_backend: mutation.tcpBackends.map((g) =>
+            g.backend_name === groupName && algorithm !== undefined
+              ? { ...g, balance: algorithm }
+              : g
+          )
+        })
+      );
+    } else {
+      const backendProtocol =
+        options.backendProtocol === undefined
+          ? undefined
+          : assertAlbBackendProtocol(options.backendProtocol);
+      const exists = mutation.backends.some((g) => g.name === groupName);
+      if (!exists) {
+        throwBackendGroupNotFound(lbId, groupName);
+      }
+      await client.updateLoadBalancer(
+        lbId,
+        buildLoadBalancerUpdateRequest(lb, mutation.context, {
+          acl_list: mutation.aclList,
+          acl_map: mutation.aclMap,
+          backends: mutation.backends.map((g) =>
+            g.name === groupName
+              ? {
+                  ...g,
+                  ...(algorithm === undefined ? {} : { balance: algorithm }),
+                  ...(backendProtocol === undefined
+                    ? {}
+                    : {
+                        backend_mode:
+                          normalizeAlbBackendProtocol(backendProtocol),
+                        backend_ssl: backendProtocol === 'HTTPS'
+                      })
+                }
+              : g
+          ),
+          lb_mode: normalizeExistingMode(lb.lb_mode, 'HTTP'),
+          lb_port: mutation.lbPort,
+          plan_name: mutation.planName,
+          tcp_backend: mutation.tcpBackends
+        })
+      );
+    }
+
+    return {
+      action: 'backend-group-update',
+      group_name: groupName,
+      lb_id: lbId,
+      message: `Backend group "${groupName}" updated.`
+    };
   }
 
   async deleteBackendGroup(
@@ -704,10 +1016,10 @@ export class LoadBalancerService {
     }
 
     return {
-      action: 'backend-group-delete',
+      action: 'backend-group-remove',
       lb_id: lbId,
       group_name: groupName,
-      message: `Backend group "${groupName}" deleted.`
+      message: `Backend group "${groupName}" removed.`
     };
   }
 
@@ -715,9 +1027,20 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerAddOptions
   ): Promise<LoadBalancerBackendServerAddCommandResult> {
+    const legacyOptions = options;
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const serverPort = assertPort(options.serverPort, '--server-port');
-    const serverIp = assertServerIp(options.serverIp);
+    const backendGroup = assertNonEmpty(
+      options.backendGroup ?? legacyOptions.backendName,
+      '--backend-group'
+    );
+    const server = parseBackendServerSpec(
+      options.backendServer ??
+        legacyBackendServerSpec(
+          legacyOptions.serverName,
+          legacyOptions.serverIp,
+          legacyOptions.serverPort
+        )
+    );
 
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
@@ -732,30 +1055,24 @@ export class LoadBalancerService {
       tcpBackends: currentTcpBackends
     } = resolveLoadBalancerMutationContext(lb, lbId);
 
-    const server: LoadBalancerServer = {
-      backend_name: options.serverName,
-      backend_ip: serverIp,
-      backend_port: serverPort
-    };
-
     if (isNlb) {
       const existingGroup = currentTcpBackends.find(
-        (g) => g.backend_name === options.backendName
+        (g) => g.backend_name === backendGroup
       );
 
       if (existingGroup === undefined) {
         throw new CliError(
-          `Backend group "${options.backendName}" not found on load balancer ${lbId}.`,
+          `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
           {
             code: 'BACKEND_GROUP_NOT_FOUND',
             exitCode: EXIT_CODES.usage,
-            suggestion: `Use ${formatCliCommand(`load-balancer backend group create ${lbId}`)} to create a new backend group.`
+            suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
           }
         );
       }
 
       const updatedTcpBackends = currentTcpBackends.map((g) =>
-        g.backend_name === options.backendName
+        g.backend_name === backendGroup
           ? { ...g, servers: [...g.servers, server] }
           : g
       );
@@ -774,24 +1091,22 @@ export class LoadBalancerService {
       );
     } else {
       const existingGroup = currentBackends.find(
-        (g) => g.name === options.backendName
+        (g) => g.name === backendGroup
       );
 
       if (existingGroup === undefined) {
         throw new CliError(
-          `Backend group "${options.backendName}" not found on load balancer ${lbId}.`,
+          `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
           {
             code: 'BACKEND_GROUP_NOT_FOUND',
             exitCode: EXIT_CODES.usage,
-            suggestion: `Use ${formatCliCommand(`load-balancer backend group create ${lbId}`)} to create a new backend group.`
+            suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
           }
         );
       }
 
       const updatedBackends = currentBackends.map((g) =>
-        g.name === options.backendName
-          ? { ...g, servers: [...g.servers, server] }
-          : g
+        g.name === backendGroup ? { ...g, servers: [...g.servers, server] } : g
       );
 
       await client.updateLoadBalancer(
@@ -810,8 +1125,124 @@ export class LoadBalancerService {
 
     return {
       action: 'backend-server-add',
+      group_name: backendGroup,
       lb_id: lbId,
-      message: `Server "${options.serverName}" added to backend group "${options.backendName}".`
+      message: `Server "${server.backend_name}" added to backend group "${backendGroup}".`,
+      server_name: server.backend_name
+    };
+  }
+
+  async updateBackendServer(
+    lbId: string,
+    options: LoadBalancerBackendServerUpdateOptions
+  ): Promise<LoadBalancerBackendServerUpdateCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const nextIp =
+      options.ip === undefined ? undefined : assertIp(options.ip, '--ip');
+    const nextPort =
+      options.port === undefined
+        ? undefined
+        : assertPort(options.port, '--port');
+
+    if (nextIp === undefined && nextPort === undefined) {
+      throw new CliError(
+        'Provide --ip, --port, or both to update a backend server.',
+        {
+          code: 'BACKEND_SERVER_UPDATE_EMPTY',
+          exitCode: EXIT_CODES.usage
+        }
+      );
+    }
+
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    let matched = false;
+
+    if (mutation.isNlb) {
+      const updatedTcpBackends = mutation.tcpBackends.map((group) => {
+        if (group.backend_name !== options.backendGroup) return group;
+        matched = group.servers.some(
+          (server) => server.backend_name === options.backendServerName
+        );
+        return {
+          ...group,
+          servers: group.servers.map((server) =>
+            server.backend_name === options.backendServerName
+              ? {
+                  ...server,
+                  ...(nextIp === undefined ? {} : { backend_ip: nextIp }),
+                  ...(nextPort === undefined ? {} : { backend_port: nextPort })
+                }
+              : server
+          )
+        };
+      });
+      if (!matched) {
+        throwBackendServerNotFound(
+          lbId,
+          options.backendGroup,
+          options.backendServerName
+        );
+      }
+      await client.updateLoadBalancer(
+        lbId,
+        buildLoadBalancerUpdateRequest(lb, mutation.context, {
+          acl_list: mutation.aclList,
+          acl_map: mutation.aclMap,
+          backends: mutation.backends,
+          lb_mode: 'TCP',
+          lb_port: mutation.lbPort,
+          plan_name: mutation.planName,
+          tcp_backend: updatedTcpBackends
+        })
+      );
+    } else {
+      const updatedBackends = mutation.backends.map((group) => {
+        if (group.name !== options.backendGroup) return group;
+        matched = group.servers.some(
+          (server) => server.backend_name === options.backendServerName
+        );
+        return {
+          ...group,
+          servers: group.servers.map((server) =>
+            server.backend_name === options.backendServerName
+              ? {
+                  ...server,
+                  ...(nextIp === undefined ? {} : { backend_ip: nextIp }),
+                  ...(nextPort === undefined ? {} : { backend_port: nextPort })
+                }
+              : server
+          )
+        };
+      });
+      if (!matched) {
+        throwBackendServerNotFound(
+          lbId,
+          options.backendGroup,
+          options.backendServerName
+        );
+      }
+      await client.updateLoadBalancer(
+        lbId,
+        buildLoadBalancerUpdateRequest(lb, mutation.context, {
+          acl_list: mutation.aclList,
+          acl_map: mutation.aclMap,
+          backends: updatedBackends,
+          lb_mode: normalizeExistingMode(lb.lb_mode, 'HTTP'),
+          lb_port: mutation.lbPort,
+          plan_name: mutation.planName,
+          tcp_backend: mutation.tcpBackends
+        })
+      );
+    }
+
+    return {
+      action: 'backend-server-update',
+      group_name: options.backendGroup,
+      lb_id: lbId,
+      message: `Server "${options.backendServerName}" updated in backend group "${options.backendGroup}".`,
+      server_name: options.backendServerName
     };
   }
 
@@ -819,16 +1250,24 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerDeleteOptions
   ): Promise<LoadBalancerBackendServerDeleteCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const legacyOptions = options;
+    const backendGroup = assertNonEmpty(
+      options.backendGroup ?? legacyOptions.backendName,
+      '--backend-group'
+    );
+    const backendServerName = assertNonEmpty(
+      options.backendServerName ?? legacyOptions.serverName,
+      '--backend-server-name'
+    );
     const serverPort =
-      options.serverPort === undefined
+      legacyOptions.serverPort === undefined
         ? undefined
-        : assertPort(options.serverPort, '--server-port');
+        : assertPort(legacyOptions.serverPort, 'Backend server port');
     const serverIp =
-      options.serverIp === undefined
+      legacyOptions.serverIp === undefined
         ? undefined
-        : assertServerIp(options.serverIp);
-
+        : assertIp(legacyOptions.serverIp, 'Backend server IP');
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
     const {
@@ -844,42 +1283,42 @@ export class LoadBalancerService {
 
     if (isNlb) {
       const existingGroup = currentTcpBackends.find(
-        (g) => g.backend_name === options.backendName
+        (g) => g.backend_name === backendGroup
       );
 
       if (existingGroup === undefined) {
         throw new CliError(
-          `Backend group "${options.backendName}" not found on load balancer ${lbId}.`,
+          `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
           {
             code: 'BACKEND_GROUP_NOT_FOUND',
             exitCode: EXIT_CODES.usage,
-            suggestion: `Use ${formatCliCommand(`load-balancer backend group create ${lbId}`)} to create a new backend group.`
+            suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
           }
         );
       }
 
       if (existingGroup.servers.length <= 1) {
         throw new CliError(
-          `Server "${options.serverName}" is the last server in backend group "${options.backendName}". Keep at least one server attached.`,
+          `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
           {
             code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
             exitCode: EXIT_CODES.usage,
-            suggestion: `Add another server to backend group "${options.backendName}" before removing "${options.serverName}".`
+            suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
           }
         );
       }
 
       const { remainingServers, removedServer } = removeServerFromGroup(
         existingGroup.servers,
-        options.serverName,
+        backendServerName,
         serverIp,
         serverPort,
         lbId,
-        options.backendName
+        backendGroup
       );
 
       const updatedTcpBackends = currentTcpBackends.map((g) =>
-        g.backend_name === options.backendName
+        g.backend_name === backendGroup
           ? { ...g, servers: remainingServers }
           : g
       );
@@ -898,51 +1337,49 @@ export class LoadBalancerService {
       );
 
       return {
-        action: 'backend-server-delete',
-        group_name: options.backendName,
+        action: 'backend-server-remove',
+        group_name: backendGroup,
         lb_id: lbId,
-        message: `Server "${removedServer.backend_name}" deleted from backend group "${options.backendName}".`,
+        message: `Server "${removedServer.backend_name}" removed from backend group "${backendGroup}".`,
         server_name: removedServer.backend_name
       };
     }
 
-    const existingGroup = currentBackends.find(
-      (g) => g.name === options.backendName
-    );
+    const existingGroup = currentBackends.find((g) => g.name === backendGroup);
 
     if (existingGroup === undefined) {
       throw new CliError(
-        `Backend group "${options.backendName}" not found on load balancer ${lbId}.`,
+        `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
         {
           code: 'BACKEND_GROUP_NOT_FOUND',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`load-balancer backend group create ${lbId}`)} to create a new backend group.`
+          suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
         }
       );
     }
 
     if (existingGroup.servers.length <= 1) {
       throw new CliError(
-        `Server "${options.serverName}" is the last server in backend group "${options.backendName}". Keep at least one server attached.`,
+        `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
         {
           code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Add another server to backend group "${options.backendName}" before removing "${options.serverName}".`
+          suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
         }
       );
     }
 
     const { remainingServers, removedServer } = removeServerFromGroup(
       existingGroup.servers,
-      options.serverName,
+      backendServerName,
       serverIp,
       serverPort,
       lbId,
-      options.backendName
+      backendGroup
     );
 
     const updatedBackends = currentBackends.map((g) =>
-      g.name === options.backendName ? { ...g, servers: remainingServers } : g
+      g.name === backendGroup ? { ...g, servers: remainingServers } : g
     );
 
     await client.updateLoadBalancer(
@@ -959,11 +1396,170 @@ export class LoadBalancerService {
     );
 
     return {
-      action: 'backend-server-delete',
-      group_name: options.backendName,
+      action: 'backend-server-remove',
+      group_name: backendGroup,
       lb_id: lbId,
-      message: `Server "${removedServer.backend_name}" deleted from backend group "${options.backendName}".`,
+      message: `Server "${removedServer.backend_name}" removed from backend group "${backendGroup}".`,
       server_name: removedServer.backend_name
+    };
+  }
+
+  async attachReserveIp(
+    lbId: string,
+    ip: string,
+    options: LoadBalancerContextOptions
+  ): Promise<LoadBalancerNetworkCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const reserveIp = assertIp(ip, '<ip>');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+
+    if (
+      normalizeExistingLoadBalancerType(lb, mutation.context) === 'internal'
+    ) {
+      throw new CliError(
+        'Reserved public IPs can only be attached to external load balancers.',
+        {
+          code: 'RESERVE_IP_REQUIRES_EXTERNAL_LB',
+          exitCode: EXIT_CODES.usage
+        }
+      );
+    }
+
+    const result = await client.updateLoadBalancer(
+      lbId,
+      buildLoadBalancerUpdateRequest(lb, mutation.context, {
+        acl_list: mutation.aclList,
+        acl_map: mutation.aclMap,
+        backends: mutation.backends,
+        lb_mode: mutation.isNlb
+          ? 'TCP'
+          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
+        lb_port: mutation.lbPort,
+        lb_reserve_ip: reserveIp,
+        lb_type: 'external',
+        plan_name: mutation.planName,
+        tcp_backend: mutation.tcpBackends,
+        vpc_list: []
+      })
+    );
+
+    return {
+      action: 'network-reserve-ip-attach',
+      lb_id: lbId,
+      message: result.message
+    };
+  }
+
+  async detachReserveIp(
+    lbId: string,
+    options: LoadBalancerContextOptions
+  ): Promise<LoadBalancerNetworkCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const result = await client.updateLoadBalancer(
+      lbId,
+      buildLoadBalancerUpdateRequest(lb, mutation.context, {
+        acl_list: mutation.aclList,
+        acl_map: mutation.aclMap,
+        backends: mutation.backends,
+        lb_mode: mutation.isNlb
+          ? 'TCP'
+          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
+        lb_port: mutation.lbPort,
+        lb_reserve_ip: '',
+        plan_name: mutation.planName,
+        tcp_backend: mutation.tcpBackends
+      })
+    );
+
+    return {
+      action: 'network-reserve-ip-detach',
+      lb_id: lbId,
+      message: result.message
+    };
+  }
+
+  async attachVpc(
+    lbId: string,
+    options: LoadBalancerVpcAttachOptions
+  ): Promise<LoadBalancerNetworkCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const vpcId = normalizeRequiredNumericId(options.vpc, 'VPC ID', '--vpc');
+    const subnetId =
+      options.subnet === undefined
+        ? null
+        : normalizeRequiredNumericId(options.subnet, 'Subnet ID', '--subnet');
+    const credentials = await this.resolveContext(options);
+    const client = this.dependencies.createLoadBalancerClient(credentials);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const attachment = await resolveVpcAttachment(
+      this.dependencies.createVpcClient(credentials),
+      vpcId,
+      subnetId
+    );
+    const result = await client.updateLoadBalancer(
+      lbId,
+      buildLoadBalancerUpdateRequest(lb, mutation.context, {
+        acl_list: mutation.aclList,
+        acl_map: mutation.aclMap,
+        backends: mutation.backends,
+        lb_mode: mutation.isNlb
+          ? 'TCP'
+          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
+        lb_port: mutation.lbPort,
+        lb_reserve_ip: '',
+        lb_type: 'internal',
+        plan_name: mutation.planName,
+        tcp_backend: mutation.tcpBackends,
+        vpc_list: [attachment]
+      })
+    );
+
+    return {
+      action: 'network-vpc-attach',
+      lb_id: lbId,
+      message: result.message
+    };
+  }
+
+  async detachVpc(
+    lbId: string,
+    options: LoadBalancerVpcDetachOptions
+  ): Promise<LoadBalancerNetworkCommandResult> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const vpcId = normalizeRequiredNumericId(options.vpc, 'VPC ID', '--vpc');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const remainingVpcList = (mutation.context.vpc_list ?? []).filter(
+      (item) => String(item.network_id) !== String(vpcId)
+    );
+    const result = await client.updateLoadBalancer(
+      lbId,
+      buildLoadBalancerUpdateRequest(lb, mutation.context, {
+        acl_list: mutation.aclList,
+        acl_map: mutation.aclMap,
+        backends: mutation.backends,
+        lb_mode: mutation.isNlb
+          ? 'TCP'
+          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
+        lb_port: mutation.lbPort,
+        lb_type: remainingVpcList.length === 0 ? 'external' : 'internal',
+        plan_name: mutation.planName,
+        tcp_backend: mutation.tcpBackends,
+        vpc_list: remainingVpcList
+      })
+    );
+
+    return {
+      action: 'network-vpc-detach',
+      lb_id: lbId,
+      message: result.message
     };
   }
 
@@ -1033,7 +1629,7 @@ async function resolveCreateBillingSelection(
       {
         code: 'COMMITTED_PLAN_SELECTOR_REQUIRED',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('load-balancer plans')} to find committed options for your base plan.`
+        suggestion: `Run ${formatCliCommand('lb plans')} to find committed options for your base plan.`
       }
     );
   }
@@ -1059,7 +1655,7 @@ async function resolveCreateBillingSelection(
       {
         code: 'LOAD_BALANCER_PLAN_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('load-balancer plans')} to list valid base plans and committed options.`
+        suggestion: `Run ${formatCliCommand('lb plans')} to list valid base plans and committed options.`
       }
     );
   }
@@ -1094,7 +1690,7 @@ async function resolveCreateBillingSelection(
       {
         code: 'LOAD_BALANCER_COMMITTED_PLAN_UNAVAILABLE',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('load-balancer plans')} to choose a base plan with committed options.`
+        suggestion: `Run ${formatCliCommand('lb plans')} to choose a base plan with committed options.`
       }
     );
   }
@@ -1114,7 +1710,7 @@ async function resolveCreateBillingSelection(
       {
         code: 'LOAD_BALANCER_COMMITTED_PLAN_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('load-balancer plans --json')} to inspect committed plans for "${basePlan.name}".`
+        suggestion: `Run ${formatCliCommand('lb plans --json')} to inspect committed plans for "${basePlan.name}".`
       }
     );
   }
@@ -1199,13 +1795,15 @@ function normalizePostCommitBehavior(
 
 async function resolveVpcAttachment(
   client: VpcClient,
-  vpcId: number
+  vpcId: number,
+  subnetId: number | null = null
 ): Promise<LoadBalancerVpcAttachment> {
   const vpc = await client.getVpc(vpcId);
 
   return {
     ipv4_cidr: vpc.ipv4_cidr,
     network_id: vpc.network_id,
+    ...(subnetId === null ? {} : { subnet_id: subnetId }),
     vpc_name: vpc.name
   };
 }
@@ -1222,11 +1820,23 @@ function buildLoadBalancerUpdateRequest(
     | 'lb_port'
     | 'plan_name'
     | 'tcp_backend'
-  >
+  > &
+    Partial<
+      Pick<
+        LoadBalancerUpdateRequest,
+        | 'lb_name'
+        | 'lb_reserve_ip'
+        | 'lb_type'
+        | 'ssl_certificate_id'
+        | 'ssl_context'
+        | 'vpc_list'
+      >
+    >
 ): LoadBalancerUpdateRequest {
   return {
-    lb_name: lb.appliance_name,
-    lb_type: normalizeExistingLoadBalancerType(lb, context),
+    lb_name: overrides.lb_name ?? lb.appliance_name,
+    lb_type:
+      overrides.lb_type ?? normalizeExistingLoadBalancerType(lb, context),
     lb_mode: overrides.lb_mode,
     lb_port: overrides.lb_port,
     plan_name: overrides.plan_name,
@@ -1255,7 +1865,19 @@ function buildLoadBalancerUpdateRequest(
       'http_keep_alive_timeout',
       DEFAULT_TIMEOUT
     ),
-    ...extractPreservedContextFields(context)
+    ...extractPreservedContextFields(context),
+    ...(overrides.lb_reserve_ip === undefined
+      ? {}
+      : { lb_reserve_ip: overrides.lb_reserve_ip }),
+    ...(overrides.ssl_certificate_id === undefined
+      ? {}
+      : { ssl_certificate_id: overrides.ssl_certificate_id }),
+    ...(overrides.ssl_context === undefined
+      ? {}
+      : { ssl_context: overrides.ssl_context }),
+    ...(overrides.vpc_list === undefined
+      ? {}
+      : { vpc_list: overrides.vpc_list })
   };
 }
 
@@ -1305,7 +1927,7 @@ function resolveLoadBalancerMutationContext(
       {
         code: 'LOAD_BALANCER_CONTEXT_MISSING',
         exitCode: EXIT_CODES.network,
-        suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current state.`
+        suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect current state.`
       }
     );
   }
@@ -1369,7 +1991,7 @@ function removeServerFromGroup(
       {
         code: 'BACKEND_SERVER_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand(`load-balancer backend group list ${lbId}`)} to inspect current backend groups and their servers.`
+        suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect current backend groups and their servers.`
       }
     );
   }
@@ -1381,7 +2003,7 @@ function removeServerFromGroup(
         code: 'BACKEND_SERVER_AMBIGUOUS',
         exitCode: EXIT_CODES.usage,
         suggestion:
-          'Retry with --server-ip and, if needed, --server-port to target one server exactly.'
+          'Rename duplicate backend servers before removing one by name.'
       }
     );
   }
@@ -1435,6 +2057,27 @@ function normalizeExistingMode(
   } catch {
     return fallback;
   }
+}
+
+function getContextSslCertificateId(
+  context: LoadBalancerContextPayload
+): number | null {
+  const directValue = context.ssl_certificate_id;
+  if (typeof directValue === 'number') {
+    return directValue;
+  }
+  const contextValue = context.ssl_context?.['ssl_certificate_id'];
+  return typeof contextValue === 'number' ? contextValue : null;
+}
+
+function hasSslCertificate(
+  options: LoadBalancerUpdateOptions,
+  context: LoadBalancerContextPayload
+): boolean {
+  return (
+    options.sslCertificateId !== undefined ||
+    getContextSslCertificateId(context) !== null
+  );
 }
 
 function normalizeNodeListType(value: unknown): 'S' | 'D' {
@@ -1501,15 +2144,21 @@ function assignIfDefined<TKey extends keyof LoadBalancerUpdateRequest>(
   }
 }
 
-function assertLoadBalancerMode(mode: string): LoadBalancerMode {
+function assertFrontendProtocol(mode: string | undefined): LoadBalancerMode {
   const valid: LoadBalancerMode[] = ['HTTP', 'HTTPS', 'BOTH', 'TCP'];
+  if (mode === undefined) {
+    throw new CliError('--frontend-protocol is required.', {
+      code: 'MISSING_REQUIRED_OPTION',
+      exitCode: EXIT_CODES.usage
+    });
+  }
   const upper = mode.toUpperCase() as LoadBalancerMode;
 
   if (!valid.includes(upper)) {
     throw new CliError(
-      `Invalid --mode "${mode}". Must be one of: ${valid.join(', ')}.`,
+      `Invalid --frontend-protocol "${mode}". Must be one of: ${valid.join(', ')}.`,
       {
-        code: 'INVALID_LB_MODE',
+        code: 'INVALID_LB_FRONTEND_PROTOCOL',
         exitCode: EXIT_CODES.usage
       }
     );
@@ -1517,6 +2166,8 @@ function assertLoadBalancerMode(mode: string): LoadBalancerMode {
 
   return upper;
 }
+
+const assertLoadBalancerMode = assertFrontendProtocol;
 
 function assertAlgorithm(algorithm: string): LoadBalancerAlgorithm {
   const valid: LoadBalancerAlgorithm[] = ['source', 'roundrobin', 'leastconn'];
@@ -1574,28 +2225,89 @@ function assertPort(port: string, flag: string): number {
   return num;
 }
 
-function assertServerIp(ip: string): string {
+function assertIp(ip: string, flag: string): string {
   const trimmed = ip.trim();
 
   if (trimmed.length === 0) {
-    throw new CliError('--server-ip is required.', {
+    throw new CliError(`${flag} is required.`, {
       code: 'MISSING_SERVER_IP',
       exitCode: EXIT_CODES.usage
     });
   }
 
   if (!isIPv4(trimmed)) {
-    throw new CliError(
-      `--server-ip "${trimmed}" is not a valid IPv4 address.`,
-      { code: 'INVALID_SERVER_IP', exitCode: EXIT_CODES.usage }
-    );
+    throw new CliError(`${flag} "${trimmed}" is not a valid IPv4 address.`, {
+      code: 'INVALID_SERVER_IP',
+      exitCode: EXIT_CODES.usage
+    });
   }
 
   return trimmed;
 }
 
-function assertNonEmpty(value: string, flag: string): string {
-  const trimmed = value.trim();
+function parseBackendServerSpecs(
+  values: string[] | undefined
+): LoadBalancerServer[] {
+  if (values === undefined || values.length === 0) {
+    throw new CliError('At least one --backend-server is required.', {
+      code: 'BACKEND_SERVER_REQUIRED',
+      exitCode: EXIT_CODES.usage
+    });
+  }
+
+  return values.map(parseBackendServerSpec);
+}
+
+function parseBackendServerSpec(value: string): LoadBalancerServer {
+  const [name, ip, port, ...extra] = value.split(':');
+  if (
+    name === undefined ||
+    ip === undefined ||
+    port === undefined ||
+    extra.length > 0
+  ) {
+    throw new CliError(
+      `Invalid --backend-server "${value}". Expected name:ip:port.`,
+      {
+        code: 'INVALID_BACKEND_SERVER_SPEC',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+
+  return {
+    backend_name: assertNonEmpty(name, '--backend-server name'),
+    backend_ip: assertIp(ip, '--backend-server ip'),
+    backend_port: assertPort(port, '--backend-server port')
+  };
+}
+
+function throwBackendGroupNotFound(lbId: string, groupName: string): never {
+  throw new CliError(
+    `Backend group "${groupName}" not found on load balancer ${lbId}.`,
+    {
+      code: 'BACKEND_GROUP_NOT_FOUND',
+      exitCode: EXIT_CODES.usage
+    }
+  );
+}
+
+function throwBackendServerNotFound(
+  lbId: string,
+  groupName: string,
+  serverName: string
+): never {
+  throw new CliError(
+    `Server "${serverName}" was not found in backend group "${groupName}" on load balancer ${lbId}.`,
+    {
+      code: 'BACKEND_SERVER_NOT_FOUND',
+      exitCode: EXIT_CODES.usage
+    }
+  );
+}
+
+function assertNonEmpty(value: string | undefined, flag: string): string {
+  const trimmed = value?.trim() ?? '';
 
   if (trimmed.length === 0) {
     throw new CliError(`${flag} is required.`, {
@@ -1605,6 +2317,24 @@ function assertNonEmpty(value: string, flag: string): string {
   }
 
   return trimmed;
+}
+
+function legacyBackendServerList(
+  name: string | undefined,
+  ip: string | undefined,
+  port: string | undefined
+): string[] | undefined {
+  return name === undefined && ip === undefined && port === undefined
+    ? undefined
+    : [legacyBackendServerSpec(name, ip, port)];
+}
+
+function legacyBackendServerSpec(
+  name: string | undefined,
+  ip: string | undefined,
+  port: string | undefined
+): string {
+  return `${name ?? ''}:${ip ?? ''}:${port ?? ''}`;
 }
 
 function assertCanDelete(isInteractive: boolean): void {

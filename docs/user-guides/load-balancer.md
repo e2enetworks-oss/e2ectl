@@ -1,376 +1,167 @@
-# Load Balancer
+# Load Balancer Guide
 
-## What This Command Group Does
-
-The `load-balancer` command group lets you create, list, and delete load balancers on E2E Networks, and manage the backend groups and servers that sit behind them.
-
-Two load balancer types are supported:
-
-| Type                                | Mode flag                  | Layer   | Use case                                                |
-| ----------------------------------- | -------------------------- | ------- | ------------------------------------------------------- |
-| **ALB** (Application Load Balancer) | `HTTP`, `HTTPS`, or `BOTH` | Layer 7 | HTTP/HTTPS routing, domain-based routing, health checks |
-| **NLB** (Network Load Balancer)     | `TCP`                      | Layer 4 | TCP passthrough, port-based routing                     |
-
----
+The `lb` command group manages E2E Networks load balancers. It supports ALB (`HTTP`, `HTTPS`, `BOTH`) and NLB (`TCP`) creation, LB-level updates, network attachments, backend groups, and backend servers.
 
 ## Before You Start
 
-- Configure a profile with your API key and auth token: `e2ectl config set`
-- List available plans first: `e2ectl load-balancer plans`
-- Pick the base plan name you want to create with (for example `E2E-LB-2`).
-- If you want committed billing, note the committed option shown under that base plan.
-- Use `e2ectl load-balancer plans --json` when you need the committed plan ID.
-- For backend servers, have the server IP address and port ready.
+- Save a default alias and default project/location context, or pass `--alias`, `--project-id`, and `--location` explicitly.
+- List plans with `e2ectl lb plans`.
+- For HTTPS or BOTH frontends, find a certificate ID with `e2ectl ssl list`.
+- Backend servers use `name:ip:port` syntax, for example `web-1:192.168.1.1:8080`.
 
----
+## List And Inspect
 
-## Common Tasks
-
-### List Load Balancers
-
-```
-e2ectl load-balancer list
-```
-
-```
-e2ectl load-balancer list --json
+```bash
+e2ectl lb list
+e2ectl lb list --json
+e2ectl lb plans
+e2ectl lb plans --json
+e2ectl lb get <lbId>
+e2ectl lb get <lbId> --json
 ```
 
-The table shows ID, Name, Status, Mode, Type, Public IP, and Private IP for each load balancer.
+## Create An ALB
 
-### List Available Load Balancer Plans
-
-First, list available plans to find the base plan you want to use. Each base plan shows its hourly price, monthly price, and any committed options that belong to that SKU:
-
-```
-e2ectl load-balancer plans
-```
-
-```
-e2ectl load-balancer plans --json
-```
-
-Use the base plan name from this output with `--plan`. If you want a committed load balancer, add either `--committed-plan <name>` or `--committed-plan-id <id>` during create.
-
-### Create an ALB (HTTP)
-
-Creates an Application Load Balancer that listens on port 80 with one backend group and one server.
-
-```
-e2ectl load-balancer create \
-  --name my-alb \
+```bash
+e2ectl lb create \
+  --name my-lb \
   --plan E2E-LB-2 \
-  --mode HTTP \
+  --frontend-protocol HTTP \
   --port 80 \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+  --backend-group web \
+  --backend-protocol HTTP \
+  --backend-server web-1:192.168.1.1:8080 \
+  --backend-server web-2:192.168.1.2:8080 \
+  --reserve-ip 203.0.113.10
 ```
 
-### Create an ALB (HTTPS or BOTH)
+ALB frontend protocols are `HTTP`, `HTTPS`, and `BOTH`. ALB backend protocols are `HTTP` and `HTTPS`. ALB health checks are always enabled with check URL `/`.
 
-`--mode HTTPS` and `--mode BOTH` require `--ssl-certificate-id`. Get your certificate ID from the E2E Networks Console.
+HTTPS and BOTH require `--ssl-certificate-id`:
 
-```
-e2ectl load-balancer create \
-  --name my-https-alb \
+```bash
+e2ectl lb create \
+  --name secure-lb \
   --plan E2E-LB-2 \
-  --mode HTTPS \
+  --frontend-protocol HTTPS \
+  --ssl-certificate-id 123 \
   --port 443 \
-  --ssl-certificate-id <certId> \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+  --backend-group web \
+  --backend-protocol HTTPS \
+  --backend-server web-1:192.168.1.1:8443
 ```
 
-### Create an NLB (TCP)
+## Create An NLB
 
-Creates a Network Load Balancer that passes TCP traffic through on port 80.
-
-```
-e2ectl load-balancer create \
+```bash
+e2ectl lb create \
   --name my-nlb \
   --plan E2E-LB-2 \
-  --mode TCP \
-  --port 80 \
-  --backend-name tcp-group \
-  --server-ip 10.0.0.2 \
-  --server-port 8080 \
-  --server-name srv-1 \
-  --backend-port 8080
+  --frontend-protocol TCP \
+  --port 9000 \
+  --backend-group tcp-main \
+  --backend-server app-1:192.168.1.10:9000 \
+  --backend-server app-2:192.168.1.11:9000 \
+  --reserve-ip 203.0.113.10
 ```
 
-### Create an Internal Load Balancer (VPC only)
+NLB has no backend protocol. The backend group port follows the frontend port.
 
-Use `--vpc <networkId>` to attach the load balancer to a VPC — it will be accessible only within that VPC network.
+## Create An Internal LB
 
-```
-e2ectl load-balancer create \
-  --name internal-alb \
+```bash
+e2ectl lb create \
+  --name internal-lb \
   --plan E2E-LB-2 \
-  --mode HTTP \
+  --frontend-protocol HTTP \
   --port 80 \
-  --vpc <networkId> \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+  --vpc 123 \
+  --backend-group web \
+  --backend-protocol HTTP \
+  --backend-server web-1:192.168.1.1:8080
 ```
 
-### Create a Committed Load Balancer
+`--reserve-ip` is only for external load balancers and cannot be combined with `--vpc`.
 
-Committed billing is chosen under a base plan. First inspect plans, then create the load balancer with `--billing-type committed`, the base SKU in `--plan`, and the committed option in `--committed-plan`:
+## Update LB Settings
 
-```
-e2ectl load-balancer plans
-```
-
-```
-e2ectl load-balancer create \
-  --name committed-alb \
-  --plan E2E-LB-2 \
-  --billing-type committed \
-  --committed-plan "90 Days" \
-  --post-commit-behavior auto-renew \
-  --mode HTTP \
-  --port 80 \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+```bash
+e2ectl lb update <lbId> --name new-name
+e2ectl lb update <lbId> --frontend-protocol HTTPS --ssl-certificate-id 123
+e2ectl lb update <lbId> --frontend-protocol BOTH --ssl-certificate-id 123 --redirect-http-to-https
+e2ectl lb update <lbId> --ssl-certificate-id 456
 ```
 
-If you prefer deterministic scripting, use the committed plan ID from `load-balancer plans --json`:
+ALBs can move among `HTTP`, `HTTPS`, and `BOTH`. NLBs stay `TCP`; the CLI does not allow changing an ALB to TCP or a TCP NLB to an ALB protocol. SSL updates are ALB-only, and `--redirect-http-to-https` is valid only with `--frontend-protocol BOTH`.
 
-```
-e2ectl load-balancer create \
-  --name committed-alb \
-  --plan E2E-LB-2 \
-  --billing-type committed \
-  --committed-plan-id 901 \
-  --post-commit-behavior hourly-billing \
-  --mode HTTP \
-  --port 80 \
-  --backend-name web \
-  --server-ip 10.0.0.1 \
-  --server-port 8080 \
-  --server-name server-1
+## Network Attachments
+
+```bash
+e2ectl lb network reserve-ip attach <lbId> <ip>
+e2ectl lb network reserve-ip detach <lbId>
+e2ectl lb network vpc attach <lbId> --vpc <vpcId>
+e2ectl lb network vpc attach <lbId> --vpc <vpcId> --subnet <subnetId>
+e2ectl lb network vpc detach <lbId> --vpc <vpcId>
 ```
 
-### List Backend Groups
+Reserved public IP attachments are for external load balancers. VPC attachment switches the LB to internal and clears the reserved public IP field.
 
-Shows all backend groups for a load balancer with their routing policy, protocol, health check status, and the servers in each group (formatted as `name (ip:port)`).
+## Backend Groups
 
-```
-e2ectl load-balancer backend group list <lbId>
-```
-
-```
-e2ectl load-balancer backend group list <lbId> --json
-```
-
-### Create a New Backend Group
-
-For ALBs, this adds another backend group. For NLBs, only one backend group is allowed. Each new backend group requires at least one server at creation time.
-
-```
-e2ectl load-balancer backend group create <lbId> \
+```bash
+e2ectl lb backend-group add <lbId> \
   --name api \
-  --server-ip 10.0.0.9 \
-  --server-name api-server-1 \
-  --server-port 9090 \
+  --backend-protocol HTTP \
+  --backend-server api-1:192.168.2.1:9000
+
+e2ectl lb backend-group update <lbId> web \
   --backend-protocol HTTPS \
-  --algorithm leastconn \
-  --http-check
+  --algorithm leastconn
+
+e2ectl lb backend-group remove <lbId> api
 ```
 
-### Delete a Backend Group
+Creation supports one backend group with multiple backend servers. Add more backend groups after creation for ALB workflows. The CLI refuses to remove the final backend group.
 
-Removes a backend group and all its servers from the load balancer. The CLI follows the Backend Mapping tab behavior: it refuses to delete the last remaining backend group, and for ALBs it also removes ACL entries that still point at the deleted backend.
+## Backend Servers
 
-```
-e2ectl load-balancer backend group delete <lbId> <groupName>
-```
+```bash
+e2ectl lb backend-server add <lbId> \
+  --backend-group web \
+  --backend-server web-3:192.168.1.3:8080
 
-### Add a Server to an Existing Backend Group
+e2ectl lb backend-server update <lbId> \
+  --backend-group web \
+  --backend-server-name web-3 \
+  --ip 192.168.1.30 \
+  --port 8081
 
-If the backend group named `web` already exists, the server is appended to it.
-
-```
-e2ectl load-balancer backend server add <lbId> \
-  --backend-name web \
-  --server-ip 10.0.0.5 \
-  --server-port 8080 \
-  --server-name server-2
-```
-
-> **NLB constraint**: NLB supports only one backend group. If you specify a `--backend-name` that differs from the existing group name, the command will error.
-
-### Delete a Server from an Existing Backend Group
-
-Removes a server from a backend group. The CLI refuses to remove the last remaining server from a backend group, matching the Backend Mapping tab flow.
-
-```
-e2ectl load-balancer backend server delete <lbId> \
-  --backend-name web \
-  --server-name server-2
+e2ectl lb backend-server remove <lbId> \
+  --backend-group web \
+  --backend-server-name web-3
 ```
 
-If duplicate server names exist in the same backend group, add `--server-ip` and optionally `--server-port` to target one exact server.
+The CLI refuses to remove the final backend server from a backend group.
 
-### Delete a Load Balancer
+## Delete
 
-```
-e2ectl load-balancer delete <lbId>
-```
-
-Skip the interactive confirmation prompt with `--force`:
-
-```
-e2ectl load-balancer delete <lbId> --force
+```bash
+e2ectl lb delete <lbId>
+e2ectl lb delete <lbId> --force
+e2ectl lb delete <lbId> --force --reserve-public-ip
 ```
 
-Preserve the public IP as a reserved IP during deletion:
+Without `--force`, interactive terminals are prompted for confirmation. `--reserve-public-ip` asks the backend to preserve the LB public IP when deleting.
 
-```
-e2ectl load-balancer delete <lbId> --force --reserve-public-ip
-```
+## JSON Contracts
 
----
-
-## Command Reference
-
-### `e2ectl load-balancer plans`
-
-Lists all available load balancer base plans. Human output shows base plans and committed options in separate tables. Use `--json` when you need committed plan IDs for scripting.
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer list`
-
-Lists all load balancers for the active profile. Columns: ID, Name, Status, Mode, Type, Public IP, Private IP.
-
-**Options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer create`
-
-Creates a new load balancer.
-
-| Flag                                | Required | Description                                                                                          |
-| ----------------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
-| `--name <name>`                     | Yes      | Load balancer name                                                                                   |
-| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.                            |
-| `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                                        |
-| `--port <port>`                     | Yes      | Frontend listener port                                                                               |
-| `--backend-name <name>`             | Yes      | Initial backend group name                                                                           |
-| `--server-ip <ip>`                  | Yes      | Backend server IP address                                                                            |
-| `--server-name <name>`              | Yes      | Unique server identifier within the backend group                                                    |
-| `--server-port <port>`              | No       | Backend server port. Defaults to `--port`                                                            |
-| `--algorithm <algo>`                | No       | `roundrobin` (default), `leastconn`, or `source`                                                     |
-| `--backend-protocol <protocol>`     | No       | `HTTP` (default) or `HTTPS` for the initial ALB backend group                                        |
-| `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                                                 |
-| `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                                                  |
-| `--billing-type <type>`             | No       | `hourly` (default) or `committed`. Use `committed` with `--committed-plan` or `--committed-plan-id`. |
-| `--committed-plan <name>`           | No       | Committed plan name under the selected base plan                                                     |
-| `--committed-plan-id <id>`          | No       | Committed plan ID under the selected base plan                                                       |
-| `--post-commit-behavior <behavior>` | No       | `auto-renew` or `hourly-billing` after the committed term ends                                       |
-| `--ssl-certificate-id <id>`         | No\*     | SSL certificate ID. **Required** when `--mode` is `HTTPS` or `BOTH`                                  |
-| `--vpc <networkId>`                 | No       | VPC network ID to attach the LB (creates internal LB). Run `vpc list` first.                         |
-| `--security-group <id>`             | No       | Security group ID to attach to the load balancer                                                     |
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer delete <lbId>`
-
-Deletes a load balancer. Prompts for confirmation unless `--force` is passed.
-
-| Flag                  | Description                              |
-| --------------------- | ---------------------------------------- |
-| `--force`             | Skip the interactive confirmation prompt |
-| `--reserve-public-ip` | Preserve the public IP as a reserved IP  |
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend group list <lbId>`
-
-Lists all backend groups for a load balancer. Columns: Backend Group, Routing Policy, Protocol, Health Check, Servers. The Servers column shows each server as `name (ip:port)`, one per line.
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend group create <lbId>`
-
-Creates a backend group on an existing load balancer. At least one server must be provided at creation time.
-
-| Flag                            | Required | Description                                           |
-| ------------------------------- | -------- | ----------------------------------------------------- |
-| `--name <name>`                 | Yes      | Backend group name                                    |
-| `--server-ip <ip>`              | Yes      | Initial server IP address                             |
-| `--server-name <name>`          | Yes      | Initial server identifier                             |
-| `--server-port <port>`          | No       | Initial server port. Defaults to the LB frontend port |
-| `--backend-protocol <protocol>` | No       | `HTTP` (default) or `HTTPS` for ALB backend groups    |
-| `--algorithm <algo>`            | No       | `roundrobin` (default), `leastconn`, or `source`      |
-| `--http-check`                  | No       | Enable health checks for a new ALB backend group      |
-| `--backend-port <port>`         | No       | Port for a new NLB backend group                      |
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend group delete <lbId> <groupName>`
-
-Removes a backend group and all its servers from the load balancer.
-
-The command refuses to delete the last remaining backend group on the load balancer. For ALBs, it also cleans up stale ACL mappings that pointed at the deleted backend group.
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend server add <lbId>`
-
-Adds a server to an existing backend group.
-
-| Flag                    | Required | Description                               |
-| ----------------------- | -------- | ----------------------------------------- |
-| `--backend-name <name>` | Yes      | Existing backend group name               |
-| `--server-ip <ip>`      | Yes      | Backend server IP address                 |
-| `--server-port <port>`  | Yes      | Backend server port                       |
-| `--server-name <name>`  | Yes      | Unique server identifier within the group |
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
-
-### `e2ectl load-balancer backend server delete <lbId>`
-
-Deletes a server from an existing backend group.
-
-| Flag                    | Required | Description                                                         |
-| ----------------------- | -------- | ------------------------------------------------------------------- |
-| `--backend-name <name>` | Yes      | Existing backend group name                                         |
-| `--server-name <name>`  | Yes      | Server identifier to delete                                         |
-| `--server-ip <ip>`      | No       | Optional server IP to disambiguate duplicate server names           |
-| `--server-port <port>`  | No       | Optional server port to disambiguate duplicate server names further |
-
-The command refuses to remove the last remaining server from a backend group.
-
-**Context options**: `--alias`, `--project-id`, `--location`, `--json`
-
----
+- `e2ectl lb list --json` returns `action` and `items`; each item includes `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
+- `e2ectl lb plans --json` returns base plans and committed plan options.
+- `e2ectl lb get --json` returns the backend load balancer detail object.
+- Mutation commands return an `action`, `lb_id`, and command-specific metadata or message.
 
 ## Related Commands
 
-- `e2ectl reserved-ip list` — List reserved IPs (useful before deleting an LB with `--reserve-public-ip`)
-- `e2ectl node list` — List nodes to find backend server IPs
+- `e2ectl ssl list` - discover SSL certificate IDs.
+- `e2ectl node list` - find backend server IPs.
+- `e2ectl vpc list` - find VPC IDs for internal load balancers.

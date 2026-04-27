@@ -25,4 +25,31 @@ describe('built CLI help', () => {
     expect(result.stdout).toContain('remove');
     expect(result.stdout).not.toMatch(/^\s+add\b/m);
   });
+
+  it('rejects retired load balancer command shapes', async () => {
+    const legacyTopLevel = await runBuiltCli(['load-balancer', '--help']);
+    const legacyBackendGroup = await runBuiltCli([
+      'lb',
+      'backend',
+      'group',
+      '--help'
+    ]);
+    const legacyBackendServer = await runBuiltCli([
+      'lb',
+      'backend',
+      'server',
+      '--help'
+    ]);
+
+    expect(legacyTopLevel.exitCode).not.toBe(0);
+    expect(legacyTopLevel.stderr).toContain('Unknown command "load-balancer"');
+    expect(legacyBackendGroup.exitCode).not.toBe(0);
+    expect(legacyBackendGroup.stderr).toContain(
+      'Unknown command "lb backend group"'
+    );
+    expect(legacyBackendServer.exitCode).not.toBe(0);
+    expect(legacyBackendServer.stderr).toContain(
+      'Unknown command "lb backend server"'
+    );
+  });
 });

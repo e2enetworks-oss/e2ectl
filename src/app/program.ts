@@ -9,6 +9,7 @@ import { buildProjectCommand } from '../project/index.js';
 import { buildReservedIpCommand } from '../reserved-ip/index.js';
 import { buildSecurityGroupCommand } from '../security-group/index.js';
 import { buildSshKeyCommand } from '../ssh-key/index.js';
+import { buildSslCommand } from '../ssl/index.js';
 import { buildVolumeCommand } from '../volume/index.js';
 import { buildVpcCommand } from '../vpc/index.js';
 import { createRuntime, type CliRuntime } from './runtime.js';
@@ -34,6 +35,7 @@ export function createProgram(runtime: CliRuntime = createRuntime()): Command {
   program.addCommand(buildVpcCommand(runtime));
   program.addCommand(buildSecurityGroupCommand(runtime));
   program.addCommand(buildSshKeyCommand(runtime));
+  program.addCommand(buildSslCommand(runtime));
   program.helpCommand('help [command]', 'Show help for a command');
 
   program.action(() => {

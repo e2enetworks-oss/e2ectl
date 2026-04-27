@@ -34,6 +34,7 @@ export async function runCli(
   prepareProgramForCli(program);
 
   try {
+    rejectRetiredLoadBalancerCommands(argv);
     await program.parseAsync(argv);
     return EXIT_CODES.success;
   } catch (error: unknown) {
@@ -47,6 +48,34 @@ export async function runCli(
     return isCliError(normalizedError)
       ? normalizedError.exitCode
       : EXIT_CODES.general;
+  }
+}
+
+function rejectRetiredLoadBalancerCommands(argv: string[]): void {
+  const positional = argv.slice(2).filter((value) => !value.startsWith('-'));
+  const [command, firstNested, secondNested] = positional;
+
+  if (command === 'load-balancer') {
+    throw new CliError('Unknown command "load-balancer".', {
+      code: 'INVALID_USAGE',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Use "lb" instead.'
+    });
+  }
+
+  if (
+    command === 'lb' &&
+    firstNested === 'backend' &&
+    (secondNested === 'group' || secondNested === 'server')
+  ) {
+    throw new CliError(`Unknown command "lb backend ${secondNested}".`, {
+      code: 'INVALID_USAGE',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        secondNested === 'group'
+          ? 'Use "lb backend-group" instead.'
+          : 'Use "lb backend-server" instead.'
+    });
   }
 }
 
@@ -69,6 +98,7 @@ export function pathsReferToSameFile(
 }
 
 function prepareProgramForCli(program: Command): void {
+  program.allowExcessArguments(false);
   program.configureOutput({
     outputError: () => {},
     writeErr: () => {}

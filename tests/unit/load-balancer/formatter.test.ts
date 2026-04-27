@@ -362,10 +362,10 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-create', () => {
-    it('renders backend-group-create summary (human)', () => {
+  describe('backend-group-add', () => {
+    it('renders backend-group-add summary (human)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: null,
           health_check: false,
@@ -381,18 +381,18 @@ describe('renderLoadBalancerResult', () => {
           ]
         },
         lb_id: '10',
-        message: 'Backend group "api" created.'
+        message: 'Backend group "api" added.'
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Backend group "api" created.');
+      expect(output).toContain('Backend group "api" added.');
       expect(output).toContain('Protocol');
       expect(output).toContain('HTTP');
       expect(output).toContain('api-1');
     });
 
-    it('renders JSON for backend-group-create', () => {
+    it('renders JSON for backend-group-add', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: null,
           health_check: true,
@@ -402,7 +402,7 @@ describe('renderLoadBalancerResult', () => {
           servers: []
         },
         lb_id: '10',
-        message: 'Backend group "api" created.'
+        message: 'Backend group "api" added.'
       };
       const output = renderLoadBalancerResult(result, true);
       const parsed = JSON.parse(output) as {
@@ -411,15 +411,15 @@ describe('renderLoadBalancerResult', () => {
         lb_id: string;
         message: string;
       };
-      expect(parsed.action).toBe('backend-group-create');
+      expect(parsed.action).toBe('backend-group-add');
       expect(parsed.group.protocol).toBe('HTTPS');
       expect(parsed.lb_id).toBe('10');
-      expect(parsed.message).toBe('Backend group "api" created.');
+      expect(parsed.message).toBe('Backend group "api" added.');
     });
 
     it('renders Backend Port row when backend_port is set (NLB backend group)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: 8080,
           health_check: false,
@@ -429,7 +429,7 @@ describe('renderLoadBalancerResult', () => {
           servers: []
         },
         lb_id: '20',
-        message: 'Backend group "tcp-grp" created.'
+        message: 'Backend group "tcp-grp" added.'
       };
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain('Backend Port');
@@ -441,8 +441,10 @@ describe('renderLoadBalancerResult', () => {
     it('renders backend-server-add message (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-add',
+        group_name: 'web',
         lb_id: '10',
-        message: 'Server "srv-2" added to backend group "web".'
+        message: 'Server "srv-2" added to backend group "web".',
+        server_name: 'srv-2'
       };
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain('Server "srv-2" added to backend group "web".');
@@ -452,8 +454,10 @@ describe('renderLoadBalancerResult', () => {
     it('renders JSON for backend-server-add', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-add',
+        group_name: 'web',
         lb_id: '10',
-        message: 'Server "srv-2" added to backend group "web".'
+        message: 'Server "srv-2" added to backend group "web".',
+        server_name: 'srv-2'
       };
       const output = renderLoadBalancerResult(result, true);
       const parsed = JSON.parse(output) as {
@@ -467,29 +471,29 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-server-delete', () => {
-    it('renders backend-server-delete message (human)', () => {
+  describe('backend-server-remove', () => {
+    it('renders backend-server-remove message (human)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-server-delete',
+        action: 'backend-server-remove',
         group_name: 'web',
         lb_id: '10',
-        message: 'Server "srv-2" deleted from backend group "web".',
+        message: 'Server "srv-2" removed from backend group "web".',
         server_name: 'srv-2'
       };
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain(
-        'Server "srv-2" deleted from backend group "web".'
+        'Server "srv-2" removed from backend group "web".'
       );
       expect(output).toContain('web');
       expect(output).toContain('srv-2');
     });
 
-    it('renders JSON for backend-server-delete', () => {
+    it('renders JSON for backend-server-remove', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-server-delete',
+        action: 'backend-server-remove',
         group_name: 'web',
         lb_id: '10',
-        message: 'Server "srv-2" deleted from backend group "web".',
+        message: 'Server "srv-2" removed from backend group "web".',
         server_name: 'srv-2'
       };
       const output = renderLoadBalancerResult(result, true);
@@ -500,32 +504,32 @@ describe('renderLoadBalancerResult', () => {
         message: string;
         server_name: string;
       };
-      expect(parsed.action).toBe('backend-server-delete');
+      expect(parsed.action).toBe('backend-server-remove');
       expect(parsed.group_name).toBe('web');
       expect(parsed.server_name).toBe('srv-2');
     });
   });
 
-  describe('backend-group-delete', () => {
-    it('renders backend-group-delete message (human)', () => {
+  describe('backend-group-remove', () => {
+    it('renders backend-group-remove message (human)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-group-delete',
+        action: 'backend-group-remove',
         lb_id: '10',
         group_name: 'api',
-        message: 'Backend group "api" deleted.'
+        message: 'Backend group "api" removed.'
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Backend group "api" deleted.');
+      expect(output).toContain('Backend group "api" removed.');
       expect(output).toContain('10');
       expect(output).toContain('api');
     });
 
-    it('renders JSON for backend-group-delete', () => {
+    it('renders JSON for backend-group-remove', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'backend-group-delete',
+        action: 'backend-group-remove',
         lb_id: '10',
         group_name: 'api',
-        message: 'Backend group "api" deleted.'
+        message: 'Backend group "api" removed.'
       };
       const output = renderLoadBalancerResult(result, true);
       const parsed = JSON.parse(output) as {
@@ -534,10 +538,10 @@ describe('renderLoadBalancerResult', () => {
         lb_id: string;
         message: string;
       };
-      expect(parsed.action).toBe('backend-group-delete');
+      expect(parsed.action).toBe('backend-group-remove');
       expect(parsed.group_name).toBe('api');
       expect(parsed.lb_id).toBe('10');
-      expect(parsed.message).toBe('Backend group "api" deleted.');
+      expect(parsed.message).toBe('Backend group "api" removed.');
     });
   });
 

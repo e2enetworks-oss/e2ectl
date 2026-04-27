@@ -27,6 +27,7 @@ import {
   type SecurityGroupClient
 } from '../security-group/index.js';
 import { SshKeyApiClient, type SshKeyClient } from '../ssh-key/index.js';
+import { SslApiClient, type SslClient } from '../ssl/index.js';
 import { VolumeApiClient, type VolumeClient } from '../volume/index.js';
 import { VpcApiClient, type VpcClient } from '../vpc/index.js';
 
@@ -47,6 +48,7 @@ export interface CliRuntime {
     credentials: ResolvedCredentials
   ): SecurityGroupClient;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
+  createSslClient?(credentials: ResolvedCredentials): SslClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   credentialValidator: CredentialValidator;
@@ -91,6 +93,10 @@ export function createRuntime(): CliRuntime {
       ),
     createSshKeyClient: (credentials) =>
       new SshKeyApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createSslClient: (credentials) =>
+      new SslApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     createVolumeClient: (credentials) =>

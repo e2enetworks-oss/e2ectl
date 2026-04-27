@@ -30,18 +30,32 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
     case 'create':
       return renderLoadBalancerCreateHuman(result);
 
+    case 'get':
+      return renderLoadBalancerGetHuman(result);
+
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
         : `Load balancer deleted.\n${formatFieldTable([['Load Balancer ID', result.lb_id]])}\n`;
 
+    case 'update':
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id]
+      ])}\n`;
+
     case 'backend-group-list':
       return renderBackendGroupListHuman(result);
 
-    case 'backend-group-create':
+    case 'backend-group-add':
       return renderBackendGroupCreateHuman(result);
 
-    case 'backend-group-delete':
+    case 'backend-group-update':
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id],
+        ['Backend Group', result.group_name]
+      ])}\n`;
+
+    case 'backend-group-remove':
       return `${result.message}\n${formatFieldTable([
         ['Load Balancer ID', result.lb_id],
         ['Backend Group', result.group_name]
@@ -49,14 +63,25 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
 
     case 'backend-server-add':
       return `${result.message}\n${formatFieldTable([
-        ['Load Balancer ID', result.lb_id]
+        ['Load Balancer ID', result.lb_id],
+        ['Backend Group', result.group_name],
+        ['Server', result.server_name]
       ])}\n`;
 
-    case 'backend-server-delete':
+    case 'backend-server-update':
+    case 'backend-server-remove':
       return `${result.message}\n${formatFieldTable([
         ['Load Balancer ID', result.lb_id],
         ['Backend Group', result.group_name],
         ['Server', result.server_name]
+      ])}\n`;
+
+    case 'network-reserve-ip-attach':
+    case 'network-reserve-ip-detach':
+    case 'network-vpc-attach':
+    case 'network-vpc-detach':
+      return `${result.message}\n${formatFieldTable([
+        ['Load Balancer ID', result.lb_id]
       ])}\n`;
 
     case 'plans':
@@ -120,6 +145,12 @@ function normalizeLoadBalancerJson(
         }
       };
 
+    case 'get':
+      return {
+        action: 'get',
+        item: result.item as unknown as JsonValue
+      };
+
     case 'delete':
       return result.cancelled
         ? { action: 'delete', cancelled: true, lb_id: result.lb_id }
@@ -130,6 +161,13 @@ function normalizeLoadBalancerJson(
             message: result.message ?? ''
           };
 
+    case 'update':
+      return {
+        action: 'update',
+        lb_id: result.lb_id,
+        message: result.message
+      };
+
     case 'backend-group-list':
       return {
         action: 'backend-group-list',
@@ -139,9 +177,9 @@ function normalizeLoadBalancerJson(
         tcp_backends: result.tcp_backends as unknown as JsonValue
       };
 
-    case 'backend-group-create':
+    case 'backend-group-add':
       return {
-        action: 'backend-group-create',
+        action: 'backend-group-add',
         group: {
           backend_port: result.group.backend_port,
           health_check: result.group.health_check,
@@ -154,9 +192,17 @@ function normalizeLoadBalancerJson(
         message: result.message
       };
 
-    case 'backend-group-delete':
+    case 'backend-group-update':
       return {
-        action: 'backend-group-delete',
+        action: 'backend-group-update',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        message: result.message
+      };
+
+    case 'backend-group-remove':
+      return {
+        action: 'backend-group-remove',
         group_name: result.group_name,
         lb_id: result.lb_id,
         message: result.message
@@ -165,17 +211,38 @@ function normalizeLoadBalancerJson(
     case 'backend-server-add':
       return {
         action: 'backend-server-add',
-        lb_id: result.lb_id,
-        message: result.message
-      };
-
-    case 'backend-server-delete':
-      return {
-        action: 'backend-server-delete',
         group_name: result.group_name,
         lb_id: result.lb_id,
         message: result.message,
         server_name: result.server_name
+      };
+
+    case 'backend-server-update':
+      return {
+        action: 'backend-server-update',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        message: result.message,
+        server_name: result.server_name
+      };
+
+    case 'backend-server-remove':
+      return {
+        action: 'backend-server-remove',
+        group_name: result.group_name,
+        lb_id: result.lb_id,
+        message: result.message,
+        server_name: result.server_name
+      };
+
+    case 'network-reserve-ip-attach':
+    case 'network-reserve-ip-detach':
+    case 'network-vpc-attach':
+    case 'network-vpc-detach':
+      return {
+        action: result.action,
+        lb_id: result.lb_id,
+        message: result.message
       };
 
     case 'plans':
@@ -295,6 +362,28 @@ function renderLoadBalancerCreateHuman(
   }
 
   return `Load balancer created.\n${formatFieldTable(rows)}\n`;
+}
+
+function renderLoadBalancerGetHuman(
+  result: Extract<LoadBalancerCommandResult, { action: 'get' }>
+): string {
+  const item = result.item;
+  const rows: Array<[string, string]> = [
+    ['ID', String(item.id)],
+    ['Name', item.appliance_name],
+    ['Status', item.status],
+    ['Mode', item.lb_mode ?? '--'],
+    ['Type', item.lb_type ?? '--'],
+    ['Public IP', item.public_ip ?? '--'],
+    ['Private IP', item.private_ip ?? '--']
+  ];
+  const context = item.context?.[0];
+  const backendCount =
+    (context?.backends ?? []).length + (context?.tcp_backend ?? []).length;
+
+  rows.push(['Backend Groups', String(backendCount)]);
+
+  return `Load balancer details.\n${formatFieldTable(rows)}\n`;
 }
 
 function renderBackendGroupCreateHuman(

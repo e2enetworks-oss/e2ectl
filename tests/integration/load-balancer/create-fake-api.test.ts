@@ -50,7 +50,7 @@ function buildCreateResponse() {
   };
 }
 
-describe('load-balancer create against a fake MyAccount API', () => {
+describe('lb create against a fake MyAccount API', () => {
   it('creates an ALB and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliance-type/': () => ({
@@ -68,24 +68,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           '--json',
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'my-alb',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTP',
           '--port',
           '80',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-port',
-          '8080',
-          '--server-name',
-          'server-1'
+          '--backend-server',
+          'server-1:10.0.0.1:8080'
         ],
         {
           env: {
@@ -102,7 +98,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
           action: 'create',
           backend: {
             backend_port: null,
-            health_check: false,
+            health_check: true,
             name: 'web',
             protocol: 'HTTP',
             routing_policy: 'roundrobin',
@@ -148,7 +144,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
             checkbox_enable: true,
             check_url: '/',
             domain_name: 'localhost',
-            http_check: false,
+            http_check: true,
             name: 'web',
             scaler_id: null,
             scaler_port: null,
@@ -206,26 +202,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           '--json',
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'my-nlb',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'TCP',
           '--port',
           '80',
-          '--backend-name',
+          '--backend-group',
           'tcp-grp',
-          '--server-ip',
-          '10.0.0.2',
-          '--server-port',
-          '8080',
-          '--server-name',
-          'srv-1',
-          '--backend-port',
-          '8080'
+          '--backend-server',
+          'srv-1:10.0.0.2:8080'
         ],
         {
           env: {
@@ -263,7 +253,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
           {
             backend_name: 'tcp-grp',
             balance: 'roundrobin',
-            port: 8080,
+            port: 80,
             servers: [
               {
                 backend_ip: '10.0.0.2',
@@ -340,13 +330,13 @@ describe('load-balancer create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           '--json',
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'internal-committed-alb',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTP',
           '--port',
           '80',
@@ -356,12 +346,10 @@ describe('load-balancer create against a fake MyAccount API', () => {
           '90 Days',
           '--post-commit-behavior',
           'hourly-billing',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-name',
-          'server-1'
+          '--backend-server',
+          'server-1:10.0.0.1:80'
         ],
         {
           env: {
@@ -378,7 +366,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
           action: 'create',
           backend: {
             backend_port: null,
-            health_check: false,
+            health_check: true,
             name: 'web',
             protocol: 'HTTP',
             routing_policy: 'roundrobin',
@@ -424,7 +412,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
             checkbox_enable: true,
             check_url: '/',
             domain_name: 'localhost',
-            http_check: false,
+            http_check: true,
             name: 'web',
             scaler_id: null,
             scaler_port: null,
@@ -489,24 +477,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'my-alb',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTP',
           '--port',
           '80',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-port',
-          '8080',
-          '--server-name',
-          'server-1'
+          '--backend-server',
+          'server-1:10.0.0.1:8080'
         ],
         {
           env: {
@@ -526,7 +510,7 @@ describe('load-balancer create against a fake MyAccount API', () => {
     }
   });
 
-  it('fails when --mode HTTPS but --ssl-certificate-id not provided', async () => {
+  it('fails when --frontend-protocol HTTPS but --ssl-certificate-id not provided', async () => {
     const server = await startTestHttpServer({
       'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
         body: buildCreateResponse()
@@ -539,24 +523,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'test',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTPS',
           '--port',
           '443',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-port',
-          '8080',
-          '--server-name',
-          's1'
+          '--backend-server',
+          's1:10.0.0.1:8080'
         ],
         {
           env: {
@@ -590,24 +570,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'test',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTP',
           '--port',
           '80',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-port',
-          '8080',
-          '--server-name',
-          's1',
+          '--backend-server',
+          's1:10.0.0.1:8080',
           '--committed-plan',
           '90 Days',
           '--committed-plan-id',
@@ -645,24 +621,20 @@ describe('load-balancer create against a fake MyAccount API', () => {
 
       const result = await runBuiltCli(
         [
-          'load-balancer',
+          'lb',
           'create',
           '--name',
           'test',
           '--plan',
           'LB-2',
-          '--mode',
+          '--frontend-protocol',
           'HTTP',
           '--port',
           '80',
-          '--backend-name',
+          '--backend-group',
           'web',
-          '--server-ip',
-          '10.0.0.1',
-          '--server-port',
-          '8080',
-          '--server-name',
-          's1',
+          '--backend-server',
+          's1:10.0.0.1:8080',
           '--post-commit-behavior',
           'auto-renew'
         ],
