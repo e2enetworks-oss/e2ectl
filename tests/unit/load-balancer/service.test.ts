@@ -1996,4 +1996,317 @@ describe('LoadBalancerService', () => {
       ).rejects.toMatchObject({ code: 'LAST_BACKEND_SERVER_NOT_DELETABLE' });
     });
   });
+
+  describe('updateLoadBalancer', () => {
+    it('renames an ALB', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateLoadBalancer('10', {
+        name: 'new-name'
+      });
+
+      expect(result.action).toBe('update');
+      expect(result.lb_id).toBe('10');
+      expect(result.changes.name).toBe('new-name');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('changes protocol from HTTP to HTTPS with ssl cert', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateLoadBalancer('10', {
+        frontendProtocol: 'HTTPS',
+        sslCertificateId: '99'
+      });
+
+      expect(result.action).toBe('update');
+      expect(result.changes.protocol).toBe('HTTPS');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('throws LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE when changing NLB to HTTP', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.updateLoadBalancer('20', { frontendProtocol: 'HTTP' })
+      ).rejects.toMatchObject({ code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE' });
+    });
+
+    it('throws LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE when changing ALB to TCP', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateLoadBalancer('10', { frontendProtocol: 'TCP' })
+      ).rejects.toMatchObject({ code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE' });
+    });
+
+    it('throws SSL_UPDATE_REQUIRES_ALB when setting ssl cert on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.updateLoadBalancer('20', { sslCertificateId: '42' })
+      ).rejects.toMatchObject({ code: 'SSL_UPDATE_REQUIRES_ALB' });
+    });
+
+    it('throws MISSING_SSL_CERTIFICATE_ID when changing to HTTPS without cert', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateLoadBalancer('10', { frontendProtocol: 'HTTPS' })
+      ).rejects.toMatchObject({ code: 'MISSING_SSL_CERTIFICATE_ID' });
+    });
+
+    it('throws REDIRECT_REQUIRES_BOTH_PROTOCOL when redirect used without BOTH', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateLoadBalancer('10', { redirectHttpToHttps: true })
+      ).rejects.toMatchObject({ code: 'REDIRECT_REQUIRES_BOTH_PROTOCOL' });
+    });
+  });
+
+  describe('updateBackendGroup', () => {
+    it('updates ALB backend group algorithm', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateBackendGroup('10', 'web', {
+        algorithm: 'leastconn'
+      });
+
+      expect(result.action).toBe('backend-group-update');
+      expect(result.group_name).toBe('web');
+      expect(result.algorithm).toBe('leastconn');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('updates ALB backend group protocol to HTTPS', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateBackendGroup('10', 'web', {
+        backendProtocol: 'HTTPS'
+      });
+
+      expect(result.action).toBe('backend-group-update');
+      expect(result.backend_protocol).toBe('HTTPS');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('updates NLB backend group algorithm', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      const result = await service.updateBackendGroup('20', 'tcp-grp', {
+        algorithm: 'leastconn'
+      });
+
+      expect(result.action).toBe('backend-group-update');
+      expect(result.group_name).toBe('tcp-grp');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('throws NLB_BACKEND_PROTOCOL_NOT_SUPPORTED for NLB with backend-protocol', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.updateBackendGroup('20', 'tcp-grp', { backendProtocol: 'HTTP' })
+      ).rejects.toMatchObject({ code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED' });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateBackendGroup('10', 'nonexistent', {
+          algorithm: 'roundrobin'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.updateBackendGroup('20', 'nonexistent', {
+          algorithm: 'roundrobin'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
+    });
+  });
+
+  describe('updateBackendServer', () => {
+    it('updates ALB server IP', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateBackendServer('10', {
+        backendGroup: 'web',
+        backendServerName: 'server-1',
+        ip: '10.0.0.9'
+      });
+
+      expect(result.action).toBe('backend-server-update');
+      expect(result.server_name).toBe('server-1');
+      expect(result.ip).toBe('10.0.0.9');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('updates NLB server port', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      const result = await service.updateBackendServer('20', {
+        backendGroup: 'tcp-grp',
+        backendServerName: 'srv-1',
+        port: '9090'
+      });
+
+      expect(result.action).toBe('backend-server-update');
+      expect(result.port).toBe('9090');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('throws BACKEND_SERVER_UPDATE_EMPTY when neither ip nor port is provided', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateBackendServer('10', {
+          backendGroup: 'web',
+          backendServerName: 'server-1'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_UPDATE_EMPTY' });
+    });
+
+    it('throws BACKEND_SERVER_NOT_FOUND when server does not exist on ALB', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.updateBackendServer('10', {
+          backendGroup: 'web',
+          backendServerName: 'nonexistent',
+          ip: '10.0.0.1'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
+    });
+
+    it('throws BACKEND_SERVER_NOT_FOUND when server does not exist on NLB', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.updateBackendServer('20', {
+          backendGroup: 'tcp-grp',
+          backendServerName: 'nonexistent',
+          port: '8080'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
+    });
+  });
+
+  describe('attachVpc', () => {
+    it('attaches a VPC to an ALB', async () => {
+      const { service, updateLoadBalancer, createVpcClient } =
+        createServiceFixture();
+
+      const result = await service.attachVpc('10', { vpc: '12345' });
+
+      expect(result.action).toBe('network-vpc-attach');
+      expect(result.lb_id).toBe('10');
+      expect(result.vpc_id).toBe('12345');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+      expect(createVpcClient).toHaveBeenCalledOnce();
+    });
+
+    it('attaches a VPC with subnet and includes subnet_id in result', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.attachVpc('10', {
+        vpc: '12345',
+        subnet: '1'
+      });
+
+      expect(result.action).toBe('network-vpc-attach');
+      expect(result.subnet_id).toBe('1');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('detachVpc', () => {
+    it('detaches a VPC from an ALB', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createAlbDetails({
+          context: [
+            {
+              backends: [],
+              tcp_backend: [],
+              lb_port: '80',
+              node_list_type: 'S',
+              plan_name: 'LB-2',
+              vpc_list: [
+                {
+                  vpc_name: 'prod-vpc',
+                  network_id: 100,
+                  ipv4_cidr: '10.0.0.0/16'
+                }
+              ]
+            }
+          ]
+        })
+      );
+
+      const result = await service.detachVpc('10', { vpc: '100' });
+
+      expect(result.action).toBe('network-vpc-detach');
+      expect(result.lb_id).toBe('10');
+      expect(result.vpc_id).toBe('100');
+      expect(updateLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('throws VPC_NOT_ATTACHED when VPC is not in vpc_list', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.detachVpc('10', { vpc: '9999' })
+      ).rejects.toMatchObject({ code: 'VPC_NOT_ATTACHED' });
+    });
+  });
+
+  describe('createLoadBalancer – defaultPortForProtocol', () => {
+    it('uses default port 443 when HTTPS LB is created without --port', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+
+      await service.createLoadBalancer({
+        name: 'lb',
+        plan: 'LB-2',
+        frontendProtocol: 'HTTPS',
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80'],
+        sslCertificateId: '99'
+      });
+
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.lb_port).toBe('443');
+    });
+
+    it('throws when TCP LB is created without --port', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'lb',
+          plan: 'LB-2',
+          frontendProtocol: 'TCP',
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
+        })
+      ).rejects.toThrow('--port is required for TCP load balancers');
+    });
+  });
 });

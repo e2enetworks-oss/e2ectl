@@ -998,6 +998,166 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
+  describe('backend-group-list with empty servers', () => {
+    it('renders "--" when backend group has no servers (ALB)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-list',
+        lb_id: '10',
+        lb_mode: 'HTTP',
+        backends: [
+          {
+            name: 'empty-grp',
+            domain_name: '',
+            backend_mode: 'http',
+            balance: 'roundrobin',
+            backend_ssl: false,
+            http_check: false,
+            check_url: '/',
+            servers: []
+          }
+        ],
+        tcp_backends: []
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('empty-grp');
+      expect(output).toContain('--');
+    });
+
+    it('renders "--" when TCP backend group has no servers', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-list',
+        lb_id: '20',
+        lb_mode: 'TCP',
+        backends: [],
+        tcp_backends: [
+          {
+            backend_name: 'empty-tcp',
+            port: 3306,
+            balance: 'roundrobin',
+            servers: []
+          }
+        ]
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('empty-tcp');
+      expect(output).toContain('--');
+    });
+  });
+
+  describe('get with backend_mode fallback and empty servers', () => {
+    it('uses "http" fallback when backend_mode is undefined in get view', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 50,
+          appliance_name: 'fallback-alb',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'external',
+          public_ip: '1.2.3.4',
+          private_ip: null,
+          context: [
+            {
+              lb_port: '80',
+              plan_name: 'LB-2',
+              backends: [
+                {
+                  name: 'grp',
+                  balance: 'roundrobin',
+                  backend_ssl: false,
+                  http_check: false,
+                  check_url: '/',
+                  domain_name: '',
+                  servers: [
+                    {
+                      backend_name: 'web1',
+                      backend_ip: '10.0.0.1',
+                      backend_port: 8080
+                    }
+                  ]
+                }
+              ],
+              tcp_backend: []
+            }
+          ]
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('grp');
+      expect(output).toContain('http');
+    });
+
+    it('renders "--" when backend group has no servers in get view', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 51,
+          appliance_name: 'empty-alb',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'external',
+          public_ip: '1.2.3.4',
+          private_ip: null,
+          context: [
+            {
+              lb_port: '80',
+              plan_name: 'LB-2',
+              backends: [
+                {
+                  name: 'grp',
+                  backend_mode: 'http',
+                  balance: 'roundrobin',
+                  backend_ssl: false,
+                  http_check: false,
+                  check_url: '/',
+                  domain_name: '',
+                  servers: []
+                }
+              ],
+              tcp_backend: []
+            }
+          ]
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('grp');
+      expect(output).toContain('--');
+    });
+
+    it('renders "--" when TCP backend group has no servers in get view', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 52,
+          appliance_name: 'empty-nlb',
+          status: 'RUNNING',
+          lb_mode: 'TCP',
+          lb_type: 'external',
+          public_ip: '2.3.4.5',
+          private_ip: null,
+          context: [
+            {
+              lb_port: '3306',
+              plan_name: 'LB-2',
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'tcp-grp',
+                  port: 3306,
+                  balance: 'roundrobin',
+                  servers: []
+                }
+              ]
+            }
+          ]
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('tcp-grp');
+      expect(output).toContain('--');
+    });
+  });
+
   describe('create with committed billing', () => {
     it('renders committed plan name in billing row', () => {
       const result: LoadBalancerCommandResult = {
