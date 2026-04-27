@@ -141,6 +141,12 @@ export interface LoadBalancerDetails {
   lb_type?: string;
   public_ip?: string | null;
   private_ip?: string | null;
+  created_at?: string;
+  node_detail?: {
+    billing_type?: string;
+    plan_name?: string;
+    price?: string;
+  };
   context?:
     | {
         acl_list?: LoadBalancerAclRule[];

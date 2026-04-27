@@ -2,32 +2,34 @@
 
 The `lb` command group manages E2E Networks load balancers. It supports ALB (`HTTP`, `HTTPS`, `BOTH`) and NLB (`TCP`) creation, LB-level updates, network attachments, backend groups, and backend servers.
 
+Every command accepts `--json` for machine-readable output.
+
 ## Before You Start
 
 - Save a default alias and default project/location context, or pass `--alias`, `--project-id`, and `--location` explicitly.
 - List plans with `e2ectl lb plans`.
-- For HTTPS or BOTH frontends, find a certificate ID with `e2ectl ssl list`.
 - Backend servers use `name:ip:port` syntax, for example `web-1:192.168.1.1:8080`.
 
 ## List And Inspect
 
 ```bash
 e2ectl lb list
-e2ectl lb list --json
 e2ectl lb plans
-e2ectl lb plans --json
 e2ectl lb get <lbId>
-e2ectl lb get <lbId> --json
 ```
 
 ## Create An ALB
+
+`--port` defaults to `80` for HTTP and `443` for HTTPS/BOTH, so it can be omitted for those protocols.
+
+Use `e2ectl node list` to find the private IP of your backend nodes.
+Use `e2ectl reserved-ip list` to find an available reserved IP for `--reserve-ip`.
 
 ```bash
 e2ectl lb create \
   --name my-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
-  --port 80 \
   --backend-group web \
   --backend-protocol HTTP \
   --backend-server web-1:192.168.1.1:8080 \
@@ -37,7 +39,7 @@ e2ectl lb create \
 
 ALB frontend protocols are `HTTP`, `HTTPS`, and `BOTH`. ALB backend protocols are `HTTP` and `HTTPS`. ALB health checks are always enabled with check URL `/`.
 
-HTTPS and BOTH require `--ssl-certificate-id`:
+HTTPS and BOTH require `--ssl-certificate-id`. Use `e2ectl ssl list` to find the certificate ID.
 
 ```bash
 e2ectl lb create \
@@ -45,13 +47,16 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol HTTPS \
   --ssl-certificate-id 123 \
-  --port 443 \
   --backend-group web \
   --backend-protocol HTTPS \
   --backend-server web-1:192.168.1.1:8443
 ```
 
 ## Create An NLB
+
+`--port` is required for TCP as there is no standard default.
+
+Use `e2ectl node list` to find node IPs. Use `e2ectl reserved-ip list` for `--reserve-ip`.
 
 ```bash
 e2ectl lb create \
@@ -69,12 +74,13 @@ NLB has no backend protocol. The backend group port follows the frontend port.
 
 ## Create An Internal LB
 
+Use `e2ectl vpc list` to find the VPC ID for `--vpc`.
+
 ```bash
 e2ectl lb create \
   --name internal-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
-  --port 80 \
   --vpc 123 \
   --backend-group web \
   --backend-protocol HTTP \
@@ -84,6 +90,8 @@ e2ectl lb create \
 `--reserve-ip` is only for external load balancers and cannot be combined with `--vpc`.
 
 ## Update LB Settings
+
+Use `e2ectl ssl list` to find the certificate ID for `--ssl-certificate-id`.
 
 ```bash
 e2ectl lb update <lbId> --name new-name
@@ -95,6 +103,9 @@ e2ectl lb update <lbId> --ssl-certificate-id 456
 ALBs can move among `HTTP`, `HTTPS`, and `BOTH`. NLBs stay `TCP`; the CLI does not allow changing an ALB to TCP or a TCP NLB to an ALB protocol. SSL updates are ALB-only, and `--redirect-http-to-https` is valid only with `--frontend-protocol BOTH`.
 
 ## Network Attachments
+
+Use `e2ectl reserved-ip list` to find the IP for `reserve-ip attach`.
+Use `e2ectl vpc list` to find the VPC ID for `vpc attach/detach`.
 
 ```bash
 e2ectl lb network reserve-ip attach <lbId> <ip>
@@ -125,6 +136,8 @@ Creation supports one backend group with multiple backend servers. Add more back
 
 ## Backend Servers
 
+Use `e2ectl node list` to find node IPs for `--backend-server`.
+
 ```bash
 e2ectl lb backend-server add <lbId> \
   --backend-group web \
@@ -152,16 +165,3 @@ e2ectl lb delete <lbId> --force --reserve-public-ip
 ```
 
 Without `--force`, interactive terminals are prompted for confirmation. `--reserve-public-ip` asks the backend to preserve the LB public IP when deleting.
-
-## JSON Contracts
-
-- `e2ectl lb list --json` returns `action` and `items`; each item includes `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
-- `e2ectl lb plans --json` returns base plans and committed plan options.
-- `e2ectl lb get --json` returns the backend load balancer detail object.
-- Mutation commands return an `action`, `lb_id`, and command-specific metadata or message.
-
-## Related Commands
-
-- `e2ectl ssl list` - discover SSL certificate IDs.
-- `e2ectl node list` - find backend server IPs.
-- `e2ectl vpc list` - find VPC IDs for internal load balancers.

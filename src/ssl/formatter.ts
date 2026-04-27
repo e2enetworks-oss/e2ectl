@@ -17,7 +17,7 @@ function renderHuman(result: SslCommandResult): string {
   }
 
   const table = new Table({
-    head: ['ID', 'Name', 'Type', 'Status', 'Common Name', 'Expires']
+    head: ['ID', 'Name', 'Type', 'State', 'Domain', 'Expires']
   });
 
   for (const item of result.items) {
@@ -25,8 +25,8 @@ function renderHuman(result: SslCommandResult): string {
       String(item.id),
       getCertificateName(item),
       item.ssl_certificate_type ?? '--',
-      item.status ?? '--',
-      item.common_name ?? '--',
+      item.ssl_certificate_state ?? '--',
+      item.ssl_domain_name ?? '--',
       item.expiry_date ?? '--'
     ]);
   }
@@ -41,20 +41,16 @@ function toJson(result: SslCommandResult): JsonValue {
       id: item.id,
       name: getCertificateName(item),
       ssl_certificate_type: item.ssl_certificate_type ?? null,
-      status: item.status ?? null,
-      common_name: item.common_name ?? null,
+      ssl_certificate_state: item.ssl_certificate_state ?? null,
+      ssl_domain_name: item.ssl_domain_name ?? null,
       expiry_date: item.expiry_date ?? null,
-      created_at: item.created_at ?? null
+      imported_date: item.imported_date ?? null
     }))
   };
 }
 
 function getCertificateName(item: SslCertificateSummary): string {
   return (
-    item.ssl_cert_name ??
-    item.certificate_name ??
-    item.name ??
-    item.common_name ??
-    String(item.id)
+    item.ssl_cert_name ?? item.certificate_name ?? item.name ?? String(item.id)
   );
 }

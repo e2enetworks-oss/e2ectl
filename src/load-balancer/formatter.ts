@@ -23,9 +23,18 @@ export function renderLoadBalancerResult(
 function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
   switch (result.action) {
     case 'list':
-      return result.items.length === 0
-        ? 'No load balancers found.\n'
-        : `${formatLoadBalancerListTable(result.items)}\n`;
+      if (result.items.length === 0) {
+        return (
+          'No load balancers found.\n' +
+          hint(
+            'Run "e2ectl lb plans" to see available plans, then "e2ectl lb create" to create one.'
+          )
+        );
+      }
+      return (
+        `${formatLoadBalancerListTable(result.items)}\n` +
+        hint('Run "e2ectl lb get <id>" to see full details of a load balancer.')
+      );
 
     case 'create':
       return renderLoadBalancerCreateHuman(result);
@@ -34,14 +43,38 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
       return renderLoadBalancerGetHuman(result);
 
     case 'delete':
-      return result.cancelled
-        ? 'Deletion cancelled.\n'
-        : `Load balancer deleted.\n${formatFieldTable([['Load Balancer ID', result.lb_id]])}\n`;
+      if (result.cancelled) return 'Deletion cancelled.\n';
+      return (
+        `Load balancer deleted.\n${formatFieldTable([['Load Balancer ID', result.lb_id]])}\n` +
+        hint('Run "e2ectl lb list" to see your remaining load balancers.')
+      );
 
-    case 'update':
-      return `${result.message}\n${formatFieldTable([
-        ['Load Balancer ID', result.lb_id]
-      ])}\n`;
+    case 'update': {
+      const updateRows: Array<[string, string]> = [
+        ['Load Balancer ID', result.lb_id],
+        ['Name', result.lb_name]
+      ];
+      if (result.changes.name !== undefined)
+        updateRows.push(['New Name', result.changes.name]);
+      if (result.changes.protocol !== undefined)
+        updateRows.push(['Protocol', result.changes.protocol]);
+      if (result.changes.ssl_certificate_id !== undefined)
+        updateRows.push([
+          'SSL Certificate ID',
+          String(result.changes.ssl_certificate_id)
+        ]);
+      if (result.changes.redirect_http_to_https !== undefined)
+        updateRows.push([
+          'HTTP→HTTPS Redirect',
+          result.changes.redirect_http_to_https ? 'enabled' : 'disabled'
+        ]);
+      return (
+        `${result.message}\n${formatFieldTable(updateRows)}\n` +
+        hint(
+          `Run "e2ectl lb get ${result.lb_id}" to view the updated configuration.`
+        )
+      );
+    }
 
     case 'backend-group-list':
       return renderBackendGroupListHuman(result);
@@ -49,46 +82,110 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
     case 'backend-group-add':
       return renderBackendGroupCreateHuman(result);
 
-    case 'backend-group-update':
-      return `${result.message}\n${formatFieldTable([
+    case 'backend-group-update': {
+      const bgUpdateRows: Array<[string, string]> = [
         ['Load Balancer ID', result.lb_id],
+        ['Name', result.lb_name],
         ['Backend Group', result.group_name]
-      ])}\n`;
+      ];
+      if (result.algorithm !== undefined)
+        bgUpdateRows.push(['Algorithm', result.algorithm]);
+      if (result.backend_protocol !== undefined)
+        bgUpdateRows.push(['Backend Protocol', result.backend_protocol]);
+      return (
+        `${result.message}\n${formatFieldTable(bgUpdateRows)}\n` +
+        hint(
+          `Run "e2ectl lb get ${result.lb_id}" to view the updated configuration.`
+        )
+      );
+    }
 
     case 'backend-group-remove':
-      return `${result.message}\n${formatFieldTable([
-        ['Load Balancer ID', result.lb_id],
-        ['Backend Group', result.group_name]
-      ])}\n`;
+      return (
+        `${result.message}\n${formatFieldTable([
+          ['Load Balancer ID', result.lb_id],
+          ['Name', result.lb_name],
+          ['Backend Group', result.group_name]
+        ])}\n` +
+        hint(
+          `Run "e2ectl lb backend-group add ${result.lb_id} --name <group> --backend-server <name:ip:port>" to add a new group.`
+        )
+      );
 
     case 'backend-server-add':
-      return `${result.message}\n${formatFieldTable([
-        ['Load Balancer ID', result.lb_id],
-        ['Backend Group', result.group_name],
-        ['Server', result.server_name]
-      ])}\n`;
+      return (
+        `${result.message}\n${formatFieldTable([
+          ['Load Balancer ID', result.lb_id],
+          ['Name', result.lb_name],
+          ['Backend Group', result.group_name],
+          ['Server', result.server_name]
+        ])}\n` +
+        hint(
+          `Run "e2ectl lb get ${result.lb_id}" to view the updated server list.`
+        )
+      );
 
-    case 'backend-server-update':
-    case 'backend-server-remove':
-      return `${result.message}\n${formatFieldTable([
+    case 'backend-server-update': {
+      const bsUpdateRows: Array<[string, string]> = [
         ['Load Balancer ID', result.lb_id],
+        ['Name', result.lb_name],
         ['Backend Group', result.group_name],
         ['Server', result.server_name]
-      ])}\n`;
+      ];
+      if (result.ip !== undefined) bsUpdateRows.push(['New IP', result.ip]);
+      if (result.port !== undefined)
+        bsUpdateRows.push(['New Port', result.port]);
+      return (
+        `${result.message}\n${formatFieldTable(bsUpdateRows)}\n` +
+        hint(
+          `Run "e2ectl lb get ${result.lb_id}" to view the updated server configuration.`
+        )
+      );
+    }
+
+    case 'backend-server-remove':
+      return (
+        `${result.message}\n${formatFieldTable([
+          ['Load Balancer ID', result.lb_id],
+          ['Name', result.lb_name],
+          ['Backend Group', result.group_name],
+          ['Server', result.server_name]
+        ])}\n` +
+        hint(
+          `Run "e2ectl lb backend-server add ${result.lb_id} --backend-group ${result.group_name} --backend-server <name:ip:port>" to add a replacement server.`
+        )
+      );
 
     case 'network-reserve-ip-attach':
     case 'network-reserve-ip-detach':
     case 'network-vpc-attach':
-    case 'network-vpc-detach':
-      return `${result.message}\n${formatFieldTable([
-        ['Load Balancer ID', result.lb_id]
-      ])}\n`;
+    case 'network-vpc-detach': {
+      const netRows: Array<[string, string]> = [
+        ['Load Balancer ID', result.lb_id],
+        ['Name', result.lb_name]
+      ];
+      if (result.reserve_ip !== undefined)
+        netRows.push(['Reserved IP', result.reserve_ip]);
+      if (result.vpc_id !== undefined) netRows.push(['VPC ID', result.vpc_id]);
+      if (result.subnet_id !== undefined)
+        netRows.push(['Subnet ID', result.subnet_id]);
+      return (
+        `${result.message}\n${formatFieldTable(netRows)}\n` +
+        hint(
+          `Run "e2ectl lb get ${result.lb_id}" to verify the network configuration.`
+        )
+      );
+    }
 
     case 'plans':
       return result.items.length === 0
         ? 'No load balancer plans available.\n'
         : `${formatLoadBalancerPlans(result.items)}\n`;
   }
+}
+
+function hint(text: string): string {
+  return `\nHint: ${text}\n`;
 }
 
 function renderLoadBalancerJson(result: LoadBalancerCommandResult): string {
@@ -297,7 +394,12 @@ function renderBackendGroupListHuman(
   const isTcp = result.tcp_backends.length > 0;
 
   if (!isTcp && result.backends.length === 0) {
-    return `No backend groups configured for load balancer ${result.lb_id}.\n`;
+    return (
+      `No backend groups configured for load balancer ${result.lb_id}.\n` +
+      hint(
+        `Run "e2ectl lb backend-group add ${result.lb_id} --name <group> --backend-server <name:ip:port>" to add one.`
+      )
+    );
   }
 
   const table = new Table({
@@ -361,29 +463,106 @@ function renderLoadBalancerCreateHuman(
     rows.push(['Servers', serverSummary]);
   }
 
-  return `Load balancer created.\n${formatFieldTable(rows)}\n`;
+  return (
+    `Load balancer created.\n${formatFieldTable(rows)}\n` +
+    hint(
+      `Run "e2ectl lb get ${result.result.id}" to view details, or ` +
+        `"e2ectl lb backend-group add ${result.result.id} --name <group> --backend-server <name:ip:port>" to add more backend groups.`
+    )
+  );
 }
 
 function renderLoadBalancerGetHuman(
   result: Extract<LoadBalancerCommandResult, { action: 'get' }>
 ): string {
   const item = result.item;
-  const rows: Array<[string, string]> = [
+  const ctx = item.context?.[0];
+  const sslCtx = ctx?.ssl_context as
+    | { ssl_certificate_id?: number | null; redirect_to_https?: boolean }
+    | undefined;
+
+  const basicRows: Array<[string, string]> = [
     ['ID', String(item.id)],
     ['Name', item.appliance_name],
     ['Status', item.status],
-    ['Mode', item.lb_mode ?? '--'],
+    ['Protocol', item.lb_mode ?? '--'],
     ['Type', item.lb_type ?? '--'],
+    ['Port', ctx?.lb_port ?? '--'],
+    ['Plan', item.node_detail?.plan_name ?? ctx?.plan_name ?? '--'],
+    ['Billing', item.node_detail?.billing_type ?? '--'],
+    ['Price', item.node_detail?.price ?? '--'],
+    ['Created', item.created_at ?? '--']
+  ];
+
+  const networkRows: Array<[string, string]> = [
     ['Public IP', item.public_ip ?? '--'],
     ['Private IP', item.private_ip ?? '--']
   ];
-  const context = item.context?.[0];
-  const backendCount =
-    (context?.backends ?? []).length + (context?.tcp_backend ?? []).length;
+  const reservedIp = ctx?.lb_reserve_ip;
+  if (reservedIp) networkRows.push(['Reserved IP', String(reservedIp)]);
+  const sslId = sslCtx?.ssl_certificate_id;
+  if (sslId != null) networkRows.push(['SSL Certificate ID', String(sslId)]);
+  if (sslCtx?.redirect_to_https)
+    networkRows.push(['HTTP→HTTPS Redirect', 'yes']);
+  const vpcList = ctx?.vpc_list ?? [];
+  if (vpcList.length > 0) {
+    for (const vpc of vpcList) {
+      networkRows.push([
+        'VPC',
+        `${vpc.vpc_name} [ID: ${vpc.network_id}] (${vpc.ipv4_cidr})${vpc.ip ? ` · IP: ${vpc.ip}` : ''}${vpc.subnet_name ? ` · Subnet: ${vpc.subnet_name}` : ''}`
+      ]);
+    }
+  }
 
-  rows.push(['Backend Groups', String(backendCount)]);
+  const backends = ctx?.backends ?? [];
+  const tcpBackends = ctx?.tcp_backend ?? [];
 
-  return `Load balancer details.\n${formatFieldTable(rows)}\n`;
+  let backendSection = '';
+  if (backends.length > 0 || tcpBackends.length > 0) {
+    const bgTable = new Table({
+      head: ['Group', 'Protocol', 'Algorithm', 'Servers']
+    });
+    for (const bg of backends) {
+      bgTable.push([
+        bg.name,
+        bg.backend_mode ?? 'http',
+        bg.balance,
+        bg.servers.length === 0
+          ? '--'
+          : bg.servers
+              .map(
+                (s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`
+              )
+              .join('\n')
+      ]);
+    }
+    for (const bg of tcpBackends) {
+      bgTable.push([
+        bg.backend_name,
+        'tcp',
+        bg.balance,
+        bg.servers.length === 0
+          ? '--'
+          : bg.servers
+              .map(
+                (s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`
+              )
+              .join('\n')
+      ]);
+    }
+    backendSection = `Backend Groups (${backends.length + tcpBackends.length})\n${bgTable.toString()}\n\n`;
+  }
+
+  return (
+    `Load balancer details.\n${formatFieldTable(basicRows)}\n` +
+    `Network\n${formatFieldTable(networkRows)}\n\n` +
+    backendSection +
+    hint(
+      `Run "e2ectl lb update ${item.id} --name <name>" to rename, ` +
+        `"e2ectl lb backend-group add ${item.id} --name <group> --backend-server <name:ip:port>" to add a backend group, ` +
+        `or "e2ectl lb delete ${item.id}" to delete.`
+    )
+  );
 }
 
 function renderBackendGroupCreateHuman(
@@ -395,6 +574,7 @@ function renderBackendGroupCreateHuman(
 
   const rows: Array<[string, string]> = [
     ['Load Balancer ID', result.lb_id],
+    ['Name', result.lb_name],
     ['Backend Group', result.group.name],
     ['Protocol', result.group.protocol],
     ['Routing Policy', result.group.routing_policy]
@@ -408,7 +588,12 @@ function renderBackendGroupCreateHuman(
     rows.push(['Servers', serverSummary]);
   }
 
-  return `${result.message}\n${formatFieldTable(rows)}\n`;
+  return (
+    `${result.message}\n${formatFieldTable(rows)}\n` +
+    hint(
+      `Run "e2ectl lb backend-server add ${result.lb_id} --backend-group ${result.group.name} --backend-server <name:ip:port>" to add more servers.`
+    )
+  );
 }
 
 function formatServerList(
@@ -424,9 +609,20 @@ function formatLoadBalancerPlans(
   items: LoadBalancerPlansCommandResult['items']
 ): string {
   const basePlansSection = `Base Plans\n${formatLoadBalancerBasePlansTable(items)}\n`;
+  const hourlyHint =
+    'To create a load balancer (hourly billing):\n' +
+    '  e2ectl lb create --name <name> --plan <Plan> --billing-type hourly \\\n' +
+    '    --frontend-protocol <protocol> --port <port> \\\n' +
+    '    --backend-group <group> --backend-server <name:ip:port>';
   const committedSection = formatLoadBalancerCommittedPlansSection(items);
+  const committedHint =
+    'To create a load balancer (committed billing):\n' +
+    '  e2ectl lb create --name <name> --plan <Plan> --billing-type committed \\\n' +
+    '    --committed-plan-id <Plan ID> --post-commit-behavior auto-renew \\\n' +
+    '    --frontend-protocol <protocol> --port <port> \\\n' +
+    '    --backend-group <group> --backend-server <name:ip:port>';
 
-  return `${basePlansSection}\n${committedSection}`;
+  return `${basePlansSection}\n${hourlyHint}\n\n${committedSection}\n${committedHint}`;
 }
 
 function formatLoadBalancerBasePlansTable(

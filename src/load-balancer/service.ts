@@ -42,7 +42,7 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   name: string;
   plan: string;
   frontendProtocol?: string;
-  port: string;
+  port?: string;
   networkId?: string;
   postCommitBehavior?: string;
   vpc?: string;
@@ -159,7 +159,14 @@ export interface LoadBalancerDeleteCommandResult {
 export interface LoadBalancerUpdateCommandResult {
   action: 'update';
   lb_id: string;
+  lb_name: string;
   message: string;
+  changes: {
+    name?: string;
+    protocol?: string;
+    ssl_certificate_id?: number;
+    redirect_http_to_https?: boolean;
+  };
 }
 
 export interface LoadBalancerBackendGroupListCommandResult {
@@ -174,6 +181,7 @@ export interface LoadBalancerBackendGroupCreateCommandResult {
   action: 'backend-group-add';
   group: LoadBalancerCreatedBackendSummary;
   lb_id: string;
+  lb_name: string;
   message: string;
 }
 
@@ -181,12 +189,16 @@ export interface LoadBalancerBackendGroupUpdateCommandResult {
   action: 'backend-group-update';
   group_name: string;
   lb_id: string;
+  lb_name: string;
   message: string;
+  algorithm?: string;
+  backend_protocol?: string;
 }
 
 export interface LoadBalancerBackendGroupDeleteCommandResult {
   action: 'backend-group-remove';
   lb_id: string;
+  lb_name: string;
   group_name: string;
   message: string;
 }
@@ -195,6 +207,7 @@ export interface LoadBalancerBackendServerAddCommandResult {
   action: 'backend-server-add';
   group_name: string;
   lb_id: string;
+  lb_name: string;
   message: string;
   server_name: string;
 }
@@ -203,14 +216,18 @@ export interface LoadBalancerBackendServerUpdateCommandResult {
   action: 'backend-server-update';
   group_name: string;
   lb_id: string;
+  lb_name: string;
   message: string;
   server_name: string;
+  ip?: string;
+  port?: string;
 }
 
 export interface LoadBalancerBackendServerDeleteCommandResult {
   action: 'backend-server-remove';
   group_name: string;
   lb_id: string;
+  lb_name: string;
   message: string;
   server_name: string;
 }
@@ -222,7 +239,11 @@ export interface LoadBalancerNetworkCommandResult {
     | 'network-vpc-attach'
     | 'network-vpc-detach';
   lb_id: string;
+  lb_name: string;
   message: string;
+  reserve_ip?: string;
+  vpc_id?: string;
+  subnet_id?: string;
 }
 
 export interface LoadBalancerPlansCommandResult {
@@ -340,7 +361,15 @@ export class LoadBalancerService {
         : normalizeRequiredNumericId(options.subnet, 'Subnet ID', '--subnet');
     const lbType: LoadBalancerVpc =
       networkId !== null ? 'internal' : 'external';
-    const port = assertPort(options.port, '--port');
+    const resolvedPort = options.port ?? defaultPortForProtocol(mode);
+    if (resolvedPort === undefined) {
+      throw new CliError('--port is required for TCP load balancers.', {
+        code: 'MISSING_PORT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Pass --port <port> to specify the frontend listener port.'
+      });
+    }
+    const port = assertPort(resolvedPort, '--port');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
     const credentials = await this.resolveContext(options);
     const client = this.dependencies.createLoadBalancerClient(credentials);
@@ -657,7 +686,20 @@ export class LoadBalancerService {
     return {
       action: 'update',
       lb_id: lbId,
-      message: result.message
+      lb_name: options.name ?? lb.appliance_name,
+      message: result.message,
+      changes: {
+        ...(options.name === undefined ? {} : { name: options.name }),
+        ...(options.frontendProtocol === undefined
+          ? {}
+          : { protocol: options.frontendProtocol }),
+        ...(sslCertificateId === null
+          ? {}
+          : { ssl_certificate_id: sslCertificateId }),
+        ...(options.redirectHttpToHttps === undefined
+          ? {}
+          : { redirect_http_to_https: options.redirectHttpToHttps })
+      }
     };
   }
 
@@ -783,6 +825,7 @@ export class LoadBalancerService {
           servers
         },
         lb_id: lbId,
+        lb_name: lb.appliance_name,
         message: `Backend group "${options.name}" added.`
       };
     } else {
@@ -820,6 +863,7 @@ export class LoadBalancerService {
           servers
         },
         lb_id: lbId,
+        lb_name: lb.appliance_name,
         message: `Backend group "${options.name}" added.`
       };
     }
@@ -912,7 +956,14 @@ export class LoadBalancerService {
       action: 'backend-group-update',
       group_name: groupName,
       lb_id: lbId,
-      message: `Backend group "${groupName}" updated.`
+      lb_name: lb.appliance_name,
+      message: `Backend group "${groupName}" updated.`,
+      ...(options.algorithm === undefined
+        ? {}
+        : { algorithm: options.algorithm }),
+      ...(options.backendProtocol === undefined
+        ? {}
+        : { backend_protocol: options.backendProtocol })
     };
   }
 
@@ -1018,6 +1069,7 @@ export class LoadBalancerService {
     return {
       action: 'backend-group-remove',
       lb_id: lbId,
+      lb_name: lb.appliance_name,
       group_name: groupName,
       message: `Backend group "${groupName}" removed.`
     };
@@ -1127,6 +1179,7 @@ export class LoadBalancerService {
       action: 'backend-server-add',
       group_name: backendGroup,
       lb_id: lbId,
+      lb_name: lb.appliance_name,
       message: `Server "${server.backend_name}" added to backend group "${backendGroup}".`,
       server_name: server.backend_name
     };
@@ -1241,8 +1294,11 @@ export class LoadBalancerService {
       action: 'backend-server-update',
       group_name: options.backendGroup,
       lb_id: lbId,
+      lb_name: lb.appliance_name,
       message: `Server "${options.backendServerName}" updated in backend group "${options.backendGroup}".`,
-      server_name: options.backendServerName
+      server_name: options.backendServerName,
+      ...(options.ip === undefined ? {} : { ip: options.ip }),
+      ...(options.port === undefined ? {} : { port: options.port })
     };
   }
 
@@ -1340,6 +1396,7 @@ export class LoadBalancerService {
         action: 'backend-server-remove',
         group_name: backendGroup,
         lb_id: lbId,
+        lb_name: lb.appliance_name,
         message: `Server "${removedServer.backend_name}" removed from backend group "${backendGroup}".`,
         server_name: removedServer.backend_name
       };
@@ -1399,6 +1456,7 @@ export class LoadBalancerService {
       action: 'backend-server-remove',
       group_name: backendGroup,
       lb_id: lbId,
+      lb_name: lb.appliance_name,
       message: `Server "${removedServer.backend_name}" removed from backend group "${backendGroup}".`,
       server_name: removedServer.backend_name
     };
@@ -1448,7 +1506,9 @@ export class LoadBalancerService {
     return {
       action: 'network-reserve-ip-attach',
       lb_id: lbId,
-      message: result.message
+      lb_name: lb.appliance_name,
+      message: result.message,
+      reserve_ip: reserveIp
     };
   }
 
@@ -1476,10 +1536,13 @@ export class LoadBalancerService {
       })
     );
 
+    const detachedIp = mutation.context.lb_reserve_ip || undefined;
     return {
       action: 'network-reserve-ip-detach',
       lb_id: lbId,
-      message: result.message
+      lb_name: lb.appliance_name,
+      message: result.message,
+      ...(detachedIp ? { reserve_ip: String(detachedIp) } : {})
     };
   }
 
@@ -1523,7 +1586,10 @@ export class LoadBalancerService {
     return {
       action: 'network-vpc-attach',
       lb_id: lbId,
-      message: result.message
+      lb_name: lb.appliance_name,
+      message: result.message,
+      vpc_id: String(vpcId),
+      ...(subnetId !== null ? { subnet_id: String(subnetId) } : {})
     };
   }
 
@@ -1559,7 +1625,9 @@ export class LoadBalancerService {
     return {
       action: 'network-vpc-detach',
       lb_id: lbId,
-      message: result.message
+      lb_name: lb.appliance_name,
+      message: result.message,
+      vpc_id: String(vpcId)
     };
   }
 
@@ -2335,6 +2403,12 @@ function legacyBackendServerSpec(
   port: string | undefined
 ): string {
   return `${name ?? ''}:${ip ?? ''}:${port ?? ''}`;
+}
+
+function defaultPortForProtocol(mode: LoadBalancerMode): string | undefined {
+  if (mode === 'HTTP') return '80';
+  if (mode === 'HTTPS' || mode === 'BOTH') return '443';
+  return undefined;
 }
 
 function assertCanDelete(isInteractive: boolean): void {

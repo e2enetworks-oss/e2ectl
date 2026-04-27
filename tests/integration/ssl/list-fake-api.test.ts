@@ -15,10 +15,11 @@ describe('ssl list against a fake MyAccount API', () => {
             {
               id: 123,
               ssl_cert_name: 'api-cert',
-              ssl_certificate_type: 'CUSTOM',
-              status: 'ACTIVE',
-              common_name: 'api.example.com',
-              expiry_date: '2027-01-01'
+              ssl_certificate_type: 'Imported',
+              ssl_certificate_state: 'NA',
+              ssl_domain_name: 'api.example.com',
+              expiry_date: '2027-01-01',
+              imported_date: '01/Jan/2025 10:00 AM'
             }
           ],
           errors: {},
@@ -46,11 +47,11 @@ describe('ssl list against a fake MyAccount API', () => {
             {
               id: 123,
               name: 'api-cert',
-              ssl_certificate_type: 'CUSTOM',
-              status: 'ACTIVE',
-              common_name: 'api.example.com',
+              ssl_certificate_type: 'Imported',
+              ssl_certificate_state: 'NA',
+              ssl_domain_name: 'api.example.com',
               expiry_date: '2027-01-01',
-              created_at: null
+              imported_date: '01/Jan/2025 10:00 AM'
             }
           ]
         }) + '\n'

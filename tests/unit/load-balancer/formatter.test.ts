@@ -6,9 +6,9 @@ describe('renderLoadBalancerResult', () => {
   describe('list', () => {
     it('renders "No load balancers found." when list is empty', () => {
       const result: LoadBalancerCommandResult = { action: 'list', items: [] };
-      expect(renderLoadBalancerResult(result, false)).toBe(
-        'No load balancers found.\n'
-      );
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('No load balancers found.');
+      expect(output).toContain('e2ectl lb plans');
     });
 
     it('renders a table when items exist', () => {
@@ -381,6 +381,7 @@ describe('renderLoadBalancerResult', () => {
           ]
         },
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Backend group "api" added.'
       };
       const output = renderLoadBalancerResult(result, false);
@@ -402,6 +403,7 @@ describe('renderLoadBalancerResult', () => {
           servers: []
         },
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Backend group "api" added.'
       };
       const output = renderLoadBalancerResult(result, true);
@@ -429,6 +431,7 @@ describe('renderLoadBalancerResult', () => {
           servers: []
         },
         lb_id: '20',
+        lb_name: 'my-nlb',
         message: 'Backend group "tcp-grp" added.'
       };
       const output = renderLoadBalancerResult(result, false);
@@ -443,6 +446,7 @@ describe('renderLoadBalancerResult', () => {
         action: 'backend-server-add',
         group_name: 'web',
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Server "srv-2" added to backend group "web".',
         server_name: 'srv-2'
       };
@@ -456,6 +460,7 @@ describe('renderLoadBalancerResult', () => {
         action: 'backend-server-add',
         group_name: 'web',
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Server "srv-2" added to backend group "web".',
         server_name: 'srv-2'
       };
@@ -477,6 +482,7 @@ describe('renderLoadBalancerResult', () => {
         action: 'backend-server-remove',
         group_name: 'web',
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Server "srv-2" removed from backend group "web".',
         server_name: 'srv-2'
       };
@@ -493,6 +499,7 @@ describe('renderLoadBalancerResult', () => {
         action: 'backend-server-remove',
         group_name: 'web',
         lb_id: '10',
+        lb_name: 'my-lb',
         message: 'Server "srv-2" removed from backend group "web".',
         server_name: 'srv-2'
       };
@@ -515,6 +522,7 @@ describe('renderLoadBalancerResult', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-remove',
         lb_id: '10',
+        lb_name: 'my-lb',
         group_name: 'api',
         message: 'Backend group "api" removed.'
       };
@@ -528,6 +536,7 @@ describe('renderLoadBalancerResult', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-remove',
         lb_id: '10',
+        lb_name: 'my-lb',
         group_name: 'api',
         message: 'Backend group "api" removed.'
       };

@@ -9,9 +9,9 @@ describe('SSL formatter', () => {
           {
             id: 123,
             ssl_cert_name: 'api-cert',
-            ssl_certificate_type: 'CUSTOM',
-            status: 'ACTIVE',
-            common_name: 'api.example.com',
+            ssl_certificate_type: 'Imported',
+            ssl_certificate_state: 'NA',
+            ssl_domain_name: 'api.example.com',
             expiry_date: '2027-01-01'
           }
         ]
@@ -32,7 +32,7 @@ describe('SSL formatter', () => {
           {
             id: 456,
             certificate_name: 'web-cert',
-            status: 'ACTIVE'
+            ssl_certificate_state: 'NA'
           }
         ]
       },
@@ -46,10 +46,10 @@ describe('SSL formatter', () => {
           id: 456,
           name: 'web-cert',
           ssl_certificate_type: null,
-          status: 'ACTIVE',
-          common_name: null,
+          ssl_certificate_state: 'NA',
+          ssl_domain_name: null,
           expiry_date: null,
-          created_at: null
+          imported_date: null
         }
       ]
     });

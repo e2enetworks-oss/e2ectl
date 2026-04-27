@@ -95,7 +95,10 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           .choices(FRONTEND_PROTOCOL_CHOICES)
           .makeOptionMandatory()
       )
-      .requiredOption('--port <port>', 'Frontend listener port.')
+      .option(
+        '--port <port>',
+        'Frontend listener port. Defaults to 80 for HTTP, 443 for HTTPS/BOTH. Required for TCP.'
+      )
       .addOption(
         new Option(
           '--billing-type <billingType>',
