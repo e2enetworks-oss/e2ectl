@@ -262,27 +262,27 @@ Lists all load balancers for the active profile. Columns: ID, Name, Status, Mode
 
 Creates a new load balancer.
 
-| Flag                                | Required | Description                                                                  |
-| ----------------------------------- | -------- | ---------------------------------------------------------------------------- |
-| `--name <name>`                     | Yes      | Load balancer name                                                           |
-| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.    |
-| `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                |
-| `--port <port>`                     | Yes      | Frontend listener port                                                       |
-| `--backend-name <name>`             | Yes      | Initial backend group name                                                   |
-| `--server-ip <ip>`                  | Yes      | Backend server IP address                                                    |
-| `--server-name <name>`              | Yes      | Unique server identifier within the backend group                            |
-| `--server-port <port>`              | No       | Backend server port. Defaults to `--port`                                    |
-| `--algorithm <algo>`                | No       | `roundrobin` (default), `leastconn`, or `source`                             |
-| `--backend-protocol <protocol>`     | No       | `HTTP` (default) or `HTTPS` for the initial ALB backend group                |
-| `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                         |
-| `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                          |
+| Flag                                | Required | Description                                                                                          |
+| ----------------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `--name <name>`                     | Yes      | Load balancer name                                                                                   |
+| `--plan <plan>`                     | Yes      | Base plan name (for example `E2E-LB-2`). Run `load-balancer plans` first.                            |
+| `--mode <mode>`                     | Yes      | `HTTP`, `HTTPS`, `BOTH` (ALB), or `TCP` (NLB)                                                        |
+| `--port <port>`                     | Yes      | Frontend listener port                                                                               |
+| `--backend-name <name>`             | Yes      | Initial backend group name                                                                           |
+| `--server-ip <ip>`                  | Yes      | Backend server IP address                                                                            |
+| `--server-name <name>`              | Yes      | Unique server identifier within the backend group                                                    |
+| `--server-port <port>`              | No       | Backend server port. Defaults to `--port`                                                            |
+| `--algorithm <algo>`                | No       | `roundrobin` (default), `leastconn`, or `source`                                                     |
+| `--backend-protocol <protocol>`     | No       | `HTTP` (default) or `HTTPS` for the initial ALB backend group                                        |
+| `--http-check`                      | No       | Enable HTTP health checks (ALB only)                                                                 |
+| `--backend-port <port>`             | No       | NLB backend group port. Defaults to `--server-port`                                                  |
 | `--billing-type <type>`             | No       | `hourly` (default) or `committed`. Use `committed` with `--committed-plan` or `--committed-plan-id`. |
-| `--committed-plan <name>`           | No       | Committed plan name under the selected base plan                             |
-| `--committed-plan-id <id>`          | No       | Committed plan ID under the selected base plan                               |
-| `--post-commit-behavior <behavior>` | No       | `auto-renew` or `hourly-billing` after the committed term ends               |
-| `--ssl-certificate-id <id>`         | No\*     | SSL certificate ID. **Required** when `--mode` is `HTTPS` or `BOTH`          |
-| `--vpc <networkId>`                 | No       | VPC network ID to attach the LB (creates internal LB). Run `vpc list` first. |
-| `--security-group <id>`             | No       | Security group ID to attach to the load balancer                             |
+| `--committed-plan <name>`           | No       | Committed plan name under the selected base plan                                                     |
+| `--committed-plan-id <id>`          | No       | Committed plan ID under the selected base plan                                                       |
+| `--post-commit-behavior <behavior>` | No       | `auto-renew` or `hourly-billing` after the committed term ends                                       |
+| `--ssl-certificate-id <id>`         | No\*     | SSL certificate ID. **Required** when `--mode` is `HTTPS` or `BOTH`                                  |
+| `--vpc <networkId>`                 | No       | VPC network ID to attach the LB (creates internal LB). Run `vpc list` first.                         |
+| `--security-group <id>`             | No       | Security group ID to attach to the load balancer                                                     |
 
 **Context options**: `--alias`, `--project-id`, `--location`, `--json`
 
