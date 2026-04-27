@@ -20,6 +20,7 @@ interface GlobalOptions {
 const LB_MODE_CHOICES = ['HTTP', 'HTTPS', 'BOTH', 'TCP'] as const;
 const LB_ALGORITHM_CHOICES = ['roundrobin', 'leastconn', 'source'] as const;
 const ALB_BACKEND_PROTOCOL_CHOICES = ['HTTP', 'HTTPS'] as const;
+const LB_BILLING_TYPE_CHOICES = ['hourly', 'committed'] as const;
 
 export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
   const service = new LoadBalancerService({
@@ -92,6 +93,12 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       .requiredOption(
         '--port <port>',
         'Frontend listener port (e.g. 80 for HTTP, 443 for HTTPS).'
+      )
+      .addOption(
+        new Option(
+          '--billing-type <billingType>',
+          'Billing type for the load balancer. Use "committed" with --committed-plan or --committed-plan-id.'
+        ).choices(LB_BILLING_TYPE_CHOICES)
       )
       .option(
         '--committed-plan <name>',

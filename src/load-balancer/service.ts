@@ -36,6 +36,7 @@ export interface LoadBalancerContextOptions {
 }
 
 export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
+  billingType?: string;
   committedPlan?: string;
   committedPlanId?: string;
   name: string;
@@ -327,6 +328,9 @@ export class LoadBalancerService {
     }
 
     const billing = await resolveCreateBillingSelection(client, options.plan, {
+      ...(options.billingType === undefined
+        ? {}
+        : { billingType: options.billingType }),
       ...(options.committedPlan === undefined
         ? {}
         : { committedPlan: options.committedPlan }),
@@ -979,6 +983,7 @@ export class LoadBalancerService {
 }
 
 interface LoadBalancerCreateBillingSelectionOptions {
+  billingType?: string;
   committedPlan?: string;
   committedPlanId?: string;
   postCommitBehavior?: string;
@@ -1006,6 +1011,33 @@ async function resolveCreateBillingSelection(
   requestedBasePlan: string,
   options: LoadBalancerCreateBillingSelectionOptions
 ): Promise<ResolvedLoadBalancerCreateBilling> {
+  const hasCommittedSelector =
+    options.committedPlan !== undefined ||
+    options.committedPlanId !== undefined;
+
+  if (options.billingType === 'hourly' && hasCommittedSelector) {
+    throw new CliError(
+      '--billing-type hourly cannot be used with --committed-plan or --committed-plan-id.',
+      {
+        code: 'BILLING_TYPE_CONFLICT',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --billing-type or change it to --billing-type committed.'
+      }
+    );
+  }
+
+  if (options.billingType === 'committed' && !hasCommittedSelector) {
+    throw new CliError(
+      '--billing-type committed requires --committed-plan <name> or --committed-plan-id <id>.',
+      {
+        code: 'COMMITTED_PLAN_SELECTOR_REQUIRED',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand('load-balancer plans')} to find committed options for your base plan.`
+      }
+    );
+  }
+
   if (
     options.committedPlan !== undefined &&
     options.committedPlanId !== undefined

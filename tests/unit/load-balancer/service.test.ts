@@ -611,6 +611,98 @@ describe('LoadBalancerService', () => {
       ).rejects.toThrow('--port must be an integer');
     });
 
+    it('creates a committed LB with --billing-type committed and --committed-plan', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+
+      const result = await service.createLoadBalancer({
+        billingType: 'committed',
+        committedPlan: '90 Days',
+        mode: 'HTTP',
+        name: 'committed-alb',
+        plan: 'LB-2',
+        port: '80',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
+
+      expect(result.billing.type).toBe('committed');
+      expect(result.billing.committed_plan_name).toBe('90 Days');
+      expect(createLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('creates an hourly LB with explicit --billing-type hourly', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+
+      const result = await service.createLoadBalancer({
+        billingType: 'hourly',
+        mode: 'HTTP',
+        name: 'hourly-alb',
+        plan: 'LB-2',
+        port: '80',
+        backendName: 'web',
+        serverIp: '10.0.0.1',
+        serverName: 'srv-1'
+      });
+
+      expect(result.billing.type).toBe('hourly');
+      expect(result.billing.committed_plan_id).toBeNull();
+      expect(createLoadBalancer).toHaveBeenCalledOnce();
+    });
+
+    it('rejects --billing-type hourly with --committed-plan', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          billingType: 'hourly',
+          committedPlan: '90 Days',
+          mode: 'HTTP',
+          name: 'lb',
+          plan: 'LB-2',
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'BILLING_TYPE_CONFLICT' });
+    });
+
+    it('rejects --billing-type hourly with --committed-plan-id', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          billingType: 'hourly',
+          committedPlanId: '901',
+          mode: 'HTTP',
+          name: 'lb',
+          plan: 'LB-2',
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'BILLING_TYPE_CONFLICT' });
+    });
+
+    it('rejects --billing-type committed without a committed selector', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          billingType: 'committed',
+          mode: 'HTTP',
+          name: 'lb',
+          plan: 'LB-2',
+          port: '80',
+          backendName: 'web',
+          serverIp: '10.0.0.1',
+          serverName: 'srv-1'
+        })
+      ).rejects.toMatchObject({ code: 'COMMITTED_PLAN_SELECTOR_REQUIRED' });
+    });
+
     it('rejects selecting both committed selectors', async () => {
       const { service } = createServiceFixture();
 

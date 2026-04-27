@@ -121,7 +121,7 @@ e2ectl load-balancer create \
 
 ### Create a Committed Load Balancer
 
-Committed billing is chosen under a base plan. First inspect plans, then create the load balancer with the base SKU in `--plan` and the committed option in `--committed-plan`:
+Committed billing is chosen under a base plan. First inspect plans, then create the load balancer with `--billing-type committed`, the base SKU in `--plan`, and the committed option in `--committed-plan`:
 
 ```
 e2ectl load-balancer plans
@@ -131,6 +131,7 @@ e2ectl load-balancer plans
 e2ectl load-balancer create \
   --name committed-alb \
   --plan E2E-LB-2 \
+  --billing-type committed \
   --committed-plan "90 Days" \
   --post-commit-behavior auto-renew \
   --mode HTTP \
@@ -147,6 +148,7 @@ If you prefer deterministic scripting, use the committed plan ID from `load-bala
 e2ectl load-balancer create \
   --name committed-alb \
   --plan E2E-LB-2 \
+  --billing-type committed \
   --committed-plan-id 901 \
   --post-commit-behavior hourly-billing \
   --mode HTTP \
