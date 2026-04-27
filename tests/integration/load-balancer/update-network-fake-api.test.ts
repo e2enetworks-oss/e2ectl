@@ -26,6 +26,10 @@ function buildAlbGetResponse() {
       lb_mode: 'HTTP',
       lb_type: 'external',
       public_ip: '1.2.3.4',
+      node_detail: {
+        public_ip: '1.2.3.4',
+        vm_id: 1001
+      },
       appliance_instance: [
         {
           context: {
@@ -131,13 +135,24 @@ describe('lb update and network commands against a fake MyAccount API', () => {
     }
   });
 
-  it('lb network reserve-ip attach sets the reserved public IP', async () => {
+  it('lb network reserve-ip reserve reserves the current public IP', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
       }),
-      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
-        body: buildUpdateResponse()
+      'POST /myaccount/api/v1/reserve_ips/1.2.3.4/actions/': () => ({
+        body: {
+          code: 200,
+          data: {
+            IP: '1.2.3.4',
+            message: 'IP reserved successfully.',
+            status: 'Available',
+            vm_id: 1001,
+            vm_name: 'my-alb'
+          },
+          errors: {},
+          message: 'IP reserved successfully.'
+        }
       })
     });
     const tempHome = await createTempHome();
@@ -146,7 +161,7 @@ describe('lb update and network commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'network', 'reserve-ip', 'attach', '10', '203.0.113.10'],
+        ['lb', 'network', 'reserve-ip', 'reserve', '10'],
         {
           env: {
             HOME: tempHome.path,
@@ -156,10 +171,11 @@ describe('lb update and network commands against a fake MyAccount API', () => {
       );
 
       expect(result.exitCode).toBe(0);
-      const body = JSON.parse(server.requests[1]!.body) as UpdateRequestBody;
-      expect(body.lb_reserve_ip).toBe('203.0.113.10');
-      expect(body.lb_type).toBe('external');
-      expect(body.vpc_list).toEqual([]);
+      const body = JSON.parse(server.requests[1]!.body) as {
+        type?: string;
+        vm_id?: number;
+      };
+      expect(body).toEqual({ type: 'live-reserve', vm_id: 1001 });
     } finally {
       await server.close();
       await tempHome.cleanup();

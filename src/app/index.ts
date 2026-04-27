@@ -77,6 +77,23 @@ function rejectRetiredLoadBalancerCommands(argv: string[]): void {
           : 'Use "lb backend-server" instead.'
     });
   }
+
+  if (
+    command === 'lb' &&
+    firstNested === 'network' &&
+    secondNested === 'reserve-ip' &&
+    (positional[3] === 'attach' || positional[3] === 'detach')
+  ) {
+    throw new CliError(
+      `Unknown command "lb network reserve-ip ${positional[3]}".`,
+      {
+        code: 'INVALID_USAGE',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Use "lb network reserve-ip reserve <lbId>" to reserve the current public IP.'
+      }
+    );
+  }
 }
 
 function isMainModule(): boolean {

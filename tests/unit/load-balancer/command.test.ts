@@ -61,6 +61,10 @@ function createLbClientStub(): {
     lb_mode: 'HTTP',
     lb_type: 'external',
     public_ip: '1.2.3.4',
+    node_detail: {
+      public_ip: '1.2.3.4',
+      vm_id: 1001
+    },
     context: [
       {
         backends: [
@@ -116,12 +120,44 @@ function createLbClientStub(): {
   };
 }
 
+function createReservedIpClientStub(): {
+  stub: ReservedIpClient;
+  listReservedIps: ReturnType<typeof vi.fn>;
+  reserveNodePublicIp: ReturnType<typeof vi.fn>;
+} {
+  const listReservedIps = vi.fn(() =>
+    Promise.resolve([{ ip_address: '203.0.113.10', status: 'Reserved' }])
+  );
+  const reserveNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '1.2.3.4',
+      message: 'IP reserved successfully.',
+      status: 'Available',
+      vm_id: 1001,
+      vm_name: 'my-alb'
+    })
+  );
+
+  const stub: ReservedIpClient = {
+    attachReservedIpToNode: vi.fn(),
+    createReservedIp: vi.fn(),
+    deleteReservedIp: vi.fn(),
+    detachNodePublicIp: vi.fn(),
+    detachReservedIpFromNode: vi.fn(),
+    listReservedIps,
+    reserveNodePublicIp
+  };
+
+  return { stub, listReservedIps, reserveNodePublicIp };
+}
+
 describe('lb commands', () => {
   function createRuntimeFixture(options?: {
     confirmResult?: boolean;
     isInteractive?: boolean;
   }): {
     lbStub: ReturnType<typeof createLbClientStub>;
+    reservedIpStub: ReturnType<typeof createReservedIpClientStub>;
     runtime: CliRuntime;
     stdout: MemoryWriter;
     stderr: MemoryWriter;
@@ -132,6 +168,7 @@ describe('lb commands', () => {
     const stdout = new MemoryWriter();
     const stderr = new MemoryWriter();
     const lbStub = createLbClientStub();
+    const reservedIpStub = createReservedIpClientStub();
     const confirm = vi.fn(() =>
       Promise.resolve(options?.confirmResult ?? true)
     );
@@ -173,7 +210,7 @@ describe('lb commands', () => {
       createProjectClient: throwNotUsed(
         'ProjectClient'
       ) as unknown as CliRuntime['createProjectClient'],
-      createReservedIpClient: vi.fn() as unknown as (
+      createReservedIpClient: vi.fn(() => reservedIpStub.stub) as unknown as (
         c: ResolvedCredentials
       ) => ReservedIpClient,
       createSecurityGroupClient: vi.fn() as unknown as (
@@ -198,6 +235,7 @@ describe('lb commands', () => {
 
     return {
       lbStub,
+      reservedIpStub,
       runtime,
       stdout,
       stderr,
@@ -527,8 +565,8 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('Updated.');
   });
 
-  it('attaches a reserved IP via lb network reserve-ip attach', async () => {
-    const { runtime, stdout, lbStub } = createRuntimeFixture();
+  it('reserves the current public IP via lb network reserve-ip reserve', async () => {
+    const { runtime, stdout, reservedIpStub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
 
@@ -538,15 +576,17 @@ describe('lb commands', () => {
       'lb',
       'network',
       'reserve-ip',
-      'attach',
+      'reserve',
       '10',
-      '203.0.113.10',
       '--alias',
       'prod'
     ]);
 
-    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
-    expect(stdout.buffer).toContain('Updated.');
+    expect(reservedIpStub.reserveNodePublicIp).toHaveBeenCalledWith('1.2.3.4', {
+      type: 'live-reserve',
+      vm_id: 1001
+    });
+    expect(stdout.buffer).toContain('IP reserved successfully.');
   });
 
   it('attaches a VPC via lb network vpc attach', async () => {

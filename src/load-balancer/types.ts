@@ -130,6 +130,7 @@ export interface LoadBalancerSummary {
   lb_mode?: string;
   lb_type?: string;
   public_ip?: string | null;
+  public_ip_reserved?: boolean;
   private_ip?: string | null;
 }
 
@@ -140,12 +141,23 @@ export interface LoadBalancerDetails {
   lb_mode?: string;
   lb_type?: string;
   public_ip?: string | null;
+  public_ip_reserved?: boolean;
   private_ip?: string | null;
   created_at?: string;
   node_detail?: {
+    allow_reserve_ip?: {
+      can_we_reserved?: boolean;
+      is_already_reserved?: boolean;
+      is_limit_available?: boolean;
+      reserve_ip_price?: string | number | null;
+      [key: string]: unknown;
+    };
     billing_type?: string;
+    private_ip?: string | null;
     plan_name?: string;
     price?: string;
+    public_ip?: string | null;
+    vm_id?: number | null;
   };
   context?:
     | {

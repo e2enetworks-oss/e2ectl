@@ -8,6 +8,7 @@ import type {
   LoadBalancerCreateRequest,
   LoadBalancerDetails
 } from '../../../src/load-balancer/index.js';
+import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 
 function createConfig(): ConfigFile {
@@ -34,6 +35,10 @@ function createAlbDetails(
     lb_mode: 'HTTP',
     lb_type: 'external',
     public_ip: '1.2.3.4',
+    node_detail: {
+      public_ip: '1.2.3.4',
+      vm_id: 1001
+    },
     context: [
       {
         backends: [
@@ -226,13 +231,16 @@ function createServiceFixture(options?: {
   confirm: ReturnType<typeof vi.fn>;
   createLoadBalancer: ReturnType<typeof vi.fn>;
   createLoadBalancerClient: ReturnType<typeof vi.fn>;
+  createReservedIpClient: ReturnType<typeof vi.fn>;
   createVpcClient: ReturnType<typeof vi.fn>;
   deleteLoadBalancer: ReturnType<typeof vi.fn>;
   getLoadBalancer: ReturnType<typeof vi.fn>;
   getVpc: ReturnType<typeof vi.fn>;
   lbClient: LoadBalancerClient;
+  listReservedIps: ReturnType<typeof vi.fn>;
   listLoadBalancers: ReturnType<typeof vi.fn>;
   listLoadBalancerPlans: ReturnType<typeof vi.fn>;
+  reserveNodePublicIp: ReturnType<typeof vi.fn>;
   readConfig: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   service: LoadBalancerService;
@@ -290,6 +298,33 @@ function createServiceFixture(options?: {
     capturedCredentials = creds;
     return lbClient;
   });
+  const listReservedIps = vi.fn(() =>
+    Promise.resolve([
+      {
+        ip_address: '203.0.113.10',
+        status: 'Reserved'
+      }
+    ])
+  );
+  const reserveNodePublicIp = vi.fn(() =>
+    Promise.resolve({
+      ip_address: '1.2.3.4',
+      message: 'IP reserved successfully.',
+      status: 'Available',
+      vm_id: 1001,
+      vm_name: 'my-alb'
+    })
+  );
+  const reservedIpClient: ReservedIpClient = {
+    attachReservedIpToNode: vi.fn(),
+    createReservedIp: vi.fn(),
+    deleteReservedIp: vi.fn(),
+    detachNodePublicIp: vi.fn(),
+    detachReservedIpFromNode: vi.fn(),
+    listReservedIps,
+    reserveNodePublicIp
+  };
+  const createReservedIpClient = vi.fn(() => reservedIpClient);
   const getVpc = vi.fn(() =>
     Promise.resolve({
       ipv4_cidr: '10.10.0.0/16',
@@ -316,6 +351,7 @@ function createServiceFixture(options?: {
   const service = new LoadBalancerService({
     confirm,
     createLoadBalancerClient,
+    createReservedIpClient,
     createVpcClient,
     isInteractive: options?.isInteractive ?? true,
     store: { configPath: '/tmp/.e2ectl/config.json', read: readConfig }
@@ -325,16 +361,19 @@ function createServiceFixture(options?: {
     confirm,
     createLoadBalancer,
     createLoadBalancerClient,
+    createReservedIpClient,
     createVpcClient,
     deleteLoadBalancer,
     getLoadBalancer,
     getVpc,
     lbClient,
+    listReservedIps,
     listLoadBalancers,
     listLoadBalancerPlans,
     readConfig,
     receivedCredentials: () => capturedCredentials,
     service,
+    reserveNodePublicIp,
     updateLoadBalancer
   };
 }
@@ -385,12 +424,10 @@ describe('LoadBalancerService', () => {
       const result = await service.createLoadBalancer({
         name: 'my-alb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverPort: '8080',
-        serverName: 'server-1'
+        backendGroup: 'web',
+        backendServer: ['server-1:10.0.0.1:8080']
       });
 
       const body = createLoadBalancer.mock
@@ -412,13 +449,11 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'my-alb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         port: '80',
-        backendName: 'web',
+        backendGroup: 'web',
         backendProtocol: 'HTTPS',
-        serverIp: '10.0.0.1',
-        serverPort: '8080',
-        serverName: 'server-1'
+        backendServer: ['server-1:10.0.0.1:8080']
       });
 
       const body = createLoadBalancer.mock
@@ -427,18 +462,83 @@ describe('LoadBalancerService', () => {
       expect(body.backends[0]?.backend_ssl).toBe(true);
     });
 
+    it('uses only unattached reserved IPs from inventory during create', async () => {
+      const { service, createLoadBalancer, listReservedIps } =
+        createServiceFixture();
+
+      await service.createLoadBalancer({
+        name: 'my-alb',
+        plan: 'LB-2',
+        frontendProtocol: 'HTTP',
+        port: '80',
+        backendGroup: 'web',
+        backendServer: ['server-1:10.0.0.1:8080'],
+        reserveIp: '203.0.113.10'
+      });
+
+      expect(listReservedIps).toHaveBeenCalled();
+      const body = createLoadBalancer.mock
+        .calls[0]![0] as LoadBalancerCreateRequest;
+      expect(body.lb_reserve_ip).toBe('203.0.113.10');
+    });
+
+    it('rejects create when --reserve-ip is not in inventory', async () => {
+      const { service, listReservedIps, createLoadBalancer } =
+        createServiceFixture();
+      listReservedIps.mockResolvedValue([
+        { ip_address: '203.0.113.11', status: 'Reserved' }
+      ]);
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'my-alb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          port: '80',
+          backendGroup: 'web',
+          backendServer: ['server-1:10.0.0.1:8080'],
+          reserveIp: '203.0.113.10'
+        })
+      ).rejects.toMatchObject({ code: 'RESERVE_IP_NOT_FOUND' });
+      expect(createLoadBalancer).not.toHaveBeenCalled();
+    });
+
+    it('rejects create when --reserve-ip is already attached', async () => {
+      const { service, listReservedIps, createLoadBalancer } =
+        createServiceFixture();
+      listReservedIps.mockResolvedValue([
+        {
+          floating_ip_attached_nodes: [{ id: 101, vm_id: 1001 }],
+          ip_address: '203.0.113.10',
+          status: 'Assigned',
+          vm_id: 1001
+        }
+      ]);
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'my-alb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          port: '80',
+          backendGroup: 'web',
+          backendServer: ['server-1:10.0.0.1:8080'],
+          reserveIp: '203.0.113.10'
+        })
+      ).rejects.toMatchObject({ code: 'RESERVE_IP_NOT_AVAILABLE' });
+      expect(createLoadBalancer).not.toHaveBeenCalled();
+    });
+
     it('creates an NLB with TCP mode and puts backend in tcp_backend[]', async () => {
       const { service, createLoadBalancer } = createServiceFixture();
 
       await service.createLoadBalancer({
         name: 'my-nlb',
         plan: 'LB-2',
-        mode: 'TCP',
+        frontendProtocol: 'TCP',
         port: '80',
-        backendName: 'tcp-grp',
-        serverIp: '10.0.0.2',
-        serverPort: '8080',
-        serverName: 'srv-1',
+        backendGroup: 'tcp-grp',
+        backendServer: ['srv-1:10.0.0.2:8080'],
         backendPort: '8080'
       });
 
@@ -456,11 +556,10 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'lb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = createLoadBalancer.mock
@@ -477,12 +576,11 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'internal-alb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         networkId: '12345',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(getVpc).toHaveBeenCalledWith(12345);
@@ -504,14 +602,13 @@ describe('LoadBalancerService', () => {
 
       const result = await service.createLoadBalancer({
         committedPlan: '90 Days',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         name: 'committed-alb',
         plan: 'LB-2',
         port: '80',
         postCommitBehavior: 'hourly-billing',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(listLoadBalancerPlans).toHaveBeenCalled();
@@ -535,11 +632,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTPS',
+          frontendProtocol: 'HTTPS',
           port: '443',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_SSL_CERTIFICATE_ID' });
     });
@@ -551,11 +647,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'BOTH',
+          frontendProtocol: 'BOTH',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_SSL_CERTIFICATE_ID' });
     });
@@ -566,11 +661,10 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'lb',
         plan: 'LB-2',
-        mode: 'HTTPS',
+        frontendProtocol: 'HTTPS',
         port: '443',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1',
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80'],
         sslCertificateId: '99'
       });
 
@@ -586,11 +680,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'FTP',
+          frontendProtocol: 'FTP',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toThrow('Invalid --frontend-protocol');
     });
@@ -602,11 +695,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: 'abc',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toThrow('--port must be an integer');
     });
@@ -617,13 +709,12 @@ describe('LoadBalancerService', () => {
       const result = await service.createLoadBalancer({
         billingType: 'committed',
         committedPlan: '90 Days',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         name: 'committed-alb',
         plan: 'LB-2',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(result.billing.type).toBe('committed');
@@ -636,13 +727,12 @@ describe('LoadBalancerService', () => {
 
       const result = await service.createLoadBalancer({
         billingType: 'hourly',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         name: 'hourly-alb',
         plan: 'LB-2',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(result.billing.type).toBe('hourly');
@@ -657,13 +747,12 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           billingType: 'hourly',
           committedPlan: '90 Days',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'BILLING_TYPE_CONFLICT' });
     });
@@ -675,13 +764,12 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           billingType: 'hourly',
           committedPlanId: '901',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'BILLING_TYPE_CONFLICT' });
     });
@@ -692,13 +780,12 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createLoadBalancer({
           billingType: 'committed',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'COMMITTED_PLAN_SELECTOR_REQUIRED' });
     });
@@ -710,13 +797,12 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           committedPlan: '90 Days',
           committedPlanId: '901',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'COMMITTED_PLAN_SELECTOR_CONFLICT' });
     });
@@ -726,14 +812,13 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.createLoadBalancer({
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
           postCommitBehavior: 'hourly-billing',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({
         code: 'LOAD_BALANCER_POST_COMMIT_BEHAVIOR_REQUIRES_COMMITTED_PLAN'
@@ -746,12 +831,11 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'internal-alb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         vpc: '12345',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(getVpc).toHaveBeenCalledWith(12345);
@@ -766,11 +850,10 @@ describe('LoadBalancerService', () => {
       await service.createLoadBalancer({
         name: 'alb',
         plan: 'LB-2',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1',
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80'],
         securityGroupId: '55'
       });
 
@@ -784,13 +867,12 @@ describe('LoadBalancerService', () => {
 
       const result = await service.createLoadBalancer({
         committedPlanId: '901',
-        mode: 'HTTP',
+        frontendProtocol: 'HTTP',
         name: 'committed-alb',
         plan: 'LB-2',
         port: '80',
-        backendName: 'web',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendGroup: 'web',
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       expect(result.billing.committed_plan_id).toBe(901);
@@ -805,13 +887,12 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createLoadBalancer({
           committedPlan: '90 Days',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'nonexistent-plan',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_PLAN_NOT_FOUND' });
     });
@@ -834,13 +915,12 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createLoadBalancer({
           committedPlan: '90 Days',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({
         code: 'LOAD_BALANCER_COMMITTED_PLAN_UNAVAILABLE'
@@ -853,13 +933,12 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createLoadBalancer({
           committedPlan: 'nonexistent-option',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({
         code: 'LOAD_BALANCER_COMMITTED_PLAN_NOT_FOUND'
@@ -872,13 +951,12 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createLoadBalancer({
           committedPlanId: '999',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({
         code: 'LOAD_BALANCER_COMMITTED_PLAN_NOT_FOUND'
@@ -892,13 +970,12 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           committedPlan: '90 Days',
           postCommitBehavior: 'invalid-behavior',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           name: 'lb',
           plan: 'LB-2',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({
         code: 'INVALID_LOAD_BALANCER_POST_COMMIT_BEHAVIOR'
@@ -912,12 +989,11 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: '80',
           algorithm: 'invalid-algo',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'INVALID_LB_ALGORITHM' });
     });
@@ -929,12 +1005,11 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: '80',
           backendProtocol: 'FTP',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'INVALID_LB_BACKEND_PROTOCOL' });
     });
@@ -946,11 +1021,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: '80',
-          backendName: 'web',
-          serverIp: '',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1::80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_SERVER_IP' });
     });
@@ -962,11 +1036,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: '80',
-          backendName: 'web',
-          serverIp: 'not-an-ip',
-          serverName: 'srv-1'
+          backendGroup: 'web',
+          backendServer: ['srv-1:not-an-ip:80']
         })
       ).rejects.toMatchObject({ code: 'INVALID_SERVER_IP' });
     });
@@ -978,11 +1051,10 @@ describe('LoadBalancerService', () => {
         service.createLoadBalancer({
           name: 'lb',
           plan: 'LB-2',
-          mode: 'HTTP',
+          frontendProtocol: 'HTTP',
           port: '80',
-          backendName: 'web',
-          serverIp: '10.0.0.1',
-          serverName: ''
+          backendGroup: 'web',
+          backendServer: [':10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_REQUIRED_OPTION' });
     });
@@ -1057,6 +1129,65 @@ describe('LoadBalancerService', () => {
     });
   });
 
+  describe('reservePublicIp', () => {
+    it('reserves the current LB public IP through the reserved IP live-reserve path', async () => {
+      const { service, reserveNodePublicIp } = createServiceFixture();
+
+      const result = await service.reservePublicIp('10', {});
+
+      expect(reserveNodePublicIp).toHaveBeenCalledWith('1.2.3.4', {
+        type: 'live-reserve',
+        vm_id: 1001
+      });
+      expect(result.action).toBe('network-reserve-ip-reserve');
+      expect(result.reserve_ip).toBe('1.2.3.4');
+    });
+
+    it('rejects reserve when the LB public IP is already reserved', async () => {
+      const { service, getLoadBalancer, reserveNodePublicIp } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createAlbDetails({ public_ip_reserved: true })
+      );
+
+      await expect(service.reservePublicIp('10', {})).rejects.toMatchObject({
+        code: 'LOAD_BALANCER_PUBLIC_IP_ALREADY_RESERVED'
+      });
+      expect(reserveNodePublicIp).not.toHaveBeenCalled();
+    });
+
+    it('rejects reserve for internal load balancers', async () => {
+      const { service, getLoadBalancer, reserveNodePublicIp } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createAlbDetails({
+          lb_type: 'internal',
+          context: [
+            {
+              backends: [],
+              lb_port: '80',
+              node_list_type: 'S',
+              plan_name: 'LB-2',
+              tcp_backend: [],
+              vpc_list: [
+                {
+                  ipv4_cidr: '10.10.0.0/16',
+                  network_id: 12345,
+                  vpc_name: 'prod-vpc'
+                }
+              ]
+            }
+          ]
+        })
+      );
+
+      await expect(service.reservePublicIp('10', {})).rejects.toMatchObject({
+        code: 'RESERVE_IP_REQUIRES_EXTERNAL_LB'
+      });
+      expect(reserveNodePublicIp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listBackendGroups', () => {
     it('returns ALB backends from context', async () => {
       const { service } = createServiceFixture();
@@ -1090,9 +1221,7 @@ describe('LoadBalancerService', () => {
 
       const result = await service.createBackendGroup('30', {
         name: 'web',
-        serverIp: '10.0.0.5',
-        serverPort: '8080',
-        serverName: 'server-1'
+        backendServer: ['server-1:10.0.0.5:8080']
       });
 
       expect(result.action).toBe('backend-group-add');
@@ -1134,8 +1263,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1161,9 +1289,7 @@ describe('LoadBalancerService', () => {
       const result = await service.createBackendGroup('40', {
         name: 'tcp-grp',
         backendPort: '8080',
-        serverIp: '10.0.0.2',
-        serverPort: '8080',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.2:8080']
       });
 
       expect(result.action).toBe('backend-group-add');
@@ -1181,8 +1307,7 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createBackendGroup('10', {
           name: 'web',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_EXISTS' });
     });
@@ -1195,8 +1320,7 @@ describe('LoadBalancerService', () => {
         service.createBackendGroup('20', {
           name: 'new-group',
           backendPort: '9000',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'NLB_SINGLE_BACKEND_GROUP' });
     });
@@ -1211,8 +1335,7 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createBackendGroup('10', {
           name: 'api',
-          serverIp: '10.0.0.1',
-          serverName: 'srv-1'
+          backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
@@ -1224,8 +1347,7 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createBackendGroup('30', {
           name: 'api',
-          serverIp: '10.0.0.1',
-          serverName: ''
+          backendServer: [':10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_REQUIRED_OPTION' });
     });
@@ -1253,8 +1375,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1274,8 +1395,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1306,8 +1426,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1322,8 +1441,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1340,8 +1458,7 @@ describe('LoadBalancerService', () => {
 
       await service.createBackendGroup('30', {
         name: 'api',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1369,8 +1486,7 @@ describe('LoadBalancerService', () => {
       await service.createBackendGroup('30', {
         name: 'api',
         backendProtocol: 'HTTP',
-        serverIp: '10.0.0.1',
-        serverName: 'srv-1'
+        backendServer: ['srv-1:10.0.0.1:80']
       });
 
       const body = updateLoadBalancer.mock
@@ -1553,10 +1669,8 @@ describe('LoadBalancerService', () => {
       const { service, updateLoadBalancer } = createServiceFixture();
 
       const result = await service.addBackendServer('10', {
-        backendName: 'web',
-        serverIp: '10.0.0.5',
-        serverPort: '8080',
-        serverName: 'server-2'
+        backendGroup: 'web',
+        backendServer: 'server-2:10.0.0.5:8080'
       });
 
       expect(result.action).toBe('backend-server-add');
@@ -1573,10 +1687,8 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createNlbDetails());
 
       const result = await service.addBackendServer('20', {
-        backendName: 'tcp-grp',
-        serverIp: '10.0.0.3',
-        serverPort: '8080',
-        serverName: 'srv-2'
+        backendGroup: 'tcp-grp',
+        backendServer: 'srv-2:10.0.0.3:8080'
       });
 
       expect(result.action).toBe('backend-server-add');
@@ -1590,10 +1702,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.addBackendServer('10', {
-          backendName: 'nonexistent',
-          serverIp: '10.0.0.5',
-          serverPort: '8080',
-          serverName: 'server-2'
+          backendGroup: 'nonexistent',
+          backendServer: 'server-2:10.0.0.5:8080'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
@@ -1604,10 +1714,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.addBackendServer('20', {
-          backendName: 'nonexistent',
-          serverIp: '10.0.0.4',
-          serverPort: '8080',
-          serverName: 'srv-3'
+          backendGroup: 'nonexistent',
+          backendServer: 'srv-3:10.0.0.4:8080'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
@@ -1621,10 +1729,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.addBackendServer('10', {
-          backendName: 'web',
-          serverIp: '10.0.0.5',
-          serverPort: '8080',
-          serverName: 'server-2'
+          backendGroup: 'web',
+          backendServer: 'server-2:10.0.0.5:8080'
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
@@ -1663,10 +1769,8 @@ describe('LoadBalancerService', () => {
       } satisfies LoadBalancerDetails);
 
       await service.addBackendServer('20', {
-        backendName: 'tcp-grp',
-        serverIp: '10.0.0.3',
-        serverPort: '8080',
-        serverName: 'srv-2'
+        backendGroup: 'tcp-grp',
+        backendServer: 'srv-2:10.0.0.3:8080'
       });
 
       const body = updateLoadBalancer.mock
@@ -1682,8 +1786,8 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
 
       const result = await service.deleteBackendServer('10', {
-        backendName: 'web',
-        serverName: 'server-2'
+        backendGroup: 'web',
+        backendServerName: 'server-2'
       });
 
       expect(result.action).toBe('backend-server-remove');
@@ -1734,8 +1838,8 @@ describe('LoadBalancerService', () => {
       });
 
       const result = await service.deleteBackendServer('20', {
-        backendName: 'tcp-grp',
-        serverName: 'srv-2'
+        backendGroup: 'tcp-grp',
+        backendServerName: 'srv-2'
       });
 
       expect(result.action).toBe('backend-server-remove');
@@ -1755,8 +1859,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('10', {
-          backendName: 'web',
-          serverName: 'server-1'
+          backendGroup: 'web',
+          backendServerName: 'server-1'
         })
       ).rejects.toMatchObject({
         code: 'LAST_BACKEND_SERVER_NOT_DELETABLE'
@@ -1769,8 +1873,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('10', {
-          backendName: 'nonexistent',
-          serverName: 'server-1'
+          backendGroup: 'nonexistent',
+          backendServerName: 'server-1'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
@@ -1781,8 +1885,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('20', {
-          backendName: 'nonexistent',
-          serverName: 'srv-1'
+          backendGroup: 'nonexistent',
+          backendServerName: 'srv-1'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
@@ -1793,8 +1897,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('10', {
-          backendName: 'web',
-          serverName: 'nonexistent-server'
+          backendGroup: 'web',
+          backendServerName: 'nonexistent-server'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
     });
@@ -1839,8 +1943,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('10', {
-          backendName: 'web',
-          serverName: 'dup'
+          backendGroup: 'web',
+          backendServerName: 'dup'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_SERVER_AMBIGUOUS' });
     });
@@ -1854,8 +1958,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('10', {
-          backendName: 'web',
-          serverName: 'server-1'
+          backendGroup: 'web',
+          backendServerName: 'server-1'
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
@@ -1866,8 +1970,8 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
 
       const result = await service.deleteBackendServer('10', {
-        backendName: 'web',
-        serverName: 'server-1',
+        backendGroup: 'web',
+        backendServerName: 'server-1',
         serverIp: '10.0.0.1',
         serverPort: '8080'
       });
@@ -1886,8 +1990,8 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.deleteBackendServer('20', {
-          backendName: 'tcp-grp',
-          serverName: 'srv-1'
+          backendGroup: 'tcp-grp',
+          backendServerName: 'srv-1'
         })
       ).rejects.toMatchObject({ code: 'LAST_BACKEND_SERVER_NOT_DELETABLE' });
     });

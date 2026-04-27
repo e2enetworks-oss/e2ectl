@@ -22,6 +22,7 @@ describe('renderLoadBalancerResult', () => {
             lb_mode: 'HTTP',
             lb_type: 'external',
             public_ip: '1.2.3.4',
+            public_ip_reserved: true,
             private_ip: '10.0.0.1'
           }
         ]
@@ -30,7 +31,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('my-alb');
       expect(output).toContain('RUNNING');
       expect(output).toContain('HTTP');
-      expect(output).toContain('1.2.3.4');
+      expect(output).toContain('1.2.3.4 (Reserved)');
       expect(output).toContain('10.0.0.1');
     });
 
@@ -61,6 +62,7 @@ describe('renderLoadBalancerResult', () => {
               lb_type: 'external',
               private_ip: '10.0.0.2',
               public_ip: null,
+              public_ip_reserved: false,
               status: 'RUNNING'
             }
           ]
@@ -672,6 +674,7 @@ describe('renderLoadBalancerResult', () => {
           lb_mode: 'HTTP',
           lb_type: 'external',
           public_ip: '1.2.3.4',
+          public_ip_reserved: true,
           private_ip: null,
           context: undefined
         }
@@ -680,7 +683,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('Load balancer details.');
       expect(output).toContain('my-alb');
       expect(output).toContain('RUNNING');
-      expect(output).toContain('1.2.3.4');
+      expect(output).toContain('1.2.3.4 (Reserved)');
       expect(output).toContain('e2ectl lb delete 10');
     });
 
@@ -938,30 +941,18 @@ describe('renderLoadBalancerResult', () => {
   });
 
   describe('network actions', () => {
-    it('renders network-reserve-ip-attach (human)', () => {
+    it('renders network-reserve-ip-reserve (human)', () => {
       const result: LoadBalancerCommandResult = {
-        action: 'network-reserve-ip-attach',
+        action: 'network-reserve-ip-reserve',
         lb_id: '10',
         lb_name: 'my-alb',
-        message: 'Reserved IP attached.',
+        message: 'IP reserved successfully.',
         reserve_ip: '5.5.5.5'
       };
       const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Reserved IP attached.');
+      expect(output).toContain('IP reserved successfully.');
       expect(output).toContain('5.5.5.5');
       expect(output).toContain('e2ectl lb get 10');
-    });
-
-    it('renders network-reserve-ip-detach (human)', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'network-reserve-ip-detach',
-        lb_id: '10',
-        lb_name: 'my-alb',
-        message: 'Reserved IP detached.'
-      };
-      const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Reserved IP detached.');
-      expect(output).toContain('10');
     });
 
     it('renders network-vpc-attach (human)', () => {

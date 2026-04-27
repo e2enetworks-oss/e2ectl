@@ -8,6 +8,10 @@ import {
 import { normalizeRequiredNumericId } from '../node/normalizers.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import type {
+  ReservedIpClient,
+  ReservedIpSummary
+} from '../reserved-ip/index.js';
 import type { LoadBalancerClient } from './client.js';
 import type {
   LoadBalancerAclMapRule,
@@ -234,8 +238,7 @@ export interface LoadBalancerBackendServerDeleteCommandResult {
 
 export interface LoadBalancerNetworkCommandResult {
   action:
-    | 'network-reserve-ip-attach'
-    | 'network-reserve-ip-detach'
+    | 'network-reserve-ip-reserve'
     | 'network-vpc-attach'
     | 'network-vpc-detach';
   lb_id: string;
@@ -294,6 +297,7 @@ export interface LoadBalancerServiceDependencies {
   createLoadBalancerClient(
     credentials: ResolvedCredentials
   ): LoadBalancerClient;
+  createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   isInteractive: boolean;
   store: LoadBalancerStore;
@@ -339,11 +343,8 @@ export class LoadBalancerService {
   async createLoadBalancer(
     options: LoadBalancerCreateOptions
   ): Promise<LoadBalancerCreateCommandResult> {
-    const legacyOptions = options;
     const requestedVpcId = options.networkId ?? options.vpc;
-    const mode = assertFrontendProtocol(
-      options.frontendProtocol ?? legacyOptions.mode
-    );
+    const mode = assertFrontendProtocol(options.frontendProtocol);
     if (requestedVpcId !== undefined && options.reserveIp !== undefined) {
       throw new CliError('--reserve-ip cannot be used with --vpc.', {
         code: 'RESERVE_IP_REQUIRES_EXTERNAL_LB',
@@ -373,6 +374,14 @@ export class LoadBalancerService {
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
     const credentials = await this.resolveContext(options);
     const client = this.dependencies.createLoadBalancerClient(credentials);
+    const reserveIp =
+      options.reserveIp === undefined
+        ? ''
+        : await resolveAvailableReservedIp(
+            this.dependencies.createReservedIpClient(credentials),
+            options.reserveIp,
+            '--reserve-ip'
+          );
 
     const SSL_MODES: LoadBalancerMode[] = ['HTTPS', 'BOTH'];
     const requiresSslCert = (SSL_MODES as string[]).includes(mode);
@@ -410,17 +419,10 @@ export class LoadBalancerService {
       ? assertAlbBackendProtocol(options.backendProtocol)
       : null;
     const backendGroup = assertNonEmpty(
-      options.backendGroup ?? legacyOptions.backendName,
+      options.backendGroup,
       '--backend-group'
     );
-    const servers = parseBackendServerSpecs(
-      options.backendServer ??
-        legacyBackendServerList(
-          legacyOptions.serverName,
-          legacyOptions.serverIp,
-          legacyOptions.serverPort ?? options.port
-        )
-    );
+    const servers = parseBackendServerSpecs(options.backendServer);
 
     const backends: LoadBalancerBackend[] = [];
     const tcpBackend: LoadBalancerTcpBackend[] = [];
@@ -523,7 +525,7 @@ export class LoadBalancerService {
       default_backend: '',
       enable_bitninja: false,
       is_ipv6_attached: false,
-      lb_reserve_ip: options.reserveIp ?? '',
+      lb_reserve_ip: reserveIp,
       ssl_certificate_id: sslCertificateId,
       ssl_context: { redirect_to_https: false },
       vpc_list: vpcList ?? [],
@@ -725,7 +727,6 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendGroupCreateOptions
   ): Promise<LoadBalancerBackendGroupCreateCommandResult> {
-    const legacyOptions = options;
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
 
@@ -779,14 +780,7 @@ export class LoadBalancerService {
       );
     }
 
-    const servers = parseBackendServerSpecs(
-      options.backendServer ??
-        legacyBackendServerList(
-          legacyOptions.serverName,
-          legacyOptions.serverIp,
-          legacyOptions.serverPort ?? lbPort
-        )
-    );
+    const servers = parseBackendServerSpecs(options.backendServer);
 
     if (isNlb) {
       // For NLB: backendPort is required (use backendPort ?? serverPort)
@@ -1079,20 +1073,12 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerAddOptions
   ): Promise<LoadBalancerBackendServerAddCommandResult> {
-    const legacyOptions = options;
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const backendGroup = assertNonEmpty(
-      options.backendGroup ?? legacyOptions.backendName,
+      options.backendGroup,
       '--backend-group'
     );
-    const server = parseBackendServerSpec(
-      options.backendServer ??
-        legacyBackendServerSpec(
-          legacyOptions.serverName,
-          legacyOptions.serverIp,
-          legacyOptions.serverPort
-        )
-    );
+    const server = parseBackendServerSpec(options.backendServer!);
 
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
@@ -1306,23 +1292,14 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerDeleteOptions
   ): Promise<LoadBalancerBackendServerDeleteCommandResult> {
-    const legacyOptions = options;
     const backendGroup = assertNonEmpty(
-      options.backendGroup ?? legacyOptions.backendName,
+      options.backendGroup,
       '--backend-group'
     );
     const backendServerName = assertNonEmpty(
-      options.backendServerName ?? legacyOptions.serverName,
+      options.backendServerName,
       '--backend-server-name'
     );
-    const serverPort =
-      legacyOptions.serverPort === undefined
-        ? undefined
-        : assertPort(legacyOptions.serverPort, 'Backend server port');
-    const serverIp =
-      legacyOptions.serverIp === undefined
-        ? undefined
-        : assertIp(legacyOptions.serverIp, 'Backend server IP');
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
@@ -1337,120 +1314,39 @@ export class LoadBalancerService {
       tcpBackends: currentTcpBackends
     } = resolveLoadBalancerMutationContext(lb, lbId);
 
-    if (isNlb) {
-      const existingGroup = currentTcpBackends.find(
-        (g) => g.backend_name === backendGroup
-      );
-
-      if (existingGroup === undefined) {
-        throw new CliError(
-          `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
+    const removedServer = isNlb
+      ? await deleteServerFromNlb(
+          client,
+          lb,
+          context,
           {
-            code: 'BACKEND_GROUP_NOT_FOUND',
-            exitCode: EXIT_CODES.usage,
-            suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
-          }
-        );
-      }
-
-      if (existingGroup.servers.length <= 1) {
-        throw new CliError(
-          `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
+            existingAclList,
+            existingAclMap,
+            lbPort,
+            planName,
+            currentBackends,
+            currentTcpBackends
+          },
+          backendGroup,
+          backendServerName,
+          lbId
+        )
+      : await deleteServerFromAlb(
+          client,
+          lb,
+          context,
           {
-            code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
-            exitCode: EXIT_CODES.usage,
-            suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
-          }
+            existingAclList,
+            existingAclMap,
+            lbPort,
+            planName,
+            currentBackends,
+            currentTcpBackends
+          },
+          backendGroup,
+          backendServerName,
+          lbId
         );
-      }
-
-      const { remainingServers, removedServer } = removeServerFromGroup(
-        existingGroup.servers,
-        backendServerName,
-        serverIp,
-        serverPort,
-        lbId,
-        backendGroup
-      );
-
-      const updatedTcpBackends = currentTcpBackends.map((g) =>
-        g.backend_name === backendGroup
-          ? { ...g, servers: remainingServers }
-          : g
-      );
-
-      await client.updateLoadBalancer(
-        lbId,
-        buildLoadBalancerUpdateRequest(lb, context, {
-          acl_list: existingAclList,
-          acl_map: existingAclMap,
-          backends: currentBackends,
-          lb_mode: 'TCP',
-          lb_port: lbPort,
-          plan_name: planName,
-          tcp_backend: updatedTcpBackends
-        })
-      );
-
-      return {
-        action: 'backend-server-remove',
-        group_name: backendGroup,
-        lb_id: lbId,
-        lb_name: lb.appliance_name,
-        message: `Server "${removedServer.backend_name}" removed from backend group "${backendGroup}".`,
-        server_name: removedServer.backend_name
-      };
-    }
-
-    const existingGroup = currentBackends.find((g) => g.name === backendGroup);
-
-    if (existingGroup === undefined) {
-      throw new CliError(
-        `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
-        {
-          code: 'BACKEND_GROUP_NOT_FOUND',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
-        }
-      );
-    }
-
-    if (existingGroup.servers.length <= 1) {
-      throw new CliError(
-        `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
-        {
-          code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
-        }
-      );
-    }
-
-    const { remainingServers, removedServer } = removeServerFromGroup(
-      existingGroup.servers,
-      backendServerName,
-      serverIp,
-      serverPort,
-      lbId,
-      backendGroup
-    );
-
-    const updatedBackends = currentBackends.map((g) =>
-      g.name === backendGroup ? { ...g, servers: remainingServers } : g
-    );
-
-    await client.updateLoadBalancer(
-      lbId,
-      buildLoadBalancerUpdateRequest(lb, context, {
-        acl_list: existingAclList,
-        acl_map: existingAclMap,
-        backends: updatedBackends,
-        lb_mode: normalizeExistingMode(lb.lb_mode, 'HTTP'),
-        lb_port: lbPort,
-        plan_name: planName,
-        tcp_backend: currentTcpBackends
-      })
-    );
 
     return {
       action: 'backend-server-remove',
@@ -1462,14 +1358,13 @@ export class LoadBalancerService {
     };
   }
 
-  async attachReserveIp(
+  async reservePublicIp(
     lbId: string,
-    ip: string,
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerNetworkCommandResult> {
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const reserveIp = assertIp(ip, '<ip>');
-    const client = await this.createClient(options);
+    const credentials = await this.resolveContext(options);
+    const client = this.dependencies.createLoadBalancerClient(credentials);
     const lb = await client.getLoadBalancer(lbId);
     const mutation = resolveLoadBalancerMutationContext(lb, lbId);
 
@@ -1485,64 +1380,29 @@ export class LoadBalancerService {
       );
     }
 
-    const result = await client.updateLoadBalancer(
-      lbId,
-      buildLoadBalancerUpdateRequest(lb, mutation.context, {
-        acl_list: mutation.aclList,
-        acl_map: mutation.aclMap,
-        backends: mutation.backends,
-        lb_mode: mutation.isNlb
-          ? 'TCP'
-          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
-        lb_port: mutation.lbPort,
-        lb_reserve_ip: reserveIp,
-        lb_type: 'external',
-        plan_name: mutation.planName,
-        tcp_backend: mutation.tcpBackends,
-        vpc_list: []
-      })
-    );
+    if (isLoadBalancerPublicIpReserved(lb, mutation.context)) {
+      throw new CliError(
+        `Load balancer ${lbId} public IP is already reserved.`,
+        {
+          code: 'LOAD_BALANCER_PUBLIC_IP_ALREADY_RESERVED',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect the current public IP.`
+        }
+      );
+    }
+
+    const publicIp = getReservableLoadBalancerPublicIp(lb, lbId);
+    const vmId = getLoadBalancerVmId(lb, lbId);
+    const result = await this.dependencies
+      .createReservedIpClient(credentials)
+      .reserveNodePublicIp(publicIp, { type: 'live-reserve', vm_id: vmId });
 
     return {
-      action: 'network-reserve-ip-attach',
+      action: 'network-reserve-ip-reserve',
       lb_id: lbId,
       lb_name: lb.appliance_name,
       message: result.message,
-      reserve_ip: reserveIp
-    };
-  }
-
-  async detachReserveIp(
-    lbId: string,
-    options: LoadBalancerContextOptions
-  ): Promise<LoadBalancerNetworkCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
-    const result = await client.updateLoadBalancer(
-      lbId,
-      buildLoadBalancerUpdateRequest(lb, mutation.context, {
-        acl_list: mutation.aclList,
-        acl_map: mutation.aclMap,
-        backends: mutation.backends,
-        lb_mode: mutation.isNlb
-          ? 'TCP'
-          : normalizeExistingMode(lb.lb_mode, 'HTTP'),
-        lb_port: mutation.lbPort,
-        lb_reserve_ip: '',
-        plan_name: mutation.planName,
-        tcp_backend: mutation.tcpBackends
-      })
-    );
-
-    const detachedIp = mutation.context.lb_reserve_ip || undefined;
-    return {
-      action: 'network-reserve-ip-detach',
-      lb_id: lbId,
-      lb_name: lb.appliance_name,
-      message: result.message,
-      ...(detachedIp ? { reserve_ip: String(detachedIp) } : {})
+      reserve_ip: result.ip_address
     };
   }
 
@@ -1602,7 +1462,21 @@ export class LoadBalancerService {
     const client = await this.createClient(options);
     const lb = await client.getLoadBalancer(lbId);
     const mutation = resolveLoadBalancerMutationContext(lb, lbId);
-    const remainingVpcList = (mutation.context.vpc_list ?? []).filter(
+    const currentVpcList = mutation.context.vpc_list ?? [];
+    const vpcExists = currentVpcList.some(
+      (item) => String(item.network_id) === String(vpcId)
+    );
+    if (!vpcExists) {
+      throw new CliError(
+        `VPC ${vpcId} is not attached to load balancer ${lbId}.`,
+        {
+          code: 'VPC_NOT_ATTACHED',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect current VPC attachments.`
+        }
+      );
+    }
+    const remainingVpcList = currentVpcList.filter(
       (item) => String(item.network_id) !== String(vpcId)
     );
     const result = await client.updateLoadBalancer(
@@ -1876,6 +1750,50 @@ async function resolveVpcAttachment(
   };
 }
 
+async function resolveAvailableReservedIp(
+  client: ReservedIpClient,
+  ip: string,
+  label: string
+): Promise<string> {
+  const reserveIp = assertIp(ip, label);
+  const reservedIps = await client.listReservedIps();
+  const match = reservedIps.find((item) => item.ip_address === reserveIp);
+
+  if (match === undefined) {
+    throw new CliError(
+      `Reserved IP ${reserveIp} was not found in your reserved IP inventory.`,
+      {
+        code: 'RESERVE_IP_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand('reserved-ip list')} and retry with an available ip_address.`
+      }
+    );
+  }
+
+  if (!isAvailableReservedIp(match)) {
+    throw new CliError(`Reserved IP ${reserveIp} is not available.`, {
+      code: 'RESERVE_IP_NOT_AVAILABLE',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Choose an unattached reserved IP whose status is Reserved or Available, then retry the command.'
+    });
+  }
+
+  return match.ip_address;
+}
+
+function isAvailableReservedIp(item: ReservedIpSummary): boolean {
+  const normalizedStatus = item.status?.trim().toLowerCase();
+  const hasAttachedNode =
+    (item.floating_ip_attached_nodes ?? []).length > 0 ||
+    (item.vm_id !== undefined && item.vm_id !== null);
+
+  return (
+    (normalizedStatus === 'reserved' || normalizedStatus === 'available') &&
+    !hasAttachedNode
+  );
+}
+
 function buildLoadBalancerUpdateRequest(
   lb: LoadBalancerDetails,
   context: LoadBalancerContextPayload,
@@ -2034,6 +1952,132 @@ function filterAclForRemainingBackends(
   };
 }
 
+interface DeleteServerMutationState {
+  existingAclList: LoadBalancerAclRule[];
+  existingAclMap: LoadBalancerAclMapRule[];
+  lbPort: string;
+  planName: string;
+  currentBackends: LoadBalancerBackend[];
+  currentTcpBackends: LoadBalancerTcpBackend[];
+}
+
+async function deleteServerFromNlb(
+  client: LoadBalancerClient,
+  lb: LoadBalancerDetails,
+  context: LoadBalancerContextPayload,
+  state: DeleteServerMutationState,
+  backendGroup: string,
+  backendServerName: string,
+  lbId: string
+): Promise<LoadBalancerServer> {
+  const existingGroup = state.currentTcpBackends.find(
+    (g) => g.backend_name === backendGroup
+  );
+  if (existingGroup === undefined) {
+    throw new CliError(
+      `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
+      {
+        code: 'BACKEND_GROUP_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
+      }
+    );
+  }
+  if (existingGroup.servers.length <= 1) {
+    throw new CliError(
+      `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
+      {
+        code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
+      }
+    );
+  }
+  const { remainingServers, removedServer } = removeServerFromGroup(
+    existingGroup.servers,
+    backendServerName,
+    undefined,
+    undefined,
+    lbId,
+    backendGroup
+  );
+  await client.updateLoadBalancer(
+    lbId,
+    buildLoadBalancerUpdateRequest(lb, context, {
+      acl_list: state.existingAclList,
+      acl_map: state.existingAclMap,
+      backends: state.currentBackends,
+      lb_mode: 'TCP',
+      lb_port: state.lbPort,
+      plan_name: state.planName,
+      tcp_backend: state.currentTcpBackends.map((g) =>
+        g.backend_name === backendGroup
+          ? { ...g, servers: remainingServers }
+          : g
+      )
+    })
+  );
+  return removedServer;
+}
+
+async function deleteServerFromAlb(
+  client: LoadBalancerClient,
+  lb: LoadBalancerDetails,
+  context: LoadBalancerContextPayload,
+  state: DeleteServerMutationState,
+  backendGroup: string,
+  backendServerName: string,
+  lbId: string
+): Promise<LoadBalancerServer> {
+  const existingGroup = state.currentBackends.find(
+    (g) => g.name === backendGroup
+  );
+  if (existingGroup === undefined) {
+    throw new CliError(
+      `Backend group "${backendGroup}" not found on load balancer ${lbId}.`,
+      {
+        code: 'BACKEND_GROUP_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
+      }
+    );
+  }
+  if (existingGroup.servers.length <= 1) {
+    throw new CliError(
+      `Server "${backendServerName}" is the last server in backend group "${backendGroup}". Keep at least one server attached.`,
+      {
+        code: 'LAST_BACKEND_SERVER_NOT_DELETABLE',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Add another server to backend group "${backendGroup}" before removing "${backendServerName}".`
+      }
+    );
+  }
+  const { remainingServers, removedServer } = removeServerFromGroup(
+    existingGroup.servers,
+    backendServerName,
+    undefined,
+    undefined,
+    lbId,
+    backendGroup
+  );
+  const updatedBackends = state.currentBackends.map((g) =>
+    g.name === backendGroup ? { ...g, servers: remainingServers } : g
+  );
+  await client.updateLoadBalancer(
+    lbId,
+    buildLoadBalancerUpdateRequest(lb, context, {
+      acl_list: state.existingAclList,
+      acl_map: state.existingAclMap,
+      backends: updatedBackends,
+      lb_mode: normalizeExistingMode(lb.lb_mode, 'HTTP'),
+      lb_port: state.lbPort,
+      plan_name: state.planName,
+      tcp_backend: state.currentTcpBackends
+    })
+  );
+  return removedServer;
+}
+
 function removeServerFromGroup(
   servers: LoadBalancerServer[],
   serverName: string,
@@ -2110,6 +2154,69 @@ function normalizeExistingLoadBalancerType(
   return Array.isArray(context.vpc_list) && context.vpc_list.length > 0
     ? 'internal'
     : 'external';
+}
+
+function isLoadBalancerPublicIpReserved(
+  lb: LoadBalancerDetails,
+  context: LoadBalancerContextPayload
+): boolean {
+  if (lb.public_ip_reserved === true) {
+    return true;
+  }
+
+  const publicIp = normalizeOptionalPublicIp(
+    lb.public_ip ?? lb.node_detail?.public_ip
+  );
+  const reserveIp = normalizeOptionalPublicIp(context.lb_reserve_ip);
+  return publicIp !== undefined && reserveIp === publicIp;
+}
+
+function getReservableLoadBalancerPublicIp(
+  lb: LoadBalancerDetails,
+  lbId: string
+): string {
+  const publicIp = normalizeOptionalPublicIp(
+    lb.public_ip ?? lb.node_detail?.public_ip
+  );
+  if (publicIp !== undefined && isIPv4(publicIp)) {
+    return publicIp;
+  }
+
+  throw new CliError(
+    `Load balancer ${lbId} does not have a public IPv4 address to reserve.`,
+    {
+      code: 'LOAD_BALANCER_PUBLIC_IP_MISSING',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect the current network state.`
+    }
+  );
+}
+
+function getLoadBalancerVmId(lb: LoadBalancerDetails, lbId: string): number {
+  const vmId = lb.node_detail?.vm_id;
+  if (typeof vmId === 'number' && Number.isInteger(vmId) && vmId > 0) {
+    return vmId;
+  }
+
+  throw new CliError(
+    `Load balancer ${lbId} did not include the VM ID required to reserve its public IP.`,
+    {
+      code: 'LOAD_BALANCER_VM_ID_MISSING',
+      exitCode: EXIT_CODES.network,
+      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to confirm the API response includes node_detail.vm_id.`
+    }
+  );
+}
+
+function normalizeOptionalPublicIp(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length === 0 || normalized === '[]'
+    ? undefined
+    : normalized;
 }
 
 function normalizeExistingMode(
@@ -2385,24 +2492,6 @@ function assertNonEmpty(value: string | undefined, flag: string): string {
   }
 
   return trimmed;
-}
-
-function legacyBackendServerList(
-  name: string | undefined,
-  ip: string | undefined,
-  port: string | undefined
-): string[] | undefined {
-  return name === undefined && ip === undefined && port === undefined
-    ? undefined
-    : [legacyBackendServerSpec(name, ip, port)];
-}
-
-function legacyBackendServerSpec(
-  name: string | undefined,
-  ip: string | undefined,
-  port: string | undefined
-): string {
-  return `${name ?? ''}:${ip ?? ''}:${port ?? ''}`;
 }
 
 function defaultPortForProtocol(mode: LoadBalancerMode): string | undefined {

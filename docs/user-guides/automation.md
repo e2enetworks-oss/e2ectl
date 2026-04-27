@@ -143,7 +143,7 @@ e2ectl lb backend-server add "$LB_ID" \
 e2ectl lb delete "$LB_ID" --force
 ```
 
-The `--json` flag on `lb list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, and `private_ip`.
+The `--json` flag on `lb list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, `public_ip_reserved`, and `private_ip`.
 
 The `--json` flag on `lb get` returns the backend load balancer detail object. For ALBs, backend groups live under `context[0].backends`; for NLBs, they live under `context[0].tcp_backend`. Each server inside a group has `backend_name`, `backend_ip`, and `backend_port`.
 

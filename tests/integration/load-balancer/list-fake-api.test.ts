@@ -67,6 +67,7 @@ describe('lb list against a fake MyAccount API', () => {
               lb_type: 'external',
               private_ip: '10.0.0.1',
               public_ip: '1.2.3.4',
+              public_ip_reserved: false,
               status: 'RUNNING'
             }
           ]

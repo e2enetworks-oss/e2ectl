@@ -156,8 +156,7 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         )
       );
 
-    case 'network-reserve-ip-attach':
-    case 'network-reserve-ip-detach':
+    case 'network-reserve-ip-reserve':
     case 'network-vpc-attach':
     case 'network-vpc-detach': {
       const netRows: Array<[string, string]> = [
@@ -206,6 +205,7 @@ function normalizeLoadBalancerJson(
           lb_mode: item.lb_mode ?? null,
           lb_type: item.lb_type ?? null,
           public_ip: item.public_ip ?? null,
+          public_ip_reserved: item.public_ip_reserved ?? false,
           private_ip: item.private_ip ?? null
         }))
       };
@@ -332,8 +332,7 @@ function normalizeLoadBalancerJson(
         server_name: result.server_name
       };
 
-    case 'network-reserve-ip-attach':
-    case 'network-reserve-ip-detach':
+    case 'network-reserve-ip-reserve':
     case 'network-vpc-attach':
     case 'network-vpc-detach':
       return {
@@ -366,6 +365,17 @@ function normalizeLoadBalancerJson(
   }
 }
 
+function formatPublicIp(
+  publicIp: string | null | undefined,
+  reserved: boolean | undefined
+): string {
+  if (publicIp === undefined || publicIp === null || publicIp.length === 0) {
+    return '--';
+  }
+
+  return reserved === true ? `${publicIp} (Reserved)` : publicIp;
+}
+
 function formatLoadBalancerListTable(
   items: LoadBalancerListCommandResult['items']
 ): string {
@@ -380,7 +390,7 @@ function formatLoadBalancerListTable(
       item.status,
       item.lb_mode ?? '--',
       item.lb_type ?? '--',
-      item.public_ip ?? '--',
+      formatPublicIp(item.public_ip, item.public_ip_reserved),
       item.private_ip ?? '--'
     ]);
   }
@@ -495,7 +505,7 @@ function renderLoadBalancerGetHuman(
   ];
 
   const networkRows: Array<[string, string]> = [
-    ['Public IP', item.public_ip ?? '--'],
+    ['Public IP', formatPublicIp(item.public_ip, item.public_ip_reserved)],
     ['Private IP', item.private_ip ?? '--']
   ];
   const reservedIp = ctx?.lb_reserve_ip;

@@ -23,7 +23,8 @@ e2ectl lb get <lbId>
 `--port` defaults to `80` for HTTP and `443` for HTTPS/BOTH, so it can be omitted for those protocols.
 
 Use `e2ectl node list` to find the private IP of your backend nodes.
-Use `e2ectl reserved-ip list` to find an available reserved IP for `--reserve-ip`.
+Use `e2ectl reserved-ip list` to find an unattached reserved IP for `--reserve-ip`.
+If `--reserve-ip` is not specified, a random public IP is automatically allocated as part of the selected plan.
 
 ```bash
 e2ectl lb create \
@@ -56,7 +57,7 @@ e2ectl lb create \
 
 `--port` is required for TCP as there is no standard default.
 
-Use `e2ectl node list` to find node IPs. Use `e2ectl reserved-ip list` for `--reserve-ip`.
+Use `e2ectl node list` to find node IPs. Use `e2ectl reserved-ip list` for `--reserve-ip`; only unattached reserved IPs with `Reserved` or `Available` status can be selected during create.
 
 ```bash
 e2ectl lb create \
@@ -104,18 +105,17 @@ ALBs can move among `HTTP`, `HTTPS`, and `BOTH`. NLBs stay `TCP`; the CLI does n
 
 ## Network Attachments
 
-Use `e2ectl reserved-ip list` to find the IP for `reserve-ip attach`.
+Use `e2ectl lb network reserve-ip reserve <lbId>` to preserve an external LB's current public IP as a reserved IP when it is not already reserved.
 Use `e2ectl vpc list` to find the VPC ID for `vpc attach/detach`.
 
 ```bash
-e2ectl lb network reserve-ip attach <lbId> <ip>
-e2ectl lb network reserve-ip detach <lbId>
+e2ectl lb network reserve-ip reserve <lbId>
 e2ectl lb network vpc attach <lbId> --vpc <vpcId>
 e2ectl lb network vpc attach <lbId> --vpc <vpcId> --subnet <subnetId>
 e2ectl lb network vpc detach <lbId> --vpc <vpcId>
 ```
 
-Reserved public IP attachments are for external load balancers. VPC attachment switches the LB to internal and clears the reserved public IP field.
+Reserving a public IP is for external load balancers with an assigned public IPv4 address. If the public IP is already reserved, `lb get` and `lb list` show `(Reserved)` next to the public IP. VPC attachment switches the LB to internal and clears the reserved public IP field.
 
 ## Backend Groups
 

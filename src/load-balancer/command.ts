@@ -32,6 +32,8 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createLoadBalancerClient: (credentials) =>
       runtime.createLoadBalancerClient(credentials),
+    createReservedIpClient: (credentials) =>
+      runtime.createReservedIpClient(credentials),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
     isInteractive: runtime.isInteractive,
     store: runtime.store
@@ -147,7 +149,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       )
       .option(
         '--reserve-ip <ip>',
-        'Reserved public IP to attach to an external load balancer.'
+        'Unattached reserved public IP to use for an external load balancer.'
       )
       .option(
         '--ssl-certificate-id <id>',
@@ -243,36 +245,20 @@ function buildReserveIpCommand(
   runtime: CliRuntime
 ): Command {
   const command = new Command('reserve-ip').description(
-    'Manage a load balancer reserved public IP attachment.'
+    "Reserve a load balancer's current public IP."
   );
 
   addContextOptions(
     command
-      .command('attach <lbId> <ip>')
-      .description('Attach a reserved public IP to an external load balancer.')
-  ).action(
-    async (
-      lbId: string,
-      ip: string,
-      options: LoadBalancerContextOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.attachReserveIp(lbId, ip, options);
-      writeResult(runtime, commandInstance, result);
-    }
-  );
-
-  addContextOptions(
-    command
-      .command('detach <lbId>')
-      .description('Detach the reserved public IP from a load balancer.')
+      .command('reserve <lbId>')
+      .description("Reserve an external load balancer's current public IP.")
   ).action(
     async (
       lbId: string,
       options: LoadBalancerContextOptions,
       commandInstance: Command
     ) => {
-      const result = await service.detachReserveIp(lbId, options);
+      const result = await service.reservePublicIp(lbId, options);
       writeResult(runtime, commandInstance, result);
     }
   );

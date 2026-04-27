@@ -19,6 +19,7 @@ const APPLIANCES_PATH = '/appliances/';
 const LOAD_BALANCER_LIST_PAGE_SIZE = 100;
 
 interface LoadBalancerListContext {
+  lb_reserve_ip?: string | null;
   lb_mode?: string;
   lb_type?: string;
   tcp_backend?: unknown[];
@@ -34,6 +35,9 @@ interface LoadBalancerListApiItem {
   public_ip?: string | null;
   private_ip?: string | null;
   node_detail?: {
+    allow_reserve_ip?: {
+      is_already_reserved?: boolean;
+    };
     public_ip?: string | null;
     private_ip?: string | null;
   };
@@ -99,6 +103,9 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
       appliance_name?: string;
       name?: string;
       node_detail?: {
+        allow_reserve_ip?: {
+          is_already_reserved?: boolean;
+        };
         public_ip?: string | null;
         private_ip?: string | null;
       };
@@ -121,7 +128,7 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
       ?.map((instance) => instance.context)
       .filter((item): item is NonNullable<typeof item> => item !== undefined);
     const primaryContext = context?.[0] as
-      | { lb_mode?: string; lb_type?: string }
+      | { lb_mode?: string; lb_type?: string; lb_reserve_ip?: string | null }
       | undefined;
     const result: LoadBalancerDetails = {
       ...data,
@@ -143,6 +150,11 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
     if (publicIp !== undefined) {
       result.public_ip = publicIp;
     }
+    result.public_ip_reserved = isPublicIpReserved(
+      data.node_detail?.allow_reserve_ip?.is_already_reserved,
+      publicIp,
+      primaryContext?.lb_reserve_ip
+    );
 
     const privateIp = data.private_ip ?? data.node_detail?.private_ip;
     if (privateIp !== undefined) {
@@ -244,6 +256,11 @@ function normalizeLoadBalancerSummary(
     ...(lbMode === undefined ? {} : { lb_mode: lbMode }),
     ...(lbType === undefined ? {} : { lb_type: lbType }),
     ...(publicIp === undefined ? {} : { public_ip: publicIp }),
+    public_ip_reserved: isPublicIpReserved(
+      item.node_detail?.allow_reserve_ip?.is_already_reserved,
+      publicIp,
+      context?.lb_reserve_ip
+    ),
     ...(privateIp === undefined ? {} : { private_ip: privateIp }),
 
     status: item.status
@@ -290,4 +307,21 @@ function normalizePublicIp(
 
   const normalized = publicIp.trim();
   return normalized.length === 0 || normalized === '[]' ? null : normalized;
+}
+
+function isPublicIpReserved(
+  allowReserveIpFlag: boolean | undefined,
+  publicIp: string | null | undefined,
+  lbReserveIp: unknown
+): boolean {
+  if (allowReserveIpFlag === true) {
+    return true;
+  }
+
+  return (
+    typeof publicIp === 'string' &&
+    publicIp.trim().length > 0 &&
+    typeof lbReserveIp === 'string' &&
+    lbReserveIp.trim() === publicIp.trim()
+  );
 }
