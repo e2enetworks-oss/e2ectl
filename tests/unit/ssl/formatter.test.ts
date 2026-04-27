@@ -1,6 +1,11 @@
 import { renderSslResult } from '../../../src/ssl/formatter.js';
 
 describe('SSL formatter', () => {
+  it('renders "No SSL certificates found." when list is empty', () => {
+    const output = renderSslResult({ action: 'list', items: [] }, false);
+    expect(output).toBe('No SSL certificates found.\n');
+  });
+
   it('renders certificate IDs in human output', () => {
     const output = renderSslResult(
       {

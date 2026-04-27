@@ -661,6 +661,352 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
+  describe('get', () => {
+    it('renders load balancer details (human, no context)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 10,
+          appliance_name: 'my-alb',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'external',
+          public_ip: '1.2.3.4',
+          private_ip: null,
+          context: undefined
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Load balancer details.');
+      expect(output).toContain('my-alb');
+      expect(output).toContain('RUNNING');
+      expect(output).toContain('1.2.3.4');
+      expect(output).toContain('e2ectl lb delete 10');
+    });
+
+    it('renders load balancer details with backends and VPC (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 20,
+          appliance_name: 'my-alb-full',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'internal',
+          public_ip: null,
+          private_ip: '10.0.0.1',
+          context: [
+            {
+              lb_port: '80',
+              plan_name: 'E2E-LB-2',
+              lb_reserve_ip: '5.5.5.5',
+              ssl_context: {
+                ssl_certificate_id: 99,
+                redirect_to_https: true
+              },
+              vpc_list: [
+                {
+                  vpc_name: 'my-vpc',
+                  network_id: 1,
+                  ipv4_cidr: '10.0.0.0/24',
+                  ip: '10.0.0.10',
+                  subnet_name: 'subnet-a'
+                }
+              ],
+              backends: [
+                {
+                  name: 'grp1',
+                  backend_mode: 'http',
+                  balance: 'roundrobin',
+                  backend_ssl: false,
+                  http_check: true,
+                  check_url: '/',
+                  domain_name: '',
+                  servers: [
+                    {
+                      backend_name: 'web1',
+                      backend_ip: '10.0.0.2',
+                      backend_port: 8080
+                    }
+                  ]
+                }
+              ],
+              tcp_backend: []
+            }
+          ]
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('my-alb-full');
+      expect(output).toContain('grp1');
+      expect(output).toContain('web1 (10.0.0.2:8080)');
+      expect(output).toContain('my-vpc');
+      expect(output).toContain('5.5.5.5');
+      expect(output).toContain('99');
+      expect(output).toContain('HTTP→HTTPS Redirect');
+    });
+
+    it('renders load balancer details with TCP backends (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 30,
+          appliance_name: 'my-nlb',
+          status: 'RUNNING',
+          lb_mode: 'TCP',
+          lb_type: 'external',
+          public_ip: '2.3.4.5',
+          private_ip: null,
+          context: [
+            {
+              lb_port: '3306',
+              plan_name: 'E2E-LB-2',
+              backends: [],
+              tcp_backend: [
+                {
+                  backend_name: 'tcp-grp',
+                  port: 3306,
+                  balance: 'leastconn',
+                  servers: [
+                    {
+                      backend_name: 'db1',
+                      backend_ip: '10.0.0.5',
+                      backend_port: 3306
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('my-nlb');
+      expect(output).toContain('tcp-grp');
+      expect(output).toContain('db1 (10.0.0.5:3306)');
+    });
+
+    it('renders JSON for get', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'get',
+        item: {
+          id: 10,
+          appliance_name: 'my-alb',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'external',
+          public_ip: '1.2.3.4',
+          private_ip: null
+        }
+      };
+      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
+        action: string;
+        item: { id: number };
+      };
+      expect(parsed.action).toBe('get');
+      expect(parsed.item.id).toBe(10);
+    });
+  });
+
+  describe('update', () => {
+    it('renders update message with changed fields (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Load balancer updated.',
+        changes: {
+          name: 'new-name',
+          protocol: 'HTTPS',
+          ssl_certificate_id: 42,
+          redirect_http_to_https: true
+        }
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Load balancer updated.');
+      expect(output).toContain('new-name');
+      expect(output).toContain('HTTPS');
+      expect(output).toContain('42');
+      expect(output).toContain('enabled');
+      expect(output).toContain('e2ectl lb get 10');
+    });
+
+    it('renders update with no optional changes (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Load balancer updated.',
+        changes: {}
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Load balancer updated.');
+      expect(output).toContain('10');
+    });
+
+    it('renders JSON for update', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Load balancer updated.',
+        changes: {}
+      };
+      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
+        action: string;
+        lb_id: string;
+      };
+      expect(parsed.action).toBe('update');
+      expect(parsed.lb_id).toBe('10');
+    });
+  });
+
+  describe('backend-group-update', () => {
+    it('renders backend-group-update message (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        group_name: 'grp1',
+        message: 'Backend group updated.',
+        algorithm: 'leastconn',
+        backend_protocol: 'HTTP'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Backend group updated.');
+      expect(output).toContain('grp1');
+      expect(output).toContain('leastconn');
+      expect(output).toContain('HTTP');
+      expect(output).toContain('e2ectl lb get 10');
+    });
+
+    it('renders JSON for backend-group-update', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        group_name: 'grp1',
+        message: 'Backend group updated.',
+        algorithm: 'roundrobin'
+      };
+      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
+        action: string;
+        group_name: string;
+      };
+      expect(parsed.action).toBe('backend-group-update');
+      expect(parsed.group_name).toBe('grp1');
+    });
+  });
+
+  describe('backend-server-update', () => {
+    it('renders backend-server-update with ip and port changes (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        group_name: 'grp1',
+        server_name: 'web1',
+        message: 'Backend server updated.',
+        ip: '10.0.0.9',
+        port: '9090'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Backend server updated.');
+      expect(output).toContain('web1');
+      expect(output).toContain('10.0.0.9');
+      expect(output).toContain('9090');
+      expect(output).toContain('e2ectl lb get 10');
+    });
+
+    it('renders JSON for backend-server-update', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-server-update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        group_name: 'grp1',
+        server_name: 'web1',
+        message: 'Backend server updated.',
+        ip: '10.0.0.9'
+      };
+      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
+        action: string;
+        server_name: string;
+      };
+      expect(parsed.action).toBe('backend-server-update');
+      expect(parsed.server_name).toBe('web1');
+    });
+  });
+
+  describe('network actions', () => {
+    it('renders network-reserve-ip-attach (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'network-reserve-ip-attach',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Reserved IP attached.',
+        reserve_ip: '5.5.5.5'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Reserved IP attached.');
+      expect(output).toContain('5.5.5.5');
+      expect(output).toContain('e2ectl lb get 10');
+    });
+
+    it('renders network-reserve-ip-detach (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'network-reserve-ip-detach',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Reserved IP detached.'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Reserved IP detached.');
+      expect(output).toContain('10');
+    });
+
+    it('renders network-vpc-attach (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'network-vpc-attach',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'VPC attached.',
+        vpc_id: 'vpc-1',
+        subnet_id: 'sub-1'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('VPC attached.');
+      expect(output).toContain('vpc-1');
+      expect(output).toContain('sub-1');
+    });
+
+    it('renders network-vpc-detach (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'network-vpc-detach',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'VPC detached.'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('VPC detached.');
+    });
+
+    it('renders JSON for network actions', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'network-vpc-attach',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'VPC attached.',
+        vpc_id: 'vpc-1'
+      };
+      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
+        action: string;
+        lb_id: string;
+      };
+      expect(parsed.action).toBe('network-vpc-attach');
+      expect(parsed.lb_id).toBe('10');
+    });
+  });
+
   describe('create with committed billing', () => {
     it('renders committed plan name in billing row', () => {
       const result: LoadBalancerCommandResult = {
