@@ -262,6 +262,7 @@ describe('DbaasService', () => {
           database_name: 'analytics',
           id: 9901,
           name: 'analytics-db',
+          private_ips: ['10.0.0.20'],
           public_ip: '5.6.7.8',
           status: 'Running',
           type: 'PostgreSQL',
@@ -274,6 +275,7 @@ describe('DbaasService', () => {
           database_name: 'appdb',
           id: 7869,
           name: 'customer-db',
+          private_ips: ['10.0.0.10'],
           public_ip: '1.2.3.4',
           status: 'Running',
           type: 'MySQL',
@@ -283,6 +285,43 @@ describe('DbaasService', () => {
       total_count: 2,
       total_page_number: 1
     });
+  });
+
+  it('returns empty list with page count zero when all items are filtered out', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          id: 10001,
+          master_node: {
+            cluster_id: 10001,
+            database: {
+              database: 'ignored',
+              id: 99,
+              pg_detail: {},
+              username: 'admin'
+            },
+            port: '5433'
+          },
+          name: 'unsupported-db',
+          software: {
+            engine: 'Distributed',
+            id: 999,
+            name: 'YugaByte',
+            version: '2.0'
+          }
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items).toHaveLength(0);
+    expect(result.total_count).toBe(0);
+    expect(result.total_page_number).toBe(0);
   });
 
   it('creates supported DBaaS clusters by resolving engine and plan ids first', async () => {
@@ -572,6 +611,274 @@ describe('DbaasService', () => {
       ],
       total_count: 1
     });
+  });
+
+  it('normalizes string price_per_hour from template plan API response', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: '12',
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.price_per_hour).toBe(12);
+  });
+
+  it('normalizes non-parseable string price_per_hour to null', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: 'N/A',
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.price_per_hour).toBeNull();
+  });
+
+  it('includes committed SKU entries that have a committed_sku_id', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: 12,
+            ram: '4',
+            committed_sku: [
+              {
+                committed_sku_id: 101,
+                committed_days: 365,
+                committed_sku_name: 'Small-1Y',
+                committed_sku_price: 3000
+              }
+            ],
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.committed_sku).toHaveLength(1);
+    expect(result.items[0]?.committed_sku[0]?.committed_sku_id).toBe(101);
+  });
+
+  it('filters out committed SKU entries with no committed_sku_id', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: 12,
+            ram: '4',
+            committed_sku: [{ committed_days: 365 }],
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.committed_sku).toHaveLength(0);
+  });
+
+  it('sorts template plans: unavailable last, cheapest first, then by name', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    const basePlan = {
+      available_inventory_status: true,
+      cpu: '2',
+      currency: 'INR',
+      disk: '100 GB',
+      ram: '4',
+      software: { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+    };
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            ...basePlan,
+            available_inventory_status: false,
+            name: 'Unavailable',
+            price_per_hour: 5,
+            template_id: 904
+          },
+          {
+            ...basePlan,
+            name: 'Expensive',
+            price_per_hour: 30,
+            template_id: 903
+          },
+          { ...basePlan, name: 'Zebra', price_per_hour: 10, template_id: 902 },
+          { ...basePlan, name: 'Alpha', price_per_hour: 10, template_id: 901 }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.name).toBe('Alpha');
+    expect(result.items[1]?.name).toBe('Zebra');
+    expect(result.items[2]?.name).toBe('Expensive');
+    expect(result.items[3]?.name).toBe('Unavailable');
+  });
+
+  it('normalizes null price_per_hour and null price to null', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: null,
+            disk: '100 GB',
+            name: 'Free',
+            price_per_hour: null,
+            price: null,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.price_per_hour).toBeNull();
   });
 
   it('lists template plans for one supported engine version', async () => {
@@ -1079,6 +1386,157 @@ describe('DbaasService', () => {
     expect(createDbaasClient).not.toHaveBeenCalled();
   });
 
+  it('rejects createDbaas when the plan name does not match any template plan', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'NonExistentPlan',
+        type: 'sql'
+      })
+    ).rejects.toThrow('No DBaaS plan matches "NonExistentPlan".');
+  });
+
+  it('rejects invalid --billing-type values', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        billingType: 'quarterly',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Billing type must be one of: hourly, committed.');
+  });
+
+  it('rejects --committed-plan-id when billing type is not committed', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        committedPlanId: '999',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      '--committed-plan-id can only be used with --billing-type committed.'
+    );
+  });
+
+  it('rejects invalid --committed-renewal values', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        billingType: 'committed',
+        committedPlanId: '999',
+        committedRenewal: 'monthly',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('Committed renewal must be auto-renew or hourly.');
+  });
+
+  it('accepts --committed-renewal hourly and passes it through to the API', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: []
+      });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        billingType: 'committed',
+        committedPlanId: '999',
+        committedRenewal: 'hourly',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow('No DBaaS plan matches "Small".');
+  });
+
+  it('wraps file read errors with a helpful message', async () => {
+    const { readPasswordFile, service } = createServiceFixture();
+
+    readPasswordFile.mockRejectedValue(new Error('ENOENT: no such file'));
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        passwordFile: '/etc/missing-pass.txt',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      'Could not read DBaaS password file: /etc/missing-pass.txt'
+    );
+  });
+
   it('rejects committed billing when --committed-plan-id is not provided', async () => {
     const { createDbaasClient, service } = createServiceFixture();
 
@@ -1116,6 +1574,56 @@ describe('DbaasService', () => {
     );
 
     expect(deleteDbaas).not.toHaveBeenCalled();
+  });
+
+  it('rejects detach public IP in non-interactive terminals', async () => {
+    const { detachPublicIp, service } = createServiceFixture({
+      isInteractive: false
+    });
+
+    await expect(
+      service.detachPublicIp('7869', { alias: 'prod' })
+    ).rejects.toThrow(
+      'Detaching a DBaaS public IP requires confirmation in an interactive terminal.'
+    );
+
+    expect(detachPublicIp).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-numeric DBaaS IDs', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(service.getDbaas('abc', { alias: 'prod' })).rejects.toThrow(
+      'DBaaS ID must be numeric.'
+    );
+  });
+
+  it('rejects empty DBaaS IDs', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(service.getDbaas('', { alias: 'prod' })).rejects.toThrow(
+      'DBaaS ID cannot be empty.'
+    );
+  });
+
+  it('rejects empty IP address for whitelist', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.addWhitelistedIp('7869', { alias: 'prod', ip: '' })
+    ).rejects.toThrow('IP address cannot be empty.');
+  });
+
+  it('rejects passwords that do not meet complexity requirements', async () => {
+    const { getDbaas, service } = createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+
+    await expect(
+      service.resetPassword('7869', { alias: 'prod', password: 'tooshort' })
+    ).rejects.toThrow(
+      'Password must be 16-30 characters and include uppercase, lowercase, numeric, and special characters.'
+    );
   });
 
   it('fails clearly when the create response does not include a usable id', async () => {
@@ -1652,5 +2160,244 @@ describe('DbaasService', () => {
     const result = await service.listDbaas({ alias: 'prod' });
 
     expect(result.items[0]?.connection_string).toBeNull();
+  });
+
+  it('sorts list items by type when names are equal but types differ', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        { ...createMysqlCluster(), name: 'z-db' },
+        { ...createPostgresCluster(), id: 9902, name: 'z-db' }
+      ],
+      total_count: 2,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.type).toBe('MySQL');
+    expect(result.items[1]?.type).toBe('PostgreSQL');
+  });
+
+  it('sorts list items by version descending when name and type are equal', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    const cluster80 = { ...createMysqlCluster(), id: 801, name: 'same-db' };
+    const cluster57 = {
+      ...createMysqlCluster(),
+      id: 802,
+      name: 'same-db',
+      software: { engine: 'Relational', id: 302, name: 'MySQL', version: '5.7' }
+    };
+
+    listDbaas.mockResolvedValue({
+      items: [cluster57, cluster80],
+      total_count: 2,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.version).toBe('8.0');
+    expect(result.items[1]?.version).toBe('5.7');
+  });
+
+  it('resolves subnet id from subnets array when subnet field is not a number or array', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 1,
+        ip_address: '10.0.0.1',
+        subnet: null,
+        subnets: [{ id: 44, ipv4_cidr: '10.0.0.0/24' }],
+        vpc: { ipv4_cidr: '10.0.0.0/16', name: 'app-vpc', network_id: 501 }
+      }
+    ]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.vpc_connections[0]?.subnet_id).toBe(44);
+  });
+
+  it('throws when VPC operations are requested but no VPC client is provided', async () => {
+    const listDbaas = vi.fn();
+    const getDbaas = vi.fn();
+    const listPlans = vi.fn();
+    const createDbaas = vi.fn();
+    const createDbaasClient = vi.fn(
+      () =>
+        ({
+          attachVpc: vi.fn(),
+          attachPublicIp: vi.fn(),
+          createDbaas,
+          deleteDbaas: vi.fn(),
+          detachPublicIp: vi.fn(),
+          detachVpc: vi.fn(),
+          getDbaas,
+          getPublicIpStatus: vi.fn(),
+          listDbaas,
+          listPlans,
+          listVpcConnections: vi.fn(),
+          listWhitelistedIps: vi.fn(),
+          resetPassword: vi.fn(),
+          updateWhitelistedIps: vi.fn()
+        }) as unknown as DbaasClient
+    );
+
+    const service = new DbaasService({
+      confirm: vi.fn(() => Promise.resolve(true)),
+      createDbaasClient,
+      isInteractive: true,
+      readPasswordFile: vi.fn(),
+      readPasswordFromStdin: vi.fn(),
+      store: {
+        configPath: '/tmp/e2ectl-config.json',
+        read: () =>
+          Promise.resolve({
+            default: 'prod',
+            profiles: {
+              prod: {
+                api_key: 'api-key',
+                auth_token: 'auth-token',
+                default_location: 'Delhi',
+                default_project_id: '46429'
+              }
+            }
+          })
+      }
+    });
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'Small',
+        type: 'sql',
+        vpcId: '501'
+      })
+    ).rejects.toThrow('VPC operations are not available in this context.');
+  });
+
+  it('normalizes whitelist IPs from master_node tags when top-level whitelisted_ips is empty', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      whitelisted_ips: [],
+      master_node: {
+        ...createMysqlCluster().master_node,
+        allowed_ip_address: {
+          whitelisted_ips_tags: [{ ip: '10.0.0.5', tag_list: [] }]
+        }
+      }
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.whitelisted_ips[0]?.ip).toBe('10.0.0.5');
+  });
+
+  it('normalizes whitelist IPs from master_node plain ips array filtering null values', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      whitelisted_ips: [],
+      master_node: {
+        ...createMysqlCluster().master_node,
+        allowed_ip_address: {
+          whitelisted_ips: ['10.0.0.5', '', null as unknown as string]
+        }
+      }
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.whitelisted_ips).toHaveLength(1);
+    expect(result.dbaas.whitelisted_ips[0]?.ip).toBe('10.0.0.5');
+  });
+
+  it('resolves subnet id from array-typed subnet field', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 1,
+        ip_address: '10.0.0.1',
+        subnet: [44, 55],
+        subnets: undefined,
+        vpc: { ipv4_cidr: '10.0.0.0/16', name: 'app-vpc', network_id: 501 }
+      }
+    ]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.vpc_connections[0]?.subnet_id).toBe(44);
+  });
+
+  it('normalizes an empty-string port to null', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      master_node: {
+        ...createMysqlCluster().master_node,
+        port: '',
+        public_port: undefined
+      }
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.connection_port).toBeNull();
   });
 });

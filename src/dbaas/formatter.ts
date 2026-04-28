@@ -119,12 +119,18 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       createTable.push(
         ['Name', result.dbaas.name || '--'],
         ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
-        ['DB Version', formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'],
+        [
+          'DB Version',
+          formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
+        ],
         ['Database Name', result.dbaas.database_name ?? '--'],
         ['Billing Type', result.requested.billing_type || '--']
       );
       if (result.requested.committed_plan_id !== undefined) {
-        createTable.push(['Committed Plan ID', String(result.requested.committed_plan_id)]);
+        createTable.push([
+          'Committed Plan ID',
+          String(result.requested.committed_plan_id)
+        ]);
       }
       if (result.requested.vpc_id !== undefined) {
         createTable.push(['VPC ID', String(result.requested.vpc_id)]);
@@ -150,7 +156,10 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       resetTable.push(
         ['Name', result.dbaas.name || '--'],
         ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
-        ['DB Version', formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'],
+        [
+          'DB Version',
+          formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
+        ],
         ['Username', result.dbaas.username ?? '--'],
         ['Message', result.message || '--']
       );
@@ -207,7 +216,12 @@ function renderGetHuman(item: DbaasDetailItem): string {
     ['Price', item.plan.price ?? '--'],
     ['Status', item.status ?? '--'],
     ['Public Connection Endpoint', item.connection_endpoint ?? '--'],
-    ['Connection Port', item.connection_port === null || item.connection_port === undefined ? '--' : String(item.connection_port)]
+    [
+      'Connection Port',
+      item.connection_port === null || item.connection_port === undefined
+        ? '--'
+        : String(item.connection_port)
+    ]
   );
 
   return `${detailsTable.toString()}\n` + vpcSection + whitelistSection;
@@ -260,7 +274,6 @@ function renderTemplatePlansHuman(result: {
   );
 }
 
-
 function renderVpcAttachHuman(result: DbaasVpcAttachCommandResult): string {
   return (
     `Attached VPC ${result.vpc.id} (${result.vpc.name}) to DBaaS ${result.dbaas_id}.\n` +
@@ -279,7 +292,6 @@ function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
     (result.message === null ? '' : `Message: ${result.message}\n`)
   );
 }
-
 
 function formatVpcConnectionsTable(
   items: DbaasDetailItem['vpc_connections']

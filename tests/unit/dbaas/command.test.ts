@@ -1,3 +1,7 @@
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { Command, CommanderError } from 'commander';
 
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
@@ -338,6 +342,7 @@ describe('dbaas commands', () => {
             database_name: 'appdb',
             id: 7869,
             name: 'customer-db',
+            private_ips: [],
             public_ip: null,
             status: 'Running',
             type: 'MySQL',
@@ -458,9 +463,8 @@ describe('dbaas commands', () => {
       '--force'
     ]);
 
-    expect(stdout.buffer).toContain(
-      'Password reset requested for DBaaS: customer-db'
-    );
+    expect(stdout.buffer).toContain('Password Reset');
+    expect(stdout.buffer).toContain('customer-db');
     expect(stdout.buffer).toContain('"action": "delete"');
     expect(stdout.buffer).toContain('"cancelled": false');
   });
@@ -507,13 +511,256 @@ describe('dbaas commands', () => {
       '--force'
     ]);
 
-    expect(stdout.buffer).toContain('DBaaS: customer-db');
-    expect(stdout.buffer).toContain('Connection Endpoint: db.example.com');
+    expect(stdout.buffer).toContain('customer-db');
+    expect(stdout.buffer).toContain('db.example.com');
     expect(stdout.buffer).toContain('"action": "whitelist-add"');
     expect(stdout.buffer).toContain('"action": "public-ip-detach"');
     expect(stub.updateWhitelistedIps).toHaveBeenCalledWith(7869, 'attach', {
       allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
     });
     expect(stub.detachPublicIp).toHaveBeenCalledWith(7869);
+  });
+
+  it('lists engine types through the command surface', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'dbaas',
+      'list-types',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('MySQL');
+  });
+
+  it('lists plans through the command surface in json mode', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'plans',
+      '--type',
+      'sql',
+      '--db-version',
+      '8.0',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "plans"');
+    expect(stdout.buffer).toContain('General Purpose Small');
+  });
+
+  it('attaches a public IP through the network command surface', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'network',
+      'attach-public-ip',
+      '7869',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "public-ip-attach"');
+    expect(stub.attachPublicIp).toHaveBeenCalledWith(7869);
+  });
+
+  it('lists and removes whitelisted IPs through the command surface', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'whitelist',
+      'list',
+      '7869',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'whitelist',
+      'remove',
+      '7869',
+      '--ip',
+      '203.0.113.10',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "whitelist-list"');
+    expect(stdout.buffer).toContain('"action": "whitelist-remove"');
+    expect(stub.listWhitelistedIps).toHaveBeenCalledWith(
+      7869,
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it('shows help for network and whitelist subcommands', async () => {
+    const networkHelp = await renderHelp(['dbaas', 'network', '--help']);
+    const whitelistHelp = await renderHelp(['dbaas', 'whitelist', '--help']);
+
+    expect(networkHelp).toContain('attach-vpc');
+    expect(networkHelp).toContain('detach-vpc');
+    expect(whitelistHelp).toContain('list');
+    expect(whitelistHelp).toContain('add');
+    expect(whitelistHelp).toContain('remove');
+  });
+
+  function createVpcEnabledRuntime(
+    base: ReturnType<typeof createRuntimeFixture>
+  ) {
+    return {
+      ...base.runtime,
+      createVpcClient: vi.fn(() => ({
+        attachNodeVpc: vi.fn(),
+        createVpc: vi.fn(),
+        deleteVpc: vi.fn(),
+        detachNodeVpc: vi.fn(),
+        getVpc: vi.fn(() =>
+          Promise.resolve({
+            ipv4_cidr: '10.40.0.0/16',
+            is_e2e_vpc: true,
+            name: 'app-vpc',
+            network_id: 501,
+            state: 'Active'
+          })
+        ),
+        listVpcPlans: vi.fn(),
+        listVpcs: vi.fn()
+      }))
+    };
+  }
+
+  it('attaches and detaches a VPC through the network command surface', async () => {
+    const fixture = createRuntimeFixture();
+    const runtime = createVpcEnabledRuntime(fixture);
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'network',
+      'attach-vpc',
+      '7869',
+      '--vpc-id',
+      '501',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(fixture.stdout.buffer).toContain('"action": "vpc-attach"');
+    expect(fixture.stub.attachVpc).toHaveBeenCalledWith(
+      7869,
+      expect.objectContaining({ action: 'attach' })
+    );
+  });
+
+  it('detaches a VPC through the network command surface', async () => {
+    const fixture = createRuntimeFixture();
+    const runtime = createVpcEnabledRuntime(fixture);
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'network',
+      'detach-vpc',
+      '7869',
+      '--vpc-id',
+      '501',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(fixture.stdout.buffer).toContain('"action": "vpc-detach"');
+    expect(fixture.stub.detachVpc).toHaveBeenCalledWith(
+      7869,
+      expect.objectContaining({ action: 'detach' })
+    );
+  });
+
+  it('outputs help when network or whitelist are invoked with no subcommand', async () => {
+    const networkHelp = await renderHelp(['dbaas', 'network']);
+    const whitelistHelp = await renderHelp(['dbaas', 'whitelist']);
+
+    expect(networkHelp).toContain('attach-vpc');
+    expect(whitelistHelp).toContain('add');
+  });
+
+  it('prompts for confirmation when deleting without --force', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'delete',
+      '7869',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(runtime.confirm).toHaveBeenCalled();
+    expect(stdout.buffer).toContain('"action": "delete"');
+    expect(stdout.buffer).toContain('"cancelled": false');
+  });
+
+  it('reads the password from a file when --password-file is provided', async () => {
+    const { runtime, stdout } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    const passwordFile = join(tmpdir(), `e2ectl-test-pw-${Date.now()}.txt`);
+    writeFileSync(passwordFile, 'ValidPassword1!A');
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'reset-password',
+      '7869',
+      '--alias',
+      'prod',
+      '--password-file',
+      passwordFile
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "reset-password"');
   });
 });

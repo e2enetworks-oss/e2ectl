@@ -158,6 +158,37 @@ describe('DbaasApiClient', () => {
     });
   });
 
+  it('lists DBaaS plans without a software id filter', async () => {
+    const transport = new StubTransport();
+    const client = new DbaasApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope({
+        database_engines: [],
+        template_plans: []
+      })
+    );
+
+    await client.listPlans();
+
+    expect(transport.getMock).toHaveBeenCalledWith('/rds/plans/', {});
+  });
+
+  it('omits pagination fields when absent from listWhitelistedIps response', async () => {
+    const transport = new StubTransport();
+    const client = new DbaasApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([{ ip: '10.0.0.1', tag_list: [] }])
+    );
+
+    const result = await client.listWhitelistedIps(7869, 1, 100);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.total_count).toBeUndefined();
+    expect(result.total_page_number).toBeUndefined();
+  });
+
   it('creates DBaaS clusters through the cluster collection path', async () => {
     const transport = new StubTransport();
     const client = new DbaasApiClient(transport);

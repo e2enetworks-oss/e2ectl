@@ -19,7 +19,6 @@ import {
   type DbaasPublicIpOptions,
   type DbaasPlansOptions,
   type DbaasResetPasswordOptions,
-
   type DbaasWhitelistListOptions,
   type DbaasWhitelistUpdateOptions
 } from './service.js';
@@ -318,9 +317,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
   });
 
   const whitelistCommand = addContextOptions(
-    command
-      .command('whitelist')
-      .description('Manage DBaaS whitelisted IPs.')
+    command.command('whitelist').description('Manage DBaaS whitelisted IPs.')
   );
   whitelistCommand.helpCommand(
     'help [command]',

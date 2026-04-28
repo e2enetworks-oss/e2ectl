@@ -343,7 +343,6 @@ export type DbaasCommandResult =
   | DbaasPublicIpAttachCommandResult
   | DbaasPublicIpDetachCommandResult
   | DbaasResetPasswordCommandResult
-
   | DbaasVpcAttachCommandResult
   | DbaasVpcDetachCommandResult
   | DbaasWhitelistListCommandResult
@@ -529,9 +528,9 @@ export class DbaasService {
             database_name: normalized.database_name,
             id: normalized.id,
             name: normalized.name,
-            private_ips: [normalizeHost(item.master_node.private_ip_address)].filter(
-              (ip): ip is string => ip !== null
-            ),
+            private_ips: [
+              normalizeHost(item.master_node.private_ip_address)
+            ].filter((ip): ip is string => ip !== null),
             public_ip: normalizeHost(item.master_node.public_ip_address),
             status: normalizeOptionalString(item.status),
             type: normalized.type,
@@ -1235,7 +1234,6 @@ function summarizeTemplatePlans(
       return left.name.localeCompare(right.name);
     });
 }
-
 
 function resolveSoftware(
   catalog: DbaasPlanCatalog,
