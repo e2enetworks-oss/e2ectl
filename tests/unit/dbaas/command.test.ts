@@ -735,7 +735,7 @@ describe('dbaas commands', () => {
       'prod'
     ]);
 
-    expect(runtime.confirm).toHaveBeenCalled();
+    expect(runtime.confirm.bind(runtime)).toHaveBeenCalled();
     expect(stdout.buffer).toContain('"action": "delete"');
     expect(stdout.buffer).toContain('"cancelled": false');
   });
