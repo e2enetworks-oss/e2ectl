@@ -76,7 +76,7 @@ If you want a different admin user, also pass `--username <username>`.
 
 #### Committed (Reserved) Billing
 
-Use `--billing-type committed` with a SKU ID from `dbaas skus`:
+Use `--billing-type committed` with a SKU ID from `dbaas plans`:
 
 ```bash
 e2ectl dbaas create \
@@ -113,13 +113,7 @@ When a VPC is attached during creation, public IP access is enabled by default. 
 
 ### Attach A VPC To An Existing Cluster
 
-The cluster must be in Running state:
-
-```bash
-e2ectl dbaas attach <dbaas-id> --vpc-id <network-id>
-```
-
-The preferred network command is:
+The cluster must be in Running state. Attach with the network command:
 
 ```bash
 e2ectl dbaas network attach-vpc <dbaas-id> --vpc-id <network-id>
