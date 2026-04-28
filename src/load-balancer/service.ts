@@ -372,6 +372,7 @@ export class LoadBalancerService {
     }
     const port = assertPort(resolvedPort, '--port');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
+    assertCreateBillingOptionShape(options);
     const credentials = await this.resolveContext(options);
     const client = this.dependencies.createLoadBalancerClient(credentials);
     const reserveIp =
@@ -1549,46 +1550,7 @@ async function resolveCreateBillingSelection(
   requestedBasePlan: string,
   options: LoadBalancerCreateBillingSelectionOptions
 ): Promise<ResolvedLoadBalancerCreateBilling> {
-  const hasCommittedSelector =
-    options.committedPlan !== undefined ||
-    options.committedPlanId !== undefined;
-
-  if (options.billingType === 'hourly' && hasCommittedSelector) {
-    throw new CliError(
-      '--billing-type hourly cannot be used with --committed-plan or --committed-plan-id.',
-      {
-        code: 'BILLING_TYPE_CONFLICT',
-        exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Remove --billing-type or change it to --billing-type committed.'
-      }
-    );
-  }
-
-  if (options.billingType === 'committed' && !hasCommittedSelector) {
-    throw new CliError(
-      '--billing-type committed requires --committed-plan <name> or --committed-plan-id <id>.',
-      {
-        code: 'COMMITTED_PLAN_SELECTOR_REQUIRED',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatCliCommand('lb plans')} to find committed options for your base plan.`
-      }
-    );
-  }
-
-  if (
-    options.committedPlan !== undefined &&
-    options.committedPlanId !== undefined
-  ) {
-    throw new CliError(
-      'Choose either --committed-plan or --committed-plan-id, not both.',
-      {
-        code: 'COMMITTED_PLAN_SELECTOR_CONFLICT',
-        exitCode: EXIT_CODES.usage
-      }
-    );
-  }
-
+  assertCreateBillingOptionShape(options);
   const plans = await client.listLoadBalancerPlans();
   const basePlan = findBasePlan(plans, requestedBasePlan);
   if (basePlan === undefined) {
@@ -1664,6 +1626,50 @@ async function resolveCreateBillingSelection(
     postCommitBehavior: normalizePostCommitBehavior(options.postCommitBehavior),
     type: 'committed'
   };
+}
+
+function assertCreateBillingOptionShape(
+  options: LoadBalancerCreateBillingSelectionOptions
+): void {
+  const hasCommittedSelector =
+    options.committedPlan !== undefined ||
+    options.committedPlanId !== undefined;
+
+  if (options.billingType === 'hourly' && hasCommittedSelector) {
+    throw new CliError(
+      '--billing-type hourly cannot be used with --committed-plan or --committed-plan-id.',
+      {
+        code: 'BILLING_TYPE_CONFLICT',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --billing-type or change it to --billing-type committed.'
+      }
+    );
+  }
+
+  if (options.billingType === 'committed' && !hasCommittedSelector) {
+    throw new CliError(
+      '--billing-type committed requires --committed-plan <name> or --committed-plan-id <id>.',
+      {
+        code: 'COMMITTED_PLAN_SELECTOR_REQUIRED',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatCliCommand('lb plans')} to find committed options for your base plan.`
+      }
+    );
+  }
+
+  if (
+    options.committedPlan !== undefined &&
+    options.committedPlanId !== undefined
+  ) {
+    throw new CliError(
+      'Choose either --committed-plan or --committed-plan-id, not both.',
+      {
+        code: 'COMMITTED_PLAN_SELECTOR_CONFLICT',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
 }
 
 function findBasePlan(
