@@ -237,6 +237,49 @@ function buildAlbWithTwoGroupsGetResponse() {
   };
 }
 
+function buildAlbWithDuplicateServersGetResponse() {
+  return {
+    code: 200,
+    data: {
+      id: 10,
+      appliance_name: 'my-alb',
+      status: 'RUNNING',
+      lb_mode: 'HTTP',
+      lb_type: 'external',
+      public_ip: '1.2.3.4',
+      appliance_instance: [
+        {
+          context: buildAlbContext([
+            {
+              name: 'web',
+              domain_name: 'example.com',
+              backend_mode: 'http',
+              balance: 'roundrobin',
+              backend_ssl: false,
+              http_check: false,
+              check_url: '/',
+              servers: [
+                {
+                  backend_name: 'dup',
+                  backend_ip: '10.0.0.1',
+                  backend_port: 8080
+                },
+                {
+                  backend_name: 'dup',
+                  backend_ip: '10.0.0.2',
+                  backend_port: 8080
+                }
+              ]
+            }
+          ])
+        }
+      ]
+    },
+    errors: {},
+    message: 'OK'
+  };
+}
+
 describe('lb backend commands against a fake MyAccount API', () => {
   it('lb get — GET and renders details', async () => {
     const server = await startTestHttpServer({
@@ -259,6 +302,90 @@ describe('lb backend commands against a fake MyAccount API', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('my-alb');
       expect(result.stdout).toContain('Backend Groups');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group list — renders empty ALB backend groups', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildEmptyAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['lb', 'backend-group', 'list', '10'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('No backend groups configured');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group list — renders ALB backend groups', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['lb', 'backend-group', 'list', '10'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Backend Group');
+      expect(result.stdout).toContain('web');
+      expect(result.stdout).toContain('HTTP');
+      expect(result.stdout).toContain('server-1 (10.0.0.1:8080)');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group list — renders NLB backend groups', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['lb', 'backend-group', 'list', '20'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('grp');
+      expect(result.stdout).toContain('TCP');
+      expect(result.stdout).toContain('Port: 3000');
+      expect(result.stdout).toContain('srv-1 (10.0.0.1:3000)');
     } finally {
       await server.close();
       await tempHome.cleanup();
@@ -1379,6 +1506,587 @@ describe('lb backend commands against a fake MyAccount API', () => {
       expect(result.exitCode).toBe(0);
       const parsed = JSON.parse(result.stdout) as JsonActionResult;
       expect(parsed.action).toBe('backend-group-remove');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group add — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildEmptyAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'lb',
+          'backend-group',
+          'add',
+          '10',
+          '--name',
+          'api',
+          '--backend-server',
+          'api-1:10.0.0.9:9000'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-group-add');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group update — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'lb',
+          'backend-group',
+          'update',
+          '10',
+          'web',
+          '--algorithm',
+          'leastconn'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-group-update');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server add — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'lb',
+          'backend-server',
+          'add',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server',
+          'server-2:10.0.0.5:8080'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-server-add');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'lb',
+          'backend-server',
+          'update',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'server-1',
+          '--ip',
+          '10.0.0.9'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-server-update');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server remove — JSON output', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbWithTwoGroupsGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': () => ({
+        body: buildUpdateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'lb',
+          'backend-server',
+          'remove',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'server-2'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as JsonActionResult;
+      expect(parsed.action).toBe('backend-server-remove');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group update — fails when backend protocol is sent to an NLB', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-group',
+          'update',
+          '20',
+          'grp',
+          '--backend-protocol',
+          'HTTP'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain(
+        '--backend-protocol is only valid for ALB backend groups'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group update — fails when an NLB group is missing', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-group',
+          'update',
+          '20',
+          'missing',
+          '--algorithm',
+          'source'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Backend group "missing" not found');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group update — fails when an ALB group is missing', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-group',
+          'update',
+          '10',
+          'missing',
+          '--algorithm',
+          'source'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Backend group "missing" not found');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group remove — fails when removing the final ALB group', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['lb', 'backend-group', 'remove', '10', 'web'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('is the last backend group');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group remove — fails when removing the final NLB group', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['lb', 'backend-group', 'remove', '20', 'grp'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('is the last backend group');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — fails when an ALB server is missing', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'update',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'missing',
+          '--ip',
+          '10.0.0.9'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Server "missing" was not found');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — fails when an NLB server is missing', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'update',
+          '20',
+          '--backend-group',
+          'grp',
+          '--backend-server-name',
+          'missing',
+          '--port',
+          '9090'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Server "missing" was not found');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server remove — fails when removing the final ALB server', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'remove',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'server-1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('is the last server');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server remove — fails when removing the final NLB server', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'remove',
+          '20',
+          '--backend-group',
+          'grp',
+          '--backend-server-name',
+          'srv-1'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('is the last server');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server remove — fails when a server name is ambiguous', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbWithDuplicateServersGetResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'remove',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'dup'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Multiple servers named "dup"');
     } finally {
       await server.close();
       await tempHome.cleanup();

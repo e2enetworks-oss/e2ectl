@@ -36,6 +36,30 @@ function buildPlansResponse() {
   };
 }
 
+function buildPlansResponseWithoutCommittedOptions() {
+  return {
+    code: 200,
+    data: [
+      {
+        appliance_config: [
+          {
+            committed_sku: [],
+            disk: 50,
+            hourly: 3,
+            name: 'LB-2',
+            price: 2000,
+            ram: 4,
+            template_id: 'plan-1',
+            vcpu: 2
+          }
+        ]
+      }
+    ],
+    errors: {},
+    message: 'OK'
+  };
+}
+
 function buildCreateResponse() {
   return {
     code: 200,
@@ -48,6 +72,26 @@ function buildCreateResponse() {
     errors: {},
     message: 'OK'
   };
+}
+
+function baseCreateArgs(overrides: string[] = []) {
+  return [
+    'lb',
+    'create',
+    '--name',
+    'test',
+    '--plan',
+    'LB-2',
+    '--frontend-protocol',
+    'HTTP',
+    '--port',
+    '80',
+    '--backend-group',
+    'web',
+    '--backend-server',
+    's1:10.0.0.1:8080',
+    ...overrides
+  ];
 }
 
 describe('lb create against a fake MyAccount API', () => {
@@ -313,6 +357,74 @@ describe('lb create against a fake MyAccount API', () => {
           }
         ],
         vpc_list: []
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('creates an external ALB with an available reserved IP', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              floating_ip_attached_nodes: [],
+              ip_address: '9.9.9.9',
+              status: 'Reserved'
+            }
+          ],
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      }),
+      'POST /myaccount/api/v1/appliances/load-balancers/': () => ({
+        body: buildCreateResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'create',
+          '--name',
+          'reserved-alb',
+          '--plan',
+          'LB-2',
+          '--frontend-protocol',
+          'HTTP',
+          '--port',
+          '80',
+          '--backend-group',
+          'web',
+          '--backend-server',
+          's1:10.0.0.1:8080',
+          '--reserve-ip',
+          '9.9.9.9'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(JSON.parse(server.requests[2]!.body)).toMatchObject({
+        lb_name: 'reserved-alb',
+        lb_reserve_ip: '9.9.9.9',
+        lb_type: 'external'
       });
     } finally {
       await server.close();
@@ -696,6 +808,205 @@ describe('lb create against a fake MyAccount API', () => {
 
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('post-commit-behavior');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when --billing-type hourly is combined with committed options', async () => {
+    const result = await runBuiltCli(
+      baseCreateArgs(['--billing-type', 'hourly', '--committed-plan-id', '901'])
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('--billing-type hourly cannot be used');
+  });
+
+  it('fails when --billing-type committed omits the committed plan selector', async () => {
+    const result = await runBuiltCli(
+      baseCreateArgs(['--billing-type', 'committed'])
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('--billing-type committed requires');
+  });
+
+  it('fails when the requested base plan is not available', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'create',
+          '--name',
+          'test',
+          '--plan',
+          'missing',
+          '--frontend-protocol',
+          'HTTP',
+          '--port',
+          '80',
+          '--backend-group',
+          'web',
+          '--backend-server',
+          's1:10.0.0.1:8080'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain(
+        'Load balancer plan "missing" was not found'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when the base plan has no committed options', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponseWithoutCommittedOptions()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        baseCreateArgs(['--committed-plan', '90 Days']),
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain(
+        'Plan "LB-2" has no committed load balancer options'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when the committed plan selector does not match the base plan', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildPlansResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        baseCreateArgs(['--committed-plan-id', '902']),
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain(
+        'Committed plan ID 902 does not exist for base plan "LB-2"'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when a reserved IP is not in inventory', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: { code: 200, data: [], errors: {}, message: 'OK' }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        baseCreateArgs(['--reserve-ip', '9.9.9.9']),
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain(
+        'Reserved IP 9.9.9.9 was not found in your reserved IP inventory'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('fails when a reserved IP is already attached', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/reserve_ips/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              floating_ip_attached_nodes: [{ vm_id: 1001 }],
+              ip_address: '9.9.9.9',
+              status: 'Reserved'
+            }
+          ],
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        baseCreateArgs(['--reserve-ip', '9.9.9.9']),
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stderr).toContain('Reserved IP 9.9.9.9 is not available');
     } finally {
       await server.close();
       await tempHome.cleanup();

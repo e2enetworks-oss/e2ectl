@@ -326,6 +326,21 @@ function buildBackendGroupCommand(
 
   addContextOptions(
     command
+      .command('list <lbId>')
+      .description('List backend groups on a load balancer.')
+  ).action(
+    async (
+      lbId: string,
+      options: LoadBalancerContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.listBackendGroups(lbId, options);
+      writeResult(runtime, commandInstance, result);
+    }
+  );
+
+  addContextOptions(
+    command
       .command('add <lbId>')
       .description('Add a backend group to a load balancer.')
       .requiredOption('--name <name>', 'Backend group name.')

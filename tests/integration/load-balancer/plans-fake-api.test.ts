@@ -36,6 +36,30 @@ function buildPlansResponse() {
   };
 }
 
+function buildSparsePlansResponse() {
+  return {
+    code: 200,
+    data: [
+      {
+        appliance_config: [
+          {
+            committed_sku: [],
+            disk: -1,
+            hourly: undefined,
+            name: 'LB-0',
+            price: -1,
+            ram: undefined,
+            template_id: 'plan-0',
+            vcpu: undefined
+          }
+        ]
+      }
+    ],
+    errors: {},
+    message: 'OK'
+  };
+}
+
 describe('lb plans against a fake MyAccount API', () => {
   it('emits committed plan data in deterministic JSON', async () => {
     const server = await startTestHttpServer({
@@ -113,6 +137,34 @@ describe('lb plans against a fake MyAccount API', () => {
       expect(result.stdout).toContain('90 Days');
       expect(result.stdout).toContain('901');
       expect(result.stdout).toContain('Price/Month');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('renders sparse human-readable plans without committed options', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliance-type/': () => ({
+        body: buildSparsePlansResponse()
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['lb', 'plans'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('LB-0');
+      expect(result.stdout).toContain('No committed plans found.');
+      expect(result.stdout).toContain('--');
     } finally {
       await server.close();
       await tempHome.cleanup();

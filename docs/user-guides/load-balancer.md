@@ -120,6 +120,8 @@ Reserving a public IP is for external load balancers with an assigned public IPv
 ## Backend Groups
 
 ```bash
+e2ectl lb backend-group list <lbId>
+
 e2ectl lb backend-group add <lbId> \
   --name api \
   --backend-protocol HTTP \
