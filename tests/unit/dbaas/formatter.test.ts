@@ -1167,4 +1167,26 @@ describe('dbaas formatter', () => {
     expect(json.items[0]?.committed_sku[0]?.committed_sku_id).toBe(101);
     expect(json.items[0]?.committed_sku[0]?.committed_days).toBe(365);
   });
+
+  it('renders reset-password output with null username as --', () => {
+    const output = renderDbaasResult(
+      {
+        action: 'reset-password',
+        dbaas: {
+          connection_string: null,
+          database_name: 'appdb',
+          id: 7869,
+          name: 'customer-db',
+          type: 'MySQL',
+          username: null,
+          version: '8.0'
+        },
+        message: 'Password reset request processed successfully.'
+      },
+      false
+    );
+
+    expect(output).toContain('Password Reset');
+    expect(output).toContain('--');
+  });
 });

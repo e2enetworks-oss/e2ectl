@@ -695,6 +695,54 @@ describe('DbaasService', () => {
     expect(result.items[0]?.price_per_hour).toBeNull();
   });
 
+  it('normalizes committed SKU entries with undefined committed_sku_price to null', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: null,
+            disk: '100 GB',
+            name: 'Small',
+            price_per_hour: 12,
+            ram: '4',
+            committed_sku: [
+              {
+                committed_sku_id: 101,
+                committed_days: 365,
+                committed_sku_name: 'Small-1Y'
+              }
+            ],
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.committed_sku[0]?.committed_sku_price).toBeNull();
+  });
+
   it('includes committed SKU entries that have a committed_sku_id', async () => {
     const { listPlans, service } = createServiceFixture();
 
@@ -837,6 +885,96 @@ describe('DbaasService', () => {
     expect(result.items[1]?.name).toBe('Zebra');
     expect(result.items[2]?.name).toBe('Expensive');
     expect(result.items[3]?.name).toBe('Unavailable');
+  });
+
+  it('sorts available plan before unavailable when available appears first in input', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    const basePlan = {
+      cpu: '2',
+      currency: null,
+      disk: '100 GB',
+      ram: '4',
+      software: { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+    };
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            ...basePlan,
+            available_inventory_status: true,
+            name: 'Available',
+            price_per_hour: 10,
+            template_id: 901
+          },
+          {
+            ...basePlan,
+            available_inventory_status: false,
+            name: 'Unavailable',
+            price_per_hour: 5,
+            template_id: 902
+          }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.name).toBe('Available');
+    expect(result.items[1]?.name).toBe('Unavailable');
+  });
+
+  it('sorts a null-price plan after plans with defined prices', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    const basePlan = {
+      available_inventory_status: true,
+      cpu: '2',
+      currency: null,
+      disk: '100 GB',
+      ram: '4',
+      software: { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+    };
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            ...basePlan,
+            name: 'NullPrice',
+            price_per_hour: null,
+            template_id: 902
+          },
+          { ...basePlan, name: 'Priced', price_per_hour: 10, template_id: 901 }
+        ]
+      });
+
+    const result = await service.listPlans({
+      alias: 'prod',
+      dbVersion: '8.0',
+      type: 'sql'
+    });
+
+    expect(result.items[0]?.name).toBe('Priced');
+    expect(result.items[1]?.name).toBe('NullPrice');
   });
 
   it('normalizes null price_per_hour and null price to null', async () => {
@@ -1024,6 +1162,19 @@ describe('DbaasService', () => {
       softwareType: 'MySQL'
     });
   });
+
+  it('throws when list pagination exceeds the maximum supported depth', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [],
+      total_page_number: 600
+    });
+
+    await expect(service.listDbaas({ alias: 'prod' })).rejects.toMatchObject({
+      code: 'DBAAS_LIST_PAGINATION_LIMIT'
+    });
+  }, 10000);
 
   it('resets passwords using the current DB username from cluster details', async () => {
     const { getDbaas, resetPassword, service } = createServiceFixture();
@@ -1877,6 +2028,31 @@ describe('DbaasService', () => {
     ).rejects.toThrow('No supported PostgreSQL engine matches version 14.');
   });
 
+  it('reports no available versions when catalog has no engines of the requested type', async () => {
+    const { listPlans, service } = createServiceFixture();
+
+    listPlans.mockResolvedValue({
+      database_engines: [
+        { engine: 'Relational', id: 301, name: 'MySQL', version: '8.0' }
+      ],
+      template_plans: []
+    });
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'mydb',
+        dbVersion: '16',
+        name: 'my-cluster',
+        password: 'ValidPassword1!A',
+        plan: 'Small',
+        type: 'postgres'
+      })
+    ).rejects.toMatchObject({
+      details: expect.arrayContaining([expect.stringContaining('none')])
+    });
+  });
+
   it('fails clearly when neither password nor password-file is provided', async () => {
     const { createDbaasClient, service } = createServiceFixture();
 
@@ -2381,6 +2557,69 @@ describe('DbaasService', () => {
     expect(result.dbaas.vpc_connections[0]?.subnet_id).toBe(44);
   });
 
+  it('returns null subnet id when array has no integer items', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 1,
+        ip_address: '10.0.0.1',
+        subnet: [] as number[],
+        subnets: undefined,
+        vpc: { ipv4_cidr: '10.0.0.0/16', name: 'app-vpc', network_id: 501 }
+      }
+    ]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.vpc_connections[0]?.subnet_id).toBeNull();
+  });
+
+  it('returns null subnet id when subnets array has no entry with integer id', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 1,
+        ip_address: '10.0.0.1',
+        subnet: null,
+        subnets: [],
+        vpc: { ipv4_cidr: '10.0.0.0/16', name: 'app-vpc', network_id: 501 }
+      }
+    ]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.vpc_connections[0]?.subnet_id).toBeNull();
+  });
+
+  it('normalizes non-finite appliance_id to null', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: NaN,
+        ip_address: '10.0.0.1',
+        subnet: 44,
+        subnets: undefined,
+        vpc: { ipv4_cidr: '10.0.0.0/16', name: 'app-vpc', network_id: 501 }
+      }
+    ]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.vpc_connections[0]?.appliance_id).toBeNull();
+  });
+
   it('normalizes an empty-string port to null', async () => {
     const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
       createServiceFixture();
@@ -2399,5 +2638,117 @@ describe('DbaasService', () => {
     const result = await service.getDbaas('7869', { alias: 'prod' });
 
     expect(result.dbaas.connection_port).toBeNull();
+  });
+
+  it('normalizes a string-typed port when public_port is absent', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      master_node: {
+        ...createMysqlCluster().master_node,
+        port: '3306',
+        public_port: undefined
+      }
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.connection_port).toBe('3306');
+  });
+
+  it('builds a PostgreSQL connection string without port when port is null', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          ...createPostgresCluster(),
+          master_node: {
+            ...createPostgresCluster().master_node,
+            port: null as unknown as string,
+            public_port: null as unknown as number
+          }
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.connection_string).toBe(
+      'psql -h pg.example.com -U admin -d analytics'
+    );
+  });
+
+  it('builds a PostgreSQL connection string without port or database name when both are null', async () => {
+    const { listDbaas, service } = createServiceFixture();
+    const base = createPostgresCluster();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        {
+          ...base,
+          master_node: {
+            ...base.master_node,
+            database: {
+              ...base.master_node.database,
+              database: null as unknown as string
+            },
+            port: null as unknown as string,
+            public_port: null as unknown as number
+          }
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items[0]?.connection_string).toBe(
+      'psql -h pg.example.com -U admin'
+    );
+  });
+
+  it('normalizes whitelist tags from the tags field when tag_list is absent', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      whitelisted_ips: [
+        {
+          ip: '10.0.0.1',
+          tags: [{ id: 7, tag: 'vpn-office' }]
+        }
+      ]
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.whitelisted_ips[0]?.tags[0]?.name).toBe('vpn-office');
+  });
+
+  it('returns empty tags when whitelist item has neither tag_list nor tags', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      whitelisted_ips: [{ ip: '10.0.0.2' }]
+    });
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+    listVpcConnections.mockResolvedValue([]);
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result.dbaas.whitelisted_ips[0]?.tags).toEqual([]);
   });
 });
