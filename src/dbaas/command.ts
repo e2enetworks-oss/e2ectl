@@ -157,10 +157,15 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'Initial admin username. Defaults to admin.',
         'admin'
       )
-      .option('--no-public-ip', 'Create the DBaaS without a public endpoint.')
       .option(
         '--public-ip',
-        'Create the DBaaS with a public endpoint. This is the default when a VPC is attached.'
+        'Create a VPC-attached DBaaS with a public endpoint. This is the default when a VPC is attached.'
+      )
+      .addOption(
+        new Option(
+          '--no-public-ip',
+          'Create a VPC-attached DBaaS without a public endpoint.'
+        ).default(undefined)
       )
       .addOption(
         new Option(

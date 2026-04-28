@@ -87,6 +87,21 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
           message: 'OK'
         }
       }),
+      'GET /myaccount/api/v1/rds/cluster/7869/update-allowed-hosts': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              ip: '203.0.113.10',
+              tag_list: [{ id: 7, label_name: 'office' }]
+            }
+          ],
+          errors: {},
+          message: 'OK',
+          total_count: 1,
+          total_page_number: 1
+        }
+      }),
       'PUT /myaccount/api/v1/rds/cluster/7869/update-allowed-hosts': () => ({
         body: {
           code: 200,
@@ -95,12 +110,50 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
           message: 'IP whitelisting in progress.'
         }
       }),
+      'PUT /myaccount/api/v1/rds/cluster/7869/public-ip-attach/': () => ({
+        body: {
+          code: 200,
+          data: {},
+          errors: {},
+          message: 'Public IP attach initiated.'
+        }
+      }),
       'PUT /myaccount/api/v1/rds/cluster/7869/public-ip-detach/': () => ({
         body: {
           code: 200,
           data: {},
           errors: {},
           message: 'Public IP detach initiated.'
+        }
+      }),
+      'GET /myaccount/api/v1/vpc/501/': () => ({
+        body: {
+          code: 200,
+          data: {
+            ipv4_cidr: '10.40.0.0/16',
+            is_e2e_vpc: true,
+            name: 'app-vpc',
+            network_id: 501,
+            state: 'Active'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'PUT /myaccount/api/v1/rds/cluster/7869/vpc-attach/': () => ({
+        body: {
+          code: 200,
+          data: {},
+          errors: {},
+          message: 'VPC attach initiated.'
+        }
+      }),
+      'PUT /myaccount/api/v1/rds/cluster/7869/vpc-detach/': () => ({
+        body: {
+          code: 200,
+          data: {},
+          errors: {},
+          message: 'VPC detach initiated.'
         }
       })
     });
@@ -132,6 +185,63 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       );
       const detachPublicIpResult = await runBuiltCli(
         ['--json', 'dbaas', 'network', 'detach-public-ip', '7869', '--force'],
+        { env }
+      );
+      const humanGetResult = await runBuiltCli(['dbaas', 'get', '7869'], {
+        env
+      });
+      const whitelistListResult = await runBuiltCli(
+        ['dbaas', 'whitelist', 'list', '7869'],
+        { env }
+      );
+      const whitelistRemoveResult = await runBuiltCli(
+        [
+          'dbaas',
+          'whitelist',
+          'remove',
+          '7869',
+          '--ip',
+          '203.0.113.10',
+          '--tag-id',
+          '7'
+        ],
+        { env }
+      );
+      const attachPublicIpResult = await runBuiltCli(
+        ['dbaas', 'network', 'attach-public-ip', '7869'],
+        { env }
+      );
+      const attachVpcResult = await runBuiltCli(
+        ['dbaas', 'network', 'attach-vpc', '7869', '--vpc-id', '501'],
+        { env }
+      );
+      const detachVpcResult = await runBuiltCli(
+        [
+          'dbaas',
+          'network',
+          'detach-vpc',
+          '7869',
+          '--vpc-id',
+          '501',
+          '--subnet-id',
+          '44'
+        ],
+        { env }
+      );
+      const attachPublicIpJsonResult = await runBuiltCli(
+        ['--json', 'dbaas', 'network', 'attach-public-ip', '7869'],
+        { env }
+      );
+      const attachVpcJsonResult = await runBuiltCli(
+        ['--json', 'dbaas', 'network', 'attach-vpc', '7869', '--vpc-id', '501'],
+        { env }
+      );
+      const detachVpcJsonResult = await runBuiltCli(
+        ['--json', 'dbaas', 'network', 'detach-vpc', '7869', '--vpc-id', '501'],
+        { env }
+      );
+      const whitelistListJsonResult = await runBuiltCli(
+        ['--json', 'dbaas', 'whitelist', 'list', '7869'],
         { env }
       );
 
@@ -194,15 +304,101 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       expect(detachPublicIpResult.stdout).toContain(
         '"action": "public-ip-detach"'
       );
-      expect(JSON.parse(server.requests[3]!.body)).toEqual({
+      expect(humanGetResult.exitCode).toBe(0);
+      expect(humanGetResult.stdout).toContain('Plan');
+      expect(humanGetResult.stdout).toContain('DBS.16GB');
+      expect(humanGetResult.stdout).toContain('Price');
+      expect(humanGetResult.stdout).toContain('150 INR');
+      expect(humanGetResult.stdout).toContain('Configuration');
+      expect(humanGetResult.stdout).toContain('4 vCPU, 16 GB RAM, 100 GB disk');
+      expect(humanGetResult.stdout).toContain('VPC Connections:');
+      expect(humanGetResult.stdout).toContain('Whitelisted IPs:');
+      expect(whitelistListResult.exitCode).toBe(0);
+      expect(whitelistListResult.stdout).toContain('203.0.113.10');
+      expect(whitelistRemoveResult.exitCode).toBe(0);
+      expect(whitelistRemoveResult.stdout).toContain(
+        'Removed whitelisted IP 203.0.113.10 from DBaaS 7869.'
+      );
+      expect(attachPublicIpResult.exitCode).toBe(0);
+      expect(attachPublicIpResult.stdout).toContain(
+        'Public IP attach requested for DBaaS 7869.'
+      );
+      expect(attachVpcResult.exitCode).toBe(0);
+      expect(attachVpcResult.stdout).toContain(
+        'Attached VPC 501 (app-vpc) to DBaaS 7869.'
+      );
+      expect(detachVpcResult.exitCode).toBe(0);
+      expect(detachVpcResult.stdout).toContain(
+        'Detached VPC 501 (app-vpc) from DBaaS 7869.'
+      );
+      expect(detachVpcResult.stdout).toContain('Subnet ID: 44');
+      expect(attachPublicIpJsonResult.exitCode).toBe(0);
+      expect(attachPublicIpJsonResult.stdout).toContain(
+        '"action": "public-ip-attach"'
+      );
+      expect(attachVpcJsonResult.exitCode).toBe(0);
+      expect(attachVpcJsonResult.stdout).toContain('"action": "vpc-attach"');
+      expect(detachVpcJsonResult.exitCode).toBe(0);
+      expect(detachVpcJsonResult.stdout).toContain('"action": "vpc-detach"');
+      expect(whitelistListJsonResult.exitCode).toBe(0);
+      expect(whitelistListJsonResult.stdout).toContain(
+        '"action": "whitelist-list"'
+      );
+
+      const whitelistAddRequest = server.requests.find(
+        (request) =>
+          request.method === 'PUT' &&
+          request.query.action === 'attach' &&
+          request.pathname.endsWith('/update-allowed-hosts')
+      );
+      const whitelistRemoveRequest = server.requests.find(
+        (request) =>
+          request.method === 'PUT' &&
+          request.query.action === 'detach' &&
+          request.pathname.endsWith('/update-allowed-hosts')
+      );
+      const publicIpDetachRequest = server.requests.find((request) =>
+        request.pathname.endsWith('/public-ip-detach/')
+      );
+      const vpcAttachRequest = server.requests.find((request) =>
+        request.pathname.endsWith('/vpc-attach/')
+      );
+      const vpcDetachRequest = server.requests.find((request) =>
+        request.pathname.endsWith('/vpc-detach/')
+      );
+
+      expect(JSON.parse(whitelistAddRequest!.body)).toEqual({
         allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
       });
-      expect(server.requests[3]?.query).toMatchObject({
-        action: 'attach'
+      expect(JSON.parse(whitelistRemoveRequest!.body)).toEqual({
+        allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
       });
-      expect(server.requests[4]?.pathname).toBe(
+      expect(publicIpDetachRequest?.pathname).toBe(
         '/myaccount/api/v1/rds/cluster/7869/public-ip-detach/'
       );
+      expect(JSON.parse(vpcAttachRequest!.body)).toEqual({
+        action: 'attach',
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      });
+      expect(JSON.parse(vpcDetachRequest!.body)).toEqual({
+        action: 'detach',
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            subnet_id: 44,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      });
     } finally {
       await server.close();
       await tempHome.cleanup();

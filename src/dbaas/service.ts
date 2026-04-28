@@ -966,6 +966,27 @@ function normalizeDbaasCreateInput(
           '--subnet-id'
         );
 
+  if (vpcId === null && subnetId !== null) {
+    throw new CliError('--subnet-id can only be used with --vpc-id.', {
+      code: 'UNEXPECTED_DBAAS_SUBNET_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Remove --subnet-id, or add --vpc-id to attach the DBaaS to a VPC during creation.'
+    });
+  }
+
+  if (vpcId === null && options.publicIp !== undefined) {
+    throw new CliError(
+      'DBaaS public IP creation flags can only be used with --vpc-id.',
+      {
+        code: 'UNEXPECTED_DBAAS_PUBLIC_IP_FLAG',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Attach the DBaaS to a VPC with --vpc-id before choosing --public-ip or --no-public-ip.'
+      }
+    );
+  }
+
   return {
     billingType,
     committedPlanId,

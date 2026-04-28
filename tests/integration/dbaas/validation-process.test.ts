@@ -55,6 +55,54 @@ describe('dbaas validation through the built CLI', () => {
     );
   });
 
+  it('rejects public IP creation flags unless DBaaS creation also attaches a VPC', async () => {
+    const noPublicIpResult = await runBuiltCli([
+      'dbaas',
+      'create',
+      '--name',
+      'customer-db',
+      '--type',
+      'sql',
+      '--db-version',
+      '8.0',
+      '--plan',
+      'Small',
+      '--database-name',
+      'appdb',
+      '--password',
+      'ValidPassword1!A',
+      '--no-public-ip'
+    ]);
+    const publicIpResult = await runBuiltCli([
+      'dbaas',
+      'create',
+      '--name',
+      'customer-db',
+      '--type',
+      'sql',
+      '--db-version',
+      '8.0',
+      '--plan',
+      'Small',
+      '--database-name',
+      'appdb',
+      '--password',
+      'ValidPassword1!A',
+      '--public-ip'
+    ]);
+
+    expect(noPublicIpResult.exitCode).toBe(2);
+    expect(noPublicIpResult.stdout).toBe('');
+    expect(noPublicIpResult.stderr).toBe(
+      'Error: DBaaS public IP creation flags can only be used with --vpc-id.\n\nNext step: Attach the DBaaS to a VPC with --vpc-id before choosing --public-ip or --no-public-ip.\n'
+    );
+    expect(publicIpResult.exitCode).toBe(2);
+    expect(publicIpResult.stdout).toBe('');
+    expect(publicIpResult.stderr).toBe(
+      'Error: DBaaS public IP creation flags can only be used with --vpc-id.\n\nNext step: Attach the DBaaS to a VPC with --vpc-id before choosing --public-ip or --no-public-ip.\n'
+    );
+  });
+
   it('rejects dbaas plans --db-version without --type', async () => {
     const result = await runBuiltCli(['dbaas', 'plans', '--db-version', '16']);
 

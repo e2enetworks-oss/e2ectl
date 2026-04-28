@@ -72,7 +72,7 @@ e2ectl dbaas create \
 
 Use `--password-file -` to read the password from stdin. `--password <password>` is still supported for one-off interactive use, but it can leave the password in shell history.
 
-If you want a different admin user, also pass `--username <username>`. To create without a public endpoint, add `--no-public-ip`. You can also pass `--public-ip` explicitly; this is the default when a VPC is attached.
+If you want a different admin user, also pass `--username <username>`.
 
 #### Committed (Reserved) Billing
 
@@ -109,7 +109,7 @@ e2ectl dbaas create \
 
 For non-default VPCs that require a specific subnet, also pass `--subnet-id <subnet-id>`.
 
-When a VPC is attached during creation, public IP access is enabled by default. Add `--no-public-ip` if the DBaaS should be private to the VPC.
+When a VPC is attached during creation, public IP access is enabled by default. Add `--no-public-ip` if the DBaaS should be private to the VPC, or pass `--public-ip` explicitly when you want to be clear in automation. These public IP creation flags are only for VPC-attached DBaaS creation.
 
 ### Attach A VPC To An Existing Cluster
 

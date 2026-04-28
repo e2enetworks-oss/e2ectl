@@ -488,6 +488,55 @@ describe('DbaasService', () => {
     );
   });
 
+  it('rejects DBaaS public IP creation flags unless a VPC is attached', async () => {
+    const { createDbaasClient, service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        publicIp: false,
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      'DBaaS public IP creation flags can only be used with --vpc-id.'
+    );
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        publicIp: true,
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      'DBaaS public IP creation flags can only be used with --vpc-id.'
+    );
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        subnetId: '44',
+        type: 'sql'
+      })
+    ).rejects.toThrow('--subnet-id can only be used with --vpc-id.');
+
+    expect(createDbaasClient).not.toHaveBeenCalled();
+  });
+
   it('gets detailed DBaaS network, whitelist, public IP, and plan information', async () => {
     const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
       createServiceFixture();
