@@ -12,9 +12,12 @@ describe('dbaas formatter', () => {
     const table = formatDbaasListTable([
       {
         connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
+        connection_endpoint: 'db.example.com (1.2.3.4)',
+        connection_port: '3306',
         database_name: 'appdb',
         id: 7869,
         name: 'customer-db',
+        public_ip: '1.2.3.4',
         status: 'Running',
         type: 'MySQL',
         version: '8.0'
@@ -23,8 +26,9 @@ describe('dbaas formatter', () => {
 
     expect(table).toContain('customer-db');
     expect(table).toContain('MySQL 8.0');
-    expect(table).toContain('appdb');
-    expect(table).toContain('mysql -h db.example.com');
+    expect(table).toContain('db.example.com (1.2.3.4)');
+    expect(table).toContain('3306');
+    expect(table).toContain('Running');
   });
 
   it('renders engine and template plan tables', () => {
@@ -74,6 +78,7 @@ describe('dbaas formatter', () => {
           version: '8.0'
         },
         requested: {
+          billing_type: 'hourly',
           database_name: 'appdb',
           name: 'customer-db',
           plan: 'General Purpose Small',
@@ -91,6 +96,87 @@ describe('dbaas formatter', () => {
     expect(output).toContain('DB Version: MySQL 8.0');
     expect(output).toContain('Connection String: mysql -h db.example.com');
     expect(output).toContain(formatCliCommand('dbaas list'));
+  });
+
+  it('renders detailed DBaaS get output with plan, configuration, and network details', () => {
+    const output = renderDbaasResult(
+      {
+        action: 'get',
+        dbaas: {
+          connection_endpoint: 'db.example.com (1.2.3.4)',
+          connection_port: '3306',
+          connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
+          created_at: '2026-04-24T12:00:00.000Z',
+          database_name: 'appdb',
+          id: 7869,
+          name: 'customer-db',
+          plan: {
+            configuration: {
+              cpu: '4',
+              disk: '100 GB',
+              ram: '16 GB'
+            },
+            name: 'DBS.16GB',
+            price: '150 INR',
+            price_per_hour: '5',
+            price_per_month: '3600'
+          },
+          public_ip: {
+            attached: true,
+            enabled: true,
+            ip_address: '1.2.3.4'
+          },
+          status: 'Running',
+          type: 'MySQL',
+          username: 'admin',
+          version: '8.0',
+          vpc_connections: [
+            {
+              appliance_id: 7869,
+              ip_address: '10.40.0.8',
+              subnet_id: 44,
+              vpc_cidr: '10.40.0.0/16',
+              vpc_id: 501,
+              vpc_name: 'app-vpc'
+            }
+          ],
+          whitelisted_ips: [
+            {
+              ip: '203.0.113.10',
+              tags: [{ id: 7, name: 'office' }]
+            }
+          ]
+        }
+      },
+      false
+    );
+
+    expect(output).toContain('Plan Name: DBS.16GB');
+    expect(output).toContain('Price: 150 INR');
+    expect(output).toContain(
+      'DBaaS Configuration: 4 vCPU, 16 GB RAM, 100 GB disk'
+    );
+    expect(output).toContain('app-vpc');
+    expect(output).toContain('203.0.113.10');
+  });
+
+  it('renders DBaaS network and whitelist actions in json mode', () => {
+    const detachJson = renderDbaasResult(
+      {
+        action: 'public-ip-detach',
+        cancelled: false,
+        dbaas_id: 7869,
+        message: 'Public IP detach initiated.'
+      },
+      true
+    );
+
+    expect(JSON.parse(detachJson)).toEqual({
+      action: 'public-ip-detach',
+      cancelled: false,
+      dbaas_id: 7869,
+      message: 'Public IP detach initiated.'
+    });
   });
 
   it('renders plans guidance for both engine discovery and template selection', () => {
@@ -369,7 +455,6 @@ describe('dbaas formatter', () => {
           version: '16'
         },
         items: [],
-        mode: 'templates',
         total_count: 0
       },
       false

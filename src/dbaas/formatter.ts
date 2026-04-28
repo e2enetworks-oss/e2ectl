@@ -5,11 +5,14 @@ import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   DbaasCommandResult,
   DbaasCommittedSkuItem,
+  DbaasDetailItem,
   DbaasListItem,
   DbaasListTypeItem,
   DbaasPlansTemplateItem,
   DbaasSummaryItem,
-  DbaasVpcAttachCommandResult
+  DbaasVpcAttachCommandResult,
+  DbaasVpcDetachCommandResult,
+  DbaasWhitelistedIpItem
 } from './service.js';
 
 export function renderDbaasResult(
@@ -21,15 +24,22 @@ export function renderDbaasResult(
 
 export function formatDbaasListTable(items: DbaasListItem[]): string {
   const table = new Table({
-    head: ['Name', 'DB Version', 'Database Name', 'Connection String']
+    head: [
+      'Name',
+      'DB Version',
+      'Connection Endpoint',
+      'Connection Port',
+      'Status'
+    ]
   });
 
   items.forEach((item) => {
     table.push([
       item.name,
       formatDbaasVersion(item.type, item.version),
-      item.database_name ?? '',
-      item.connection_string ?? ''
+      item.connection_endpoint ?? '',
+      item.connection_port ?? '',
+      item.status ?? ''
     ]);
   });
 
@@ -121,6 +131,8 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return result.cancelled
         ? 'Deletion cancelled.\n'
         : `Deleted DBaaS ${result.dbaas_id}${renderDeletedDbaasSummary(result.dbaas)}\n`;
+    case 'get':
+      return renderGetHuman(result.dbaas);
     case 'list':
       return result.items.length === 0
         ? 'No supported DBaaS clusters found.\n'
@@ -141,7 +153,63 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return renderSkusHuman(result);
     case 'vpc-attach':
       return renderVpcAttachHuman(result);
+    case 'vpc-detach':
+      return renderVpcDetachHuman(result);
+    case 'public-ip-attach':
+      return (
+        `Public IP attach requested for DBaaS ${result.dbaas_id}.\n` +
+        (result.message === null ? '' : `Message: ${result.message}\n`)
+      );
+    case 'public-ip-detach':
+      return result.cancelled
+        ? 'Public IP detach cancelled.\n'
+        : `Public IP detach requested for DBaaS ${result.dbaas_id}.\n` +
+            (result.message === null ? '' : `Message: ${result.message}\n`);
+    case 'whitelist-list':
+      return result.items.length === 0
+        ? `No whitelisted IPs found for DBaaS ${result.dbaas_id}.\n`
+        : `${formatWhitelistedIpsTable(result.items)}\n`;
+    case 'whitelist-add':
+      return (
+        `Whitelisted IP ${result.ip} for DBaaS ${result.dbaas_id}.\n` +
+        (result.message === null ? '' : `Message: ${result.message}\n`)
+      );
+    case 'whitelist-remove':
+      return (
+        `Removed whitelisted IP ${result.ip} from DBaaS ${result.dbaas_id}.\n` +
+        (result.message === null ? '' : `Message: ${result.message}\n`)
+      );
   }
+}
+
+function renderGetHuman(item: DbaasDetailItem): string {
+  const vpcSection =
+    item.vpc_connections.length === 0
+      ? 'VPC Connections: none\n'
+      : `VPC Connections:\n${formatVpcConnectionsTable(item.vpc_connections)}\n`;
+  const whitelistSection =
+    item.whitelisted_ips.length === 0
+      ? 'Whitelisted IPs: none\n'
+      : `Whitelisted IPs:\n${formatWhitelistedIpsTable(item.whitelisted_ips)}\n`;
+
+  return (
+    `DBaaS: ${item.name}\n` +
+    `ID: ${item.id}\n` +
+    `DB Version: ${formatDbaasVersion(item.type, item.version)}\n` +
+    `Plan Name: ${item.plan.name ?? ''}\n` +
+    `Price: ${item.plan.price ?? ''}\n` +
+    `Price/Hour: ${item.plan.price_per_hour ?? ''}\n` +
+    `Price/Month: ${item.plan.price_per_month ?? ''}\n` +
+    `DBaaS Configuration: ${formatConfiguration(item)}\n` +
+    `Connection Endpoint: ${item.connection_endpoint ?? ''}\n` +
+    `Connection Port: ${item.connection_port ?? ''}\n` +
+    `Connection String: ${item.connection_string ?? ''}\n` +
+    `Status: ${item.status ?? ''}\n` +
+    `Public IP Enabled: ${item.public_ip.enabled ? 'yes' : 'no'}\n` +
+    `Public IP: ${item.public_ip.ip_address ?? ''}\n` +
+    vpcSection +
+    whitelistSection
+  );
 }
 
 function renderListTypesHuman(result: {
@@ -218,6 +286,54 @@ function renderVpcAttachHuman(result: DbaasVpcAttachCommandResult): string {
   );
 }
 
+function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
+  return (
+    `Detached VPC ${result.vpc.id} (${result.vpc.name}) from DBaaS ${result.dbaas_id}.\n` +
+    (result.vpc.subnet_id === null
+      ? ''
+      : `Subnet ID: ${result.vpc.subnet_id}\n`) +
+    (result.message === null ? '' : `Message: ${result.message}\n`)
+  );
+}
+
+function formatVpcConnectionsTable(
+  items: DbaasDetailItem['vpc_connections']
+): string {
+  const table = new Table({
+    head: ['VPC ID', 'VPC Name', 'CIDR', 'Private IP', 'Subnet ID']
+  });
+
+  items.forEach((item) => {
+    table.push([
+      item.vpc_id === null ? '' : String(item.vpc_id),
+      item.vpc_name ?? '',
+      item.vpc_cidr ?? '',
+      item.ip_address ?? '',
+      item.subnet_id === null ? '' : String(item.subnet_id)
+    ]);
+  });
+
+  return table.toString();
+}
+
+function formatWhitelistedIpsTable(items: DbaasWhitelistedIpItem[]): string {
+  const table = new Table({
+    head: ['IP', 'Tags']
+  });
+
+  items.forEach((item) => {
+    table.push([
+      item.ip,
+      item.tags
+        .map((tag) => tag.name ?? (tag.id === null ? '' : String(tag.id)))
+        .filter((tag) => tag.length > 0)
+        .join(', ')
+    ]);
+  });
+
+  return table.toString();
+}
+
 function renderDbaasJson(result: DbaasCommandResult): string {
   return `${stableStringify(normalizeDbaasJson(result))}\n`;
 }
@@ -255,15 +371,23 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         dbaas_id: result.dbaas_id,
         ...(result.message === undefined ? {} : { message: result.message })
       };
+    case 'get':
+      return {
+        action: 'get',
+        dbaas: normalizeDetailJson(result.dbaas)
+      };
     case 'list':
       return {
         action: 'list',
         filters: { type: result.filters.type },
         items: result.items.map((item) => ({
           connection_string: item.connection_string,
+          connection_endpoint: item.connection_endpoint,
+          connection_port: item.connection_port,
           database_name: item.database_name,
           id: item.id,
           name: item.name,
+          public_ip: item.public_ip,
           status: item.status,
           type: item.type,
           version: item.version
@@ -340,6 +464,52 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
           subnet_id: result.vpc.subnet_id
         }
       };
+    case 'vpc-detach':
+      return {
+        action: 'vpc-detach',
+        dbaas_id: result.dbaas_id,
+        message: result.message,
+        vpc: {
+          id: result.vpc.id,
+          name: result.vpc.name,
+          subnet_id: result.vpc.subnet_id
+        }
+      };
+    case 'public-ip-attach':
+      return {
+        action: 'public-ip-attach',
+        dbaas_id: result.dbaas_id,
+        message: result.message
+      };
+    case 'public-ip-detach':
+      return {
+        action: 'public-ip-detach',
+        cancelled: result.cancelled,
+        dbaas_id: result.dbaas_id,
+        message: result.message
+      };
+    case 'whitelist-list':
+      return {
+        action: 'whitelist-list',
+        dbaas_id: result.dbaas_id,
+        items: result.items.map((item) => ({
+          ip: item.ip,
+          tags: item.tags.map((tag) => ({
+            id: tag.id,
+            name: tag.name
+          }))
+        })),
+        total_count: result.total_count
+      };
+    case 'whitelist-add':
+    case 'whitelist-remove':
+      return {
+        action: result.action,
+        dbaas_id: result.dbaas_id,
+        ip: result.ip,
+        message: result.message,
+        tag_ids: result.tag_ids
+      };
   }
 }
 
@@ -355,8 +525,71 @@ function normalizeSummaryJson(item: DbaasSummaryItem): JsonValue {
   };
 }
 
+function normalizeDetailJson(item: DbaasDetailItem): JsonValue {
+  return {
+    connection_string: item.connection_string,
+    database_name: item.database_name,
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    username: item.username,
+    version: item.version,
+    connection_endpoint: item.connection_endpoint,
+    connection_port: item.connection_port,
+    created_at: item.created_at,
+    plan: {
+      configuration: {
+        cpu: item.plan.configuration.cpu,
+        disk: item.plan.configuration.disk,
+        ram: item.plan.configuration.ram
+      },
+      name: item.plan.name,
+      price: item.plan.price,
+      price_per_hour: item.plan.price_per_hour,
+      price_per_month: item.plan.price_per_month
+    },
+    public_ip: {
+      attached: item.public_ip.attached,
+      enabled: item.public_ip.enabled,
+      ip_address: item.public_ip.ip_address
+    },
+    status: item.status,
+    vpc_connections: item.vpc_connections.map((connection) => ({
+      appliance_id: connection.appliance_id,
+      ip_address: connection.ip_address,
+      subnet_id: connection.subnet_id,
+      vpc_cidr: connection.vpc_cidr,
+      vpc_id: connection.vpc_id,
+      vpc_name: connection.vpc_name
+    })),
+    whitelisted_ips: item.whitelisted_ips.map((whitelistedIp) => ({
+      ip: whitelistedIp.ip,
+      tags: whitelistedIp.tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name
+      }))
+    }))
+  };
+}
+
 function formatDbaasVersion(type: string, version: string): string {
   return `${type} ${version}`;
+}
+
+function formatConfiguration(item: DbaasDetailItem): string {
+  const parts = [
+    item.plan.configuration.cpu === null
+      ? null
+      : `${item.plan.configuration.cpu} vCPU`,
+    item.plan.configuration.ram === null
+      ? null
+      : `${item.plan.configuration.ram} RAM`,
+    item.plan.configuration.disk === null
+      ? null
+      : `${item.plan.configuration.disk} disk`
+  ].filter((part): part is string => part !== null);
+
+  return parts.join(', ');
 }
 
 function formatPrice(amount: number | null, currency: string | null): string {

@@ -261,6 +261,144 @@ describe('DbaasApiClient', () => {
     });
   });
 
+  it('manages DBaaS VPC, public IP, and whitelisted IP endpoints', async () => {
+    const transport = new StubTransport();
+    const client = new DbaasApiClient(transport);
+
+    transport.getMock
+      .mockResolvedValueOnce(
+        envelope([
+          {
+            appliance_id: 7869,
+            ip_address: '10.40.0.8',
+            subnet: 44,
+            vpc: {
+              ipv4_cidr: '10.40.0.0/16',
+              name: 'app-vpc',
+              network_id: 501
+            }
+          }
+        ])
+      )
+      .mockResolvedValueOnce(envelope({ public_ip_status: true }))
+      .mockResolvedValueOnce({
+        ...envelope([
+          {
+            ip: '203.0.113.10',
+            tag_list: [{ id: 7, label_name: 'office' }]
+          }
+        ]),
+        total_count: 1,
+        total_page_number: 1
+      });
+    transport.requestMock.mockResolvedValue(
+      envelope(
+        {},
+        {
+          message: 'Action accepted.'
+        }
+      )
+    );
+
+    await client.listVpcConnections(7869);
+    await client.getPublicIpStatus(7869);
+    await client.attachVpc(7869, {
+      action: 'attach',
+      vpcs: [
+        {
+          ipv4_cidr: '10.40.0.0/16',
+          network_id: 501,
+          target: 'vpcs',
+          vpc_name: 'app-vpc'
+        }
+      ]
+    });
+    await client.attachPublicIp(7869);
+    await client.detachPublicIp(7869);
+    await client.detachVpc(7869, {
+      action: 'detach',
+      vpcs: [
+        {
+          ipv4_cidr: '10.40.0.0/16',
+          network_id: 501,
+          target: 'vpcs',
+          vpc_name: 'app-vpc'
+        }
+      ]
+    });
+    await client.listWhitelistedIps(7869, 1, 100);
+    await client.updateWhitelistedIps(7869, 'attach', {
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+    });
+
+    expect(transport.getMock).toHaveBeenNthCalledWith(
+      1,
+      '/rds/cluster/7869/vpc/',
+      undefined
+    );
+    expect(transport.getMock).toHaveBeenNthCalledWith(
+      2,
+      '/rds/cluster/7869/public-ip-status/',
+      undefined
+    );
+    expect(transport.requestMock).toHaveBeenNthCalledWith(1, {
+      body: {
+        action: 'attach',
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      },
+      method: 'PUT',
+      path: '/rds/cluster/7869/vpc-attach/'
+    });
+    expect(transport.requestMock).toHaveBeenNthCalledWith(2, {
+      method: 'PUT',
+      path: '/rds/cluster/7869/public-ip-attach/'
+    });
+    expect(transport.requestMock).toHaveBeenNthCalledWith(3, {
+      method: 'PUT',
+      path: '/rds/cluster/7869/public-ip-detach/'
+    });
+    expect(transport.requestMock).toHaveBeenNthCalledWith(4, {
+      body: {
+        action: 'detach',
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      },
+      method: 'PUT',
+      path: '/rds/cluster/7869/vpc-detach/'
+    });
+    expect(transport.getMock).toHaveBeenNthCalledWith(
+      3,
+      '/rds/cluster/7869/update-allowed-hosts',
+      {
+        query: {
+          page: '1',
+          page_size: '100'
+        }
+      }
+    );
+    expect(transport.requestMock).toHaveBeenNthCalledWith(5, {
+      body: {
+        allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+      },
+      method: 'PUT',
+      path: '/rds/cluster/7869/update-allowed-hosts',
+      query: { action: 'attach' }
+    });
+  });
+
   it('deletes DBaaS clusters through the cluster detail path', async () => {
     const transport = new StubTransport();
     const client = new DbaasApiClient(transport);

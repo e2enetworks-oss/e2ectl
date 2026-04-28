@@ -113,20 +113,26 @@ describe('dbaas list against a fake MyAccount API', () => {
           },
           items: [
             {
+              connection_endpoint: 'pg.example.com',
+              connection_port: '5432',
               connection_string:
                 'psql -h pg.example.com -p 5432 -U admin -d analytics',
               database_name: 'analytics',
               id: 9901,
               name: 'analytics-db',
+              public_ip: null,
               status: 'Running',
               type: 'PostgreSQL',
               version: '16'
             },
             {
+              connection_endpoint: 'db.example.com',
+              connection_port: '3306',
               connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
               database_name: 'appdb',
               id: 7869,
               name: 'customer-db',
+              public_ip: null,
               status: 'Running',
               type: 'MySQL',
               version: '8.0'
@@ -219,7 +225,9 @@ describe('dbaas list against a fake MyAccount API', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('DB Version');
       expect(result.stdout).toContain('customer-db');
-      expect(result.stdout).toContain('mysql -h db.example.com');
+      expect(result.stdout).toContain('Connection Endpoint');
+      expect(result.stdout).toContain('db.example.com');
+      expect(result.stdout).toContain('3306');
     } finally {
       await server.close();
       await tempHome.cleanup();

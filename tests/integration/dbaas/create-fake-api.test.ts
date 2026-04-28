@@ -142,6 +142,7 @@ describe('dbaas create against a fake MyAccount API', () => {
             version: '8.0'
           },
           requested: {
+            billing_type: 'hourly',
             database_name: 'appdb',
             name: 'customer-db',
             plan: 'General Purpose Small',

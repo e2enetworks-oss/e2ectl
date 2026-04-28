@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl dbaas` discovers supported DBaaS engine types and plans, creates MariaDB, MySQL, and PostgreSQL clusters, lists them, resets passwords, attaches VPCs, and deletes them.
+`e2ectl dbaas` discovers supported DBaaS engine types and plans, creates MariaDB, MySQL, and PostgreSQL clusters, lists and inspects them, manages whitelisted IPs, manages VPC/public IP networking, resets passwords, and deletes clusters.
 
 ## Before You Start
 
@@ -44,6 +44,20 @@ Filter the list to one supported engine family:
 e2ectl dbaas list --type sql
 ```
 
+List output includes the cluster name, DB version, connection endpoint with the public IP in brackets when available, connection port, and status.
+
+### Get DBaaS Details
+
+```bash
+e2ectl dbaas get <dbaas-id>
+```
+
+The detail view includes the list fields plus plan name, price, DBaaS configuration, VPC connections, whitelisted IPs, public IP state, and connection port.
+
+```bash
+e2ectl --json dbaas get <dbaas-id>
+```
+
 ### Create A DBaaS Cluster
 
 ```bash
@@ -58,7 +72,7 @@ e2ectl dbaas create \
 
 Use `--password-file -` to read the password from stdin. `--password <password>` is still supported for one-off interactive use, but it can leave the password in shell history.
 
-If you want a different admin user, also pass `--username <username>`. To create without a public endpoint, add `--no-public-ip`.
+If you want a different admin user, also pass `--username <username>`. To create without a public endpoint, add `--no-public-ip`. You can also pass `--public-ip` explicitly; this is the default when a VPC is attached.
 
 #### Committed (Reserved) Billing
 
@@ -95,12 +109,74 @@ e2ectl dbaas create \
 
 For non-default VPCs that require a specific subnet, also pass `--subnet-id <subnet-id>`.
 
+When a VPC is attached during creation, public IP access is enabled by default. Add `--no-public-ip` if the DBaaS should be private to the VPC.
+
 ### Attach A VPC To An Existing Cluster
 
 The cluster must be in Running state:
 
 ```bash
 e2ectl dbaas attach <dbaas-id> --vpc-id <network-id>
+```
+
+The preferred network command is:
+
+```bash
+e2ectl dbaas network attach-vpc <dbaas-id> --vpc-id <network-id>
+```
+
+Detach a VPC:
+
+```bash
+e2ectl dbaas network detach-vpc <dbaas-id> --vpc-id <network-id>
+```
+
+For non-default VPCs, add `--subnet-id <subnet-id>`.
+
+### Manage Public IP Access
+
+Attaching a public IP enables external access:
+
+```bash
+e2ectl dbaas network attach-public-ip <dbaas-id>
+```
+
+Detaching a public IP removes external access. The CLI warns that connectivity will be lost and asks for confirmation:
+
+```bash
+e2ectl dbaas network detach-public-ip <dbaas-id>
+```
+
+For non-interactive automation, pass `--force` only when you explicitly accept the connectivity loss:
+
+```bash
+e2ectl dbaas network detach-public-ip <dbaas-id> --force
+```
+
+### Manage Whitelisted IPs
+
+Whitelist an IP or CIDR:
+
+```bash
+e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10
+```
+
+Attach MyAccount tag IDs to the whitelist entry when needed:
+
+```bash
+e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10 --tag-id <tag-id>
+```
+
+List whitelisted IPs:
+
+```bash
+e2ectl dbaas whitelist list <dbaas-id>
+```
+
+Remove a whitelisted IP:
+
+```bash
+e2ectl dbaas whitelist remove <dbaas-id> --ip 203.0.113.10
 ```
 
 ### Reset The Admin Password
@@ -166,9 +242,10 @@ e2ectl --json dbaas list
 
 - Use `dbaas list-types --json` to enumerate available engine families and versions.
 - Use `dbaas plans --json --type <type> --db-version <version>` when automation needs exact template-plan rows and committed SKU IDs before creating a cluster. Both hourly plans and committed SKUs are included in the same response.
-- Use `dbaas list --json` when later steps need the numeric DBaaS id for `reset-password`, `attach`, or `delete`.
+- Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist`, or `delete`.
+- Use `dbaas get --json <id>` when automation needs plan name, price, DBaaS configuration, VPC details, whitelisted IPs, public IP information, and connection port.
 - Prefer `--password-file <path>` or `--password-file -` over `--password <password>` so DBaaS admin passwords do not end up in shell history or CI logs.
-- In non-interactive environments, pass `--force` to `dbaas delete`.
+- In non-interactive environments, pass `--force` to `dbaas delete`. For public IP detach, `--force` means you accept that external DBaaS connectivity will be removed.
 
 ## Related Guides
 

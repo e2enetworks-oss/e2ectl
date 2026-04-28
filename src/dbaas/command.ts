@@ -11,11 +11,17 @@ import {
   type DbaasAttachVpcOptions,
   type DbaasCreateOptions,
   type DbaasDeleteOptions,
+  type DbaasDetachVpcOptions,
+  type DbaasGetOptions,
   type DbaasListOptions,
   type DbaasListTypesOptions,
+  type DbaasPublicIpDetachOptions,
+  type DbaasPublicIpOptions,
   type DbaasPlansOptions,
   type DbaasResetPasswordOptions,
-  type DbaasSkusOptions
+  type DbaasSkusOptions,
+  type DbaasWhitelistListOptions,
+  type DbaasWhitelistUpdateOptions
 } from './service.js';
 
 interface GlobalOptions {
@@ -122,6 +128,26 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
+      .command('get <dbaasId>')
+      .description('Show detailed information for a supported DBaaS cluster.')
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasGetOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getDbaas(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    command
       .command('create')
       .description(
         `Create a DBaaS cluster. Run ${formatCliCommand('dbaas list-types')} then ${formatCliCommand('dbaas plans --type <type> --db-version <version>')} first to discover plan names and committed SKU IDs.`
@@ -154,6 +180,10 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'admin'
       )
       .option('--no-public-ip', 'Create the DBaaS without a public endpoint.')
+      .option(
+        '--public-ip',
+        'Create the DBaaS with a public endpoint. This is the default when a VPC is attached.'
+      )
       .addOption(
         new Option(
           '--billing-type <billingType>',
@@ -222,6 +252,206 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     }
   );
 
+  const networkCommand = command
+    .command('network')
+    .description('Manage DBaaS VPC and public IP networking.');
+  networkCommand.helpCommand(
+    'help [command]',
+    'Show help for a dbaas network command'
+  );
+
+  addContextOptions(
+    networkCommand
+      .command('attach-vpc <dbaasId>')
+      .description('Attach a VPC to an existing DBaaS cluster.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'VPC network_id to attach. Use the network_id from vpc list.'
+      )
+      .option(
+        '--subnet-id <subnetId>',
+        'Optional subnet ID within the VPC. Only for non-default VPCs.'
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasAttachVpcOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.attachVpc(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    networkCommand
+      .command('detach-vpc <dbaasId>')
+      .description('Detach a VPC from an existing DBaaS cluster.')
+      .requiredOption(
+        '--vpc-id <vpcId>',
+        'VPC network_id to detach. Use the network_id from dbaas get.'
+      )
+      .option(
+        '--subnet-id <subnetId>',
+        'Optional subnet ID within the VPC. Only for non-default VPCs.'
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasDetachVpcOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachVpc(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    networkCommand
+      .command('attach-public-ip <dbaasId>')
+      .description('Attach a public IP and enable external DBaaS access.')
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasPublicIpOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.attachPublicIp(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    networkCommand
+      .command('detach-public-ip <dbaasId>')
+      .description(
+        'Detach the public IP and remove external DBaaS access. Requires confirmation.'
+      )
+      .option(
+        '--force',
+        'Acknowledge connectivity loss and skip the interactive confirmation prompt.'
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasPublicIpDetachOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.detachPublicIp(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  networkCommand.action(() => {
+    networkCommand.outputHelp();
+  });
+
+  const whitelistCommand = command
+    .command('whitelist')
+    .description('Manage DBaaS whitelisted IPs.');
+  whitelistCommand.helpCommand(
+    'help [command]',
+    'Show help for a dbaas whitelist command'
+  );
+
+  addContextOptions(
+    whitelistCommand
+      .command('list <dbaasId>')
+      .description('List whitelisted IPs for a DBaaS cluster.')
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasWhitelistListOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.listWhitelistedIps(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    whitelistCommand
+      .command('add <dbaasId>')
+      .description('Whitelist an IP address for a DBaaS cluster.')
+      .requiredOption('--ip <ip>', 'IPv4 address or CIDR to whitelist.')
+      .option(
+        '--tag-id <tagId>',
+        'Optional MyAccount tag ID to attach. Repeat to attach multiple tags.',
+        collectRepeatedOption,
+        []
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasWhitelistUpdateOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.addWhitelistedIp(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
+    whitelistCommand
+      .command('remove <dbaasId>')
+      .description('Remove a whitelisted IP address from a DBaaS cluster.')
+      .requiredOption('--ip <ip>', 'IPv4 address or CIDR to remove.')
+      .option(
+        '--tag-id <tagId>',
+        'Optional tag ID currently attached to the whitelisted IP. Repeat when needed by the API.',
+        collectRepeatedOption,
+        []
+      )
+  ).action(
+    async (
+      dbaasId: string,
+      options: DbaasWhitelistUpdateOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.removeWhitelistedIp(dbaasId, options);
+      runtime.stdout.write(
+        renderDbaasResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  whitelistCommand.action(() => {
+    whitelistCommand.outputHelp();
+  });
+
   addContextOptions(
     command
       .command('reset-password <dbaasId>')
@@ -287,4 +517,8 @@ async function readAllFromStdin(): Promise<string> {
   }
 
   return buffer;
+}
+
+function collectRepeatedOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }

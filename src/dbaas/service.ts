@@ -16,7 +16,10 @@ import type {
   DbaasPlanCatalog,
   DbaasSoftwareSummary,
   DbaasTemplatePlan,
-  DbaasVpcEntry
+  DbaasVpcConnection,
+  DbaasVpcEntry,
+  DbaasWhitelistedIp,
+  DbaasWhitelistedIpTag
 } from './types.js';
 
 const DBAAS_LIST_PAGE_SIZE = 100;
@@ -25,6 +28,8 @@ const DBAAS_NAME_REGEX = /^[a-zA-Z0-9-_]{1,128}$/;
 const DBAAS_USERNAME_REGEX = /^[a-z0-9]+$/;
 const DBAAS_PASSWORD_REGEX =
   /^(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z])(?=.*[#?!@$%^&|,.:<>{}()]).{16,30}$/;
+const DBAAS_IP_REGEX =
+  /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\/(?:[0-9]|[12]\d|3[0-2]))?$/;
 type SupportedDatabaseType = 'MariaDB' | 'MySQL' | 'PostgreSQL';
 export type DbaasCreateBillingType = 'hourly' | 'committed';
 const DBAAS_CREATE_BILLING_TYPES: readonly DbaasCreateBillingType[] = [
@@ -96,14 +101,72 @@ export interface DbaasAttachVpcOptions extends DbaasContextOptions {
   vpcId: string;
 }
 
+export type DbaasGetOptions = DbaasContextOptions;
+
+export interface DbaasDetachVpcOptions extends DbaasContextOptions {
+  subnetId?: string;
+  vpcId: string;
+}
+
+export type DbaasPublicIpOptions = DbaasContextOptions;
+
+export interface DbaasPublicIpDetachOptions extends DbaasContextOptions {
+  force?: boolean;
+}
+
+export type DbaasWhitelistListOptions = DbaasContextOptions;
+
+export interface DbaasWhitelistUpdateOptions extends DbaasContextOptions {
+  ip: string;
+  tagId?: string[];
+}
+
 export interface DbaasListItem {
   connection_string: string | null;
+  connection_endpoint: string | null;
+  connection_port: string | null;
   database_name: string | null;
   id: number;
   name: string;
+  public_ip: string | null;
   status: string | null;
   type: SupportedDatabaseType;
   version: string;
+}
+
+export interface DbaasVpcConnectionItem {
+  appliance_id: number | null;
+  ip_address: string | null;
+  subnet_id: number | null;
+  vpc_id: number | null;
+  vpc_name: string | null;
+  vpc_cidr: string | null;
+}
+
+export interface DbaasWhitelistedIpItem {
+  ip: string;
+  tags: Array<{
+    id: number | null;
+    name: string | null;
+  }>;
+}
+
+export interface DbaasPublicIpInfo {
+  attached: boolean;
+  enabled: boolean;
+  ip_address: string | null;
+}
+
+export interface DbaasPlanInfo {
+  configuration: {
+    cpu: string | null;
+    disk: string | null;
+    ram: string | null;
+  };
+  name: string | null;
+  price: string | null;
+  price_per_hour: string | null;
+  price_per_month: string | null;
 }
 
 export interface DbaasListTypeItem {
@@ -148,6 +211,17 @@ export interface DbaasSummaryItem {
   version: string;
 }
 
+export interface DbaasDetailItem extends DbaasSummaryItem {
+  connection_endpoint: string | null;
+  connection_port: string | null;
+  created_at: string | null;
+  plan: DbaasPlanInfo;
+  public_ip: DbaasPublicIpInfo;
+  status: string | null;
+  vpc_connections: DbaasVpcConnectionItem[];
+  whitelisted_ips: DbaasWhitelistedIpItem[];
+}
+
 export interface DbaasListCommandResult {
   action: 'list';
   filters: {
@@ -156,6 +230,11 @@ export interface DbaasListCommandResult {
   items: DbaasListItem[];
   total_count: number;
   total_page_number: number;
+}
+
+export interface DbaasGetCommandResult {
+  action: 'get';
+  dbaas: DbaasDetailItem;
 }
 
 export interface DbaasListTypesCommandResult {
@@ -229,15 +308,60 @@ export interface DbaasVpcAttachCommandResult {
   };
 }
 
+export interface DbaasVpcDetachCommandResult {
+  action: 'vpc-detach';
+  dbaas_id: number;
+  message: string | null;
+  vpc: {
+    id: number;
+    name: string;
+    subnet_id: number | null;
+  };
+}
+
+export interface DbaasPublicIpAttachCommandResult {
+  action: 'public-ip-attach';
+  dbaas_id: number;
+  message: string | null;
+}
+
+export interface DbaasPublicIpDetachCommandResult {
+  action: 'public-ip-detach';
+  cancelled: boolean;
+  dbaas_id: number;
+  message: string | null;
+}
+
+export interface DbaasWhitelistListCommandResult {
+  action: 'whitelist-list';
+  dbaas_id: number;
+  items: DbaasWhitelistedIpItem[];
+  total_count: number;
+}
+
+export interface DbaasWhitelistUpdateCommandResult {
+  action: 'whitelist-add' | 'whitelist-remove';
+  dbaas_id: number;
+  ip: string;
+  message: string | null;
+  tag_ids: number[];
+}
+
 export type DbaasCommandResult =
   | DbaasCreateCommandResult
   | DbaasDeleteCommandResult
+  | DbaasGetCommandResult
   | DbaasListCommandResult
   | DbaasListTypesCommandResult
   | DbaasPlansCommandResult
+  | DbaasPublicIpAttachCommandResult
+  | DbaasPublicIpDetachCommandResult
   | DbaasResetPasswordCommandResult
   | DbaasSkusCommandResult
-  | DbaasVpcAttachCommandResult;
+  | DbaasVpcAttachCommandResult
+  | DbaasVpcDetachCommandResult
+  | DbaasWhitelistListCommandResult
+  | DbaasWhitelistUpdateCommandResult;
 
 interface DbaasStore {
   readonly configPath: string;
@@ -373,6 +497,32 @@ export class DbaasService {
     };
   }
 
+  async getDbaas(
+    dbaasId: string,
+    options: DbaasGetOptions
+  ): Promise<DbaasGetCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const client = await this.createClient(options);
+    const [detail, vpcConnections, publicIpStatus] = await Promise.all([
+      client.getDbaas(normalizedDbaasId),
+      client.listVpcConnections(normalizedDbaasId),
+      client.getPublicIpStatus(normalizedDbaasId)
+    ]);
+
+    return {
+      action: 'get',
+      dbaas: summarizeDbaasDetail(
+        detail,
+        vpcConnections,
+        publicIpStatus.public_ip_status
+      )
+    };
+  }
+
   async listDbaas(options: DbaasListOptions): Promise<DbaasListCommandResult> {
     const requestedType =
       options.type === undefined ? null : normalizeDatabaseType(options.type);
@@ -388,9 +538,12 @@ export class DbaasService {
         return [
           {
             connection_string: normalized.connection_string,
+            connection_endpoint: buildConnectionEndpoint(item.master_node),
+            connection_port: buildConnectionPort(item.master_node),
             database_name: normalized.database_name,
             id: normalized.id,
             name: normalized.name,
+            public_ip: normalizeHost(item.master_node.public_ip_address),
             status: normalizeOptionalString(item.status),
             type: normalized.type,
             version: normalized.version
@@ -529,37 +682,136 @@ export class DbaasService {
       'DBaaS ID',
       'the first argument'
     );
-    const vpcId = normalizeRequiredNumericId(
-      options.vpcId,
-      'VPC ID',
-      '--vpc-id'
-    );
-    const subnetId =
-      options.subnetId === undefined
-        ? null
-        : normalizeRequiredNumericId(
-            options.subnetId,
-            'Subnet ID',
-            '--subnet-id'
-          );
-    const credentials = await this.resolveCredentials(options);
-    const vpcClient = this.requireVpcClient(credentials);
-    const vpc = await vpcClient.getVpc(vpcId);
-    const vpcEntry: DbaasVpcEntry = {
-      ipv4_cidr: vpc.ipv4_cidr,
-      network_id: vpc.network_id,
-      target: 'vpcs',
-      vpc_name: vpc.name,
-      ...(subnetId === null ? {} : { subnet_id: subnetId })
-    };
-    const dbaasClient = this.dependencies.createDbaasClient(credentials);
-    await dbaasClient.attachVpc(normalizedDbaasId, { vpcs: [vpcEntry] });
+    const { subnetId, vpcEntry, vpcId } = await this.resolveVpcEntry(options);
+    const client = await this.createClient(options);
+    await client.attachVpc(normalizedDbaasId, {
+      action: 'attach',
+      vpcs: [vpcEntry]
+    });
 
     return {
       action: 'vpc-attach',
       dbaas_id: normalizedDbaasId,
-      vpc: { id: vpcId, name: vpc.name, subnet_id: subnetId }
+      vpc: { id: vpcId, name: vpcEntry.vpc_name, subnet_id: subnetId }
     };
+  }
+
+  async detachVpc(
+    dbaasId: string,
+    options: DbaasDetachVpcOptions
+  ): Promise<DbaasVpcDetachCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const { subnetId, vpcEntry, vpcId } = await this.resolveVpcEntry(options);
+    const client = await this.createClient(options);
+    const result = await client.detachVpc(normalizedDbaasId, {
+      action: 'detach',
+      vpcs: [vpcEntry]
+    });
+
+    return {
+      action: 'vpc-detach',
+      dbaas_id: normalizedDbaasId,
+      message: normalizeOptionalString(result.message),
+      vpc: { id: vpcId, name: vpcEntry.vpc_name, subnet_id: subnetId }
+    };
+  }
+
+  async attachPublicIp(
+    dbaasId: string,
+    options: DbaasPublicIpOptions
+  ): Promise<DbaasPublicIpAttachCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const client = await this.createClient(options);
+    const result = await client.attachPublicIp(normalizedDbaasId);
+
+    return {
+      action: 'public-ip-attach',
+      dbaas_id: normalizedDbaasId,
+      message: normalizeOptionalString(result.message)
+    };
+  }
+
+  async detachPublicIp(
+    dbaasId: string,
+    options: DbaasPublicIpDetachOptions
+  ): Promise<DbaasPublicIpDetachCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+
+    if (!(options.force ?? false)) {
+      assertCanDetachPublicIp(this.dependencies.isInteractive);
+      const confirmed = await this.dependencies.confirm(
+        `Detach public IP from DBaaS ${normalizedDbaasId}? External connectivity will be lost.`
+      );
+
+      if (!confirmed) {
+        return {
+          action: 'public-ip-detach',
+          cancelled: true,
+          dbaas_id: normalizedDbaasId,
+          message: null
+        };
+      }
+    }
+
+    const client = await this.createClient(options);
+    const result = await client.detachPublicIp(normalizedDbaasId);
+
+    return {
+      action: 'public-ip-detach',
+      cancelled: false,
+      dbaas_id: normalizedDbaasId,
+      message: normalizeOptionalString(result.message)
+    };
+  }
+
+  async listWhitelistedIps(
+    dbaasId: string,
+    options: DbaasWhitelistListOptions
+  ): Promise<DbaasWhitelistListCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const client = await this.createClient(options);
+    const result = await client.listWhitelistedIps(
+      normalizedDbaasId,
+      1,
+      DBAAS_LIST_PAGE_SIZE
+    );
+
+    return {
+      action: 'whitelist-list',
+      dbaas_id: normalizedDbaasId,
+      items: result.items.map(normalizeWhitelistedIpItem),
+      total_count: result.total_count ?? result.items.length
+    };
+  }
+
+  async addWhitelistedIp(
+    dbaasId: string,
+    options: DbaasWhitelistUpdateOptions
+  ): Promise<DbaasWhitelistUpdateCommandResult> {
+    return this.updateWhitelistedIp('attach', dbaasId, options);
+  }
+
+  async removeWhitelistedIp(
+    dbaasId: string,
+    options: DbaasWhitelistUpdateOptions
+  ): Promise<DbaasWhitelistUpdateCommandResult> {
+    return this.updateWhitelistedIp('detach', dbaasId, options);
   }
 
   private async resolveCredentials(
@@ -591,6 +843,76 @@ export class DbaasService {
     }
 
     return this.dependencies.createVpcClient(credentials);
+  }
+
+  private async resolveVpcEntry(
+    options: {
+      subnetId?: string;
+      vpcId: string;
+    } & DbaasContextOptions
+  ): Promise<{
+    subnetId: number | null;
+    vpcEntry: DbaasVpcEntry;
+    vpcId: number;
+  }> {
+    const vpcId = normalizeRequiredNumericId(
+      options.vpcId,
+      'VPC ID',
+      '--vpc-id'
+    );
+    const subnetId =
+      options.subnetId === undefined
+        ? null
+        : normalizeRequiredNumericId(
+            options.subnetId,
+            'Subnet ID',
+            '--subnet-id'
+          );
+    const credentials = await this.resolveCredentials(options);
+    const vpcClient = this.requireVpcClient(credentials);
+    const vpc = await vpcClient.getVpc(vpcId);
+
+    return {
+      subnetId,
+      vpcEntry: {
+        ipv4_cidr: vpc.ipv4_cidr,
+        network_id: vpc.network_id,
+        target: 'vpcs',
+        vpc_name: vpc.name,
+        ...(subnetId === null ? {} : { subnet_id: subnetId })
+      },
+      vpcId
+    };
+  }
+
+  private async updateWhitelistedIp(
+    action: 'attach' | 'detach',
+    dbaasId: string,
+    options: DbaasWhitelistUpdateOptions
+  ): Promise<DbaasWhitelistUpdateCommandResult> {
+    const normalizedDbaasId = normalizeRequiredNumericId(
+      dbaasId,
+      'DBaaS ID',
+      'the first argument'
+    );
+    const ip = normalizeIpAddress(options.ip);
+    const tagIds = normalizeTagIds(options.tagId ?? []);
+    const client = await this.createClient(options);
+    const result = await client.updateWhitelistedIps(
+      normalizedDbaasId,
+      action,
+      {
+        allowed_hosts: [{ ip, tag: tagIds }]
+      }
+    );
+
+    return {
+      action: action === 'attach' ? 'whitelist-add' : 'whitelist-remove',
+      dbaas_id: normalizedDbaasId,
+      ip,
+      message: normalizeOptionalString(result.message),
+      tag_ids: tagIds
+    };
   }
 
   private async loadPassword(options: DbaasPasswordOptions): Promise<string> {
@@ -1111,6 +1433,135 @@ function summarizeSupportedClusterOrNull(
   };
 }
 
+function summarizeDbaasDetail(
+  cluster: DbaasClusterDetail,
+  vpcConnections: DbaasVpcConnection[],
+  publicIpEnabled: boolean
+): DbaasDetailItem {
+  const summary = summarizeSupportedCluster(cluster);
+  const publicIpAddress = normalizeHost(cluster.master_node.public_ip_address);
+
+  return {
+    ...summary,
+    connection_endpoint: buildConnectionEndpoint(cluster.master_node),
+    connection_port: buildConnectionPort(cluster.master_node),
+    created_at: normalizeOptionalString(cluster.created_at),
+    plan: summarizePlan(cluster.master_node),
+    public_ip: {
+      attached: publicIpAddress !== null,
+      enabled: publicIpEnabled,
+      ip_address: publicIpAddress
+    },
+    status:
+      normalizeOptionalString(cluster.status_title) ??
+      normalizeOptionalString(cluster.status),
+    vpc_connections: vpcConnections.map(normalizeVpcConnectionItem),
+    whitelisted_ips: normalizeWhitelistedIps(cluster)
+  };
+}
+
+function summarizePlan(
+  masterNode: DbaasClusterSummary['master_node']
+): DbaasPlanInfo {
+  const plan = masterNode.plan ?? null;
+
+  return {
+    configuration: {
+      cpu: normalizePlanValue(masterNode.cpu ?? plan?.cpu),
+      disk: normalizePlanValue(masterNode.disk ?? plan?.disk),
+      ram: normalizePlanValue(masterNode.ram ?? plan?.ram)
+    },
+    name:
+      normalizeOptionalString(masterNode.plan_name) ??
+      normalizeOptionalString(plan?.name),
+    price: normalizePlanValue(plan?.price),
+    price_per_hour: normalizePlanValue(plan?.price_per_hour),
+    price_per_month: normalizePlanValue(plan?.price_per_month)
+  };
+}
+
+function normalizeVpcConnectionItem(
+  connection: DbaasVpcConnection
+): DbaasVpcConnectionItem {
+  return {
+    appliance_id: normalizeOptionalNumber(connection.appliance_id),
+    ip_address: normalizeOptionalString(connection.ip_address),
+    subnet_id: normalizeSubnetId(connection.subnet, connection.subnets),
+    vpc_cidr: normalizeOptionalString(connection.vpc?.ipv4_cidr),
+    vpc_id: normalizeOptionalNumber(connection.vpc?.network_id),
+    vpc_name: normalizeOptionalString(connection.vpc?.name)
+  };
+}
+
+function normalizeWhitelistedIps(
+  cluster: DbaasClusterDetail
+): DbaasWhitelistedIpItem[] {
+  const direct = cluster.whitelisted_ips;
+  if (Array.isArray(direct) && direct.length > 0) {
+    return direct.map(normalizeWhitelistedIpItem);
+  }
+
+  const masterAllowedIps = cluster.master_node.allowed_ip_address;
+  const tags = masterAllowedIps?.whitelisted_ips_tags;
+  if (Array.isArray(tags) && tags.length > 0) {
+    return tags.map(normalizeWhitelistedIpItem);
+  }
+
+  const ips = masterAllowedIps?.whitelisted_ips;
+  if (!Array.isArray(ips)) {
+    return [];
+  }
+
+  return ips.flatMap((ip) => {
+    const normalizedIp = normalizeOptionalString(ip);
+    return normalizedIp === null ? [] : [{ ip: normalizedIp, tags: [] }];
+  });
+}
+
+function normalizeWhitelistedIpItem(
+  item: DbaasWhitelistedIp
+): DbaasWhitelistedIpItem {
+  return {
+    ip: item.ip,
+    tags: normalizeWhitelistTags(item.tag_list ?? item.tags ?? [])
+  };
+}
+
+function normalizeWhitelistTags(
+  tags: DbaasWhitelistedIpTag[]
+): DbaasWhitelistedIpItem['tags'] {
+  return tags.map((tag) => ({
+    id: normalizeOptionalNumber(tag.id),
+    name:
+      normalizeOptionalString(tag.label_name) ??
+      normalizeOptionalString(tag.tag)
+  }));
+}
+
+function buildConnectionEndpoint(
+  masterNode: DbaasClusterSummary['master_node']
+): string | null {
+  const endpoint =
+    normalizeHost(masterNode.domain) ??
+    normalizeHost(masterNode.private_ip_address) ??
+    normalizeHost(masterNode.public_ip_address);
+  const publicIp = normalizeHost(masterNode.public_ip_address);
+
+  if (endpoint === null) {
+    return null;
+  }
+
+  return publicIp === null || endpoint === publicIp
+    ? endpoint
+    : `${endpoint} (${publicIp})`;
+}
+
+function buildConnectionPort(
+  masterNode: DbaasClusterSummary['master_node']
+): string | null {
+  return normalizePort(masterNode.public_port ?? masterNode.port ?? null);
+}
+
 function buildConnectionString(
   type: SupportedDatabaseType,
   databaseName: string | null,
@@ -1121,7 +1572,7 @@ function buildConnectionString(
     normalizeHost(masterNode.domain) ??
     normalizeHost(masterNode.public_ip_address) ??
     normalizeHost(masterNode.private_ip_address);
-  const port = normalizePort(masterNode.public_port ?? masterNode.port ?? null);
+  const port = buildConnectionPort(masterNode);
 
   if (host === null || username === null) {
     return null;
@@ -1300,6 +1751,26 @@ function normalizeRequiredNumericId(
   return Number(normalized);
 }
 
+function normalizeIpAddress(value: string): string {
+  const normalized = normalizeRequiredString(value, 'IP address', '--ip');
+  if (!DBAAS_IP_REGEX.test(normalized)) {
+    throw new CliError('IP address must be a valid IPv4 address or CIDR.', {
+      code: 'INVALID_DBAAS_WHITELIST_IP',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Pass an IPv4 address such as 203.0.113.10, or a CIDR such as 203.0.113.0/24.'
+    });
+  }
+
+  return normalized;
+}
+
+function normalizeTagIds(values: string[]): number[] {
+  return values.map((value) =>
+    normalizeRequiredNumericId(value, 'Tag ID', '--tag-id')
+  );
+}
+
 function assertCanDelete(isInteractive: boolean): void {
   if (!isInteractive) {
     throw new CliError(
@@ -1308,6 +1779,20 @@ function assertCanDelete(isInteractive: boolean): void {
         code: 'DBAAS_DELETE_CONFIRMATION_REQUIRED',
         exitCode: EXIT_CODES.usage,
         suggestion: 'Re-run the command with --force to skip the prompt.'
+      }
+    );
+  }
+}
+
+function assertCanDetachPublicIp(isInteractive: boolean): void {
+  if (!isInteractive) {
+    throw new CliError(
+      'Detaching a DBaaS public IP requires confirmation in an interactive terminal.',
+      {
+        code: 'DBAAS_PUBLIC_IP_DETACH_CONFIRMATION_REQUIRED',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Re-run the command with --force only if you accept that external DBaaS connectivity will be lost.'
       }
     );
   }
@@ -1368,6 +1853,39 @@ function normalizePort(value: number | string | null): string | null {
   }
 
   return null;
+}
+
+function normalizePlanValue(
+  value: number | string | null | undefined
+): string | null {
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  return normalizeOptionalString(value);
+}
+
+function normalizeOptionalNumber(
+  value: number | null | undefined
+): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function normalizeSubnetId(
+  subnet: number | number[] | null | undefined,
+  subnets: Array<{ id?: number }> | undefined
+): number | null {
+  if (typeof subnet === 'number') {
+    return subnet;
+  }
+
+  if (Array.isArray(subnet)) {
+    const first = subnet.find((item) => Number.isInteger(item));
+    return first ?? null;
+  }
+
+  const firstSubnet = subnets?.find((item) => Number.isInteger(item.id));
+  return firstSubnet?.id ?? null;
 }
 
 function normalizeOptionalString(

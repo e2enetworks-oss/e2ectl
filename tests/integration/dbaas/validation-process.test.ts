@@ -1,5 +1,4 @@
 import { MYACCOUNT_BASE_URL_ENV_VAR } from '../../../src/app/runtime.js';
-import { formatCliCommand } from '../../../src/app/metadata.js';
 import { seedDefaultProfile } from '../../helpers/config-fixtures.js';
 import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
@@ -62,7 +61,7 @@ describe('dbaas validation through the built CLI', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      `Error: --db-version requires --type.\n\nNext step: Run ${formatCliCommand('dbaas plans --type <database-type> --db-version <version>')}.\n`
+      "Error: required option '--type <databaseType>' not specified\n\nNext step: Run the command again with --help for usage.\n"
     );
   });
 

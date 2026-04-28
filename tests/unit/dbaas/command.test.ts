@@ -12,6 +12,11 @@ import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createDbaasClientStub() {
   const attachVpc = vi.fn(() => Promise.resolve({}));
+  const attachPublicIp = vi.fn(() =>
+    Promise.resolve({
+      message: 'Public IP attach initiated.'
+    })
+  );
   const createDbaas = vi.fn(() =>
     Promise.resolve({
       id: 7869,
@@ -22,6 +27,16 @@ function createDbaasClientStub() {
     Promise.resolve({
       cluster_id: 7869,
       name: 'customer-db'
+    })
+  );
+  const detachPublicIp = vi.fn(() =>
+    Promise.resolve({
+      message: 'Public IP detach initiated.'
+    })
+  );
+  const detachVpc = vi.fn(() =>
+    Promise.resolve({
+      message: 'VPC detach initiated.'
     })
   );
   const getDbaas = vi.fn(() =>
@@ -47,6 +62,11 @@ function createDbaasClientStub() {
         version: '8.0'
       },
       status: 'Running'
+    })
+  );
+  const getPublicIpStatus = vi.fn(() =>
+    Promise.resolve({
+      public_ip_status: true
     })
   );
   const listDbaas = vi.fn(() =>
@@ -121,26 +141,53 @@ function createDbaasClientStub() {
       name: 'customer-db'
     })
   );
+  const listVpcConnections = vi.fn(() => Promise.resolve([]));
+  const listWhitelistedIps = vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      total_count: 0,
+      total_page_number: 0
+    })
+  );
+  const updateWhitelistedIps = vi.fn(() =>
+    Promise.resolve({
+      message: 'Whitelist update initiated.'
+    })
+  );
 
   const stub: DbaasClient = {
     attachVpc,
+    attachPublicIp,
     createDbaas,
     deleteDbaas,
+    detachPublicIp,
+    detachVpc,
     getDbaas,
+    getPublicIpStatus,
     listDbaas,
     listPlans,
-    resetPassword
+    listVpcConnections,
+    listWhitelistedIps,
+    resetPassword,
+    updateWhitelistedIps
   };
 
   return {
     attachVpc,
+    attachPublicIp,
     createDbaas,
     deleteDbaas,
+    detachPublicIp,
+    detachVpc,
     getDbaas,
+    getPublicIpStatus,
     listDbaas,
     listPlans,
+    listVpcConnections,
+    listWhitelistedIps,
     resetPassword,
-    stub
+    stub,
+    updateWhitelistedIps
   };
 }
 
@@ -285,10 +332,13 @@ describe('dbaas commands', () => {
         },
         items: [
           {
+            connection_endpoint: 'db.example.com',
+            connection_port: '3306',
             connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
             database_name: 'appdb',
             id: 7869,
             name: 'customer-db',
+            public_ip: null,
             status: 'Running',
             type: 'MySQL',
             version: '8.0'
@@ -308,6 +358,8 @@ describe('dbaas commands', () => {
     );
     expect(help).toContain('plans');
     expect(help).toContain('reset-password');
+    expect(help).toContain('network');
+    expect(help).toContain('whitelist');
   });
 
   it('shows safer DBaaS password file options in create help', async () => {
@@ -411,5 +463,57 @@ describe('dbaas commands', () => {
     );
     expect(stdout.buffer).toContain('"action": "delete"');
     expect(stdout.buffer).toContain('"cancelled": false');
+  });
+
+  it('gets DBaaS details and manages whitelist/public IP commands', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'dbaas',
+      'get',
+      '7869',
+      '--alias',
+      'prod'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'whitelist',
+      'add',
+      '7869',
+      '--alias',
+      'prod',
+      '--ip',
+      '203.0.113.10',
+      '--tag-id',
+      '7'
+    ]);
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'network',
+      'detach-public-ip',
+      '7869',
+      '--alias',
+      'prod',
+      '--force'
+    ]);
+
+    expect(stdout.buffer).toContain('DBaaS: customer-db');
+    expect(stdout.buffer).toContain('Connection Endpoint: db.example.com');
+    expect(stdout.buffer).toContain('"action": "whitelist-add"');
+    expect(stdout.buffer).toContain('"action": "public-ip-detach"');
+    expect(stub.updateWhitelistedIps).toHaveBeenCalledWith(7869, 'attach', {
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+    });
+    expect(stub.detachPublicIp).toHaveBeenCalledWith(7869);
   });
 });

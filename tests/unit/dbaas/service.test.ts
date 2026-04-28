@@ -4,6 +4,7 @@ import type {
 } from '../../../src/config/index.js';
 import { DbaasService } from '../../../src/dbaas/service.js';
 import type { DbaasClient } from '../../../src/dbaas/index.js';
+import type { VpcClient } from '../../../src/vpc/index.js';
 
 function createConfig(): ConfigFile {
   return {
@@ -81,40 +82,71 @@ function createPostgresCluster() {
 
 function createServiceFixture(options?: { isInteractive?: boolean }): {
   attachVpc: ReturnType<typeof vi.fn>;
+  attachPublicIp: ReturnType<typeof vi.fn>;
   confirm: ReturnType<typeof vi.fn>;
   createDbaas: ReturnType<typeof vi.fn>;
   createDbaasClient: ReturnType<typeof vi.fn>;
   deleteDbaas: ReturnType<typeof vi.fn>;
+  detachPublicIp: ReturnType<typeof vi.fn>;
+  detachVpc: ReturnType<typeof vi.fn>;
   getDbaas: ReturnType<typeof vi.fn>;
+  getPublicIpStatus: ReturnType<typeof vi.fn>;
   listDbaas: ReturnType<typeof vi.fn>;
   listPlans: ReturnType<typeof vi.fn>;
+  listVpcConnections: ReturnType<typeof vi.fn>;
+  listWhitelistedIps: ReturnType<typeof vi.fn>;
   readPasswordFile: ReturnType<typeof vi.fn>;
   readPasswordFromStdin: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
   resetPassword: ReturnType<typeof vi.fn>;
   service: DbaasService;
+  updateWhitelistedIps: ReturnType<typeof vi.fn>;
+  getVpc: ReturnType<typeof vi.fn>;
 } {
   const confirm = vi.fn(() => Promise.resolve(true));
+  const attachPublicIp = vi.fn();
   const createDbaas = vi.fn();
   const deleteDbaas = vi.fn();
+  const detachPublicIp = vi.fn();
+  const detachVpc = vi.fn();
   const getDbaas = vi.fn();
+  const getPublicIpStatus = vi.fn();
   const listDbaas = vi.fn();
   const listPlans = vi.fn();
+  const listVpcConnections = vi.fn();
+  const listWhitelistedIps = vi.fn();
   const readPasswordFile = vi.fn();
   const readPasswordFromStdin = vi.fn();
   const resetPassword = vi.fn();
+  const updateWhitelistedIps = vi.fn();
+  const getVpc = vi.fn(() =>
+    Promise.resolve({
+      ipv4_cidr: '10.40.0.0/16',
+      is_e2e_vpc: true,
+      name: 'app-vpc',
+      network_id: 501,
+      state: 'Active'
+    })
+  );
   let credentials: ResolvedCredentials | undefined;
 
   const attachVpc = vi.fn();
 
   const client: DbaasClient = {
     attachVpc,
+    attachPublicIp,
     createDbaas,
     deleteDbaas,
+    detachPublicIp,
+    detachVpc,
     getDbaas,
+    getPublicIpStatus,
     listDbaas,
     listPlans,
-    resetPassword
+    listVpcConnections,
+    listWhitelistedIps,
+    resetPassword,
+    updateWhitelistedIps
   };
   const createDbaasClient = vi.fn(
     (resolvedCredentials: ResolvedCredentials) => {
@@ -125,6 +157,16 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   const service = new DbaasService({
     confirm,
     createDbaasClient,
+    createVpcClient: () =>
+      ({
+        attachNodeVpc: vi.fn(),
+        createVpc: vi.fn(),
+        deleteVpc: vi.fn(),
+        detachNodeVpc: vi.fn(),
+        getVpc,
+        listVpcPlans: vi.fn(),
+        listVpcs: vi.fn()
+      }) as unknown as VpcClient,
     isInteractive: options?.isInteractive ?? true,
     readPasswordFile,
     readPasswordFromStdin,
@@ -136,18 +178,26 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
 
   return {
     attachVpc,
+    attachPublicIp,
     confirm,
     createDbaas,
     createDbaasClient,
     deleteDbaas,
+    detachPublicIp,
+    detachVpc,
     getDbaas,
+    getPublicIpStatus,
     listDbaas,
     listPlans,
+    listVpcConnections,
+    listWhitelistedIps,
     readPasswordFile,
     readPasswordFromStdin,
     receivedCredentials: () => credentials,
     resetPassword,
-    service
+    service,
+    updateWhitelistedIps,
+    getVpc
   };
 }
 
@@ -205,20 +255,26 @@ describe('DbaasService', () => {
       },
       items: [
         {
+          connection_endpoint: 'pg.example.com (5.6.7.8)',
+          connection_port: '5432',
           connection_string:
             'psql -h pg.example.com -p 5432 -U admin -d analytics',
           database_name: 'analytics',
           id: 9901,
           name: 'analytics-db',
+          public_ip: '5.6.7.8',
           status: 'Running',
           type: 'PostgreSQL',
           version: '16'
         },
         {
+          connection_endpoint: 'db.example.com (1.2.3.4)',
+          connection_port: '3306',
           connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
           database_name: 'appdb',
           id: 7869,
           name: 'customer-db',
+          public_ip: '1.2.3.4',
           status: 'Running',
           type: 'MySQL',
           version: '8.0'
@@ -318,6 +374,159 @@ describe('DbaasService', () => {
         type: 'MySQL',
         username: 'admin',
         version: '8.0'
+      }
+    });
+  });
+
+  it('creates a VPC-attached DBaaS with an explicit public IP opt-out', async () => {
+    const { createDbaas, getDbaas, getVpc, listPlans, service } =
+      createServiceFixture();
+
+    listPlans
+      .mockResolvedValueOnce({
+        database_engines: [
+          {
+            engine: 'Relational',
+            id: 301,
+            name: 'MySQL',
+            version: '8.0'
+          }
+        ],
+        template_plans: []
+      })
+      .mockResolvedValueOnce({
+        database_engines: [],
+        template_plans: [
+          {
+            available_inventory_status: true,
+            cpu: '2',
+            currency: 'INR',
+            disk: '100 GB',
+            name: 'General Purpose Small',
+            price_per_hour: 12,
+            ram: '4',
+            software: {
+              engine: 'Relational',
+              id: 301,
+              name: 'MySQL',
+              version: '8.0'
+            },
+            template_id: 901
+          }
+        ]
+      });
+    createDbaas.mockResolvedValue({
+      id: 7869,
+      name: 'customer-db'
+    });
+    getDbaas.mockResolvedValue(createMysqlCluster());
+
+    await service.createDbaas({
+      alias: 'prod',
+      databaseName: 'appdb',
+      dbVersion: '8.0',
+      name: 'customer-db',
+      password: 'ValidPassword1!A',
+      plan: 'General Purpose Small',
+      publicIp: false,
+      type: 'sql',
+      vpcId: '501'
+    });
+
+    expect(getVpc).toHaveBeenCalledWith(501);
+    expect(createDbaas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        public_ip_required: false,
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      })
+    );
+  });
+
+  it('gets detailed DBaaS network, whitelist, public IP, and plan information', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue({
+      ...createMysqlCluster(),
+      created_at: '2026-04-24T12:00:00.000Z',
+      master_node: {
+        ...createMysqlCluster().master_node,
+        cpu: '4',
+        disk: '100 GB',
+        plan: {
+          name: 'DBS.16GB',
+          price: '150 INR',
+          price_per_hour: 5,
+          price_per_month: 3600,
+          ram: '16 GB'
+        },
+        ram: '16 GB'
+      },
+      whitelisted_ips: [
+        {
+          ip: '203.0.113.10',
+          tag_list: [{ id: 7, label_name: 'office' }]
+        }
+      ]
+    });
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 7869,
+        ip_address: '10.40.0.8',
+        subnet: 44,
+        vpc: {
+          ipv4_cidr: '10.40.0.0/16',
+          name: 'app-vpc',
+          network_id: 501
+        }
+      }
+    ]);
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+
+    const result = await service.getDbaas('7869', { alias: 'prod' });
+
+    expect(result).toMatchObject({
+      action: 'get',
+      dbaas: {
+        connection_endpoint: 'db.example.com (1.2.3.4)',
+        connection_port: '3306',
+        plan: {
+          configuration: {
+            cpu: '4',
+            disk: '100 GB',
+            ram: '16 GB'
+          },
+          name: 'DBS.16GB',
+          price: '150 INR',
+          price_per_hour: '5',
+          price_per_month: '3600'
+        },
+        public_ip: {
+          attached: true,
+          enabled: true,
+          ip_address: '1.2.3.4'
+        },
+        vpc_connections: [
+          {
+            ip_address: '10.40.0.8',
+            subnet_id: 44,
+            vpc_id: 501,
+            vpc_name: 'app-vpc'
+          }
+        ],
+        whitelisted_ips: [
+          {
+            ip: '203.0.113.10',
+            tags: [{ id: 7, name: 'office' }]
+          }
+        ]
       }
     });
   });
@@ -540,6 +749,188 @@ describe('DbaasService', () => {
         version: '8.0'
       },
       message: 'Password reset request processed successfully.'
+    });
+  });
+
+  it('manages whitelisted IP add, list, and remove flows', async () => {
+    const { listWhitelistedIps, service, updateWhitelistedIps } =
+      createServiceFixture();
+
+    updateWhitelistedIps.mockResolvedValue({
+      message: 'IP whitelisting in progress.'
+    });
+    listWhitelistedIps.mockResolvedValue({
+      items: [
+        {
+          ip: '203.0.113.10',
+          tag_list: [{ id: 7, label_name: 'office' }]
+        }
+      ],
+      total_count: 1,
+      total_page_number: 1
+    });
+
+    const addResult = await service.addWhitelistedIp('7869', {
+      alias: 'prod',
+      ip: '203.0.113.10',
+      tagId: ['7']
+    });
+    const listResult = await service.listWhitelistedIps('7869', {
+      alias: 'prod'
+    });
+    const removeResult = await service.removeWhitelistedIp('7869', {
+      alias: 'prod',
+      ip: '203.0.113.10',
+      tagId: ['7']
+    });
+
+    expect(updateWhitelistedIps).toHaveBeenNthCalledWith(1, 7869, 'attach', {
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+    });
+    expect(updateWhitelistedIps).toHaveBeenNthCalledWith(2, 7869, 'detach', {
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+    });
+    expect(addResult.action).toBe('whitelist-add');
+    expect(removeResult.action).toBe('whitelist-remove');
+    expect(listResult.items).toEqual([
+      {
+        ip: '203.0.113.10',
+        tags: [{ id: 7, name: 'office' }]
+      }
+    ]);
+  });
+
+  it('rejects invalid whitelisted IP inputs before calling the API', async () => {
+    const { service, updateWhitelistedIps } = createServiceFixture();
+
+    await expect(
+      service.addWhitelistedIp('7869', {
+        alias: 'prod',
+        ip: 'not-an-ip'
+      })
+    ).rejects.toThrow('IP address must be a valid IPv4 address or CIDR.');
+
+    expect(updateWhitelistedIps).not.toHaveBeenCalled();
+  });
+
+  it('detaches VPCs using the same VPC payload shape as attach', async () => {
+    const { detachVpc, service } = createServiceFixture();
+
+    detachVpc.mockResolvedValue({
+      message: 'VPC detach initiated.'
+    });
+
+    const result = await service.detachVpc('7869', {
+      alias: 'prod',
+      subnetId: '44',
+      vpcId: '501'
+    });
+
+    expect(detachVpc).toHaveBeenCalledWith(7869, {
+      action: 'detach',
+      vpcs: [
+        {
+          ipv4_cidr: '10.40.0.0/16',
+          network_id: 501,
+          subnet_id: 44,
+          target: 'vpcs',
+          vpc_name: 'app-vpc'
+        }
+      ]
+    });
+    expect(result).toEqual({
+      action: 'vpc-detach',
+      dbaas_id: 7869,
+      message: 'VPC detach initiated.',
+      vpc: {
+        id: 501,
+        name: 'app-vpc',
+        subnet_id: 44
+      }
+    });
+  });
+
+  it('attaches VPCs with the backend action payload', async () => {
+    const { attachVpc, service } = createServiceFixture();
+
+    attachVpc.mockResolvedValue({
+      message: 'VPC attach initiated.'
+    });
+
+    const result = await service.attachVpc('7869', {
+      alias: 'prod',
+      vpcId: '501'
+    });
+
+    expect(attachVpc).toHaveBeenCalledWith(7869, {
+      action: 'attach',
+      vpcs: [
+        {
+          ipv4_cidr: '10.40.0.0/16',
+          network_id: 501,
+          target: 'vpcs',
+          vpc_name: 'app-vpc'
+        }
+      ]
+    });
+    expect(result).toEqual({
+      action: 'vpc-attach',
+      dbaas_id: 7869,
+      vpc: {
+        id: 501,
+        name: 'app-vpc',
+        subnet_id: null
+      }
+    });
+  });
+
+  it('attaches and detaches public IPs with confirmation before detach', async () => {
+    const { attachPublicIp, confirm, detachPublicIp, service } =
+      createServiceFixture();
+
+    attachPublicIp.mockResolvedValue({
+      message: 'Public IP attach initiated.'
+    });
+    detachPublicIp.mockResolvedValue({
+      message: 'Public IP detach initiated.'
+    });
+
+    const attachResult = await service.attachPublicIp('7869', {
+      alias: 'prod'
+    });
+    const detachResult = await service.detachPublicIp('7869', {
+      alias: 'prod'
+    });
+
+    expect(attachPublicIp).toHaveBeenCalledWith(7869);
+    expect(confirm).toHaveBeenCalledWith(
+      'Detach public IP from DBaaS 7869? External connectivity will be lost.'
+    );
+    expect(detachPublicIp).toHaveBeenCalledWith(7869);
+    expect(attachResult.action).toBe('public-ip-attach');
+    expect(detachResult).toEqual({
+      action: 'public-ip-detach',
+      cancelled: false,
+      dbaas_id: 7869,
+      message: 'Public IP detach initiated.'
+    });
+  });
+
+  it('cancels public IP detach when confirmation is declined', async () => {
+    const { confirm, detachPublicIp, service } = createServiceFixture();
+
+    confirm.mockResolvedValue(false);
+
+    const result = await service.detachPublicIp('7869', {
+      alias: 'prod'
+    });
+
+    expect(detachPublicIp).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      action: 'public-ip-detach',
+      cancelled: true,
+      dbaas_id: 7869,
+      message: null
     });
   });
 
