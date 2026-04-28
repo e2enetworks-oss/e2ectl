@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It provides a unified CLI to manage E2E MyAccount resources—compute nodes, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
+It provides a unified CLI to manage E2E MyAccount resources—compute nodes, load balancers, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
 
 ## Requirements
 
@@ -61,6 +61,7 @@ For a fuller onboarding path, use the [quickstart guide](./docs/user-guides/quic
 
 - Create your first operator-ready node: [First node workflow](./docs/user-guides/workflows/first-node.md)
 - Add networking, storage, and access resources to an existing node: [Networking and storage workflow](./docs/user-guides/workflows/networking-and-storage.md)
+- Provision a load balancer with backend groups: [Load Balancer guide](./docs/user-guides/load-balancer.md)
 - Script repeatable runs with `--json` and `--no-input`: [Automation cookbook](./docs/user-guides/automation.md)
 
 ## Documentation Map
@@ -75,6 +76,7 @@ Command guides:
 
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
+- [Load Balancer](./docs/user-guides/load-balancer.md)
 - [Node](./docs/user-guides/node.md)
 - [Image](./docs/user-guides/image.md)
 - [Reserved IP](./docs/user-guides/reserved-ip.md)

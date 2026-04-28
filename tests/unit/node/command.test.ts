@@ -421,6 +421,7 @@ describe('node commands', () => {
       createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),
+      createLoadBalancerClient: vi.fn(),
       createVpcClient: vi.fn(() => vpcStub.stub),
       credentialValidator: {
         validate: vi.fn()

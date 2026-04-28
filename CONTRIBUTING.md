@@ -46,6 +46,7 @@ src/
   myaccount/
   config/
   project/
+  load-balancer/
   node/
   reserved-ip/
   security-group/

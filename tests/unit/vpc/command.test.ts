@@ -10,6 +10,7 @@ import type { NodeClient } from '../../../src/node/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
+import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createVpcClientStub() {
@@ -142,6 +143,11 @@ describe('vpc commands', () => {
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
+      createLoadBalancerClient: vi.fn(() => {
+        throw new Error(
+          'Load balancer client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => LoadBalancerClient,
       createVpcClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;

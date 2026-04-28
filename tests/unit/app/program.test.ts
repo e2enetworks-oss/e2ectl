@@ -11,13 +11,15 @@ describe('createProgram', () => {
     ).toEqual([
       'config',
       'project',
+      'lb',
       'node',
       'image',
       'reserved-ip',
       'volume',
       'vpc',
       'security-group',
-      'ssh-key'
+      'ssh-key',
+      'ssl'
     ]);
   });
 });
