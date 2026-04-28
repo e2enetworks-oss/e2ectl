@@ -1156,6 +1156,56 @@ describe('LoadBalancerService', () => {
       expect(reserveNodePublicIp).not.toHaveBeenCalled();
     });
 
+    it('rejects reserve when context already marks the public IP as reserved', async () => {
+      const { service, getLoadBalancer, reserveNodePublicIp } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(
+        createAlbDetails({
+          public_ip_reserved: false,
+          context: [
+            {
+              backends: [],
+              lb_port: '80',
+              lb_reserve_ip: '1.2.3.4',
+              node_list_type: 'S',
+              plan_name: 'LB-2',
+              tcp_backend: []
+            }
+          ]
+        })
+      );
+
+      await expect(service.reservePublicIp('10', {})).rejects.toMatchObject({
+        code: 'LOAD_BALANCER_PUBLIC_IP_ALREADY_RESERVED'
+      });
+      expect(reserveNodePublicIp).not.toHaveBeenCalled();
+    });
+
+    it('uses node_detail.public_ip when the top-level public IP is absent', async () => {
+      const { service, getLoadBalancer, reserveNodePublicIp } =
+        createServiceFixture();
+      reserveNodePublicIp.mockResolvedValue({
+        ip_address: '2.2.2.2',
+        message: 'Reserved.'
+      });
+      const details = createAlbDetails({
+        node_detail: {
+          public_ip: '2.2.2.2',
+          vm_id: 1001
+        }
+      });
+      delete details.public_ip;
+      getLoadBalancer.mockResolvedValue(details);
+
+      const result = await service.reservePublicIp('10', {});
+
+      expect(reserveNodePublicIp).toHaveBeenCalledWith('2.2.2.2', {
+        type: 'live-reserve',
+        vm_id: 1001
+      });
+      expect(result.reserve_ip).toBe('2.2.2.2');
+    });
+
     it('rejects reserve for internal load balancers', async () => {
       const { service, getLoadBalancer, reserveNodePublicIp } =
         createServiceFixture();

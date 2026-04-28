@@ -36,6 +36,40 @@ function buildListResponse() {
 }
 
 describe('lb list against a fake MyAccount API', () => {
+  it('renders a clear empty-state message', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'OK',
+          total_count: 0,
+          total_page_number: 1
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['lb', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('No load balancers found.');
+      expect(result.stdout).toContain('e2ectl lb plans');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('fetches load balancers and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/': () => ({

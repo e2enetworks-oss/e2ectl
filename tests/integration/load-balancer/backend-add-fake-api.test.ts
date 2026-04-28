@@ -105,6 +105,51 @@ function buildUpdateResponse() {
   };
 }
 
+function buildNlbGetResponse() {
+  return {
+    code: 200,
+    data: {
+      id: 20,
+      appliance_name: 'my-nlb',
+      status: 'RUNNING',
+      lb_mode: 'TCP',
+      lb_type: 'external',
+      public_ip: '1.2.3.4',
+      appliance_instance: [
+        {
+          context: {
+            acl_list: [],
+            acl_map: [],
+            backends: [],
+            tcp_backend: [
+              {
+                backend_name: 'grp',
+                port: 3000,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-1',
+                    backend_ip: '10.0.0.1',
+                    backend_port: 3000
+                  }
+                ]
+              }
+            ],
+            lb_port: '3000',
+            plan_name: 'LB-2',
+            cn_id: 901,
+            cn_status: 'auto_renew',
+            lb_type: 'external',
+            vpc_list: []
+          }
+        }
+      ]
+    },
+    errors: {},
+    message: 'OK'
+  };
+}
+
 function buildAlbWithTwoGroupsGetResponse() {
   return {
     code: 200,
@@ -417,6 +462,154 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
+  it('backend-group update — ALB changes algorithm and protocol', async () => {
+    const receivedPutBodies: unknown[] = [];
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': (request) => {
+        receivedPutBodies.push(request);
+        return { body: buildUpdateResponse() };
+      }
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-group',
+          'update',
+          '10',
+          'web',
+          '--algorithm',
+          'leastconn',
+          '--backend-protocol',
+          'HTTPS'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Backend group "web" updated.');
+      expect(result.stdout).toContain('leastconn');
+      expect(result.stdout).toContain('HTTPS');
+      expect(receivedPutBodies).toHaveLength(1);
+      expect(
+        JSON.parse((receivedPutBodies[0] as { body: string }).body)
+      ).toMatchObject({
+        backends: [
+          {
+            name: 'web',
+            backend_mode: 'https',
+            backend_ssl: true,
+            balance: 'leastconn'
+          }
+        ]
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — ALB changes server IP and port', async () => {
+    const receivedPutBodies: unknown[] = [];
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/10/': () => ({
+        body: buildAlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/10/': (request) => {
+        receivedPutBodies.push(request);
+        return { body: buildUpdateResponse() };
+      }
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'update',
+          '10',
+          '--backend-group',
+          'web',
+          '--backend-server-name',
+          'server-1',
+          '--ip',
+          '10.0.0.9',
+          '--port',
+          '9090'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Server "server-1" updated');
+      expect(result.stdout).toContain('10.0.0.9');
+      expect(result.stdout).toContain('9090');
+      expect(receivedPutBodies).toHaveLength(1);
+      expect(
+        JSON.parse((receivedPutBodies[0] as { body: string }).body)
+      ).toMatchObject({
+        backends: [
+          {
+            name: 'web',
+            servers: [
+              {
+                backend_name: 'server-1',
+                backend_ip: '10.0.0.9',
+                backend_port: 9090
+              }
+            ]
+          }
+        ]
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — fails before network when no changes are provided', async () => {
+    const result = await runBuiltCli([
+      'lb',
+      'backend-server',
+      'update',
+      '10',
+      '--backend-group',
+      'web',
+      '--backend-server-name',
+      'server-1'
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(
+      'Provide --ip, --port, or both to update a backend server.'
+    );
+  });
+
   it('backend-group remove — GET then PUT removing group and stale ACLs', async () => {
     const receivedPutBodies: unknown[] = [];
 
@@ -705,52 +898,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
   });
 
   it('backend-server add — NLB', async () => {
-    const nlbGetResponse = {
-      code: 200,
-      data: {
-        id: 20,
-        appliance_name: 'my-nlb',
-        status: 'RUNNING',
-        lb_mode: 'TCP',
-        lb_type: 'external',
-        public_ip: '1.2.3.4',
-        appliance_instance: [
-          {
-            context: {
-              acl_list: [],
-              acl_map: [],
-              backends: [],
-              tcp_backend: [
-                {
-                  backend_name: 'grp',
-                  port: 3000,
-                  balance: 'roundrobin',
-                  servers: [
-                    {
-                      backend_name: 'srv-1',
-                      backend_ip: '10.0.0.1',
-                      backend_port: 3000
-                    }
-                  ]
-                }
-              ],
-              lb_port: '3000',
-              plan_name: 'LB-2',
-              cn_id: 901,
-              cn_status: 'auto_renew',
-              lb_type: 'external',
-              vpc_list: []
-            }
-          }
-        ]
-      },
-      errors: {},
-      message: 'OK'
-    };
-
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
-        body: nlbGetResponse
+        body: buildNlbGetResponse()
       }),
       'PUT /myaccount/api/v1/appliances/load-balancers/20/': () => ({
         body: buildUpdateResponse()
@@ -781,6 +931,118 @@ describe('lb backend commands against a fake MyAccount API', () => {
       );
 
       expect(result.exitCode).toBe(0);
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-group update — NLB changes algorithm', async () => {
+    const receivedPutBodies: unknown[] = [];
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': (request) => {
+        receivedPutBodies.push(request);
+        return { body: buildUpdateResponse() };
+      }
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        ['lb', 'backend-group', 'update', '20', 'grp', '--algorithm', 'source'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Backend group "grp" updated.');
+      expect(receivedPutBodies).toHaveLength(1);
+      expect(
+        JSON.parse((receivedPutBodies[0] as { body: string }).body)
+      ).toMatchObject({
+        lb_mode: 'TCP',
+        tcp_backend: [
+          {
+            backend_name: 'grp',
+            balance: 'source'
+          }
+        ]
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('backend-server update — NLB changes server port', async () => {
+    const receivedPutBodies: unknown[] = [];
+
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/appliances/20/': () => ({
+        body: buildNlbGetResponse()
+      }),
+      'PUT /myaccount/api/v1/appliances/load-balancers/20/': (request) => {
+        receivedPutBodies.push(request);
+        return { body: buildUpdateResponse() };
+      }
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'lb',
+          'backend-server',
+          'update',
+          '20',
+          '--backend-group',
+          'grp',
+          '--backend-server-name',
+          'srv-1',
+          '--port',
+          '9090'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Server "srv-1" updated');
+      expect(receivedPutBodies).toHaveLength(1);
+      expect(
+        JSON.parse((receivedPutBodies[0] as { body: string }).body)
+      ).toMatchObject({
+        lb_mode: 'TCP',
+        tcp_backend: [
+          {
+            backend_name: 'grp',
+            servers: [
+              {
+                backend_name: 'srv-1',
+                backend_port: 9090
+              }
+            ]
+          }
+        ]
+      });
     } finally {
       await server.close();
       await tempHome.cleanup();

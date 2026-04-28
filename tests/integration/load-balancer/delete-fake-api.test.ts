@@ -15,6 +15,16 @@ function buildDeleteResponse() {
 }
 
 describe('lb delete against a fake MyAccount API', () => {
+  it('fails in non-interactive mode when delete omits --force', async () => {
+    const result = await runBuiltCli(['lb', 'delete', '42']);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(
+      'Deleting a load balancer requires confirmation in an interactive terminal.'
+    );
+  });
+
   it('deletes a load balancer with --force and emits JSON', async () => {
     const server = await startTestHttpServer({
       'DELETE /myaccount/api/v1/appliances/42/': () => ({

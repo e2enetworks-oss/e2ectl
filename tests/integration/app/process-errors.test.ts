@@ -30,4 +30,30 @@ describe('built CLI errors', () => {
       'Error: Deleting a node requires confirmation in an interactive terminal.\n\nNext step: Re-run the command with --force to skip the prompt.\n'
     );
   });
+
+  it('rejects retired load-balancer command aliases through the CLI contract', async () => {
+    const result = await runBuiltCli(['load-balancer', 'list']);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'Error: Unknown command "load-balancer".\n\nNext step: Use "lb" instead.\n'
+    );
+  });
+
+  it('rejects retired lb network reserve-ip attach alias through the CLI contract', async () => {
+    const result = await runBuiltCli([
+      'lb',
+      'network',
+      'reserve-ip',
+      'attach',
+      '10'
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'Error: Unknown command "lb network reserve-ip attach".\n\nNext step: Use "lb network reserve-ip reserve <lbId>" to reserve the current public IP.\n'
+    );
+  });
 });

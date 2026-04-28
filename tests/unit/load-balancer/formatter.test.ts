@@ -35,6 +35,26 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('10.0.0.1');
     });
 
+    it('renders placeholders for missing list fields and blank public IPs', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'list',
+        items: [
+          {
+            id: 3,
+            appliance_name: 'private-lb',
+            status: 'RUNNING',
+            public_ip: '',
+            private_ip: null
+          }
+        ]
+      };
+
+      const output = renderLoadBalancerResult(result, false);
+
+      expect(output).toContain('private-lb');
+      expect(output).toContain('--');
+    });
+
     it('renders deterministic JSON output', () => {
       const result: LoadBalancerCommandResult = {
         action: 'list',
@@ -115,6 +135,44 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('lb-99');
       expect(output).toContain('web');
       expect(output).toContain('server-1 (10.0.0.1:8080)');
+    });
+
+    it('renders committed billing in human output', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'create',
+        backend: {
+          backend_port: 443,
+          health_check: null,
+          name: 'tcp',
+          protocol: 'TCP',
+          routing_policy: 'source',
+          servers: []
+        },
+        billing: {
+          committed_plan_id: 901,
+          committed_plan_name: '90 Days',
+          post_commit_behavior: 'auto_renew',
+          type: 'committed'
+        },
+        requested: {
+          frontend_port: 443,
+          mode: 'TCP',
+          name: 'my-nlb',
+          plan_name: 'LB-2',
+          type: 'external'
+        },
+        result: {
+          appliance_id: 99,
+          id: 'lb-99',
+          resource_type: 'load_balancer',
+          label_id: 'lbl-1'
+        }
+      };
+
+      const output = renderLoadBalancerResult(result, false);
+
+      expect(output).toContain('Committed (90 Days)');
+      expect(output).not.toContain('Servers');
     });
 
     it('renders JSON for create', () => {
@@ -661,6 +719,37 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('LB-2');
       expect(output).toContain('--');
     });
+
+    it('renders "--" for negative plan prices and scalar values', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'plans',
+        items: [
+          {
+            committed_sku: [
+              {
+                committed_days: 30,
+                committed_sku_id: 301,
+                committed_sku_name: 'Trial',
+                committed_sku_price: -1
+              }
+            ],
+            disk: -1,
+            hourly: -1,
+            name: 'LB-NEG',
+            price: -1,
+            ram: -1,
+            template_id: 'plan-neg',
+            vcpu: -1
+          }
+        ]
+      };
+
+      const output = renderLoadBalancerResult(result, false);
+
+      expect(output).toContain('LB-NEG');
+      expect(output).toContain('Trial');
+      expect(output).toContain('--');
+    });
   });
 
   describe('get', () => {
@@ -832,6 +921,23 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('42');
       expect(output).toContain('enabled');
       expect(output).toContain('e2ectl lb get 10');
+    });
+
+    it('renders disabled redirect when update explicitly turns it off', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        message: 'Load balancer updated.',
+        changes: {
+          redirect_http_to_https: false
+        }
+      };
+
+      const output = renderLoadBalancerResult(result, false);
+
+      expect(output).toContain('HTTP→HTTPS Redirect');
+      expect(output).toContain('disabled');
     });
 
     it('renders update with no optional changes (human)', () => {

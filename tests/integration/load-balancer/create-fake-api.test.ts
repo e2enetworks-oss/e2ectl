@@ -51,6 +51,54 @@ function buildCreateResponse() {
 }
 
 describe('lb create against a fake MyAccount API', () => {
+  it('fails before network when --reserve-ip is combined with --vpc', async () => {
+    const result = await runBuiltCli([
+      'lb',
+      'create',
+      '--name',
+      'bad-lb',
+      '--plan',
+      'LB-2',
+      '--frontend-protocol',
+      'HTTP',
+      '--vpc',
+      '12345',
+      '--reserve-ip',
+      '1.2.3.4',
+      '--backend-group',
+      'web',
+      '--backend-server',
+      'server-1:10.0.0.1:8080'
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('--reserve-ip cannot be used with --vpc.');
+  });
+
+  it('fails before network when TCP create omits --port', async () => {
+    const result = await runBuiltCli([
+      'lb',
+      'create',
+      '--name',
+      'bad-nlb',
+      '--plan',
+      'LB-2',
+      '--frontend-protocol',
+      'TCP',
+      '--backend-group',
+      'tcp',
+      '--backend-server',
+      'server-1:10.0.0.1:8080'
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(
+      '--port is required for TCP load balancers.'
+    );
+  });
+
   it('creates an ALB and emits deterministic JSON', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliance-type/': () => ({

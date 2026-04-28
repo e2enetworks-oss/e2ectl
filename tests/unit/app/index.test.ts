@@ -127,6 +127,74 @@ describe('runCli', () => {
     );
   });
 
+  it('rejects the retired load-balancer command alias before command parsing', async () => {
+    const { runtime, stderr, stdout } = createRuntimeFixture();
+
+    const exitCode = await runCli(
+      ['node', CLI_COMMAND_NAME, 'load-balancer', 'list'],
+      runtime,
+      stderr
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stdout.buffer).toBe('');
+    expect(stderr.buffer).toBe(
+      'Error: Unknown command "load-balancer".\n\nNext step: Use "lb" instead.\n'
+    );
+  });
+
+  it('rejects retired lb backend group and server command aliases', async () => {
+    const { runtime, stderr } = createRuntimeFixture();
+
+    await expect(
+      runCli(
+        ['node', CLI_COMMAND_NAME, 'lb', 'backend', 'group', 'add'],
+        runtime,
+        stderr
+      )
+    ).resolves.toBe(2);
+    expect(stderr.buffer).toBe(
+      'Error: Unknown command "lb backend group".\n\nNext step: Use "lb backend-group" instead.\n'
+    );
+
+    stderr.buffer = '';
+
+    await expect(
+      runCli(
+        ['node', CLI_COMMAND_NAME, 'lb', 'backend', 'server', 'add'],
+        runtime,
+        stderr
+      )
+    ).resolves.toBe(2);
+    expect(stderr.buffer).toBe(
+      'Error: Unknown command "lb backend server".\n\nNext step: Use "lb backend-server" instead.\n'
+    );
+  });
+
+  it('rejects retired lb network reserve-ip attach/detach aliases', async () => {
+    const { runtime, stderr } = createRuntimeFixture();
+
+    await expect(
+      runCli(
+        [
+          'node',
+          CLI_COMMAND_NAME,
+          'lb',
+          'network',
+          'reserve-ip',
+          'attach',
+          '10'
+        ],
+        runtime,
+        stderr
+      )
+    ).resolves.toBe(2);
+
+    expect(stderr.buffer).toBe(
+      'Error: Unknown command "lb network reserve-ip attach".\n\nNext step: Use "lb network reserve-ip reserve <lbId>" to reserve the current public IP.\n'
+    );
+  });
+
   it('treats symlinked entrypoints as the same file for npm-linked installs', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'e2ectl-app-link-'));
     const actualPath = fileURLToPath(import.meta.url);
@@ -135,5 +203,14 @@ describe('runCli', () => {
     await symlink(actualPath, symlinkPath);
 
     expect(pathsReferToSameFile(symlinkPath, actualPath)).toBe(true);
+  });
+
+  it('compares unresolved paths when realpath lookup fails', () => {
+    const missingPath = path.join(
+      os.tmpdir(),
+      'e2ectl-missing-entrypoint-for-test.js'
+    );
+
+    expect(pathsReferToSameFile(missingPath, missingPath)).toBe(true);
   });
 });

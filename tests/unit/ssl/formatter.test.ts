@@ -59,4 +59,47 @@ describe('SSL formatter', () => {
       ]
     });
   });
+
+  it('falls back through alternate certificate name fields', () => {
+    const output = renderSslResult(
+      {
+        action: 'list',
+        items: [
+          {
+            id: 789,
+            name: 'named-cert',
+            imported_date: '2026-01-01'
+          },
+          {
+            id: 987
+          }
+        ]
+      },
+      true
+    );
+
+    expect(JSON.parse(output)).toEqual({
+      action: 'list',
+      items: [
+        {
+          id: 789,
+          name: 'named-cert',
+          ssl_certificate_type: null,
+          ssl_certificate_state: null,
+          ssl_domain_name: null,
+          expiry_date: null,
+          imported_date: '2026-01-01'
+        },
+        {
+          id: 987,
+          name: '987',
+          ssl_certificate_type: null,
+          ssl_certificate_state: null,
+          ssl_domain_name: null,
+          expiry_date: null,
+          imported_date: null
+        }
+      ]
+    });
+  });
 });
