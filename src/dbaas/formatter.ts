@@ -28,20 +28,22 @@ export function formatDbaasListTable(items: DbaasListItem[]): string {
       'ID',
       'Name',
       'DB Version',
-      'Connection Endpoint',
-      'Connection Port',
+      'Public Endpoint',
+      'Private IP(s)',
+      'Port',
       'Status'
     ]
   });
 
   items.forEach((item) => {
     table.push([
-      item.id === null ? '' : String(item.id),
-      item.name,
-      formatDbaasVersion(item.type, item.version),
-      item.connection_endpoint ?? '',
-      item.connection_port ?? '',
-      item.status ?? ''
+      item.id === null ? '--' : String(item.id),
+      item.name || '--',
+      formatDbaasVersion(item.type, item.version) || '--',
+      item.connection_endpoint ?? '--',
+      item.private_ips.length > 0 ? item.private_ips.join(', ') : '--',
+      item.connection_port ?? '--',
+      item.status ?? '--'
     ]);
   });
 
@@ -112,20 +114,23 @@ export function formatDbaasCommittedSkusTable(
 
 function renderDbaasHuman(result: DbaasCommandResult): string {
   switch (result.action) {
-    case 'create':
-      return (
-        `Created DBaaS: ${result.dbaas.name}\n` +
-        `ID: ${result.dbaas.id}\n` +
-        `DB Version: ${formatDbaasVersion(result.dbaas.type, result.dbaas.version)}\n` +
-        `Database Name: ${result.dbaas.database_name ?? ''}\n` +
-        `Billing Type: ${result.requested.billing_type}\n` +
-        (result.requested.committed_plan_id === undefined
-          ? ''
-          : `Committed Plan ID: ${result.requested.committed_plan_id}\n`) +
-        (result.requested.vpc_id === undefined
-          ? ''
-          : `VPC ID: ${result.requested.vpc_id}\n`)
+    case 'create': {
+      const createTable = new Table({ head: ['Created DBaaS', ''] });
+      createTable.push(
+        ['Name', result.dbaas.name || '--'],
+        ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
+        ['DB Version', formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'],
+        ['Database Name', result.dbaas.database_name ?? '--'],
+        ['Billing Type', result.requested.billing_type || '--']
       );
+      if (result.requested.committed_plan_id !== undefined) {
+        createTable.push(['Committed Plan ID', String(result.requested.committed_plan_id)]);
+      }
+      if (result.requested.vpc_id !== undefined) {
+        createTable.push(['VPC ID', String(result.requested.vpc_id)]);
+      }
+      return `${createTable.toString()}\n`;
+    }
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -140,14 +145,17 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return renderListTypesHuman(result);
     case 'plans':
       return renderTemplatePlansHuman(result);
-    case 'reset-password':
-      return (
-        `Password reset requested for DBaaS: ${result.dbaas.name}\n` +
-        `ID: ${result.dbaas.id}\n` +
-        `DB Version: ${formatDbaasVersion(result.dbaas.type, result.dbaas.version)}\n` +
-        `Username: ${result.dbaas.username ?? ''}\n` +
-        `Message: ${result.message}\n`
+    case 'reset-password': {
+      const resetTable = new Table({ head: ['Password Reset', ''] });
+      resetTable.push(
+        ['Name', result.dbaas.name || '--'],
+        ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
+        ['DB Version', formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'],
+        ['Username', result.dbaas.username ?? '--'],
+        ['Message', result.message || '--']
       );
+      return `${resetTable.toString()}\n`;
+    }
     case 'vpc-attach':
       return renderVpcAttachHuman(result);
     case 'vpc-detach':
@@ -198,9 +206,8 @@ function renderGetHuman(item: DbaasDetailItem): string {
     ['Configuration', formatConfiguration(item) || '--'],
     ['Price', item.plan.price ?? '--'],
     ['Status', item.status ?? '--'],
-    ['Connection Endpoint', item.connection_endpoint ?? '--'],
-    ['Connection Port', item.connection_port === null || item.connection_port === undefined ? '--' : String(item.connection_port)],
-    ['Public IP', item.public_ip.enabled ? (item.public_ip.ip_address ?? '--') : 'disabled']
+    ['Public Connection Endpoint', item.connection_endpoint ?? '--'],
+    ['Connection Port', item.connection_port === null || item.connection_port === undefined ? '--' : String(item.connection_port)]
   );
 
   return `${detailsTable.toString()}\n` + vpcSection + whitelistSection;
@@ -359,6 +366,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
           database_name: item.database_name,
           id: item.id,
           name: item.name,
+          private_ips: item.private_ips,
           public_ip: item.public_ip,
           status: item.status,
           type: item.type,

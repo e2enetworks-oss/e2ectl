@@ -123,6 +123,7 @@ export interface DbaasListItem {
   database_name: string | null;
   id: number;
   name: string;
+  private_ips: string[];
   public_ip: string | null;
   status: string | null;
   type: SupportedDatabaseType;
@@ -528,6 +529,9 @@ export class DbaasService {
             database_name: normalized.database_name,
             id: normalized.id,
             name: normalized.name,
+            private_ips: [normalizeHost(item.master_node.private_ip_address)].filter(
+              (ip): ip is string => ip !== null
+            ),
             public_ip: normalizeHost(item.master_node.public_ip_address),
             status: normalizeOptionalString(item.status),
             type: normalized.type,
@@ -1232,30 +1236,6 @@ function summarizeTemplatePlans(
     });
 }
 
-function extractCommittedSkus(
-  type: SupportedDatabaseType,
-  templatePlans: DbaasTemplatePlan[]
-): DbaasCommittedSkuItem[] {
-  return templatePlans.flatMap((plan) =>
-    (plan.committed_sku ?? []).flatMap((sku) => {
-      if (sku.committed_sku_id === undefined) {
-        return [];
-      }
-
-      return [
-        {
-          committed_days: sku.committed_days ?? null,
-          committed_sku_id: sku.committed_sku_id,
-          committed_sku_name: sku.committed_sku_name ?? '',
-          committed_sku_price: sku.committed_sku_price ?? null,
-          currency: normalizeOptionalString(plan.currency),
-          plan_name: plan.name,
-          template_id: plan.template_id
-        }
-      ];
-    })
-  );
-}
 
 function resolveSoftware(
   catalog: DbaasPlanCatalog,
@@ -1433,8 +1413,8 @@ function summarizePlan(
       ram: normalizePlanValue(masterNode.ram ?? plan?.ram)
     },
     name:
-      normalizeOptionalString(masterNode.plan_name) ??
-      normalizeOptionalString(plan?.name),
+      normalizeOptionalString(plan?.name) ??
+      normalizeOptionalString(masterNode.plan_name),
     price: normalizePlanValue(plan?.price),
     price_per_hour: normalizePlanValue(plan?.price_per_hour),
     price_per_month: normalizePlanValue(plan?.price_per_month)

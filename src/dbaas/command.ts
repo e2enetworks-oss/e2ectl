@@ -201,9 +201,11 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     );
   });
 
-  const networkCommand = command
-    .command('network')
-    .description('Manage DBaaS VPC and public IP networking.');
+  const networkCommand = addContextOptions(
+    command
+      .command('network')
+      .description('Manage DBaaS VPC and public IP networking.')
+  );
   networkCommand.helpCommand(
     'help [command]',
     'Show help for a dbaas network command'
@@ -315,9 +317,11 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     networkCommand.outputHelp();
   });
 
-  const whitelistCommand = command
-    .command('whitelist')
-    .description('Manage DBaaS whitelisted IPs.');
+  const whitelistCommand = addContextOptions(
+    command
+      .command('whitelist')
+      .description('Manage DBaaS whitelisted IPs.')
+  );
   whitelistCommand.helpCommand(
     'help [command]',
     'Show help for a dbaas whitelist command'
