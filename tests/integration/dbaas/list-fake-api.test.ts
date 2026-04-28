@@ -120,6 +120,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               database_name: 'analytics',
               id: 9901,
               name: 'analytics-db',
+              private_ips: [],
               public_ip: null,
               status: 'Running',
               type: 'PostgreSQL',
@@ -132,6 +133,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               database_name: 'appdb',
               id: 7869,
               name: 'customer-db',
+              private_ips: [],
               public_ip: null,
               status: 'Running',
               type: 'MySQL',
@@ -225,7 +227,7 @@ describe('dbaas list against a fake MyAccount API', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('DB Version');
       expect(result.stdout).toContain('customer-db');
-      expect(result.stdout).toContain('Connection Endpoint');
+      expect(result.stdout).toContain('Public Endpoint');
       expect(result.stdout).toContain('db.example.com');
       expect(result.stdout).toContain('3306');
     } finally {
