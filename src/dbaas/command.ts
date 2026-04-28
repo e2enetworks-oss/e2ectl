@@ -19,7 +19,7 @@ import {
   type DbaasPublicIpOptions,
   type DbaasPlansOptions,
   type DbaasResetPasswordOptions,
-  type DbaasSkusOptions,
+
   type DbaasWhitelistListOptions,
   type DbaasWhitelistUpdateOptions
 } from './service.js';
@@ -77,27 +77,6 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       .requiredOption('--db-version <version>', 'Database engine version.')
   ).action(async (options: DbaasPlansOptions, commandInstance: Command) => {
     const result = await service.listPlans(options);
-    runtime.stdout.write(
-      renderDbaasResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
-  });
-
-  addContextOptions(
-    command
-      .command('skus')
-      .description(
-        `List committed SKU options for a specific engine version. Use the SKU ID with ${formatCliCommand('dbaas create --billing-type committed --committed-plan-id <id>')}.`
-      )
-      .requiredOption(
-        '--type <databaseType>',
-        'Database type: maria, sql, or postgres.'
-      )
-      .requiredOption('--db-version <version>', 'Database engine version.')
-  ).action(async (options: DbaasSkusOptions, commandInstance: Command) => {
-    const result = await service.listSkus(options);
     runtime.stdout.write(
       renderDbaasResult(
         result,
@@ -194,7 +173,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       )
       .option(
         '--committed-plan-id <committedPlanId>',
-        `Committed SKU ID from ${formatCliCommand('dbaas skus')} output. Requires --billing-type committed.`
+        'Committed SKU ID. Requires --billing-type committed.'
       )
       .addOption(
         new Option(
@@ -221,36 +200,6 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       )
     );
   });
-
-  addContextOptions(
-    command
-      .command('attach <dbaasId>')
-      .description(
-        'Attach a VPC to an existing DBaaS cluster. The cluster must be in Running state.'
-      )
-      .requiredOption(
-        '--vpc-id <vpcId>',
-        'VPC network_id to attach. Use the network_id from vpc list.'
-      )
-      .option(
-        '--subnet-id <subnetId>',
-        'Optional subnet ID within the VPC. Only for non-default VPCs.'
-      )
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasAttachVpcOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.attachVpc(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    }
-  );
 
   const networkCommand = command
     .command('network')

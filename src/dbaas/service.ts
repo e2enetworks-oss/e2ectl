@@ -61,11 +61,6 @@ export interface DbaasPlansOptions extends DbaasContextOptions {
   type: string;
 }
 
-export interface DbaasSkusOptions extends DbaasContextOptions {
-  dbVersion: string;
-  type: string;
-}
-
 export interface DbaasListOptions extends DbaasContextOptions {
   type?: string;
 }
@@ -256,16 +251,6 @@ export interface DbaasPlansCommandResult {
   total_count: number;
 }
 
-export interface DbaasSkusCommandResult {
-  action: 'skus';
-  filters: {
-    type: SupportedDatabaseType;
-    version: string;
-  };
-  items: DbaasCommittedSkuItem[];
-  total_count: number;
-}
-
 export interface DbaasCreateCommandResult {
   action: 'create';
   dbaas: DbaasSummaryItem;
@@ -357,7 +342,7 @@ export type DbaasCommandResult =
   | DbaasPublicIpAttachCommandResult
   | DbaasPublicIpDetachCommandResult
   | DbaasResetPasswordCommandResult
-  | DbaasSkusCommandResult
+
   | DbaasVpcAttachCommandResult
   | DbaasVpcDetachCommandResult
   | DbaasWhitelistListCommandResult
@@ -605,30 +590,6 @@ export class DbaasService {
 
     return {
       action: 'plans',
-      filters: { type: requestedType, version: requestedVersion },
-      items,
-      total_count: items.length
-    };
-  }
-
-  async listSkus(options: DbaasSkusOptions): Promise<DbaasSkusCommandResult> {
-    const requestedType = normalizeDatabaseType(options.type);
-    const requestedVersion = normalizeRequiredString(
-      options.dbVersion,
-      'DB version',
-      '--db-version'
-    );
-    const client = await this.createClient(options);
-    const catalog = await client.listPlans();
-    const software = resolveSoftware(catalog, requestedType, requestedVersion);
-    const softwareCatalog = await client.listPlans(software.id);
-    const items = extractCommittedSkus(
-      requestedType,
-      softwareCatalog.template_plans
-    );
-
-    return {
-      action: 'skus',
       filters: { type: requestedType, version: requestedVersion },
       items,
       total_count: items.length
@@ -1058,7 +1019,7 @@ function normalizeCommittedPlanId(
         {
           code: 'MISSING_COMMITTED_PLAN_ID',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatCliCommand('dbaas skus --type <database-type> --db-version <version>')} first, then pass a SKU ID with --committed-plan-id.`
+          suggestion: 'Pass a committed SKU ID with --committed-plan-id.'
         }
       );
     }

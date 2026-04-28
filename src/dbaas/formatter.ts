@@ -25,6 +25,7 @@ export function renderDbaasResult(
 export function formatDbaasListTable(items: DbaasListItem[]): string {
   const table = new Table({
     head: [
+      'ID',
       'Name',
       'DB Version',
       'Connection Endpoint',
@@ -35,6 +36,7 @@ export function formatDbaasListTable(items: DbaasListItem[]): string {
 
   items.forEach((item) => {
     table.push([
+      item.id === null ? '' : String(item.id),
       item.name,
       formatDbaasVersion(item.type, item.version),
       item.connection_endpoint ?? '',
@@ -116,16 +118,13 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
         `ID: ${result.dbaas.id}\n` +
         `DB Version: ${formatDbaasVersion(result.dbaas.type, result.dbaas.version)}\n` +
         `Database Name: ${result.dbaas.database_name ?? ''}\n` +
-        `Connection String: ${result.dbaas.connection_string ?? ''}\n` +
         `Billing Type: ${result.requested.billing_type}\n` +
         (result.requested.committed_plan_id === undefined
           ? ''
           : `Committed Plan ID: ${result.requested.committed_plan_id}\n`) +
         (result.requested.vpc_id === undefined
           ? ''
-          : `VPC ID: ${result.requested.vpc_id}\n`) +
-        '\n' +
-        `Next: run ${formatCliCommand('dbaas list')} to inspect the current state.\n`
+          : `VPC ID: ${result.requested.vpc_id}\n`)
       );
     case 'delete':
       return result.cancelled
@@ -149,8 +148,6 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
         `Username: ${result.dbaas.username ?? ''}\n` +
         `Message: ${result.message}\n`
       );
-    case 'skus':
-      return renderSkusHuman(result);
     case 'vpc-attach':
       return renderVpcAttachHuman(result);
     case 'vpc-detach':
@@ -192,24 +189,21 @@ function renderGetHuman(item: DbaasDetailItem): string {
       ? 'Whitelisted IPs: none\n'
       : `Whitelisted IPs:\n${formatWhitelistedIpsTable(item.whitelisted_ips)}\n`;
 
-  return (
-    `DBaaS: ${item.name}\n` +
-    `ID: ${item.id}\n` +
-    `DB Version: ${formatDbaasVersion(item.type, item.version)}\n` +
-    `Plan Name: ${item.plan.name ?? ''}\n` +
-    `Price: ${item.plan.price ?? ''}\n` +
-    `Price/Hour: ${item.plan.price_per_hour ?? ''}\n` +
-    `Price/Month: ${item.plan.price_per_month ?? ''}\n` +
-    `DBaaS Configuration: ${formatConfiguration(item)}\n` +
-    `Connection Endpoint: ${item.connection_endpoint ?? ''}\n` +
-    `Connection Port: ${item.connection_port ?? ''}\n` +
-    `Connection String: ${item.connection_string ?? ''}\n` +
-    `Status: ${item.status ?? ''}\n` +
-    `Public IP Enabled: ${item.public_ip.enabled ? 'yes' : 'no'}\n` +
-    `Public IP: ${item.public_ip.ip_address ?? ''}\n` +
-    vpcSection +
-    whitelistSection
+  const detailsTable = new Table({ head: ['Details', ''] });
+  detailsTable.push(
+    ['Name', item.name || '--'],
+    ['ID', item.id === null ? '--' : String(item.id)],
+    ['DB Version', formatDbaasVersion(item.type, item.version) || '--'],
+    ['Plan', item.plan.name ?? '--'],
+    ['Configuration', formatConfiguration(item) || '--'],
+    ['Price', item.plan.price ?? '--'],
+    ['Status', item.status ?? '--'],
+    ['Connection Endpoint', item.connection_endpoint ?? '--'],
+    ['Connection Port', item.connection_port === null || item.connection_port === undefined ? '--' : String(item.connection_port)],
+    ['Public IP', item.public_ip.enabled ? (item.public_ip.ip_address ?? '--') : 'disabled']
   );
+
+  return `${detailsTable.toString()}\n` + vpcSection + whitelistSection;
 }
 
 function renderListTypesHuman(result: {
@@ -259,23 +253,6 @@ function renderTemplatePlansHuman(result: {
   );
 }
 
-function renderSkusHuman(result: {
-  filters: { type: string; version: string };
-  items: DbaasCommittedSkuItem[];
-  total_count: number;
-}): string {
-  const title = `Committed SKUs for ${formatDbaasVersion(result.filters.type, result.filters.version)} (${result.total_count})`;
-
-  if (result.items.length === 0) {
-    return `${title}\nNo committed SKUs found.\n`;
-  }
-
-  return (
-    `${title}\n${formatDbaasCommittedSkusTable(result.items)}\n\n` +
-    'Create with a committed plan:\n' +
-    `${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file <path> --billing-type committed --committed-plan-id <SKU ID>')}\n`
-  );
-}
 
 function renderVpcAttachHuman(result: DbaasVpcAttachCommandResult): string {
   return (
@@ -296,6 +273,7 @@ function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
   );
 }
 
+
 function formatVpcConnectionsTable(
   items: DbaasDetailItem['vpc_connections']
 ): string {
@@ -305,11 +283,11 @@ function formatVpcConnectionsTable(
 
   items.forEach((item) => {
     table.push([
-      item.vpc_id === null ? '' : String(item.vpc_id),
-      item.vpc_name ?? '',
-      item.vpc_cidr ?? '',
-      item.ip_address ?? '',
-      item.subnet_id === null ? '' : String(item.subnet_id)
+      item.vpc_id === null ? '--' : String(item.vpc_id),
+      item.vpc_name ?? '--',
+      item.vpc_cidr ?? '--',
+      item.ip_address ?? '--',
+      item.subnet_id === null ? '--' : String(item.subnet_id)
     ]);
   });
 
@@ -318,17 +296,11 @@ function formatVpcConnectionsTable(
 
 function formatWhitelistedIpsTable(items: DbaasWhitelistedIpItem[]): string {
   const table = new Table({
-    head: ['IP', 'Tags']
+    head: ['IP']
   });
 
   items.forEach((item) => {
-    table.push([
-      item.ip,
-      item.tags
-        .map((tag) => tag.name ?? (tag.id === null ? '' : String(tag.id)))
-        .filter((tag) => tag.length > 0)
-        .join(', ')
-    ]);
+    table.push([item.ip]);
   });
 
   return table.toString();
@@ -438,21 +410,6 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         action: 'reset-password',
         dbaas: normalizeSummaryJson(result.dbaas),
         message: result.message
-      };
-    case 'skus':
-      return {
-        action: 'skus',
-        filters: { type: result.filters.type, version: result.filters.version },
-        items: result.items.map((item) => ({
-          committed_days: item.committed_days,
-          committed_sku_id: item.committed_sku_id,
-          committed_sku_name: item.committed_sku_name,
-          committed_sku_price: item.committed_sku_price,
-          currency: item.currency,
-          plan_name: item.plan_name,
-          template_id: item.template_id
-        })),
-        total_count: result.total_count
       };
     case 'vpc-attach':
       return {
