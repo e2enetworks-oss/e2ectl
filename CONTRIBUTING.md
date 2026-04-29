@@ -61,8 +61,8 @@ docs/
 ## Architecture Rules
 
 - `command.ts` defines CLI flags and delegates immediately.
-- `service.ts` owns business logic: validation, defaults, prompts, and orchestration.
-- `client.ts` owns only API interaction: endpoint paths, request execution, request payload shape, and response parsing.
+- `service.ts` owns validation, defaults, prompts, and orchestration.
+- `client.ts` owns reusable API paths and response parsing.
 - `formatter.ts` owns human-readable output and deterministic `--json` output.
 - `types/` owns interfaces and type aliases only.
 - Shared transport and API failure handling stay in `src/myaccount/`.
