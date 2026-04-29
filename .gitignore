@@ -140,5 +140,4 @@ vite.config.ts.timestamp-*
 
 # Local temporary and OS files
 .tmp/
-.gstack/
 .DS_Store
