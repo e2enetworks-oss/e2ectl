@@ -13,7 +13,7 @@ import type {
   DbaasVpcAttachCommandResult,
   DbaasVpcDetachCommandResult,
   DbaasWhitelistedIpItem
-} from './service.js';
+} from './types/index.js';
 
 export function renderDbaasResult(
   result: DbaasCommandResult,

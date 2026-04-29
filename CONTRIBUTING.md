@@ -47,6 +47,7 @@ src/
   config/
   project/
   node/
+  dbaas/
   reserved-ip/
   security-group/
   volume/
@@ -60,11 +61,26 @@ docs/
 ## Architecture Rules
 
 - `command.ts` defines CLI flags and delegates immediately.
-- `service.ts` owns validation, defaults, prompts, and orchestration.
-- `client.ts` owns reusable API paths and response parsing.
+- `service.ts` owns business logic: validation, defaults, prompts, and orchestration.
+- `client.ts` owns only API interaction: endpoint paths, request execution, request payload shape, and response parsing. Do not put business logic in clients.
 - `formatter.ts` owns human-readable output and deterministic `--json` output.
+- `types/` owns interfaces and type aliases only. Do not put runtime logic in type files.
 - Shared transport and API failure handling stay in `src/myaccount/`.
 - Keep changes explicit and local. Avoid speculative abstractions and broad refactors.
+
+For larger command families, prefer these supporting files when the domain needs them:
+
+- `constants.ts`: shared domain constants such as validation patterns, supported option values, and pagination limits. Keep client-only endpoint constants private to `client.ts`.
+- `normalizers.ts`: value-level validation and normalization, such as parsing IDs, trimming strings, validating flags, or converting empty API values to `null`.
+- `mappers.ts`: structured data mapping, such as API response objects to service command-result objects.
+
+Keep the service readable as orchestration:
+
+```text
+normalize input -> call client -> map response -> return command result
+```
+
+Type-only files should live under a domain `types/` folder so coverage tools can exclude them consistently.
 
 ## Verification Before Review
 

@@ -12,4 +12,4 @@ export type {
   DbaasResetPasswordResult,
   DbaasSoftwareSummary,
   DbaasTemplatePlan
-} from './types.js';
+} from './types/index.js';

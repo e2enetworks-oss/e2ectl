@@ -24,7 +24,7 @@ import type {
   DbaasWhitelistActionResult,
   DbaasWhitelistListResult,
   DbaasWhitelistUpdateRequest
-} from './types.js';
+} from './types/index.js';
 
 type DbaasListApiResponse = ApiResponse<
   DbaasClusterSummary[],

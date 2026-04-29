@@ -6,8 +6,8 @@ import { addContextOptions } from '../app/context-options.js';
 import { formatCliCommand } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderDbaasResult } from './formatter.js';
+import { DbaasService } from './service.js';
 import {
-  DbaasService,
   type DbaasAttachVpcOptions,
   type DbaasCreateOptions,
   type DbaasDeleteOptions,
@@ -21,7 +21,7 @@ import {
   type DbaasResetPasswordOptions,
   type DbaasWhitelistListOptions,
   type DbaasWhitelistUpdateOptions
-} from './service.js';
+} from './types/index.js';
 
 interface GlobalOptions {
   json?: boolean;
