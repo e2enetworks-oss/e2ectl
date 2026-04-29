@@ -62,9 +62,9 @@ docs/
 
 - `command.ts` defines CLI flags and delegates immediately.
 - `service.ts` owns business logic: validation, defaults, prompts, and orchestration.
-- `client.ts` owns only API interaction: endpoint paths, request execution, request payload shape, and response parsing. Do not put business logic in clients.
+- `client.ts` owns only API interaction: endpoint paths, request execution, request payload shape, and response parsing.
 - `formatter.ts` owns human-readable output and deterministic `--json` output.
-- `types/` owns interfaces and type aliases only. Do not put runtime logic in type files.
+- `types/` owns interfaces and type aliases only.
 - Shared transport and API failure handling stay in `src/myaccount/`.
 - Keep changes explicit and local. Avoid speculative abstractions and broad refactors.
 
