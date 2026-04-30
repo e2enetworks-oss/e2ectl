@@ -1,6 +1,7 @@
 import {
   buildConnectionPort,
   buildConnectionString,
+  normalizeDbaasStatusTitle,
   normalizePlanHourlyPrice,
   normalizeVpcConnectionItem,
   normalizeWhitelistedIps,
@@ -96,6 +97,22 @@ describe('dbaas mappers', () => {
           price_per_hour: 'N/A' as unknown as number
         })
       )
+    ).toBeNull();
+  });
+
+  it('uses status_title as the DBaaS status source', () => {
+    expect(
+      normalizeDbaasStatusTitle({
+        status: 'Running',
+        status_title: 'Provisioning'
+      } as DbaasClusterSummary)
+    ).toBe('Provisioning');
+
+    expect(
+      normalizeDbaasStatusTitle({
+        status: 'Running',
+        status_title: ''
+      } as DbaasClusterSummary)
     ).toBeNull();
   });
 
@@ -292,7 +309,7 @@ function createMysqlCluster(): DbaasClusterDetail {
       name: 'MySQL',
       version: '8.0'
     },
-    status: 'Running',
+    status: 'active',
     status_title: 'Running'
   };
 }
@@ -322,7 +339,7 @@ function createPostgresCluster(): DbaasClusterSummary {
       name: 'PostgreSQL',
       version: '16'
     },
-    status: 'Running',
+    status: 'active',
     status_title: 'Running'
   };
 }

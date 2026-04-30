@@ -29,7 +29,7 @@ function mysqlClusterBody() {
       name: 'MySQL',
       version: '8.0'
     },
-    status: 'Running',
+    status: 'active',
     status_title: 'Running'
   };
 }

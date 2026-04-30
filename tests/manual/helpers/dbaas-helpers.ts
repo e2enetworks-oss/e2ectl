@@ -25,7 +25,7 @@ export interface DbaasListJson {
     name: string;
     type: string;
     version: string;
-    status: string;
+    status: string | null;
   }>;
 }
 
@@ -143,6 +143,7 @@ export async function waitForDbaasStatus(
       const result = await runCommand(['dbaas', 'get', String(dbaasId)]);
 
       if (
+        result.dbaas.status !== null &&
         normalizeLifecycleStatus(result.dbaas.status) === normalizedTargetStatus
       ) {
         return;

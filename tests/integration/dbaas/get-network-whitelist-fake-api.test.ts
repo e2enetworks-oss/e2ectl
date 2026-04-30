@@ -14,6 +14,14 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       const humanGetResult = await runBuiltCli(['dbaas', 'get', '7869'], {
         env
       });
+      const networkShowResult = await runBuiltCli(
+        ['--json', 'dbaas', 'network', '7869', 'show'],
+        { env }
+      );
+      const humanNetworkShowResult = await runBuiltCli(
+        ['dbaas', 'network', '7869', 'show'],
+        { env }
+      );
 
       expect(getResult.exitCode).toBe(0);
       expect(getResult.stderr).toBe('');
@@ -76,6 +84,37 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       expect(humanGetResult.stdout).toContain('4 vCPU, 16 GB RAM, 100 GB disk');
       expect(humanGetResult.stdout).toContain('VPC Connections:');
       expect(humanGetResult.stdout).toContain('Whitelisted IPs:');
+      expect(networkShowResult.exitCode).toBe(0);
+      expect(networkShowResult.stdout).toBe(
+        `${stableStringify({
+          action: 'network-show',
+          dbaas_id: 7869,
+          network: {
+            connection_endpoint: 'db.example.com (1.2.3.4)',
+            connection_port: '3306',
+            public_ip: {
+              attached: true,
+              enabled: true,
+              ip_address: '1.2.3.4'
+            },
+            vpc_connections: [
+              {
+                appliance_id: 7869,
+                ip_address: '10.40.0.8',
+                subnet_id: 44,
+                vpc_cidr: '10.40.0.0/16',
+                vpc_id: 501,
+                vpc_name: 'app-vpc'
+              }
+            ]
+          }
+        })}\n`
+      );
+      expect(humanNetworkShowResult.exitCode).toBe(0);
+      expect(humanNetworkShowResult.stdout).toContain('Network');
+      expect(humanNetworkShowResult.stdout).toContain('Public IP Attached');
+      expect(humanNetworkShowResult.stdout).toContain('VPC Connections:');
+      expect(humanNetworkShowResult.stdout).not.toContain('Whitelisted IPs');
     });
   });
 
@@ -118,7 +157,7 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
               name: 'PostgreSQL',
               version: '16'
             },
-            status: 'Provisioning',
+            status: 'provisioning',
             status_title: ''
           },
           errors: {},
@@ -187,7 +226,7 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
               enabled: false,
               ip_address: null
             },
-            status: 'Provisioning',
+            status: null,
             type: 'PostgreSQL',
             username: null,
             version: '16',
@@ -217,27 +256,28 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
   it('lists, adds, and removes whitelisted DBaaS IPs with the expected payload', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const whitelistListResult = await runBuiltCli(
-        ['dbaas', 'whitelist', 'list', '7869'],
+        ['dbaas', 'whitelist', '7869', 'list'],
         { env }
       );
       const whitelistListJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist', 'list', '7869'],
+        ['--json', 'dbaas', 'whitelist', '7869', 'list'],
         { env }
       );
       const whitelistAddResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
+        ['--json', 'dbaas', 'whitelist', '7869', 'add', '203.0.113.10'],
         { env }
       );
       const whitelistAddHumanResult = await runBuiltCli(
-        ['dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
+        ['dbaas', 'whitelist', '7869', 'add', '203.0.113.10'],
         { env }
       );
       const whitelistRemoveResult = await runBuiltCli(
-        ['dbaas', 'whitelist', 'remove', '7869', '--ip', '203.0.113.10'],
+        ['dbaas', 'whitelist', '7869', 'remove', '203.0.113.10'],
         { env }
       );
 
       expect(whitelistListResult.exitCode).toBe(0);
+      expect(whitelistListResult.stdout).toContain('Whitelisted IPs');
       expect(whitelistListResult.stdout).toContain('203.0.113.10');
       expect(whitelistListJsonResult.exitCode).toBe(0);
       expect(whitelistListJsonResult.stdout).toContain(
@@ -274,7 +314,7 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
         allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
       });
       expect(JSON.parse(whitelistRemoveRequest!.body)).toEqual({
-        allowed_hosts: [{ ip: '203.0.113.10' }]
+        allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
       });
     });
   });
@@ -282,19 +322,19 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
   it('attaches and detaches DBaaS public IPs through the expected endpoints', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const attachPublicIpResult = await runBuiltCli(
-        ['dbaas', 'network', 'attach-public-ip', '7869'],
+        ['dbaas', 'network', '7869', 'attach-public-ip'],
         { env }
       );
       const attachPublicIpJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', 'attach-public-ip', '7869'],
+        ['--json', 'dbaas', 'network', '7869', 'attach-public-ip'],
         { env }
       );
       const detachPublicIpResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', 'detach-public-ip', '7869', '--force'],
+        ['--json', 'dbaas', 'network', '7869', 'detach-public-ip', '--force'],
         { env }
       );
       const detachPublicIpHumanResult = await runBuiltCli(
-        ['dbaas', 'network', 'detach-public-ip', '7869', '--force'],
+        ['dbaas', 'network', '7869', 'detach-public-ip', '--force'],
         { env }
       );
 
@@ -337,28 +377,19 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
   it('attaches and detaches VPCs with resolved VPC metadata', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const attachVpcResult = await runBuiltCli(
-        ['dbaas', 'network', 'attach-vpc', '7869', '--vpc-id', '501'],
+        ['dbaas', 'network', '7869', 'attach-vpc', '501'],
         { env }
       );
       const attachVpcJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', 'attach-vpc', '7869', '--vpc-id', '501'],
+        ['--json', 'dbaas', 'network', '7869', 'attach-vpc', '501'],
         { env }
       );
       const detachVpcResult = await runBuiltCli(
-        [
-          'dbaas',
-          'network',
-          'detach-vpc',
-          '7869',
-          '--vpc-id',
-          '501',
-          '--subnet-id',
-          '44'
-        ],
+        ['dbaas', 'network', '7869', 'detach-vpc', '501', '--subnet-id', '44'],
         { env }
       );
       const detachVpcJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', 'detach-vpc', '7869', '--vpc-id', '501'],
+        ['--json', 'dbaas', 'network', '7869', 'detach-vpc', '501'],
         { env }
       );
 
@@ -456,7 +487,7 @@ async function withDbaasNetworkApi(
             name: 'MySQL',
             version: '8.0'
           },
-          status: 'Running',
+          status: 'active',
           status_title: 'Running',
           whitelisted_ips: [
             {

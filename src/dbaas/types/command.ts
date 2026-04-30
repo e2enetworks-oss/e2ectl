@@ -114,6 +114,12 @@ export interface DbaasGetCommandResult {
   dbaas: DbaasDetailItem;
 }
 
+export interface DbaasNetworkShowCommandResult {
+  action: 'network-show';
+  dbaas: DbaasDetailItem;
+  dbaas_id: number;
+}
+
 export interface DbaasListTypesCommandResult {
   action: 'list-types';
   filters: {
@@ -228,6 +234,7 @@ export type DbaasCommandResult =
   | DbaasGetCommandResult
   | DbaasListCommandResult
   | DbaasListTypesCommandResult
+  | DbaasNetworkShowCommandResult
   | DbaasPlansCommandResult
   | DbaasPublicIpAttachCommandResult
   | DbaasPublicIpDetachCommandResult

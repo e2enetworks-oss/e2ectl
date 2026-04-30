@@ -242,7 +242,11 @@ export function normalizeRequiredNumericId(
 }
 
 export function normalizeIpAddress(value: string): string {
-  const normalized = normalizeRequiredString(value, 'IP address', '--ip');
+  const normalized = normalizeRequiredString(
+    value,
+    'IP address',
+    'the IP address argument'
+  );
   if (!DBAAS_IP_REGEX.test(normalized)) {
     throw new CliError('IP address must be a valid IPv4 address or CIDR.', {
       code: 'INVALID_DBAAS_WHITELIST_IP',

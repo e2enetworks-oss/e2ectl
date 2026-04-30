@@ -65,7 +65,8 @@ function createDbaasClientStub() {
         name: 'MySQL',
         version: '8.0'
       },
-      status: 'Running'
+      status: 'active',
+      status_title: 'Running'
     })
   );
   const getPublicIpStatus = vi.fn(() =>
@@ -97,7 +98,8 @@ function createDbaasClientStub() {
             name: 'MySQL',
             version: '8.0'
           },
-          status: 'Running'
+          status: 'active',
+          status_title: 'Running'
         }
       ],
       total_count: 1,
@@ -489,12 +491,11 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'whitelist',
-      'add',
       '7869',
+      'add',
+      '203.0.113.10',
       '--alias',
-      'prod',
-      '--ip',
-      '203.0.113.10'
+      'prod'
     ]);
     await program.parseAsync([
       'node',
@@ -502,8 +503,8 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
-      'detach-public-ip',
       '7869',
+      'detach-public-ip',
       '--alias',
       'prod',
       '--force'
@@ -570,14 +571,38 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
-      'attach-public-ip',
       '7869',
+      'attach-public-ip',
       '--alias',
       'prod'
     ]);
 
     expect(stdout.buffer).toContain('"action": "public-ip-attach"');
     expect(stub.attachPublicIp).toHaveBeenCalledWith(7869);
+  });
+
+  it('shows DBaaS network information through the network command surface', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'dbaas',
+      'network',
+      '7869',
+      'show',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(stdout.buffer).toContain('"action": "network-show"');
+    expect(stdout.buffer).toContain('"public_ip"');
+    expect(stub.getDbaas).toHaveBeenCalledWith(7869);
+    expect(stub.listVpcConnections).toHaveBeenCalledWith(7869);
+    expect(stub.getPublicIpStatus).toHaveBeenCalledWith(7869);
   });
 
   it('lists and removes whitelisted IPs through the command surface', async () => {
@@ -591,8 +616,8 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'whitelist',
-      'list',
       '7869',
+      'list',
       '--alias',
       'prod'
     ]);
@@ -602,9 +627,8 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'whitelist',
-      'remove',
       '7869',
-      '--ip',
+      'remove',
       '203.0.113.10',
       '--alias',
       'prod'
@@ -617,12 +641,16 @@ describe('dbaas commands', () => {
       expect.any(Number),
       expect.any(Number)
     );
+    expect(stub.updateWhitelistedIps).toHaveBeenCalledWith(7869, 'detach', {
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
+    });
   });
 
-  it('shows help for network and whitelist subcommands', async () => {
+  it('shows help for network and whitelist action groups', async () => {
     const networkHelp = await renderHelp(['dbaas', 'network', '--help']);
     const whitelistHelp = await renderHelp(['dbaas', 'whitelist', '--help']);
 
+    expect(networkHelp).toContain('show');
     expect(networkHelp).toContain('attach-vpc');
     expect(networkHelp).toContain('detach-vpc');
     expect(whitelistHelp).toContain('list');
@@ -667,9 +695,8 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
-      'attach-vpc',
       '7869',
-      '--vpc-id',
+      'attach-vpc',
       '501',
       '--alias',
       'prod'
@@ -694,9 +721,8 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
-      'detach-vpc',
       '7869',
-      '--vpc-id',
+      'detach-vpc',
       '501',
       '--alias',
       'prod'
@@ -709,7 +735,7 @@ describe('dbaas commands', () => {
     );
   });
 
-  it('outputs help when network or whitelist are invoked with no subcommand', async () => {
+  it('outputs help when network or whitelist are invoked without arguments', async () => {
     const networkHelp = await renderHelp(['dbaas', 'network']);
     const whitelistHelp = await renderHelp(['dbaas', 'whitelist']);
 

@@ -99,6 +99,19 @@ interface DbaasNetworkDetachJson {
   dbaas_id: number;
 }
 
+interface DbaasNetworkShowJson {
+  action: 'network-show';
+  dbaas_id: number;
+  network: {
+    public_ip: {
+      attached: boolean;
+      enabled: boolean;
+      ip_address: string | null;
+    };
+    vpc_connections: unknown[];
+  };
+}
+
 describeManual('manual DBaaS destructive built CLI checks', () => {
   beforeAll(async () => {
     await access(path.resolve(process.cwd(), 'dist', 'app', 'index.js'));
@@ -137,6 +150,7 @@ describeManual('manual DBaaS destructive built CLI checks', () => {
         dbaasId = dbaasResult.dbaasId;
 
         await waitForDbaasRunningStep(context, dbaasId);
+        await showNetworkStep(context, { dbaasId });
 
         // 3. Detach public IP (must be detached first)
         await detachPublicIpStep(context, { dbaasId });
@@ -361,13 +375,29 @@ async function attachPublicIpStep(
   }
 ): Promise<void> {
   await runJsonCommand<DbaasNetworkAttachJson>(
-    ['dbaas', 'network', 'attach-public-ip', String(options.dbaasId)],
+    ['dbaas', 'network', String(options.dbaasId), 'attach-public-ip'],
     context.dbaasEnv
   );
 
   await updateManifest(context, (manifest) => {
     manifest.public_ip_attached = true;
   });
+}
+
+async function showNetworkStep(
+  context: DbaasTestContext,
+  options: {
+    dbaasId: number;
+  }
+): Promise<void> {
+  const result = await runJsonCommand<DbaasNetworkShowJson>(
+    ['dbaas', 'network', String(options.dbaasId), 'show'],
+    context.dbaasEnv
+  );
+
+  if (result.dbaas_id !== options.dbaasId) {
+    throw new Error('Expected dbaas network show to target the created DBaaS.');
+  }
 }
 
 async function detachPublicIpStep(
@@ -380,8 +410,8 @@ async function detachPublicIpStep(
     [
       'dbaas',
       'network',
-      'detach-public-ip',
       String(options.dbaasId),
+      'detach-public-ip',
       '--force'
     ],
     context.dbaasEnv
@@ -403,9 +433,8 @@ async function detachVpcStep(
     [
       'dbaas',
       'network',
-      'detach-vpc',
       String(options.dbaasId),
-      '--vpc-id',
+      'detach-vpc',
       String(options.vpcId)
     ],
     context.dbaasEnv
@@ -533,9 +562,8 @@ async function runCleanup(
             [
               'dbaas',
               'network',
-              'detach-vpc',
               String(dbaasToDelete),
-              '--vpc-id',
+              'detach-vpc',
               String(vpcToDelete)
             ],
             context.dbaasEnv
@@ -552,8 +580,8 @@ async function runCleanup(
             [
               'dbaas',
               'network',
-              'detach-public-ip',
               String(dbaasToDelete),
+              'detach-public-ip',
               '--force'
             ],
             context.dbaasEnv

@@ -4,6 +4,7 @@ import { Command, Option } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
 import { formatCliCommand } from '../app/metadata.js';
+import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderDbaasResult } from './formatter.js';
 import { DbaasService } from './service.js';
@@ -27,6 +28,15 @@ import {
 interface GlobalOptions {
   json?: boolean;
 }
+
+type DbaasNetworkAction =
+  | 'show'
+  | 'attach-vpc'
+  | 'detach-vpc'
+  | 'attach-public-ip'
+  | 'detach-public-ip';
+
+type DbaasWhitelistAction = 'list' | 'add' | 'remove';
 
 export function buildDbaasCommand(runtime: CliRuntime): Command {
   const service = new DbaasService({
@@ -196,163 +206,132 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     command
       .command('network')
       .description('Manage DBaaS VPC and public IP networking.')
+      .usage('<dbaasId> <action> [target] [options]')
+      .argument('[dbaasId]', 'DBaaS cluster ID.')
+      .argument(
+        '[action]',
+        'Network action: show, attach-vpc, detach-vpc, attach-public-ip, or detach-public-ip.'
+      )
+      .argument('[target]', 'VPC network_id for attach-vpc or detach-vpc.')
+      .option(
+        '--subnet-id <subnetId>',
+        'Optional subnet ID within the VPC. Only for non-default VPCs.'
+      )
+      .option(
+        '--force',
+        'Acknowledge connectivity loss and skip the public IP detach confirmation prompt.'
+      )
   );
   networkCommand.helpCommand(
     'help [command]',
     'Show help for a dbaas network command'
   );
 
-  addContextOptions(
-    networkCommand
-      .command('attach-vpc <dbaasId>')
-      .description('Attach a VPC to an existing DBaaS cluster.')
-      .requiredOption(
-        '--vpc-id <vpcId>',
-        'VPC network_id to attach. Use the network_id from vpc list.'
-      )
-      .option(
-        '--subnet-id <subnetId>',
-        'Optional subnet ID within the VPC. Only for non-default VPCs.'
-      )
-  ).action(
+  networkCommand.action(
     async (
-      dbaasId: string,
-      options: DbaasAttachVpcOptions,
+      dbaasId: string | undefined,
+      action: string | undefined,
+      target: string | undefined,
+      options:
+        | DbaasAttachVpcOptions
+        | DbaasDetachVpcOptions
+        | DbaasPublicIpOptions
+        | DbaasPublicIpDetachOptions,
       commandInstance: Command
     ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.attachVpc(dbaasId, options)
-      );
+      if (dbaasId === undefined || action === undefined) {
+        commandInstance.outputHelp();
+        return;
+      }
+
+      switch (normalizeDbaasNetworkAction(action)) {
+        case 'show':
+          await runDbaasAction(commandInstance, () =>
+            service.showNetwork(dbaasId, options)
+          );
+          return;
+        case 'attach-vpc':
+          await runDbaasAction(commandInstance, () =>
+            service.attachVpc(dbaasId, {
+              ...options,
+              vpcId: requireNetworkTarget(target, 'attach-vpc')
+            })
+          );
+          return;
+        case 'detach-vpc':
+          await runDbaasAction(commandInstance, () =>
+            service.detachVpc(dbaasId, {
+              ...options,
+              vpcId: requireNetworkTarget(target, 'detach-vpc')
+            })
+          );
+          return;
+        case 'attach-public-ip':
+          await runDbaasAction(commandInstance, () =>
+            service.attachPublicIp(dbaasId, options)
+          );
+          return;
+        case 'detach-public-ip':
+          await runDbaasAction(commandInstance, () =>
+            service.detachPublicIp(dbaasId, options)
+          );
+          return;
+      }
     }
   );
-
-  addContextOptions(
-    networkCommand
-      .command('detach-vpc <dbaasId>')
-      .description('Detach a VPC from an existing DBaaS cluster.')
-      .requiredOption(
-        '--vpc-id <vpcId>',
-        'VPC network_id to detach. Use the network_id from dbaas get.'
-      )
-      .option(
-        '--subnet-id <subnetId>',
-        'Optional subnet ID within the VPC. Only for non-default VPCs.'
-      )
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasDetachVpcOptions,
-      commandInstance: Command
-    ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.detachVpc(dbaasId, options)
-      );
-    }
-  );
-
-  addContextOptions(
-    networkCommand
-      .command('attach-public-ip <dbaasId>')
-      .description('Attach a public IP and enable external DBaaS access.')
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasPublicIpOptions,
-      commandInstance: Command
-    ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.attachPublicIp(dbaasId, options)
-      );
-    }
-  );
-
-  addContextOptions(
-    networkCommand
-      .command('detach-public-ip <dbaasId>')
-      .description(
-        'Detach the public IP and remove external DBaaS access. Requires confirmation.'
-      )
-      .option(
-        '--force',
-        'Acknowledge connectivity loss and skip the interactive confirmation prompt.'
-      )
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasPublicIpDetachOptions,
-      commandInstance: Command
-    ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.detachPublicIp(dbaasId, options)
-      );
-    }
-  );
-
-  networkCommand.action(() => {
-    networkCommand.outputHelp();
-  });
 
   const whitelistCommand = addContextOptions(
-    command.command('whitelist').description('Manage DBaaS whitelisted IPs.')
+    command
+      .command('whitelist')
+      .description('Manage DBaaS whitelisted IPs.')
+      .usage('<dbaasId> <action> [ip] [options]')
+      .argument('[dbaasId]', 'DBaaS cluster ID.')
+      .argument('[action]', 'Whitelist action: list, add, or remove.')
+      .argument('[ip]', 'IPv4 address or CIDR for add or remove.')
   );
   whitelistCommand.helpCommand(
     'help [command]',
     'Show help for a dbaas whitelist command'
   );
 
-  addContextOptions(
-    whitelistCommand
-      .command('list <dbaasId>')
-      .description('List whitelisted IPs for a DBaaS cluster.')
-  ).action(
+  whitelistCommand.action(
     async (
-      dbaasId: string,
-      options: DbaasWhitelistListOptions,
+      dbaasId: string | undefined,
+      action: string | undefined,
+      ip: string | undefined,
+      options: DbaasWhitelistListOptions | DbaasWhitelistUpdateOptions,
       commandInstance: Command
     ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.listWhitelistedIps(dbaasId, options)
-      );
+      if (dbaasId === undefined || action === undefined) {
+        commandInstance.outputHelp();
+        return;
+      }
+
+      switch (normalizeDbaasWhitelistAction(action)) {
+        case 'list':
+          await runDbaasAction(commandInstance, () =>
+            service.listWhitelistedIps(dbaasId, options)
+          );
+          return;
+        case 'add':
+          await runDbaasAction(commandInstance, () =>
+            service.addWhitelistedIp(dbaasId, {
+              ...options,
+              ip: requireWhitelistIp(ip, 'add')
+            })
+          );
+          return;
+        case 'remove':
+          await runDbaasAction(commandInstance, () =>
+            service.removeWhitelistedIp(dbaasId, {
+              ...options,
+              ip: requireWhitelistIp(ip, 'remove')
+            })
+          );
+          return;
+      }
     }
   );
-
-  addContextOptions(
-    whitelistCommand
-      .command('add <dbaasId>')
-      .description('Whitelist an IP address for a DBaaS cluster.')
-      .requiredOption('--ip <ip>', 'IPv4 address or CIDR to whitelist.')
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasWhitelistUpdateOptions,
-      commandInstance: Command
-    ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.addWhitelistedIp(dbaasId, options)
-      );
-    }
-  );
-
-  addContextOptions(
-    whitelistCommand
-      .command('remove <dbaasId>')
-      .description('Remove a whitelisted IP address from a DBaaS cluster.')
-      .requiredOption('--ip <ip>', 'IPv4 address or CIDR to remove.')
-  ).action(
-    async (
-      dbaasId: string,
-      options: DbaasWhitelistUpdateOptions,
-      commandInstance: Command
-    ) => {
-      await runDbaasAction(commandInstance, () =>
-        service.removeWhitelistedIp(dbaasId, options)
-      );
-    }
-  );
-
-  whitelistCommand.action(() => {
-    whitelistCommand.outputHelp();
-  });
 
   addContextOptions(
     command
@@ -400,6 +379,72 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
   });
 
   return command;
+}
+
+function normalizeDbaasNetworkAction(action: string): DbaasNetworkAction {
+  if (
+    action === 'attach-vpc' ||
+    action === 'detach-vpc' ||
+    action === 'attach-public-ip' ||
+    action === 'detach-public-ip' ||
+    action === 'show'
+  ) {
+    return action;
+  }
+
+  throw new CliError(`Unknown DBaaS network action "${action}".`, {
+    code: 'INVALID_DBAAS_NETWORK_ACTION',
+    details: [
+      'Valid actions: show, attach-vpc, detach-vpc, attach-public-ip, detach-public-ip'
+    ],
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Use dbaas network <dbaas-id> <action>, for example dbaas network 7869 attach-vpc 501.'
+  });
+}
+
+function normalizeDbaasWhitelistAction(action: string): DbaasWhitelistAction {
+  if (action === 'list' || action === 'add' || action === 'remove') {
+    return action;
+  }
+
+  throw new CliError(`Unknown DBaaS whitelist action "${action}".`, {
+    code: 'INVALID_DBAAS_WHITELIST_ACTION',
+    details: ['Valid actions: list, add, remove'],
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Use dbaas whitelist <dbaas-id> <action>, for example dbaas whitelist 7869 add 203.0.113.10.'
+  });
+}
+
+function requireNetworkTarget(
+  target: string | undefined,
+  action: 'attach-vpc' | 'detach-vpc'
+): string {
+  if (target !== undefined) {
+    return target;
+  }
+
+  throw new CliError(`VPC ID is required for dbaas network ${action}.`, {
+    code: 'MISSING_DBAAS_VPC_ID',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Use dbaas network <dbaas-id> ${action} <vpc-id>.`
+  });
+}
+
+function requireWhitelistIp(
+  ip: string | undefined,
+  action: 'add' | 'remove'
+): string {
+  if (ip !== undefined) {
+    return ip;
+  }
+
+  throw new CliError(`IP address is required for dbaas whitelist ${action}.`, {
+    code: 'MISSING_DBAAS_WHITELIST_IP',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Use dbaas whitelist <dbaas-id> ${action} <ip>.`
+  });
 }
 
 async function readAllFromStdin(): Promise<string> {

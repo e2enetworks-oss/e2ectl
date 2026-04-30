@@ -206,17 +206,17 @@ describe('dbaas validation through the built CLI', () => {
         'Error: DBaaS ID must be numeric.\n\nNext step: Pass the numeric dbaas id as the first argument.\n'
     },
     {
-      args: ['dbaas', 'network', 'attach-vpc', '7869', '--vpc-id', ' '],
+      args: ['dbaas', 'network', '7869', 'attach-vpc', ' '],
       stderr:
-        'Error: VPC ID cannot be empty.\n\nNext step: Pass the numeric vpc id as --vpc-id.\n'
+        'Error: VPC ID cannot be empty.\n\nNext step: Pass the numeric vpc id as the VPC ID argument.\n'
     },
     {
-      args: ['dbaas', 'whitelist', 'add', '7869', '--ip', '999.1.1.1'],
+      args: ['dbaas', 'whitelist', '7869', 'add', '999.1.1.1'],
       stderr:
         'Error: IP address must be a valid IPv4 address or CIDR.\n\nNext step: Pass an IPv4 address such as 203.0.113.10, or a CIDR such as 203.0.113.0/24.\n'
     },
     {
-      args: ['dbaas', 'network', 'detach-public-ip', '7869'],
+      args: ['dbaas', 'network', '7869', 'detach-public-ip'],
       stderr:
         'Error: Detaching a DBaaS public IP requires confirmation in an interactive terminal.\n\nNext step: Re-run the command with --force only if you accept that external DBaaS connectivity will be lost.\n'
     }

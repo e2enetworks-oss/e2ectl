@@ -45,7 +45,7 @@ function createMysqlCluster() {
       name: 'MySQL',
       version: '8.0'
     },
-    status: 'Running',
+    status: 'active',
     status_title: 'Running'
   };
 }
@@ -75,7 +75,7 @@ function createPostgresCluster() {
       name: 'PostgreSQL',
       version: '16'
     },
-    status: 'Running',
+    status: 'active',
     status_title: 'Running'
   };
 }
@@ -615,6 +615,50 @@ describe('DbaasService', () => {
     });
   });
 
+  it('returns network details for DBaaS network show', async () => {
+    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
+      createServiceFixture();
+
+    getDbaas.mockResolvedValue(createMysqlCluster());
+    listVpcConnections.mockResolvedValue([
+      {
+        appliance_id: 7869,
+        ip_address: '10.40.0.8',
+        subnet: 44,
+        vpc: {
+          ipv4_cidr: '10.40.0.0/16',
+          name: 'app-vpc',
+          network_id: 501
+        }
+      }
+    ]);
+    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
+
+    const result = await service.showNetwork('7869', { alias: 'prod' });
+
+    expect(result).toMatchObject({
+      action: 'network-show',
+      dbaas_id: 7869,
+      dbaas: {
+        connection_endpoint: 'db.example.com (1.2.3.4)',
+        connection_port: '3306',
+        public_ip: {
+          attached: true,
+          enabled: true,
+          ip_address: '1.2.3.4'
+        },
+        vpc_connections: [
+          {
+            ip_address: '10.40.0.8',
+            subnet_id: 44,
+            vpc_id: 501,
+            vpc_name: 'app-vpc'
+          }
+        ]
+      }
+    });
+  });
+
   it('lists supported DBaaS engine types across all families', async () => {
     const { listPlans, service } = createServiceFixture();
 
@@ -882,7 +926,7 @@ describe('DbaasService', () => {
       allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
     });
     expect(updateWhitelistedIps).toHaveBeenNthCalledWith(2, 7869, 'detach', {
-      allowed_hosts: [{ ip: '203.0.113.10' }]
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
     });
     expect(addResult.action).toBe('whitelist-add');
     expect(removeResult.action).toBe('whitelist-remove');
@@ -1794,7 +1838,8 @@ describe('DbaasService', () => {
         name: 'YugaByte',
         version: '2.0'
       },
-      status: 'Running'
+      status: 'active',
+      status_title: 'Running'
     });
 
     await expect(

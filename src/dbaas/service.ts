@@ -11,6 +11,7 @@ import {
   buildConnectionPort,
   buildDbaasVpcEntry,
   extractCreatedDbaasId,
+  normalizeDbaasStatusTitle,
   normalizeWhitelistedIpItem,
   resolveSoftware,
   resolveTemplatePlan,
@@ -52,6 +53,7 @@ import type {
   DbaasListOptions,
   DbaasListTypesCommandResult,
   DbaasListTypesOptions,
+  DbaasNetworkShowCommandResult,
   DbaasPasswordOptions,
   DbaasPlansCommandResult,
   DbaasPlansOptions,
@@ -171,6 +173,32 @@ export class DbaasService {
     options: DbaasGetOptions
   ): Promise<DbaasGetCommandResult> {
     const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
+    const dbaas = await this.fetchDbaasDetail(normalizedDbaasId, options);
+
+    return {
+      action: 'get',
+      dbaas
+    };
+  }
+
+  async showNetwork(
+    dbaasId: string,
+    options: DbaasGetOptions
+  ): Promise<DbaasNetworkShowCommandResult> {
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
+    const dbaas = await this.fetchDbaasDetail(normalizedDbaasId, options);
+
+    return {
+      action: 'network-show',
+      dbaas,
+      dbaas_id: normalizedDbaasId
+    };
+  }
+
+  private async fetchDbaasDetail(
+    normalizedDbaasId: number,
+    options: DbaasContextOptions
+  ) {
     const client = await this.createClient(options);
     const [detail, vpcConnections, publicIpStatus] = await Promise.all([
       client.getDbaas(normalizedDbaasId),
@@ -178,14 +206,11 @@ export class DbaasService {
       client.getPublicIpStatus(normalizedDbaasId)
     ]);
 
-    return {
-      action: 'get',
-      dbaas: summarizeDbaasDetail(
-        detail,
-        vpcConnections,
-        publicIpStatus.public_ip_status
-      )
-    };
+    return summarizeDbaasDetail(
+      detail,
+      vpcConnections,
+      publicIpStatus.public_ip_status
+    );
   }
 
   async listDbaas(options: DbaasListOptions): Promise<DbaasListCommandResult> {
@@ -212,7 +237,7 @@ export class DbaasService {
               normalizeHost(item.master_node.private_ip_address)
             ].filter((ip): ip is string => ip !== null),
             public_ip: normalizeHost(item.master_node.public_ip_address),
-            status: normalizeOptionalString(item.status),
+            status: normalizeDbaasStatusTitle(item),
             type: normalized.type,
             version: normalized.version
           }
@@ -462,7 +487,7 @@ export class DbaasService {
     const vpcId = normalizeRequiredNumericId(
       options.vpcId,
       'VPC ID',
-      '--vpc-id'
+      'the VPC ID argument'
     );
     const subnetId =
       options.subnetId === undefined
@@ -495,7 +520,7 @@ export class DbaasService {
       normalizedDbaasId,
       action,
       {
-        allowed_hosts: [{ ip, ...(action === 'attach' ? { tag: [] } : {}) }]
+        allowed_hosts: [{ ip, tag: [] }]
       }
     );
 

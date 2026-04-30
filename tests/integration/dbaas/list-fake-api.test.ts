@@ -35,7 +35,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                       name: 'MySQL',
                       version: '8.0'
                     },
-                    status: 'Running'
+                    status: 'active',
+                    status_title: 'Running'
                   },
                   {
                     id: 9999,
@@ -56,7 +57,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                       name: 'YugaByte',
                       version: '2.0'
                     },
-                    status: 'Running'
+                    status: 'active',
+                    status_title: 'Running'
                   }
                 ]
               : [
@@ -81,7 +83,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                       name: 'PostgreSQL',
                       version: '16'
                     },
-                    status: 'Running'
+                    status: 'active',
+                    status_title: 'Running'
                   }
                 ],
           errors: {},
@@ -201,7 +204,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                 name: 'MySQL',
                 version: '8.0'
               },
-              status: 'Running'
+              status: 'active',
+              status_title: 'Running'
             }
           ],
           errors: {},
@@ -264,7 +268,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                 name: 'PostgreSQL',
                 version: '15'
               },
-              status: 'Running'
+              status: 'active',
+              status_title: 'Running'
             },
             {
               id: 101,
@@ -288,7 +293,8 @@ describe('dbaas list against a fake MyAccount API', () => {
                 name: 'MySQL',
                 version: '8.0'
               },
-              status: ''
+              status: 'pending',
+              status_title: ''
             },
             {
               id: 202,

@@ -111,18 +111,28 @@ For non-default VPCs that require a specific subnet, also pass `--subnet-id <sub
 
 When a VPC is attached during creation, public IP access is enabled by default. Add `--no-public-ip` if the DBaaS should be private to the VPC, or pass `--public-ip` explicitly when you want to be clear in automation. These public IP creation flags are only for VPC-attached DBaaS creation.
 
+### Show Network Information
+
+Show DBaaS public IP and VPC connection details:
+
+```bash
+e2ectl dbaas network <dbaas-id> show
+```
+
+This shows public IP state, public IP address, connection endpoint, connection port, and attached VPC connections. Use `dbaas whitelist <dbaas-id> list` for whitelisted IPs.
+
 ### Attach A VPC To An Existing Cluster
 
 The cluster must be in Running state. Attach with the network command:
 
 ```bash
-e2ectl dbaas network attach-vpc <dbaas-id> --vpc-id <network-id>
+e2ectl dbaas network <dbaas-id> attach-vpc <network-id>
 ```
 
 Detach a VPC:
 
 ```bash
-e2ectl dbaas network detach-vpc <dbaas-id> --vpc-id <network-id>
+e2ectl dbaas network <dbaas-id> detach-vpc <network-id>
 ```
 
 For non-default VPCs, add `--subnet-id <subnet-id>`.
@@ -132,19 +142,19 @@ For non-default VPCs, add `--subnet-id <subnet-id>`.
 Attaching a public IP enables external access:
 
 ```bash
-e2ectl dbaas network attach-public-ip <dbaas-id>
+e2ectl dbaas network <dbaas-id> attach-public-ip
 ```
 
 Detaching a public IP removes external access. The CLI warns that connectivity will be lost and asks for confirmation:
 
 ```bash
-e2ectl dbaas network detach-public-ip <dbaas-id>
+e2ectl dbaas network <dbaas-id> detach-public-ip
 ```
 
 For non-interactive automation, pass `--force` only when you explicitly accept the connectivity loss:
 
 ```bash
-e2ectl dbaas network detach-public-ip <dbaas-id> --force
+e2ectl dbaas network <dbaas-id> detach-public-ip --force
 ```
 
 ### Manage Whitelisted IPs
@@ -152,19 +162,19 @@ e2ectl dbaas network detach-public-ip <dbaas-id> --force
 Whitelist an IP or CIDR:
 
 ```bash
-e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10
+e2ectl dbaas whitelist <dbaas-id> add 203.0.113.10
 ```
 
 List whitelisted IPs:
 
 ```bash
-e2ectl dbaas whitelist list <dbaas-id>
+e2ectl dbaas whitelist <dbaas-id> list
 ```
 
 Remove a whitelisted IP:
 
 ```bash
-e2ectl dbaas whitelist remove <dbaas-id> --ip 203.0.113.10
+e2ectl dbaas whitelist <dbaas-id> remove 203.0.113.10
 ```
 
 ### Reset The Admin Password

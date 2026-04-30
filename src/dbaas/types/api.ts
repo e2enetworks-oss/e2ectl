@@ -173,7 +173,7 @@ export interface DbaasPublicIpActionResult {
 
 export interface DbaasWhitelistEntryRequest {
   ip: string;
-  tag?: string[];
+  tag: string[];
 }
 
 export interface DbaasWhitelistUpdateRequest {

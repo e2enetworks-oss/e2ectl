@@ -272,12 +272,16 @@ export function summarizeDbaasDetail(
       enabled: publicIpEnabled,
       ip_address: publicIpAddress
     },
-    status:
-      normalizeOptionalString(cluster.status_title) ??
-      normalizeOptionalString(cluster.status),
+    status: normalizeDbaasStatusTitle(cluster),
     vpc_connections: vpcConnections.map(normalizeVpcConnectionItem),
     whitelisted_ips: normalizeWhitelistedIps(cluster)
   };
+}
+
+export function normalizeDbaasStatusTitle(
+  cluster: Pick<DbaasClusterSummary, 'status_title'>
+): string | null {
+  return normalizeOptionalString(cluster.status_title);
 }
 
 export function summarizePlan(
