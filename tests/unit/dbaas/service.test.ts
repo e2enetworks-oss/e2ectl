@@ -615,50 +615,6 @@ describe('DbaasService', () => {
     });
   });
 
-  it('returns network details for DBaaS network show', async () => {
-    const { getDbaas, getPublicIpStatus, listVpcConnections, service } =
-      createServiceFixture();
-
-    getDbaas.mockResolvedValue(createMysqlCluster());
-    listVpcConnections.mockResolvedValue([
-      {
-        appliance_id: 7869,
-        ip_address: '10.40.0.8',
-        subnet: 44,
-        vpc: {
-          ipv4_cidr: '10.40.0.0/16',
-          name: 'app-vpc',
-          network_id: 501
-        }
-      }
-    ]);
-    getPublicIpStatus.mockResolvedValue({ public_ip_status: true });
-
-    const result = await service.showNetwork('7869', { alias: 'prod' });
-
-    expect(result).toMatchObject({
-      action: 'network-show',
-      dbaas_id: 7869,
-      dbaas: {
-        connection_endpoint: 'db.example.com (1.2.3.4)',
-        connection_port: '3306',
-        public_ip: {
-          attached: true,
-          enabled: true,
-          ip_address: '1.2.3.4'
-        },
-        vpc_connections: [
-          {
-            ip_address: '10.40.0.8',
-            subnet_id: 44,
-            vpc_id: 501,
-            vpc_name: 'app-vpc'
-          }
-        ]
-      }
-    });
-  });
-
   it('lists supported DBaaS engine types across all families', async () => {
     const { listPlans, service } = createServiceFixture();
 

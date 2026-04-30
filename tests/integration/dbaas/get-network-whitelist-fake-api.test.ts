@@ -5,8 +5,8 @@ import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
-describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
-  it('shows detailed DBaaS network fields in json and human output', async () => {
+describe('dbaas get/whitelist against a fake MyAccount API', () => {
+  it('shows detailed DBaaS fields in json and human output', async () => {
     await withDbaasNetworkApi(async ({ env }) => {
       const getResult = await runBuiltCli(['--json', 'dbaas', 'get', '7869'], {
         env
@@ -14,14 +14,6 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       const humanGetResult = await runBuiltCli(['dbaas', 'get', '7869'], {
         env
       });
-      const networkShowResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', '7869', 'show'],
-        { env }
-      );
-      const humanNetworkShowResult = await runBuiltCli(
-        ['dbaas', 'network', '7869', 'show'],
-        { env }
-      );
 
       expect(getResult.exitCode).toBe(0);
       expect(getResult.stderr).toBe('');
@@ -84,37 +76,6 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       expect(humanGetResult.stdout).toContain('4 vCPU, 16 GB RAM, 100 GB disk');
       expect(humanGetResult.stdout).toContain('VPC Connections:');
       expect(humanGetResult.stdout).toContain('Whitelisted IPs:');
-      expect(networkShowResult.exitCode).toBe(0);
-      expect(networkShowResult.stdout).toBe(
-        `${stableStringify({
-          action: 'network-show',
-          dbaas_id: 7869,
-          network: {
-            connection_endpoint: 'db.example.com (1.2.3.4)',
-            connection_port: '3306',
-            public_ip: {
-              attached: true,
-              enabled: true,
-              ip_address: '1.2.3.4'
-            },
-            vpc_connections: [
-              {
-                appliance_id: 7869,
-                ip_address: '10.40.0.8',
-                subnet_id: 44,
-                vpc_cidr: '10.40.0.0/16',
-                vpc_id: 501,
-                vpc_name: 'app-vpc'
-              }
-            ]
-          }
-        })}\n`
-      );
-      expect(humanNetworkShowResult.exitCode).toBe(0);
-      expect(humanNetworkShowResult.stdout).toContain('Network');
-      expect(humanNetworkShowResult.stdout).toContain('Public IP Attached');
-      expect(humanNetworkShowResult.stdout).toContain('VPC Connections:');
-      expect(humanNetworkShowResult.stdout).not.toContain('Whitelisted IPs');
     });
   });
 

@@ -53,7 +53,6 @@ import type {
   DbaasListOptions,
   DbaasListTypesCommandResult,
   DbaasListTypesOptions,
-  DbaasNetworkShowCommandResult,
   DbaasPasswordOptions,
   DbaasPlansCommandResult,
   DbaasPlansOptions,
@@ -178,20 +177,6 @@ export class DbaasService {
     return {
       action: 'get',
       dbaas
-    };
-  }
-
-  async showNetwork(
-    dbaasId: string,
-    options: DbaasGetOptions
-  ): Promise<DbaasNetworkShowCommandResult> {
-    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
-    const dbaas = await this.fetchDbaasDetail(normalizedDbaasId, options);
-
-    return {
-      action: 'network-show',
-      dbaas,
-      dbaas_id: normalizedDbaasId
     };
   }
 

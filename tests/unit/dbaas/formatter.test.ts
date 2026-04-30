@@ -176,61 +176,48 @@ describe('dbaas formatter', () => {
     });
   });
 
-  it('renders DBaaS network show output without whitelisted IPs', () => {
-    const result = {
-      action: 'network-show' as const,
-      dbaas_id: 7869,
-      dbaas: {
-        connection_endpoint: 'db.example.com (1.2.3.4)',
-        connection_port: '3306',
-        connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
-        created_at: '2026-04-24T12:00:00.000Z',
-        database_name: 'appdb',
-        id: 7869,
-        name: 'customer-db',
-        plan: {
-          configuration: { cpu: '4', disk: '100 GB', ram: '16 GB' },
-          name: 'DBS.16GB',
-          price: '150 INR',
-          price_per_hour: '5',
-          price_per_month: '3600'
-        },
-        public_ip: { attached: true, enabled: true, ip_address: '1.2.3.4' },
-        status: 'Running',
-        type: 'MySQL' as const,
-        username: 'admin',
-        version: '8.0',
-        vpc_connections: [
-          {
-            appliance_id: 7869,
-            ip_address: '10.40.0.8',
-            subnet_id: 44,
-            vpc_cidr: '10.40.0.0/16',
-            vpc_id: 501,
-            vpc_name: 'app-vpc'
-          }
-        ],
-        whitelisted_ips: [{ ip: '203.0.113.10' }]
-      }
-    };
+  it('renders detailed DBaaS get output with empty VPC connections', () => {
+    const output = renderDbaasResult(
+      {
+        action: 'get',
+        dbaas: {
+          connection_endpoint: 'db.example.com (1.2.3.4)',
+          connection_port: '3306',
+          connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
+          created_at: '2026-04-24T12:00:00.000Z',
+          database_name: 'appdb',
+          id: 7869,
+          name: 'customer-db',
+          plan: {
+            configuration: {
+              cpu: '4',
+              disk: '100 GB',
+              ram: '16 GB'
+            },
+            name: 'DBS.16GB',
+            price: '150 INR',
+            price_per_hour: '5',
+            price_per_month: '3600'
+          },
+          public_ip: {
+            attached: false,
+            enabled: false,
+            ip_address: null
+          },
+          status: 'Running',
+          type: 'MySQL',
+          username: 'admin',
+          version: '8.0',
+          vpc_connections: [],
+          whitelisted_ips: []
+        }
+      },
+      false
+    );
 
-    const human = renderDbaasResult(result, false);
-    const json = JSON.parse(renderDbaasResult(result, true)) as {
-      action: string;
-      network: {
-        public_ip: { ip_address: string };
-        vpc_connections: Array<{ vpc_name: string }>;
-        whitelisted_ips?: unknown[];
-      };
-    };
-
-    expect(human).toContain('Public IP Attached');
-    expect(human).toContain('app-vpc');
-    expect(human).not.toContain('Whitelisted IPs');
-    expect(json.action).toBe('network-show');
-    expect(json.network.public_ip.ip_address).toBe('1.2.3.4');
-    expect(json.network.vpc_connections[0]?.vpc_name).toBe('app-vpc');
-    expect(json.network.whitelisted_ips).toBeUndefined();
+    expect(output).toContain('DBS.16GB');
+    expect(output).toContain('VPC Connections: none');
+    expect(output).toContain('Whitelisted IPs: none');
   });
 
   it('renders plans guidance for both engine discovery and template selection', () => {

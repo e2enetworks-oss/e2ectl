@@ -111,16 +111,6 @@ For non-default VPCs that require a specific subnet, also pass `--subnet-id <sub
 
 When a VPC is attached during creation, public IP access is enabled by default. Add `--no-public-ip` if the DBaaS should be private to the VPC, or pass `--public-ip` explicitly when you want to be clear in automation. These public IP creation flags are only for VPC-attached DBaaS creation.
 
-### Show Network Information
-
-Show DBaaS public IP and VPC connection details:
-
-```bash
-e2ectl dbaas network <dbaas-id> show
-```
-
-This shows public IP state, public IP address, connection endpoint, connection port, and attached VPC connections. Use `dbaas whitelist <dbaas-id> list` for whitelisted IPs.
-
 ### Attach A VPC To An Existing Cluster
 
 The cluster must be in Running state. Attach with the network command:

@@ -581,30 +581,6 @@ describe('dbaas commands', () => {
     expect(stub.attachPublicIp).toHaveBeenCalledWith(7869);
   });
 
-  it('shows DBaaS network information through the network command surface', async () => {
-    const { runtime, stdout, stub } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'dbaas',
-      'network',
-      '7869',
-      'show',
-      '--alias',
-      'prod'
-    ]);
-
-    expect(stdout.buffer).toContain('"action": "network-show"');
-    expect(stdout.buffer).toContain('"public_ip"');
-    expect(stub.getDbaas).toHaveBeenCalledWith(7869);
-    expect(stub.listVpcConnections).toHaveBeenCalledWith(7869);
-    expect(stub.getPublicIpStatus).toHaveBeenCalledWith(7869);
-  });
-
   it('lists and removes whitelisted IPs through the command surface', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -650,9 +626,10 @@ describe('dbaas commands', () => {
     const networkHelp = await renderHelp(['dbaas', 'network', '--help']);
     const whitelistHelp = await renderHelp(['dbaas', 'whitelist', '--help']);
 
-    expect(networkHelp).toContain('show');
     expect(networkHelp).toContain('attach-vpc');
     expect(networkHelp).toContain('detach-vpc');
+    expect(networkHelp).toContain('attach-public-ip');
+    expect(networkHelp).toContain('detach-public-ip');
     expect(whitelistHelp).toContain('list');
     expect(whitelistHelp).toContain('add');
     expect(whitelistHelp).toContain('remove');

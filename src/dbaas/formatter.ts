@@ -9,7 +9,6 @@ import type {
   DbaasDetailItem,
   DbaasListItem,
   DbaasListTypeItem,
-  DbaasNetworkShowCommandResult,
   DbaasPlansTemplateItem,
   DbaasSummaryItem,
   DbaasVpcAttachCommandResult,
@@ -171,8 +170,6 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return renderVpcAttachHuman(result);
     case 'vpc-detach':
       return renderVpcDetachHuman(result);
-    case 'network-show':
-      return renderNetworkShowHuman(result);
     case 'public-ip-attach':
       return (
         `Public IP attach requested for DBaaS ${result.dbaas_id}.\n` +
@@ -295,27 +292,6 @@ function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
       : `Subnet ID: ${result.vpc.subnet_id}\n`) +
     (result.message === null ? '' : `Message: ${result.message}\n`)
   );
-}
-
-function renderNetworkShowHuman(result: DbaasNetworkShowCommandResult): string {
-  const item = result.dbaas;
-  const networkTable = new Table({ head: ['Network', ''] });
-  networkTable.push(
-    ['Name', item.name || '--'],
-    ['ID', String(result.dbaas_id)],
-    ['Public IP Attached', item.public_ip.attached ? 'yes' : 'no'],
-    ['Public IP Enabled', item.public_ip.enabled ? 'yes' : 'no'],
-    ['Public IP Address', item.public_ip.ip_address ?? '--'],
-    ['Connection Endpoint', item.connection_endpoint ?? '--'],
-    ['Connection Port', item.connection_port ?? '--']
-  );
-
-  const vpcSection =
-    item.vpc_connections.length === 0
-      ? 'VPC Connections: none\n'
-      : `VPC Connections:\n${formatVpcConnectionsTable(item.vpc_connections)}\n`;
-
-  return `${networkTable.toString()}\n${vpcSection}`;
 }
 
 function formatVpcConnectionsTable(
@@ -477,12 +453,6 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
           subnet_id: result.vpc.subnet_id
         }
       };
-    case 'network-show':
-      return {
-        action: 'network-show',
-        dbaas_id: result.dbaas_id,
-        network: normalizeNetworkJson(result.dbaas)
-      };
     case 'public-ip-attach':
       return {
         action: 'public-ip-attach',
@@ -578,26 +548,6 @@ function normalizeDetailJson(item: DbaasDetailItem): JsonValue {
     })),
     whitelisted_ips: item.whitelisted_ips.map((whitelistedIp) => ({
       ip: whitelistedIp.ip
-    }))
-  };
-}
-
-function normalizeNetworkJson(item: DbaasDetailItem): JsonValue {
-  return {
-    connection_endpoint: item.connection_endpoint,
-    connection_port: item.connection_port,
-    public_ip: {
-      attached: item.public_ip.attached,
-      enabled: item.public_ip.enabled,
-      ip_address: item.public_ip.ip_address
-    },
-    vpc_connections: item.vpc_connections.map((connection) => ({
-      appliance_id: connection.appliance_id,
-      ip_address: connection.ip_address,
-      subnet_id: connection.subnet_id,
-      vpc_cidr: connection.vpc_cidr,
-      vpc_id: connection.vpc_id,
-      vpc_name: connection.vpc_name
     }))
   };
 }

@@ -30,7 +30,6 @@ interface GlobalOptions {
 }
 
 type DbaasNetworkAction =
-  | 'show'
   | 'attach-vpc'
   | 'detach-vpc'
   | 'attach-public-ip'
@@ -245,11 +244,6 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       }
 
       switch (normalizeDbaasNetworkAction(action)) {
-        case 'show':
-          await runDbaasAction(commandInstance, () =>
-            service.showNetwork(dbaasId, options)
-          );
-          return;
         case 'attach-vpc':
           await runDbaasAction(commandInstance, () =>
             service.attachVpc(dbaasId, {
@@ -386,8 +380,7 @@ function normalizeDbaasNetworkAction(action: string): DbaasNetworkAction {
     action === 'attach-vpc' ||
     action === 'detach-vpc' ||
     action === 'attach-public-ip' ||
-    action === 'detach-public-ip' ||
-    action === 'show'
+    action === 'detach-public-ip'
   ) {
     return action;
   }
@@ -395,7 +388,7 @@ function normalizeDbaasNetworkAction(action: string): DbaasNetworkAction {
   throw new CliError(`Unknown DBaaS network action "${action}".`, {
     code: 'INVALID_DBAAS_NETWORK_ACTION',
     details: [
-      'Valid actions: show, attach-vpc, detach-vpc, attach-public-ip, detach-public-ip'
+      'Valid actions: attach-vpc, detach-vpc, attach-public-ip, detach-public-ip'
     ],
     exitCode: EXIT_CODES.usage,
     suggestion:
