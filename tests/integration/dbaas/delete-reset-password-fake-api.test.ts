@@ -183,13 +183,7 @@ describe('dbaas delete and reset-password against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        [
-          'dbaas',
-          'reset-password',
-          '7869',
-          '--password',
-          'ValidPassword1!A'
-        ],
+        ['dbaas', 'reset-password', '7869', '--password', 'ValidPassword1!A'],
         {
           env: {
             HOME: tempHome.path,

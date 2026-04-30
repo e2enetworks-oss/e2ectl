@@ -343,8 +343,7 @@ describe('dbaas list against a fake MyAccount API', () => {
             {
               connection_endpoint: '198.51.100.10',
               connection_port: null,
-              connection_string:
-                'mysql -h 198.51.100.10 -u admin -p',
+              connection_string: 'mysql -h 198.51.100.10 -u admin -p',
               database_name: 'appdb',
               id: 101,
               name: 'shared-name',

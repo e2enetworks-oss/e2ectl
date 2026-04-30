@@ -132,11 +132,7 @@ describe('dbaas validation through the built CLI', () => {
 
   it.each([
     {
-      args: [
-        ...BASE_CREATE_ARGS,
-        '--billing-type',
-        'committed'
-      ],
+      args: [...BASE_CREATE_ARGS, '--billing-type', 'committed'],
       stderr:
         'Error: Committed plan ID is required when --billing-type committed is used.\n\nNext step: Pass a committed SKU ID with --committed-plan-id.\n'
     },
@@ -192,13 +188,16 @@ describe('dbaas validation through the built CLI', () => {
       stderr:
         'Error: Plan cannot be empty.\n\nNext step: Pass a non-empty value with --plan.\n'
     }
-  ])('rejects invalid create options before API access', async ({ args, stderr }) => {
-    const result = await runBuiltCli(args);
+  ])(
+    'rejects invalid create options before API access',
+    async ({ args, stderr }) => {
+      const result = await runBuiltCli(args);
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe('');
-    expect(result.stderr).toBe(stderr);
-  });
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(stderr);
+    }
+  );
 
   it.each([
     {
@@ -221,13 +220,16 @@ describe('dbaas validation through the built CLI', () => {
       stderr:
         'Error: Detaching a DBaaS public IP requires confirmation in an interactive terminal.\n\nNext step: Re-run the command with --force only if you accept that external DBaaS connectivity will be lost.\n'
     }
-  ])('rejects invalid network and identifier inputs', async ({ args, stderr }) => {
-    const result = await runBuiltCli(args);
+  ])(
+    'rejects invalid network and identifier inputs',
+    async ({ args, stderr }) => {
+      const result = await runBuiltCli(args);
 
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe('');
-    expect(result.stderr).toBe(stderr);
-  });
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(stderr);
+    }
+  );
 
   it('fails clearly when a password file cannot be read before API access', async () => {
     const missingPasswordFile = '/tmp/e2ectl-missing-dbaas-password.txt';
