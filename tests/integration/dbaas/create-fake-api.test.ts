@@ -166,4 +166,169 @@ describe('dbaas create against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('creates a committed VPC-attached DBaaS from stdin password input', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/plans/': (request) => ({
+        body: {
+          code: 200,
+          data:
+            request.query.software_id === '401'
+              ? {
+                  database_engines: [],
+                  template_plans: [
+                    {
+                      available_inventory_status: true,
+                      committed_sku: [
+                        {
+                          committed_days: 365,
+                          committed_sku_id: 7701,
+                          committed_sku_name: 'Balanced Small - 1 year',
+                          committed_sku_price: 32000
+                        }
+                      ],
+                      cpu: '4',
+                      currency: 'INR',
+                      disk: '200 GB',
+                      name: 'Balanced Small',
+                      price_per_hour: 18,
+                      ram: '16 GB',
+                      software: {
+                        engine: 'Relational',
+                        id: 401,
+                        name: 'PostgreSQL',
+                        version: '16'
+                      },
+                      template_id: 990
+                    }
+                  ]
+                }
+              : {
+                  database_engines: [
+                    {
+                      engine: 'Relational',
+                      id: 401,
+                      name: 'PostgreSQL',
+                      version: '16'
+                    }
+                  ],
+                  template_plans: []
+                },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'GET /myaccount/api/v1/vpc/501/': () => ({
+        body: {
+          code: 200,
+          data: {
+            ipv4_cidr: '10.40.0.0/16',
+            is_e2e_vpc: true,
+            name: 'app-vpc',
+            network_id: 501,
+            state: 'Active'
+          },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'POST /myaccount/api/v1/rds/cluster/': () => ({
+        body: {
+          code: 201,
+          data: {
+            cluster_id: 9901,
+            name: 'analytics-db'
+          },
+          errors: {},
+          message: 'Created Successfully'
+        },
+        status: 201
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'dbaas',
+          'create',
+          '--name',
+          'analytics-db',
+          '--type',
+          'postgres',
+          '--db-version',
+          '16',
+          '--plan',
+          'Balanced Small',
+          '--database-name',
+          'analytics',
+          '--username',
+          'appuser',
+          '--password-file',
+          '-',
+          '--billing-type',
+          'committed',
+          '--committed-plan-id',
+          '7701',
+          '--committed-renewal',
+          'hourly',
+          '--vpc-id',
+          '501',
+          '--subnet-id',
+          '44',
+          '--no-public-ip'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          },
+          stdin: 'ValidPassword1!A\n'
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('Created DBaaS');
+      expect(result.stdout).toContain('analytics-db');
+      expect(result.stdout).toContain('Committed Plan ID');
+      expect(result.stdout).toContain('7701');
+      expect(result.stdout).toContain('VPC ID');
+      expect(result.stdout).toContain('501');
+
+      expect(server.requests).toHaveLength(4);
+      expect(server.requests[2]).toMatchObject({
+        method: 'GET',
+        pathname: '/myaccount/api/v1/vpc/501/'
+      });
+      expect(JSON.parse(server.requests[3]!.body)).toEqual({
+        cn_id: 7701,
+        cn_status: 'hourly_billing',
+        database: {
+          dbaas_number: 1,
+          name: 'analytics',
+          password: 'ValidPassword1!A',
+          user: 'appuser'
+        },
+        name: 'analytics-db',
+        public_ip_required: false,
+        software_id: 401,
+        template_id: 990,
+        vpcs: [
+          {
+            ipv4_cidr: '10.40.0.0/16',
+            network_id: 501,
+            subnet_id: 44,
+            target: 'vpcs',
+            vpc_name: 'app-vpc'
+          }
+        ]
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

@@ -235,4 +235,160 @@ describe('dbaas list against a fake MyAccount API', () => {
       await tempHome.cleanup();
     }
   });
+
+  it('normalizes fallback endpoints and sorts matching names deterministically', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/': () => ({
+        body: {
+          code: 200,
+          data: [
+            {
+              id: 303,
+              master_node: {
+                cluster_id: 303,
+                database: {
+                  database: 'analytics',
+                  id: 30,
+                  pg_detail: {},
+                  username: 'admin'
+                },
+                domain: 'none',
+                port: '5432',
+                private_ip_address: '10.10.0.3',
+                public_ip_address: '[]'
+              },
+              name: 'shared-name',
+              software: {
+                engine: 'Relational',
+                id: 401,
+                name: 'PostgreSQL',
+                version: '15'
+              },
+              status: 'Running'
+            },
+            {
+              id: 101,
+              master_node: {
+                cluster_id: 101,
+                database: {
+                  database: 'appdb',
+                  id: 10,
+                  pg_detail: {},
+                  username: 'admin'
+                },
+                domain: null,
+                port: '',
+                private_ip_address: '',
+                public_ip_address: '198.51.100.10'
+              },
+              name: 'shared-name',
+              software: {
+                engine: 'Relational',
+                id: 301,
+                name: 'MySQL',
+                version: '8.0'
+              },
+              status: ''
+            },
+            {
+              id: 202,
+              master_node: {
+                cluster_id: 202,
+                database: {
+                  database: 'legacy',
+                  id: 20,
+                  pg_detail: {},
+                  username: 'admin'
+                },
+                private_ip_address: null,
+                public_ip_address: null
+              },
+              name: 'shared-name',
+              software: {
+                engine: 'Relational',
+                id: 302,
+                name: 'MySQL',
+                version: '5.7'
+              }
+            }
+          ],
+          errors: {},
+          message: 'OK',
+          total_count: 3,
+          total_page_number: 1
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['--json', 'dbaas', 'list'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe(
+        `${stableStringify({
+          action: 'list',
+          filters: {
+            type: null
+          },
+          items: [
+            {
+              connection_endpoint: '198.51.100.10',
+              connection_port: null,
+              connection_string:
+                'mysql -h 198.51.100.10 -u admin -p',
+              database_name: 'appdb',
+              id: 101,
+              name: 'shared-name',
+              private_ips: [],
+              public_ip: '198.51.100.10',
+              status: null,
+              type: 'MySQL',
+              version: '8.0'
+            },
+            {
+              connection_endpoint: null,
+              connection_port: null,
+              connection_string: null,
+              database_name: 'legacy',
+              id: 202,
+              name: 'shared-name',
+              private_ips: [],
+              public_ip: null,
+              status: null,
+              type: 'MySQL',
+              version: '5.7'
+            },
+            {
+              connection_endpoint: '10.10.0.3',
+              connection_port: '5432',
+              connection_string:
+                'psql -h 10.10.0.3 -p 5432 -U admin -d analytics',
+              database_name: 'analytics',
+              id: 303,
+              name: 'shared-name',
+              private_ips: ['10.10.0.3'],
+              public_ip: null,
+              status: 'Running',
+              type: 'PostgreSQL',
+              version: '15'
+            }
+          ],
+          total_count: 3,
+          total_page_number: 1
+        })}\n`
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
 });

@@ -79,6 +79,141 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
     });
   });
 
+  it('falls back to nested whitelist data and empty network sections', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/9901/': () => ({
+        body: {
+          code: 200,
+          data: {
+            created_at: null,
+            id: 9901,
+            master_node: {
+              allowed_ip_address: {
+                whitelisted_ips: ['203.0.113.20', ' ', '198.51.100.0/24']
+              },
+              cluster_id: 9901,
+              database: {
+                database: '',
+                id: 21,
+                pg_detail: {}
+              },
+              domain: 'null',
+              plan: {
+                cpu: '2',
+                disk: '100 GB',
+                name: 'Starter',
+                price: null,
+                price_per_hour: null,
+                price_per_month: null,
+                ram: '8 GB'
+              },
+              private_ip_address: null,
+              public_ip_address: null,
+              public_port: ''
+            },
+            name: 'private-db',
+            software: {
+              engine: 'Relational',
+              id: 401,
+              name: 'PostgreSQL',
+              version: '16'
+            },
+            status: 'Provisioning',
+            status_title: ''
+          },
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'GET /myaccount/api/v1/rds/cluster/9901/vpc/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'GET /myaccount/api/v1/rds/cluster/9901/public-ip-status/': () => ({
+        body: {
+          code: 200,
+          data: {
+            public_ip_status: false
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+      const env = {
+        HOME: tempHome.path,
+        [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+      };
+
+      const jsonResult = await runBuiltCli(['--json', 'dbaas', 'get', '9901'], {
+        env
+      });
+      const humanResult = await runBuiltCli(['dbaas', 'get', '9901'], { env });
+
+      expect(jsonResult.exitCode).toBe(0);
+      expect(jsonResult.stderr).toBe('');
+      expect(jsonResult.stdout).toBe(
+        `${stableStringify({
+          action: 'get',
+          dbaas: {
+            connection_endpoint: null,
+            connection_port: null,
+            connection_string: null,
+            created_at: null,
+            database_name: null,
+            id: 9901,
+            name: 'private-db',
+            plan: {
+              configuration: {
+                cpu: '2',
+                disk: '100 GB',
+                ram: '8 GB'
+              },
+              name: 'Starter',
+              price: null,
+              price_per_hour: null,
+              price_per_month: null
+            },
+            public_ip: {
+              attached: false,
+              enabled: false,
+              ip_address: null
+            },
+            status: 'Provisioning',
+            type: 'PostgreSQL',
+            username: null,
+            version: '16',
+            vpc_connections: [],
+            whitelisted_ips: [
+              {
+                ip: '203.0.113.20'
+              },
+              {
+                ip: '198.51.100.0/24'
+              }
+            ]
+          }
+        })}\n`
+      );
+      expect(humanResult.exitCode).toBe(0);
+      expect(humanResult.stdout).toContain('VPC Connections: none');
+      expect(humanResult.stdout).toContain('Whitelisted IPs:');
+      expect(humanResult.stdout).toContain('203.0.113.20');
+      expect(humanResult.stdout).toContain('198.51.100.0/24');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('lists, adds, and removes whitelisted DBaaS IPs with the expected payload', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const whitelistListResult = await runBuiltCli(
@@ -91,6 +226,10 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       );
       const whitelistAddResult = await runBuiltCli(
         ['--json', 'dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
+        { env }
+      );
+      const whitelistAddHumanResult = await runBuiltCli(
+        ['dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
         { env }
       );
       const whitelistRemoveResult = await runBuiltCli(
@@ -106,6 +245,13 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       );
       expect(whitelistAddResult.exitCode).toBe(0);
       expect(whitelistAddResult.stdout).toContain('"action": "whitelist-add"');
+      expect(whitelistAddHumanResult.exitCode).toBe(0);
+      expect(whitelistAddHumanResult.stdout).toContain(
+        'Whitelisted IP 203.0.113.10 for DBaaS 7869.'
+      );
+      expect(whitelistAddHumanResult.stdout).toContain(
+        'Message: IP whitelisting in progress.'
+      );
       expect(whitelistRemoveResult.exitCode).toBe(0);
       expect(whitelistRemoveResult.stdout).toContain(
         'Removed whitelisted IP 203.0.113.10 from DBaaS 7869.'
@@ -147,6 +293,10 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
         ['--json', 'dbaas', 'network', 'detach-public-ip', '7869', '--force'],
         { env }
       );
+      const detachPublicIpHumanResult = await runBuiltCli(
+        ['dbaas', 'network', 'detach-public-ip', '7869', '--force'],
+        { env }
+      );
 
       expect(attachPublicIpResult.exitCode).toBe(0);
       expect(attachPublicIpResult.stdout).toContain(
@@ -159,6 +309,13 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       expect(detachPublicIpResult.exitCode).toBe(0);
       expect(detachPublicIpResult.stdout).toContain(
         '"action": "public-ip-detach"'
+      );
+      expect(detachPublicIpHumanResult.exitCode).toBe(0);
+      expect(detachPublicIpHumanResult.stdout).toContain(
+        'Public IP detach requested for DBaaS 7869.'
+      );
+      expect(detachPublicIpHumanResult.stdout).toContain(
+        'Message: Public IP detach initiated.'
       );
 
       const publicIpAttachRequest = server.requests.find((request) =>

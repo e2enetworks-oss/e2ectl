@@ -156,6 +156,60 @@ describe('dbaas delete and reset-password against a fake MyAccount API', () => {
     }
   });
 
+  it('rejects reset-password when the API does not expose an admin username', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: {
+            ...mysqlClusterBody(),
+            master_node: {
+              ...mysqlClusterBody().master_node,
+              database: {
+                database: 'appdb',
+                id: 11,
+                pg_detail: {}
+              }
+            }
+          },
+          errors: {},
+          message: 'OK'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'dbaas',
+          'reset-password',
+          '7869',
+          '--password',
+          'ValidPassword1!A'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(
+        'Error: DBaaS 7869 does not expose a resettable admin username.\n\nNext step: Inspect the DBaaS in the MyAccount UI and retry once the admin user is available.\n'
+      );
+      expect(server.requests).toHaveLength(1);
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('deletes supported DBaaS clusters with --force', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
@@ -211,6 +265,95 @@ describe('dbaas delete and reset-password against a fake MyAccount API', () => {
           message: 'Deleted customer-db.'
         })}\n`
       );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('renders successful delete output in human mode', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: mysqlClusterBody(),
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'DELETE /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: {
+            cluster_id: 7869,
+            name: 'customer-db'
+          },
+          errors: {},
+          message: 'Deleted'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['dbaas', 'delete', '7869', '--force'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toBe(
+        'Deleted DBaaS 7869 (customer-db, MySQL 8.0).\n'
+      );
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('requires --force for delete in non-interactive runs', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: mysqlClusterBody(),
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'DELETE /myaccount/api/v1/rds/cluster/7869/': () => ({
+        body: {
+          code: 200,
+          data: {},
+          errors: {},
+          message: 'Deleted'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(['dbaas', 'delete', '7869'], {
+        env: {
+          HOME: tempHome.path,
+          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+        }
+      });
+
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe(
+        'Error: Deleting a DBaaS requires confirmation in an interactive terminal.\n\nNext step: Re-run the command with --force to skip the prompt.\n'
+      );
+      expect(server.requests).toHaveLength(1);
+      expect(server.requests[0]!.method).toBe('GET');
     } finally {
       await server.close();
       await tempHome.cleanup();
