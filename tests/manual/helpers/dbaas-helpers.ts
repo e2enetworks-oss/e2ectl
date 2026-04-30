@@ -143,8 +143,7 @@ export async function waitForDbaasStatus(
       const result = await runCommand(['dbaas', 'get', String(dbaasId)]);
 
       if (
-        normalizeLifecycleStatus(result.dbaas.status) ===
-        normalizedTargetStatus
+        normalizeLifecycleStatus(result.dbaas.status) === normalizedTargetStatus
       ) {
         return;
       }

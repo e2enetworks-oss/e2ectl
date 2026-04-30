@@ -124,7 +124,9 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
         result.stdout.includes('ID') &&
         result.stdout.includes('Name') &&
         result.stdout.includes('DB Version');
-      const isEmptyState = result.stdout.includes('No supported DBaaS clusters');
+      const isEmptyState = result.stdout.includes(
+        'No supported DBaaS clusters'
+      );
       expect(hasHeaders || isEmptyState).toBe(true);
     }
   );
