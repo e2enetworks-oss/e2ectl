@@ -271,7 +271,7 @@ describe('dbaas get/network/whitelist against a fake MyAccount API', () => {
       );
 
       expect(JSON.parse(whitelistAddRequest!.body)).toEqual({
-        allowed_hosts: [{ ip: '203.0.113.10' }]
+        allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
       });
       expect(JSON.parse(whitelistRemoveRequest!.body)).toEqual({
         allowed_hosts: [{ ip: '203.0.113.10' }]

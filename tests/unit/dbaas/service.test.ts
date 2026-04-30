@@ -879,7 +879,7 @@ describe('DbaasService', () => {
     });
 
     expect(updateWhitelistedIps).toHaveBeenNthCalledWith(1, 7869, 'attach', {
-      allowed_hosts: [{ ip: '203.0.113.10' }]
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
     });
     expect(updateWhitelistedIps).toHaveBeenNthCalledWith(2, 7869, 'detach', {
       allowed_hosts: [{ ip: '203.0.113.10' }]

@@ -514,7 +514,7 @@ describe('dbaas commands', () => {
     expect(stdout.buffer).toContain('"action": "whitelist-add"');
     expect(stdout.buffer).toContain('"action": "public-ip-detach"');
     expect(stub.updateWhitelistedIps).toHaveBeenCalledWith(7869, 'attach', {
-      allowed_hosts: [{ ip: '203.0.113.10' }]
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
     });
     expect(stub.detachPublicIp).toHaveBeenCalledWith(7869);
   });

@@ -356,7 +356,7 @@ describe('DbaasApiClient', () => {
     });
     await client.listWhitelistedIps(7869, 1, 100);
     await client.updateWhitelistedIps(7869, 'attach', {
-      allowed_hosts: [{ ip: '203.0.113.10' }]
+      allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
     });
 
     expect(transport.getMock).toHaveBeenNthCalledWith(
@@ -419,7 +419,7 @@ describe('DbaasApiClient', () => {
     );
     expect(transport.requestMock).toHaveBeenNthCalledWith(5, {
       body: {
-        allowed_hosts: [{ ip: '203.0.113.10' }]
+        allowed_hosts: [{ ip: '203.0.113.10', tag: [] }]
       },
       method: 'PUT',
       path: '/rds/cluster/7869/update-allowed-hosts',

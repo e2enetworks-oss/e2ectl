@@ -495,7 +495,7 @@ export class DbaasService {
       normalizedDbaasId,
       action,
       {
-        allowed_hosts: [{ ip }]
+        allowed_hosts: [{ ip, ...(action === 'attach' ? { tag: [] } : {}) }]
       }
     );
 

@@ -43,6 +43,18 @@ Notes:
 
 Live lanes are strongly recommended before the first public release and future release candidates, but they are not mandatory CI or branch-protection gates.
 
+Build the CLI first:
+
+```bash
+make build
+```
+
+Live tests live under `tests/manual/` and are split by risk:
+
+- `npm run test:manual`: read-only API checks
+- `npm run test:manual:smoke`: destructive disposable-resource smoke checks
+- `npm run test:manual:dbaas`: destructive DBaaS lifecycle checks
+
 ### Safe Read-Only Lane
 
 Run only after `make build`.
@@ -66,26 +78,9 @@ Required read-only env vars:
 - `E2E_PROJECT_ID`
 - `E2E_LOCATION`
 
-The lane now proves both direct env-backed reads and config-backed operator usage:
+Optional fixture env vars enable resource-specific get checks:
 
-- it creates a temp `HOME`
-- it imports one disposable saved profile from the base env credentials
-- it saves default alias and default project/location context on that profile
-- it runs representative built-CLI read commands without `E2E_API_KEY`, `E2E_AUTH_TOKEN`, `E2E_PROJECT_ID`, or `E2E_LOCATION` in the command env
-- it still runs the existing list-safe and fixture-based detail/get checks
-
-Always-covered domains:
-
-- node
-- project
-- reserved-ip
-- volume
-- vpc
-- security-group
-- ssh-key
-
-Optional fixture env vars enable detail/get checks:
-
+- `E2ECTL_MANUAL_DBAAS_ID`
 - `E2ECTL_MANUAL_NODE_ID`
 - `E2ECTL_MANUAL_RESERVED_IP`
 - `E2ECTL_MANUAL_VOLUME_ID`
@@ -129,57 +124,50 @@ Optional smoke env vars:
 - `E2ECTL_SMOKE_PREFIX`
 - `E2ECTL_SMOKE_MANIFEST`
 
-Validation rules:
-
-- the smoke env parser fails once with one aggregated missing-env error
-- the upgrade target must differ from the create target in at least one of plan or image
-
-Expanded destructive proof surface:
-
-- node create/delete
-- node action security-group attach/detach
-- node action volume attach/detach
-- node action vpc attach/detach
-- node action ssh-key attach
-- node action power-off
-- node action power-on
-- node action save-image
-- node upgrade
-- reserved-ip create/get/attach/detach/delete/reserve-node
-- volume create/get/delete
-- vpc create/get/delete
-- ssh-key create/get/delete
-
 Cleanup command:
 
 ```bash
 npm run test:manual:smoke:cleanup -- --manifest <path>
 ```
 
-By default, destructive-smoke manifests are written under `.manual-smoke/` in the repo root so a routine `make build` does not erase the recovery file before cleanup can replay.
+Destructive-smoke manifests are written under `.manual-smoke/` by default. Keep the manifest until cleanup has succeeded.
 
-Cleanup order:
+### DBaaS Destructive Lane
 
-1. addon reserved IP detach
-2. attached volume detach
-3. attached VPC detach
-4. node delete
-5. reserved IP delete
-6. volume delete
-7. VPC delete
-8. saved image delete
-9. SSH key delete
-10. security group delete
-11. temp rules file cleanup
+This lane creates and deletes an actual DBaaS cluster and VPC. Run it only with disposable quota and credentials.
 
-The cleanup script updates the manifest immediately after each create, attach, and mutate step in the smoke lane.
+Command:
 
-Cleanup behavior:
+```bash
+E2ECTL_RUN_MANUAL_E2E=1 \
+E2E_API_KEY=... \
+E2E_AUTH_TOKEN=... \
+E2E_PROJECT_ID=... \
+E2E_LOCATION=... \
+E2ECTL_MANUAL_DBAAS_TYPE=postgres \
+E2ECTL_MANUAL_DBAAS_VERSION=16 \
+E2ECTL_MANUAL_DBAAS_PLAN="DBS.16GB" \
+E2ECTL_MANUAL_DBAAS_DATABASE_NAME=testdb \
+E2ECTL_MANUAL_DBAAS_PASSWORD='Testing@1234567890' \
+npm run test:manual:dbaas
+```
 
-- cleanup still tries the built CLI first for supported delete and detach flows
-- it falls back to direct clients only when CLI cleanup fails
-- saved image cleanup should use `e2ectl image delete` first and fall back to the cleanup-only direct client path only if CLI cleanup fails
-- already-gone cleanup responses are treated as successful so interrupted smoke runs can be replayed safely
+Required env vars:
+
+- `E2ECTL_RUN_MANUAL_E2E=1`
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+- `E2ECTL_MANUAL_DBAAS_TYPE`
+- `E2ECTL_MANUAL_DBAAS_VERSION`
+- `E2ECTL_MANUAL_DBAAS_PLAN`
+- `E2ECTL_MANUAL_DBAAS_DATABASE_NAME`
+- `E2ECTL_MANUAL_DBAAS_PASSWORD`
+
+Use the full DBaaS plan name from `dbaas plans`, for example `DBS.16GB`. The password must satisfy the platform policy.
+
+If a DBaaS operation fails because the cluster is not yet running, wait for `dbaas get <id>` to report `Running` before retrying. On failure, check `.manual-dbaas/*-manifest.json` before doing any manual cleanup.
 
 ## Promotion Checklist
 
