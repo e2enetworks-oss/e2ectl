@@ -155,12 +155,6 @@ Whitelist an IP or CIDR:
 e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10
 ```
 
-Attach MyAccount tag IDs to the whitelist entry when needed:
-
-```bash
-e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10 --tag-id <tag-id>
-```
-
 List whitelisted IPs:
 
 ```bash

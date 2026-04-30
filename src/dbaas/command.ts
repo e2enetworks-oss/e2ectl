@@ -9,6 +9,7 @@ import { renderDbaasResult } from './formatter.js';
 import { DbaasService } from './service.js';
 import {
   type DbaasAttachVpcOptions,
+  type DbaasCommandResult,
   type DbaasCreateOptions,
   type DbaasDeleteOptions,
   type DbaasDetachVpcOptions,
@@ -37,6 +38,20 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     readPasswordFromStdin: readAllFromStdin,
     store: runtime.store
   });
+
+  const runDbaasAction = async (
+    commandInstance: Command,
+    produceResult: () => Promise<DbaasCommandResult>
+  ): Promise<void> => {
+    const result = await produceResult();
+    runtime.stdout.write(
+      renderDbaasResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  };
+
   const command = new Command('dbaas').description(
     'Manage MyAccount MariaDB, MySQL, and PostgreSQL DBaaS clusters.'
   );
@@ -54,13 +69,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'Filter by database type: maria, sql, or postgres.'
       )
   ).action(async (options: DbaasListTypesOptions, commandInstance: Command) => {
-    const result = await service.listTypes(options);
-    runtime.stdout.write(
-      renderDbaasResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
+    await runDbaasAction(commandInstance, () => service.listTypes(options));
   });
 
   addContextOptions(
@@ -75,13 +84,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       )
       .requiredOption('--db-version <version>', 'Database engine version.')
   ).action(async (options: DbaasPlansOptions, commandInstance: Command) => {
-    const result = await service.listPlans(options);
-    runtime.stdout.write(
-      renderDbaasResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
+    await runDbaasAction(commandInstance, () => service.listPlans(options));
   });
 
   addContextOptions(
@@ -95,13 +98,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'Filter by database type: maria, sql, or postgres.'
       )
   ).action(async (options: DbaasListOptions, commandInstance: Command) => {
-    const result = await service.listDbaas(options);
-    runtime.stdout.write(
-      renderDbaasResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
+    await runDbaasAction(commandInstance, () => service.listDbaas(options));
   });
 
   addContextOptions(
@@ -114,12 +111,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasGetOptions,
       commandInstance: Command
     ) => {
-      const result = await service.getDbaas(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.getDbaas(dbaasId, options)
       );
     }
   );
@@ -196,13 +189,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         'Optional subnet ID within the VPC. Only for non-default VPCs.'
       )
   ).action(async (options: DbaasCreateOptions, commandInstance: Command) => {
-    const result = await service.createDbaas(options);
-    runtime.stdout.write(
-      renderDbaasResult(
-        result,
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-      )
-    );
+    await runDbaasAction(commandInstance, () => service.createDbaas(options));
   });
 
   const networkCommand = addContextOptions(
@@ -233,12 +220,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasAttachVpcOptions,
       commandInstance: Command
     ) => {
-      const result = await service.attachVpc(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.attachVpc(dbaasId, options)
       );
     }
   );
@@ -261,12 +244,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasDetachVpcOptions,
       commandInstance: Command
     ) => {
-      const result = await service.detachVpc(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.detachVpc(dbaasId, options)
       );
     }
   );
@@ -281,12 +260,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasPublicIpOptions,
       commandInstance: Command
     ) => {
-      const result = await service.attachPublicIp(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.attachPublicIp(dbaasId, options)
       );
     }
   );
@@ -307,12 +282,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasPublicIpDetachOptions,
       commandInstance: Command
     ) => {
-      const result = await service.detachPublicIp(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.detachPublicIp(dbaasId, options)
       );
     }
   );
@@ -339,12 +310,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasWhitelistListOptions,
       commandInstance: Command
     ) => {
-      const result = await service.listWhitelistedIps(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.listWhitelistedIps(dbaasId, options)
       );
     }
   );
@@ -354,24 +321,14 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       .command('add <dbaasId>')
       .description('Whitelist an IP address for a DBaaS cluster.')
       .requiredOption('--ip <ip>', 'IPv4 address or CIDR to whitelist.')
-      .option(
-        '--tag-id <tagId>',
-        'Optional MyAccount tag ID to attach. Repeat to attach multiple tags.',
-        collectRepeatedOption,
-        []
-      )
   ).action(
     async (
       dbaasId: string,
       options: DbaasWhitelistUpdateOptions,
       commandInstance: Command
     ) => {
-      const result = await service.addWhitelistedIp(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.addWhitelistedIp(dbaasId, options)
       );
     }
   );
@@ -381,24 +338,14 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       .command('remove <dbaasId>')
       .description('Remove a whitelisted IP address from a DBaaS cluster.')
       .requiredOption('--ip <ip>', 'IPv4 address or CIDR to remove.')
-      .option(
-        '--tag-id <tagId>',
-        'Optional tag ID currently attached to the whitelisted IP. Repeat when needed by the API.',
-        collectRepeatedOption,
-        []
-      )
   ).action(
     async (
       dbaasId: string,
       options: DbaasWhitelistUpdateOptions,
       commandInstance: Command
     ) => {
-      const result = await service.removeWhitelistedIp(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.removeWhitelistedIp(dbaasId, options)
       );
     }
   );
@@ -425,12 +372,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasResetPasswordOptions,
       commandInstance: Command
     ) => {
-      const result = await service.resetPassword(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.resetPassword(dbaasId, options)
       );
     }
   );
@@ -446,12 +389,8 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasDeleteOptions,
       commandInstance: Command
     ) => {
-      const result = await service.deleteDbaas(dbaasId, options);
-      runtime.stdout.write(
-        renderDbaasResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
+      await runDbaasAction(commandInstance, () =>
+        service.deleteDbaas(dbaasId, options)
       );
     }
   );
@@ -472,8 +411,4 @@ async function readAllFromStdin(): Promise<string> {
   }
 
   return buffer;
-}
-
-function collectRepeatedOption(value: string, previous: string[]): string[] {
-  return [...previous, value];
 }

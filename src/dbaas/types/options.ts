@@ -65,5 +65,4 @@ export type DbaasWhitelistListOptions = DbaasContextOptions;
 
 export interface DbaasWhitelistUpdateOptions extends DbaasContextOptions {
   ip: string;
-  tagId?: string[];
 }

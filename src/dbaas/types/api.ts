@@ -49,7 +49,6 @@ export interface DbaasDatabaseDetails {
 export interface DbaasMasterNodeSummary {
   allowed_ip_address?: {
     whitelisted_ips?: string[];
-    whitelisted_ips_tags?: DbaasWhitelistedIp[];
     whitelisting_in_progress?: boolean;
   } | null;
   cluster_id?: number;
@@ -174,24 +173,14 @@ export interface DbaasPublicIpActionResult {
 
 export interface DbaasWhitelistEntryRequest {
   ip: string;
-  tag: number[];
 }
 
 export interface DbaasWhitelistUpdateRequest {
   allowed_hosts: DbaasWhitelistEntryRequest[];
 }
 
-export interface DbaasWhitelistedIpTag {
-  id?: number;
-  label_name?: string;
-  tag?: string;
-}
-
 export interface DbaasWhitelistedIp {
   ip: string;
-  tag?: number[] | string[] | null;
-  tag_list?: DbaasWhitelistedIpTag[];
-  tags?: DbaasWhitelistedIpTag[];
 }
 
 export interface DbaasWhitelistListResult {

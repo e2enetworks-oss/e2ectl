@@ -3,12 +3,14 @@ import {
   type ResolvedCredentials
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import type { VpcClient } from '../vpc/client.js';
 import type { DbaasClient } from './client.js';
 import { DBAAS_LIST_MAX_PAGES, DBAAS_LIST_PAGE_SIZE } from './constants.js';
 import {
+  buildCreateRequest,
   buildConnectionEndpoint,
   buildConnectionPort,
+  buildDbaasVpcEntry,
+  extractCreatedDbaasId,
   normalizeWhitelistedIpItem,
   resolveSoftware,
   resolveTemplatePlan,
@@ -25,6 +27,7 @@ import {
   computePageCount,
   normalizeDatabaseType,
   normalizeDbaasCreateInput,
+  normalizeDbaasIdArg,
   normalizeHost,
   normalizeIpAddress,
   normalizeOptionalString,
@@ -32,7 +35,6 @@ import {
   normalizePasswordSource,
   normalizeRequiredNumericId,
   normalizeRequiredString,
-  normalizeTagIds,
   wrapPasswordReadError
 } from './normalizers.js';
 import type {
@@ -41,8 +43,6 @@ import type {
   DbaasContextOptions,
   DbaasCreateCommandResult,
   DbaasCreateOptions,
-  DbaasCreateRequest,
-  DbaasCreateResult,
   DbaasDeleteCommandResult,
   DbaasDeleteOptions,
   DbaasDetachVpcOptions,
@@ -65,11 +65,11 @@ import type {
   DbaasVpcAttachCommandResult,
   DbaasVpcDetachCommandResult,
   DbaasVpcEntry,
+  DbaasWhitelistedIp,
   DbaasWhitelistListCommandResult,
   DbaasWhitelistListOptions,
   DbaasWhitelistUpdateCommandResult,
   DbaasWhitelistUpdateOptions,
-  NormalizedDbaasCreateInput,
   SupportedDatabaseType
 } from './types/index.js';
 
@@ -90,27 +90,26 @@ export class DbaasService {
 
     let vpcEntry: DbaasVpcEntry | undefined;
     if (input.vpcId !== null) {
-      const vpcClient = this.requireVpcClient(credentials);
+      const vpcClient = this.dependencies.createVpcClient(credentials);
       const vpc = await vpcClient.getVpc(input.vpcId);
-      vpcEntry = {
-        ipv4_cidr: vpc.ipv4_cidr,
-        network_id: vpc.network_id,
-        target: 'vpcs',
-        vpc_name: vpc.name,
-        ...(input.subnetId === null ? {} : { subnet_id: input.subnetId })
-      };
+      vpcEntry = buildDbaasVpcEntry(vpc, input.subnetId);
     }
 
     const createResult = await client.createDbaas(
       buildCreateRequest(input, software.id, templatePlan.template_id, vpcEntry)
     );
     const dbaasId = extractCreatedDbaasId(createResult);
-    const detail = await client.getDbaas(dbaasId);
-    const summary = summarizeSupportedCluster(detail);
 
     return {
       action: 'create',
-      dbaas: summary,
+      dbaas: {
+        database_name: input.databaseName,
+        id: dbaasId,
+        name: input.name,
+        type: input.type,
+        username: input.username,
+        version: input.version
+      },
       requested: {
         billing_type: input.billingType,
         ...(input.committedPlanId === null
@@ -133,11 +132,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasDeleteOptions
   ): Promise<DbaasDeleteCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const client = await this.createClient(options);
     const detail = await client.getDbaas(normalizedDbaasId);
     const summary = summarizeSupportedCluster(detail);
@@ -175,11 +170,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasGetOptions
   ): Promise<DbaasGetCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const client = await this.createClient(options);
     const [detail, vpcConnections, publicIpStatus] = await Promise.all([
       client.getDbaas(normalizedDbaasId),
@@ -292,11 +283,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasResetPasswordOptions
   ): Promise<DbaasResetPasswordCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const password = await this.loadPassword(options);
     const client = await this.createClient(options);
     const detail = await client.getDbaas(normalizedDbaasId);
@@ -330,11 +317,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasAttachVpcOptions
   ): Promise<DbaasVpcAttachCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const { subnetId, vpcEntry, vpcId } = await this.resolveVpcEntry(options);
     const client = await this.createClient(options);
     await client.attachVpc(normalizedDbaasId, {
@@ -353,11 +336,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasDetachVpcOptions
   ): Promise<DbaasVpcDetachCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const { subnetId, vpcEntry, vpcId } = await this.resolveVpcEntry(options);
     const client = await this.createClient(options);
     const result = await client.detachVpc(normalizedDbaasId, {
@@ -377,11 +356,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasPublicIpOptions
   ): Promise<DbaasPublicIpAttachCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const client = await this.createClient(options);
     const result = await client.attachPublicIp(normalizedDbaasId);
 
@@ -396,11 +371,7 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasPublicIpDetachOptions
   ): Promise<DbaasPublicIpDetachCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
 
     if (!(options.force ?? false)) {
       assertCanDetachPublicIp(this.dependencies.isInteractive);
@@ -433,23 +404,15 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasWhitelistListOptions
   ): Promise<DbaasWhitelistListCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const client = await this.createClient(options);
-    const result = await client.listWhitelistedIps(
-      normalizedDbaasId,
-      1,
-      DBAAS_LIST_PAGE_SIZE
-    );
+    const items = await this.fetchAllWhitelistedIps(client, normalizedDbaasId);
 
     return {
       action: 'whitelist-list',
       dbaas_id: normalizedDbaasId,
-      items: result.items.map(normalizeWhitelistedIpItem),
-      total_count: result.total_count ?? result.items.length
+      items: items.map(normalizeWhitelistedIpItem),
+      total_count: items.length
     };
   }
 
@@ -486,18 +449,6 @@ export class DbaasService {
     return this.dependencies.createDbaasClient(credentials);
   }
 
-  private requireVpcClient(credentials: ResolvedCredentials): VpcClient {
-    if (this.dependencies.createVpcClient === undefined) {
-      throw new CliError('VPC operations are not available in this context.', {
-        code: 'DBAAS_VPC_CLIENT_UNAVAILABLE',
-        exitCode: EXIT_CODES.usage,
-        suggestion: 'Ensure the CLI runtime provides a VPC client.'
-      });
-    }
-
-    return this.dependencies.createVpcClient(credentials);
-  }
-
   private async resolveVpcEntry(
     options: {
       subnetId?: string;
@@ -522,18 +473,12 @@ export class DbaasService {
             '--subnet-id'
           );
     const credentials = await this.resolveCredentials(options);
-    const vpcClient = this.requireVpcClient(credentials);
+    const vpcClient = this.dependencies.createVpcClient(credentials);
     const vpc = await vpcClient.getVpc(vpcId);
 
     return {
       subnetId,
-      vpcEntry: {
-        ipv4_cidr: vpc.ipv4_cidr,
-        network_id: vpc.network_id,
-        target: 'vpcs',
-        vpc_name: vpc.name,
-        ...(subnetId === null ? {} : { subnet_id: subnetId })
-      },
+      vpcEntry: buildDbaasVpcEntry(vpc, subnetId),
       vpcId
     };
   }
@@ -543,19 +488,14 @@ export class DbaasService {
     dbaasId: string,
     options: DbaasWhitelistUpdateOptions
   ): Promise<DbaasWhitelistUpdateCommandResult> {
-    const normalizedDbaasId = normalizeRequiredNumericId(
-      dbaasId,
-      'DBaaS ID',
-      'the first argument'
-    );
+    const normalizedDbaasId = normalizeDbaasIdArg(dbaasId);
     const ip = normalizeIpAddress(options.ip);
-    const tagIds = normalizeTagIds(options.tagId ?? []);
     const client = await this.createClient(options);
     const result = await client.updateWhitelistedIps(
       normalizedDbaasId,
       action,
       {
-        allowed_hosts: [{ ip, tag: tagIds }]
+        allowed_hosts: [{ ip }]
       }
     );
 
@@ -563,8 +503,7 @@ export class DbaasService {
       action: action === 'attach' ? 'whitelist-add' : 'whitelist-remove',
       dbaas_id: normalizedDbaasId,
       ip,
-      message: normalizeOptionalString(result.message),
-      tag_ids: tagIds
+      message: normalizeOptionalString(result.message)
     };
   }
 
@@ -589,6 +528,41 @@ export class DbaasService {
         ? wrapPasswordReadError(source.path, error)
         : error;
     }
+  }
+
+  private async fetchAllWhitelistedIps(
+    client: DbaasClient,
+    dbaasId: number
+  ): Promise<DbaasWhitelistedIp[]> {
+    const items: DbaasWhitelistedIp[] = [];
+
+    for (
+      let pageNumber = 1;
+      pageNumber <= DBAAS_LIST_MAX_PAGES;
+      pageNumber += 1
+    ) {
+      const response = await client.listWhitelistedIps(
+        dbaasId,
+        pageNumber,
+        DBAAS_LIST_PAGE_SIZE
+      );
+      items.push(...response.items);
+
+      const totalPages = response.total_page_number ?? 1;
+      if (pageNumber >= totalPages) {
+        return items;
+      }
+    }
+
+    throw new CliError(
+      'DBaaS whitelist listing exceeded the maximum supported pagination depth.',
+      {
+        code: 'DBAAS_WHITELIST_PAGINATION_LIMIT',
+        exitCode: EXIT_CODES.network,
+        suggestion:
+          'Retry the command. If the problem persists, narrow the whitelist by removing stale entries.'
+      }
+    );
   }
 
   private async fetchAllDbaasClusters(
@@ -627,49 +601,4 @@ export class DbaasService {
       }
     );
   }
-}
-
-function buildCreateRequest(
-  input: NormalizedDbaasCreateInput,
-  softwareId: number,
-  templateId: number,
-  vpcEntry?: DbaasVpcEntry
-): DbaasCreateRequest {
-  return {
-    ...(input.committedPlanId === null
-      ? {}
-      : { cn_id: input.committedPlanId, cn_status: input.committedRenewal }),
-    database: {
-      dbaas_number: 1,
-      name: input.databaseName,
-      password: input.password,
-      user: input.username
-    },
-    name: input.name,
-    public_ip_required: input.publicIp,
-    software_id: softwareId,
-    template_id: templateId,
-    ...(vpcEntry === undefined ? {} : { vpcs: [vpcEntry] })
-  };
-}
-
-function extractCreatedDbaasId(result: DbaasCreateResult): number {
-  const candidate = result.id ?? result.cluster_id ?? null;
-  if (
-    typeof candidate === 'number' &&
-    Number.isInteger(candidate) &&
-    candidate > 0
-  ) {
-    return candidate;
-  }
-
-  throw new CliError(
-    'The DBaaS create response did not include a usable cluster id.',
-    {
-      code: 'INVALID_DBAAS_CREATE_RESPONSE',
-      exitCode: EXIT_CODES.network,
-      suggestion:
-        'Retry the command. If the resource was created, use dbaas list to find it.'
-    }
-  );
 }

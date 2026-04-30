@@ -5,6 +5,7 @@ import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   DbaasCommandResult,
   DbaasCommittedSkuItem,
+  DbaasCreatedSummary,
   DbaasDetailItem,
   DbaasListItem,
   DbaasListTypeItem,
@@ -118,12 +119,12 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       const createTable = new Table({ head: ['Created DBaaS', ''] });
       createTable.push(
         ['Name', result.dbaas.name || '--'],
-        ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
+        ['ID', String(result.dbaas.id)],
         [
           'DB Version',
           formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
         ],
-        ['Database Name', result.dbaas.database_name ?? '--'],
+        ['Database Name', result.dbaas.database_name || '--'],
         ['Billing Type', result.requested.billing_type || '--']
       );
       if (result.requested.committed_plan_id !== undefined) {
@@ -334,7 +335,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
     case 'create':
       return {
         action: 'create',
-        dbaas: normalizeSummaryJson(result.dbaas),
+        dbaas: normalizeCreatedSummaryJson(result.dbaas),
         requested: {
           billing_type: result.requested.billing_type,
           ...(result.requested.committed_plan_id === undefined
@@ -470,11 +471,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         action: 'whitelist-list',
         dbaas_id: result.dbaas_id,
         items: result.items.map((item) => ({
-          ip: item.ip,
-          tags: item.tags.map((tag) => ({
-            id: tag.id,
-            name: tag.name
-          }))
+          ip: item.ip
         })),
         total_count: result.total_count
       };
@@ -484,8 +481,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         action: result.action,
         dbaas_id: result.dbaas_id,
         ip: result.ip,
-        message: result.message,
-        tag_ids: result.tag_ids
+        message: result.message
       };
   }
 }
@@ -493,6 +489,17 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
 function normalizeSummaryJson(item: DbaasSummaryItem): JsonValue {
   return {
     connection_string: item.connection_string,
+    database_name: item.database_name,
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    username: item.username,
+    version: item.version
+  };
+}
+
+function normalizeCreatedSummaryJson(item: DbaasCreatedSummary): JsonValue {
+  return {
     database_name: item.database_name,
     id: item.id,
     name: item.name,
@@ -540,11 +547,7 @@ function normalizeDetailJson(item: DbaasDetailItem): JsonValue {
       vpc_name: connection.vpc_name
     })),
     whitelisted_ips: item.whitelisted_ips.map((whitelistedIp) => ({
-      ip: whitelistedIp.ip,
-      tags: whitelistedIp.tags.map((tag) => ({
-        id: tag.id,
-        name: tag.name
-      }))
+      ip: whitelistedIp.ip
     }))
   };
 }

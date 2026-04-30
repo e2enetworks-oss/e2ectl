@@ -17,74 +17,6 @@ import type {
   SupportedDatabaseType
 } from './types/index.js';
 
-export function normalizeDbaasCreateInput(
-  options: DbaasCreateOptions,
-  password: string
-): NormalizedDbaasCreateInput {
-  const name = normalizeDbaasName(options.name, 'Name', '--name');
-  const databaseName = normalizeDatabaseName(options.databaseName);
-  const username = normalizeUsername(options.username ?? 'admin');
-  const billingType = normalizeCreateBillingType(options.billingType);
-  const committedPlanId = normalizeCommittedPlanId(
-    billingType,
-    options.committedPlanId
-  );
-  const committedRenewal = normalizeCommittedRenewal(options.committedRenewal);
-  const vpcId =
-    options.vpcId === undefined
-      ? null
-      : normalizeRequiredNumericId(options.vpcId, 'VPC ID', '--vpc-id');
-  const subnetId =
-    options.subnetId === undefined
-      ? null
-      : normalizeRequiredNumericId(
-          options.subnetId,
-          'Subnet ID',
-          '--subnet-id'
-        );
-
-  if (vpcId === null && subnetId !== null) {
-    throw new CliError('--subnet-id can only be used with --vpc-id.', {
-      code: 'UNEXPECTED_DBAAS_SUBNET_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Remove --subnet-id, or add --vpc-id to attach the DBaaS to a VPC during creation.'
-    });
-  }
-
-  if (vpcId === null && options.publicIp !== undefined) {
-    throw new CliError(
-      'DBaaS public IP creation flags can only be used with --vpc-id.',
-      {
-        code: 'UNEXPECTED_DBAAS_PUBLIC_IP_FLAG',
-        exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Attach the DBaaS to a VPC with --vpc-id before choosing --public-ip or --no-public-ip.'
-      }
-    );
-  }
-
-  return {
-    billingType,
-    committedPlanId,
-    committedRenewal,
-    databaseName,
-    name,
-    type: normalizeDatabaseType(options.type),
-    password,
-    plan: normalizeRequiredString(options.plan, 'Plan', '--plan'),
-    publicIp: options.publicIp ?? true,
-    subnetId,
-    username,
-    version: normalizeRequiredString(
-      options.dbVersion,
-      'DB version',
-      '--db-version'
-    ),
-    vpcId
-  };
-}
-
 export function normalizeCreateBillingType(
   value: string | undefined
 ): DbaasCreateBillingType {
@@ -164,61 +96,6 @@ export function normalizeCommittedRenewal(
     suggestion:
       'Pass --committed-renewal auto-renew to renew automatically, or --committed-renewal hourly to switch to hourly billing after the term.'
   });
-}
-
-export function normalizePasswordSource(
-  options: DbaasPasswordOptions
-):
-  | { kind: 'value'; label: string; value: string }
-  | { kind: 'file'; label: string; path: string } {
-  if (options.password !== undefined && options.passwordFile !== undefined) {
-    throw new CliError('Use only one password source.', {
-      code: 'CONFLICTING_DBAAS_PASSWORD_FLAGS',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Remove one password source. Prefer --password-file for scripts and secret managers.'
-    });
-  }
-
-  if (options.password !== undefined) {
-    return { kind: 'value', label: '--password', value: options.password };
-  }
-
-  if (options.passwordFile !== undefined) {
-    const path = normalizeRequiredString(
-      options.passwordFile,
-      'Password file',
-      '--password-file'
-    );
-    return { kind: 'file', label: '--password-file', path };
-  }
-
-  throw new CliError('Password is required.', {
-    code: 'MISSING_DBAAS_PASSWORD',
-    exitCode: EXIT_CODES.usage,
-    suggestion:
-      'Pass --password for interactive use, or --password-file with a file path or - for stdin.'
-  });
-}
-
-export function wrapPasswordReadError(
-  passwordFile: string,
-  error: unknown
-): CliError {
-  return new CliError(
-    passwordFile === '-'
-      ? 'Could not read DBaaS password from stdin.'
-      : `Could not read DBaaS password file: ${passwordFile}`,
-    {
-      code: 'DBAAS_PASSWORD_READ_FAILED',
-      cause: error,
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        passwordFile === '-'
-          ? `Pipe the password into the command, for example: printf '%s' '<password>' | ${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file -')}`
-          : 'Verify that the file exists, is readable, and contains only the DBaaS admin password.'
-    }
-  );
 }
 
 export function normalizeDatabaseType(value: string): SupportedDatabaseType {
@@ -378,9 +255,130 @@ export function normalizeIpAddress(value: string): string {
   return normalized;
 }
 
-export function normalizeTagIds(values: string[]): number[] {
-  return values.map((value) =>
-    normalizeRequiredNumericId(value, 'Tag ID', '--tag-id')
+export function normalizeDbaasIdArg(dbaasId: string): number {
+  return normalizeRequiredNumericId(dbaasId, 'DBaaS ID', 'the first argument');
+}
+
+export function normalizeDbaasCreateInput(
+  options: DbaasCreateOptions,
+  password: string
+): NormalizedDbaasCreateInput {
+  const name = normalizeDbaasName(options.name, 'Name', '--name');
+  const databaseName = normalizeDatabaseName(options.databaseName);
+  const username = normalizeUsername(options.username ?? 'admin');
+  const billingType = normalizeCreateBillingType(options.billingType);
+  const committedPlanId = normalizeCommittedPlanId(
+    billingType,
+    options.committedPlanId
+  );
+  const committedRenewal = normalizeCommittedRenewal(options.committedRenewal);
+  const vpcId =
+    options.vpcId === undefined
+      ? null
+      : normalizeRequiredNumericId(options.vpcId, 'VPC ID', '--vpc-id');
+  const subnetId =
+    options.subnetId === undefined
+      ? null
+      : normalizeRequiredNumericId(
+          options.subnetId,
+          'Subnet ID',
+          '--subnet-id'
+        );
+
+  if (vpcId === null && subnetId !== null) {
+    throw new CliError('--subnet-id can only be used with --vpc-id.', {
+      code: 'UNEXPECTED_DBAAS_SUBNET_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Remove --subnet-id, or add --vpc-id to attach the DBaaS to a VPC during creation.'
+    });
+  }
+
+  if (vpcId === null && options.publicIp !== undefined) {
+    throw new CliError(
+      'DBaaS public IP creation flags can only be used with --vpc-id.',
+      {
+        code: 'UNEXPECTED_DBAAS_PUBLIC_IP_FLAG',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Attach the DBaaS to a VPC with --vpc-id before choosing --public-ip or --no-public-ip.'
+      }
+    );
+  }
+
+  return {
+    billingType,
+    committedPlanId,
+    committedRenewal,
+    databaseName,
+    name,
+    type: normalizeDatabaseType(options.type),
+    password,
+    plan: normalizeRequiredString(options.plan, 'Plan', '--plan'),
+    publicIp: options.publicIp ?? true,
+    subnetId,
+    username,
+    version: normalizeRequiredString(
+      options.dbVersion,
+      'DB version',
+      '--db-version'
+    ),
+    vpcId
+  };
+}
+
+export function normalizePasswordSource(
+  options: DbaasPasswordOptions
+):
+  | { kind: 'value'; label: string; value: string }
+  | { kind: 'file'; label: string; path: string } {
+  if (options.password !== undefined && options.passwordFile !== undefined) {
+    throw new CliError('Use only one password source.', {
+      code: 'CONFLICTING_DBAAS_PASSWORD_FLAGS',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Remove one password source. Prefer --password-file for scripts and secret managers.'
+    });
+  }
+
+  if (options.password !== undefined) {
+    return { kind: 'value', label: '--password', value: options.password };
+  }
+
+  if (options.passwordFile !== undefined) {
+    const path = normalizeRequiredString(
+      options.passwordFile,
+      'Password file',
+      '--password-file'
+    );
+    return { kind: 'file', label: '--password-file', path };
+  }
+
+  throw new CliError('Password is required.', {
+    code: 'MISSING_DBAAS_PASSWORD',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Pass --password for interactive use, or --password-file with a file path or - for stdin.'
+  });
+}
+
+export function wrapPasswordReadError(
+  passwordFile: string,
+  error: unknown
+): CliError {
+  return new CliError(
+    passwordFile === '-'
+      ? 'Could not read DBaaS password from stdin.'
+      : `Could not read DBaaS password file: ${passwordFile}`,
+    {
+      code: 'DBAAS_PASSWORD_READ_FAILED',
+      cause: error,
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        passwordFile === '-'
+          ? `Pipe the password into the command, for example: printf '%s' '<password>' | ${formatCliCommand('dbaas create --name <name> --type <database-type> --db-version <version> --plan <plan-name> --database-name <database-name> --password-file -')}`
+          : 'Verify that the file exists, is readable, and contains only the DBaaS admin password.'
+    }
   );
 }
 

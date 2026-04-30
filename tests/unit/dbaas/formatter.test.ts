@@ -65,12 +65,11 @@ describe('dbaas formatter', () => {
     expect(templateTable).toContain('12 INR');
   });
 
-  it('renders create output with DB version and connection string', () => {
+  it('renders create output with DB version', () => {
     const output = renderDbaasResult(
       {
         action: 'create',
         dbaas: {
-          connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
           database_name: 'appdb',
           id: 7869,
           name: 'customer-db',
@@ -143,8 +142,7 @@ describe('dbaas formatter', () => {
           ],
           whitelisted_ips: [
             {
-              ip: '203.0.113.10',
-              tags: [{ id: 7, name: 'office' }]
+              ip: '203.0.113.10'
             }
           ]
         }
@@ -537,7 +535,7 @@ describe('dbaas formatter', () => {
       {
         action: 'whitelist-list',
         dbaas_id: 7869,
-        items: [{ ip: '203.0.113.10', tags: [] }],
+        items: [{ ip: '203.0.113.10' }],
         total_count: 1
       },
       false
@@ -557,7 +555,7 @@ describe('dbaas formatter', () => {
         {
           action: 'whitelist-list',
           dbaas_id: 7869,
-          items: [{ ip: '203.0.113.10', tags: [{ id: 7, name: 'office' }] }],
+          items: [{ ip: '203.0.113.10' }],
           total_count: 1
         },
         true
@@ -574,8 +572,7 @@ describe('dbaas formatter', () => {
         action: 'whitelist-add',
         dbaas_id: 7869,
         ip: '203.0.113.10',
-        message: 'IP whitelisting in progress.',
-        tag_ids: []
+        message: 'IP whitelisting in progress.'
       },
       false
     );
@@ -584,8 +581,7 @@ describe('dbaas formatter', () => {
         action: 'whitelist-remove',
         dbaas_id: 7869,
         ip: '203.0.113.10',
-        message: null,
-        tag_ids: []
+        message: null
       },
       false
     );
@@ -605,16 +601,14 @@ describe('dbaas formatter', () => {
           action: 'whitelist-add',
           dbaas_id: 7869,
           ip: '203.0.113.10',
-          message: 'IP whitelisting in progress.',
-          tag_ids: [7]
+          message: 'IP whitelisting in progress.'
         },
         true
       )
-    ) as { action: string; ip: string; tag_ids: number[] };
+    ) as { action: string; ip: string };
 
     expect(addJson.action).toBe('whitelist-add');
     expect(addJson.ip).toBe('203.0.113.10');
-    expect(addJson.tag_ids).toEqual([7]);
   });
 
   it('renders get output in json mode covering normalizeDetailJson', () => {
@@ -652,9 +646,7 @@ describe('dbaas formatter', () => {
                 vpc_name: 'app-vpc'
               }
             ],
-            whitelisted_ips: [
-              { ip: '203.0.113.10', tags: [{ id: 7, name: 'office' }] }
-            ]
+            whitelisted_ips: [{ ip: '203.0.113.10' }]
           }
         },
         true
@@ -718,7 +710,6 @@ describe('dbaas formatter', () => {
         {
           action: 'create',
           dbaas: {
-            connection_string: null,
             database_name: 'appdb',
             id: 7869,
             name: 'customer-db',
@@ -824,7 +815,6 @@ describe('dbaas formatter', () => {
       {
         action: 'create',
         dbaas: {
-          connection_string: null,
           database_name: 'appdb',
           id: 7869,
           name: 'customer-db',
@@ -1005,8 +995,7 @@ describe('dbaas formatter', () => {
         action: 'whitelist-add',
         dbaas_id: 7869,
         ip: '10.0.0.1',
-        message: null,
-        tag_ids: []
+        message: null
       },
       false
     );
@@ -1015,8 +1004,7 @@ describe('dbaas formatter', () => {
         action: 'whitelist-remove',
         dbaas_id: 7869,
         ip: '10.0.0.1',
-        message: 'IP removed.',
-        tag_ids: []
+        message: 'IP removed.'
       },
       false
     );

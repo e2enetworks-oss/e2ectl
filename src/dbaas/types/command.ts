@@ -26,10 +26,6 @@ export interface DbaasVpcConnectionItem {
 
 export interface DbaasWhitelistedIpItem {
   ip: string;
-  tags: Array<{
-    id: number | null;
-    name: string | null;
-  }>;
 }
 
 export interface DbaasPublicIpInfo {
@@ -137,9 +133,18 @@ export interface DbaasPlansCommandResult {
   total_count: number;
 }
 
+export interface DbaasCreatedSummary {
+  database_name: string;
+  id: number;
+  name: string;
+  type: SupportedDatabaseType;
+  username: string;
+  version: string;
+}
+
 export interface DbaasCreateCommandResult {
   action: 'create';
-  dbaas: DbaasSummaryItem;
+  dbaas: DbaasCreatedSummary;
   requested: {
     billing_type: DbaasCreateBillingType;
     committed_plan_id?: number;
@@ -215,7 +220,6 @@ export interface DbaasWhitelistUpdateCommandResult {
   dbaas_id: number;
   ip: string;
   message: string | null;
-  tag_ids: number[];
 }
 
 export type DbaasCommandResult =

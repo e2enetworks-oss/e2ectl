@@ -60,40 +60,6 @@ describe('dbaas create against a fake MyAccount API', () => {
           message: 'Created Successfully'
         },
         status: 201
-      }),
-      'GET /myaccount/api/v1/rds/cluster/7869/': () => ({
-        body: {
-          code: 200,
-          data: {
-            created_at: '2026-04-24T12:00:00.000Z',
-            id: 7869,
-            master_node: {
-              cluster_id: 7869,
-              database: {
-                database: 'appdb',
-                id: 11,
-                pg_detail: {},
-                username: 'admin'
-              },
-              domain: 'db.example.com',
-              port: '3306',
-              private_ip_address: '10.0.0.10',
-              public_ip_address: '1.2.3.4',
-              public_port: 3306
-            },
-            name: 'customer-db',
-            software: {
-              engine: 'Relational',
-              id: 301,
-              name: 'MySQL',
-              version: '8.0'
-            },
-            status: 'Running',
-            status_title: 'Running'
-          },
-          errors: {},
-          message: 'OK'
-        }
       })
     });
     const tempHome = await createTempHome();
@@ -133,7 +99,6 @@ describe('dbaas create against a fake MyAccount API', () => {
         `${stableStringify({
           action: 'create',
           dbaas: {
-            connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
             database_name: 'appdb',
             id: 7869,
             name: 'customer-db',
@@ -155,7 +120,7 @@ describe('dbaas create against a fake MyAccount API', () => {
         })}\n`
       );
 
-      expect(server.requests).toHaveLength(4);
+      expect(server.requests).toHaveLength(3);
       expect(server.requests[0]).toMatchObject({
         method: 'GET',
         pathname: '/myaccount/api/v1/rds/plans/',
@@ -195,15 +160,6 @@ describe('dbaas create against a fake MyAccount API', () => {
         public_ip_required: true,
         software_id: 301,
         template_id: 901
-      });
-      expect(server.requests[3]).toMatchObject({
-        method: 'GET',
-        pathname: '/myaccount/api/v1/rds/cluster/7869/',
-        query: {
-          apikey: 'prod-api-key',
-          location: 'Delhi',
-          project_id: '46429'
-        }
       });
     } finally {
       await server.close();

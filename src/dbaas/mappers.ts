@@ -1,8 +1,11 @@
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
+import type { VpcSummary } from '../vpc/types.js';
 import type {
   DbaasClusterDetail,
   DbaasClusterSummary,
+  DbaasCreateRequest,
+  DbaasCreateResult,
   DbaasDetailItem,
   DbaasListItem,
   DbaasListTypeItem,
@@ -14,9 +17,10 @@ import type {
   DbaasTemplatePlan,
   DbaasVpcConnection,
   DbaasVpcConnectionItem,
+  DbaasVpcEntry,
   DbaasWhitelistedIp,
   DbaasWhitelistedIpItem,
-  DbaasWhitelistedIpTag,
+  NormalizedDbaasCreateInput,
   SupportedDatabaseType
 } from './types/index.js';
 import {
@@ -317,20 +321,14 @@ export function normalizeWhitelistedIps(
     return direct.map(normalizeWhitelistedIpItem);
   }
 
-  const masterAllowedIps = cluster.master_node.allowed_ip_address;
-  const tags = masterAllowedIps?.whitelisted_ips_tags;
-  if (Array.isArray(tags) && tags.length > 0) {
-    return tags.map(normalizeWhitelistedIpItem);
-  }
-
-  const ips = masterAllowedIps?.whitelisted_ips;
+  const ips = cluster.master_node.allowed_ip_address?.whitelisted_ips;
   if (!Array.isArray(ips)) {
     return [];
   }
 
   return ips.flatMap((ip) => {
     const normalizedIp = normalizeOptionalString(ip);
-    return normalizedIp === null ? [] : [{ ip: normalizedIp, tags: [] }];
+    return normalizedIp === null ? [] : [{ ip: normalizedIp }];
   });
 }
 
@@ -338,20 +336,8 @@ export function normalizeWhitelistedIpItem(
   item: DbaasWhitelistedIp
 ): DbaasWhitelistedIpItem {
   return {
-    ip: item.ip,
-    tags: normalizeWhitelistTags(item.tag_list ?? item.tags ?? [])
+    ip: item.ip
   };
-}
-
-export function normalizeWhitelistTags(
-  tags: DbaasWhitelistedIpTag[]
-): DbaasWhitelistedIpItem['tags'] {
-  return tags.map((tag) => ({
-    id: normalizeOptionalNumber(tag.id),
-    name:
-      normalizeOptionalString(tag.label_name) ??
-      normalizeOptionalString(tag.tag)
-  }));
 }
 
 export function buildConnectionEndpoint(
@@ -417,6 +403,64 @@ export function normalizePlanHourlyPrice(
   }
 
   return null;
+}
+
+export function buildDbaasVpcEntry(
+  vpc: VpcSummary,
+  subnetId: number | null
+): DbaasVpcEntry {
+  return {
+    ipv4_cidr: vpc.ipv4_cidr,
+    network_id: vpc.network_id,
+    target: 'vpcs',
+    vpc_name: vpc.name,
+    ...(subnetId === null ? {} : { subnet_id: subnetId })
+  };
+}
+
+export function buildCreateRequest(
+  input: NormalizedDbaasCreateInput,
+  softwareId: number,
+  templateId: number,
+  vpcEntry?: DbaasVpcEntry
+): DbaasCreateRequest {
+  return {
+    ...(input.committedPlanId === null
+      ? {}
+      : { cn_id: input.committedPlanId, cn_status: input.committedRenewal }),
+    database: {
+      dbaas_number: 1,
+      name: input.databaseName,
+      password: input.password,
+      user: input.username
+    },
+    name: input.name,
+    public_ip_required: input.publicIp,
+    software_id: softwareId,
+    template_id: templateId,
+    ...(vpcEntry === undefined ? {} : { vpcs: [vpcEntry] })
+  };
+}
+
+export function extractCreatedDbaasId(result: DbaasCreateResult): number {
+  const candidate = result.id ?? result.cluster_id ?? null;
+  if (
+    typeof candidate === 'number' &&
+    Number.isInteger(candidate) &&
+    candidate > 0
+  ) {
+    return candidate;
+  }
+
+  throw new CliError(
+    'The DBaaS create response did not include a usable cluster id.',
+    {
+      code: 'INVALID_DBAAS_CREATE_RESPONSE',
+      exitCode: EXIT_CODES.network,
+      suggestion:
+        'Retry the command. If the resource was created, use dbaas list to find it.'
+    }
+  );
 }
 
 export function sortDbaasListItems(items: DbaasListItem[]): DbaasListItem[] {

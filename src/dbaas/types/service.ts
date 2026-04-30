@@ -15,7 +15,7 @@ export interface DbaasStore {
 export interface DbaasServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createDbaasClient(credentials: ResolvedCredentials): DbaasClient;
-  createVpcClient?: (credentials: ResolvedCredentials) => VpcClient;
+  createVpcClient(credentials: ResolvedCredentials): VpcClient;
   isInteractive: boolean;
   readPasswordFile(path: string): Promise<string>;
   readPasswordFromStdin(): Promise<string>;

@@ -7,7 +7,7 @@ import { DbaasApiClient } from '../../../src/dbaas/client.js';
 import type {
   DbaasCreateRequest,
   DbaasResetPasswordRequest
-} from '../../../src/dbaas/index.js';
+} from '../../../src/dbaas/types/index.js';
 
 class StubTransport implements MyAccountTransport {
   readonly deleteMock = vi.fn();
@@ -178,9 +178,7 @@ describe('DbaasApiClient', () => {
     const transport = new StubTransport();
     const client = new DbaasApiClient(transport);
 
-    transport.getMock.mockResolvedValue(
-      envelope([{ ip: '10.0.0.1', tag_list: [] }])
-    );
+    transport.getMock.mockResolvedValue(envelope([{ ip: '10.0.0.1' }]));
 
     const result = await client.listWhitelistedIps(7869, 1, 100);
 
@@ -315,8 +313,7 @@ describe('DbaasApiClient', () => {
       .mockResolvedValueOnce({
         ...envelope([
           {
-            ip: '203.0.113.10',
-            tag_list: [{ id: 7, label_name: 'office' }]
+            ip: '203.0.113.10'
           }
         ]),
         total_count: 1,
@@ -359,7 +356,7 @@ describe('DbaasApiClient', () => {
     });
     await client.listWhitelistedIps(7869, 1, 100);
     await client.updateWhitelistedIps(7869, 'attach', {
-      allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+      allowed_hosts: [{ ip: '203.0.113.10' }]
     });
 
     expect(transport.getMock).toHaveBeenNthCalledWith(
@@ -422,7 +419,7 @@ describe('DbaasApiClient', () => {
     );
     expect(transport.requestMock).toHaveBeenNthCalledWith(5, {
       body: {
-        allowed_hosts: [{ ip: '203.0.113.10', tag: [7] }]
+        allowed_hosts: [{ ip: '203.0.113.10' }]
       },
       method: 'PUT',
       path: '/rds/cluster/7869/update-allowed-hosts',
