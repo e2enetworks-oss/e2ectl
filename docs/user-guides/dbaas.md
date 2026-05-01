@@ -217,7 +217,7 @@ e2ectl dbaas create \
   --password-file /secure/path/dbaas-password.txt \
   --billing-type committed \
   --committed-plan-id <sku-id> \
-  --vpc-id <network-id>
+  --vpc-id <vpc-id>
 ```
 
 List clusters in machine-readable form so later steps can consume ids:
