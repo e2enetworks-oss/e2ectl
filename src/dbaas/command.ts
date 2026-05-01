@@ -238,15 +238,12 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         | DbaasPublicIpDetachOptions,
       commandInstance: Command
     ) => {
-      if (dbaasId === undefined || action === undefined) {
-        commandInstance.outputHelp();
-        return;
-      }
+      const input = requireDbaasNetworkInput(dbaasId, action);
 
-      switch (normalizeDbaasNetworkAction(action)) {
+      switch (normalizeDbaasNetworkAction(input.action)) {
         case 'attach-vpc':
           await runDbaasAction(commandInstance, () =>
-            service.attachVpc(dbaasId, {
+            service.attachVpc(input.dbaasId, {
               ...options,
               vpcId: requireNetworkTarget(target, 'attach-vpc')
             })
@@ -254,7 +251,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
           return;
         case 'detach-vpc':
           await runDbaasAction(commandInstance, () =>
-            service.detachVpc(dbaasId, {
+            service.detachVpc(input.dbaasId, {
               ...options,
               vpcId: requireNetworkTarget(target, 'detach-vpc')
             })
@@ -262,12 +259,12 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
           return;
         case 'attach-public-ip':
           await runDbaasAction(commandInstance, () =>
-            service.attachPublicIp(dbaasId, options)
+            service.attachPublicIp(input.dbaasId, options)
           );
           return;
         case 'detach-public-ip':
           await runDbaasAction(commandInstance, () =>
-            service.detachPublicIp(dbaasId, options)
+            service.detachPublicIp(input.dbaasId, options)
           );
           return;
       }
@@ -296,20 +293,17 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       options: DbaasWhitelistListOptions | DbaasWhitelistUpdateOptions,
       commandInstance: Command
     ) => {
-      if (dbaasId === undefined || action === undefined) {
-        commandInstance.outputHelp();
-        return;
-      }
+      const input = requireDbaasWhitelistInput(dbaasId, action);
 
-      switch (normalizeDbaasWhitelistAction(action)) {
+      switch (normalizeDbaasWhitelistAction(input.action)) {
         case 'list':
           await runDbaasAction(commandInstance, () =>
-            service.listWhitelistedIps(dbaasId, options)
+            service.listWhitelistedIps(input.dbaasId, options)
           );
           return;
         case 'add':
           await runDbaasAction(commandInstance, () =>
-            service.addWhitelistedIp(dbaasId, {
+            service.addWhitelistedIp(input.dbaasId, {
               ...options,
               ip: requireWhitelistIp(ip, 'add')
             })
@@ -317,7 +311,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
           return;
         case 'remove':
           await runDbaasAction(commandInstance, () =>
-            service.removeWhitelistedIp(dbaasId, {
+            service.removeWhitelistedIp(input.dbaasId, {
               ...options,
               ip: requireWhitelistIp(ip, 'remove')
             })
@@ -396,6 +390,34 @@ function normalizeDbaasNetworkAction(action: string): DbaasNetworkAction {
   });
 }
 
+function requireDbaasNetworkInput(
+  dbaasId: string | undefined,
+  action: string | undefined
+): { action: string; dbaasId: string } {
+  if (dbaasId === undefined) {
+    throw new CliError('DBaaS cluster ID is required for dbaas network.', {
+      code: 'MISSING_DBAAS_NETWORK_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use dbaas network <dbaas-id> <action>, for example dbaas network 7869 attach-public-ip.'
+    });
+  }
+
+  if (action === undefined) {
+    throw new CliError('Network action is required for dbaas network.', {
+      code: 'MISSING_DBAAS_NETWORK_ACTION',
+      details: [
+        'Valid actions: attach-vpc, detach-vpc, attach-public-ip, detach-public-ip'
+      ],
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use dbaas network <dbaas-id> <action>, for example dbaas network 7869 attach-vpc 501.'
+    });
+  }
+
+  return { action, dbaasId };
+}
+
 function normalizeDbaasWhitelistAction(action: string): DbaasWhitelistAction {
   if (action === 'list' || action === 'add' || action === 'remove') {
     return action;
@@ -408,6 +430,35 @@ function normalizeDbaasWhitelistAction(action: string): DbaasWhitelistAction {
     suggestion:
       'Use dbaas whitelist-ip <dbaas-id> <action>, for example dbaas whitelist-ip 7869 add 203.0.113.10.'
   });
+}
+
+function requireDbaasWhitelistInput(
+  dbaasId: string | undefined,
+  action: string | undefined
+): { action: string; dbaasId: string } {
+  if (dbaasId === undefined) {
+    throw new CliError('DBaaS cluster ID is required for dbaas whitelist-ip.', {
+      code: 'MISSING_DBAAS_WHITELIST_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use dbaas whitelist-ip <dbaas-id> <action>, for example dbaas whitelist-ip 7869 list.'
+    });
+  }
+
+  if (action === undefined) {
+    throw new CliError(
+      'Whitelist IP action is required for dbaas whitelist-ip.',
+      {
+        code: 'MISSING_DBAAS_WHITELIST_ACTION',
+        details: ['Valid actions: list, add, remove'],
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Use dbaas whitelist-ip <dbaas-id> <action>, for example dbaas whitelist-ip 7869 add 203.0.113.10.'
+      }
+    );
+  }
+
+  return { action, dbaasId };
 }
 
 function requireNetworkTarget(

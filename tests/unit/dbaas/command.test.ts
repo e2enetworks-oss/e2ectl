@@ -713,12 +713,27 @@ describe('dbaas commands', () => {
     );
   });
 
-  it('outputs help when network or whitelist-ip are invoked without arguments', async () => {
-    const networkHelp = await renderHelp(['dbaas', 'network']);
-    const whitelistHelp = await renderHelp(['dbaas', 'whitelist-ip']);
+  it('reports usage errors when network or whitelist-ip are invoked without required arguments', async () => {
+    const networkFixture = createRuntimeFixture();
+    const networkProgram = createProgram(networkFixture.runtime);
+    await expect(
+      networkProgram.parseAsync(['node', CLI_COMMAND_NAME, 'dbaas', 'network'])
+    ).rejects.toMatchObject({
+      code: 'MISSING_DBAAS_NETWORK_ID'
+    });
 
-    expect(networkHelp).toContain('attach-vpc');
-    expect(whitelistHelp).toContain('add');
+    const whitelistFixture = createRuntimeFixture();
+    const whitelistProgram = createProgram(whitelistFixture.runtime);
+    await expect(
+      whitelistProgram.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'dbaas',
+        'whitelist-ip'
+      ])
+    ).rejects.toMatchObject({
+      code: 'MISSING_DBAAS_WHITELIST_ID'
+    });
   });
 
   it('prompts for confirmation when deleting without --force', async () => {
