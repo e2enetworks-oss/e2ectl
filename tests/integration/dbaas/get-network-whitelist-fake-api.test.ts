@@ -5,7 +5,7 @@ import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
-describe('dbaas get/whitelist against a fake MyAccount API', () => {
+describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
   it('shows detailed DBaaS fields in json and human output', async () => {
     await withDbaasNetworkApi(async ({ env }) => {
       const getResult = await runBuiltCli(['--json', 'dbaas', 'get', '7869'], {
@@ -79,7 +79,7 @@ describe('dbaas get/whitelist against a fake MyAccount API', () => {
     });
   });
 
-  it('falls back to nested whitelist data and empty network sections', async () => {
+  it('falls back to nested whitelisted IP data and empty network sections', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/rds/cluster/9901/': () => ({
         body: {
@@ -214,26 +214,26 @@ describe('dbaas get/whitelist against a fake MyAccount API', () => {
     }
   });
 
-  it('lists, adds, and removes whitelisted DBaaS IPs with the expected payload', async () => {
+  it('lists, adds, and removes DBaaS IPs through the whitelist-ip command', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const whitelistListResult = await runBuiltCli(
-        ['dbaas', 'whitelist', '7869', 'list'],
+        ['dbaas', 'whitelist-ip', '7869', 'list'],
         { env }
       );
       const whitelistListJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist', '7869', 'list'],
+        ['--json', 'dbaas', 'whitelist-ip', '7869', 'list'],
         { env }
       );
       const whitelistAddResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist', '7869', 'add', '203.0.113.10'],
+        ['--json', 'dbaas', 'whitelist-ip', '7869', 'add', '203.0.113.10'],
         { env }
       );
       const whitelistAddHumanResult = await runBuiltCli(
-        ['dbaas', 'whitelist', '7869', 'add', '203.0.113.10'],
+        ['dbaas', 'whitelist-ip', '7869', 'add', '203.0.113.10'],
         { env }
       );
       const whitelistRemoveResult = await runBuiltCli(
-        ['dbaas', 'whitelist', '7869', 'remove', '203.0.113.10'],
+        ['dbaas', 'whitelist-ip', '7869', 'remove', '203.0.113.10'],
         { env }
       );
 

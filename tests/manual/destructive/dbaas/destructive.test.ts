@@ -7,14 +7,19 @@
 // - tests/manual/destructive/ssh-key/destructive.test.ts
 // See: docs/maintainers/maintaining.md#dbaas-destructive-lane
 
-import { access, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { runBuiltCli } from '../../../helpers/process.js';
 import {
   readDbaasManualEnv,
   type DbaasManualEnv
 } from '../../helpers/dbaas-env.js';
+import {
+  buildDbaasCreatePasswordCommand,
+  buildDbaasResetPasswordCommand,
+  runDbaasDestructiveCleanup,
+  runDbaasJsonCommand
+} from '../../helpers/dbaas-destructive.js';
 import {
   createEmptyDbaasManifest,
   type DbaasCreateJson,
@@ -28,7 +33,6 @@ import {
 const runManualSuite = process.env.E2ECTL_RUN_MANUAL_E2E === '1';
 const describeManual = runManualSuite ? describe : describe.skip;
 
-const MANUAL_DESTRUCTIVE_COMMAND_TIMEOUT_MS = 120 * 1000; // 2 minutes
 const MANUAL_DESTRUCTIVE_TEST_TIMEOUT_MS = 40 * 60 * 1000; // 40 minutes
 
 interface DbaasTestContext {
@@ -170,7 +174,11 @@ describeManual('manual DBaaS destructive built CLI checks', () => {
         if (vpcId) console.error(`VPC ID for manual cleanup: ${vpcId}`);
       } finally {
         // Cleanup on failure
-        const cleanupResult = await runCleanup(context, dbaasId, vpcId);
+        const cleanupResult = await runDbaasDestructiveCleanup(
+          context,
+          dbaasId,
+          vpcId
+        );
 
         if (cleanupResult.exitCode !== 0) {
           console.error(`DBaaS test manifest: ${context.manifestPath}`);
@@ -293,27 +301,14 @@ async function createDbaasStep(
     vpcId: number;
   }
 ): Promise<{ dbaasId: number }> {
+  const createCommand = buildDbaasCreatePasswordCommand(options);
   const dbaasCreate = await runJsonCommand<DbaasCreateJson>(
-    [
-      'dbaas',
-      'create',
-      '--name',
-      options.name,
-      '--type',
-      options.type,
-      '--db-version',
-      options.version,
-      '--plan',
-      options.plan,
-      '--database-name',
-      options.databaseName,
-      '--password',
-      options.password,
-      '--vpc-id',
-      String(options.vpcId),
-      '--public-ip'
-    ],
-    context.dbaasEnv
+    createCommand.args,
+    context.dbaasEnv,
+    {
+      sensitiveValues: createCommand.sensitiveValues,
+      stdin: createCommand.stdin
+    }
   );
 
   const dbaasId = dbaasCreate.dbaas.id;
@@ -422,15 +417,14 @@ async function resetPasswordStep(
     password: string;
   }
 ): Promise<void> {
+  const resetCommand = buildDbaasResetPasswordCommand(options);
   const resetResult = await runJsonCommand<DbaasResetPasswordJson>(
-    [
-      'dbaas',
-      'reset-password',
-      String(options.dbaasId),
-      '--password',
-      options.password
-    ],
-    context.dbaasEnv
+    resetCommand.args,
+    context.dbaasEnv,
+    {
+      sensitiveValues: resetCommand.sensitiveValues,
+      stdin: resetCommand.stdin
+    }
   );
 
   if (resetResult.dbaas.id !== options.dbaasId) {
@@ -505,130 +499,15 @@ function shouldRetryVpcDeleteError(message: string): boolean {
   );
 }
 
-async function runCleanup(
-  context: DbaasTestContext,
-  dbaasId: number | undefined,
-  vpcId: number | undefined
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  // Read manifest for any additional cleanup info
-  let manifest: DbaasSmokeManifest | undefined;
-  try {
-    const content = await readFile(context.manifestPath, 'utf8');
-    manifest = JSON.parse(content) as DbaasSmokeManifest;
-  } catch {
-    // Ignore manifest read errors
-  }
-
-  const dbaasToDelete = dbaasId ?? manifest?.dbaas_id;
-  const vpcToDelete = vpcId ?? manifest?.vpc_id;
-
-  // Cleanup DBaaS if exists and not deleted
-  if (dbaasToDelete && !manifest?.dbaas_deleted) {
-    try {
-      // Try to detach VPC first if attached
-      if (vpcToDelete && manifest?.vpc_attached) {
-        try {
-          await runJsonCommand<DbaasNetworkDetachJson>(
-            [
-              'dbaas',
-              'network',
-              String(dbaasToDelete),
-              'detach-vpc',
-              String(vpcToDelete)
-            ],
-            context.dbaasEnv
-          );
-        } catch {
-          // Ignore detach errors
-        }
-      }
-
-      // Try to detach public IP if attached
-      if (manifest?.public_ip_attached) {
-        try {
-          await runJsonCommand<DbaasNetworkDetachJson>(
-            [
-              'dbaas',
-              'network',
-              String(dbaasToDelete),
-              'detach-public-ip',
-              '--force'
-            ],
-            context.dbaasEnv
-          );
-        } catch {
-          // Ignore detach errors
-        }
-      }
-
-      // Delete DBaaS
-      await runJsonCommand<DbaasDeleteJson>(
-        ['dbaas', 'delete', String(dbaasToDelete), '--force'],
-        context.dbaasEnv
-      );
-    } catch {
-      // Ignore cleanup errors - we tried
-    }
-  }
-
-  // Cleanup VPC if exists and not deleted
-  if (vpcToDelete && !manifest?.vpc_deleted) {
-    try {
-      await runJsonCommand<VpcDeleteJson>(
-        ['vpc', 'delete', String(vpcToDelete), '--force'],
-        context.dbaasEnv
-      );
-    } catch {
-      // Ignore cleanup errors - we tried
-    }
-  }
-
-  // Clean up manifest file
-  try {
-    await rm(context.manifestPath);
-  } catch {
-    // Ignore
-  }
-
-  return { exitCode: 0, stdout: '', stderr: '' };
-}
-
 async function runJsonCommand<T>(
   args: string[],
-  dbaasEnv: DbaasManualEnv
+  dbaasEnv: DbaasManualEnv,
+  options: {
+    sensitiveValues?: string[];
+    stdin?: string;
+  } = {}
 ): Promise<T> {
-  const result = await runBuiltCli(['--json', ...args], {
-    env: dbaasEnv.cliEnv,
-    timeoutMs: MANUAL_DESTRUCTIVE_COMMAND_TIMEOUT_MS
-  });
-
-  if (result.exitCode !== 0) {
-    throw new Error(
-      [
-        `Command failed: e2ectl ${args.join(' ')}`,
-        result.stderr.trim().length === 0
-          ? 'STDERR: <empty>'
-          : `STDERR: ${result.stderr.trim()}`,
-        result.stdout.trim().length === 0
-          ? 'STDOUT: <empty>'
-          : `STDOUT: ${result.stdout.trim()}`
-      ].join('\n')
-    );
-  }
-
-  return parseJsonCommandResult<T>(args, result.stdout);
-}
-
-function parseJsonCommandResult<T>(args: string[], stdout: string): T {
-  try {
-    return JSON.parse(stdout) as T;
-  } catch (error: unknown) {
-    throw new Error(
-      `Command returned invalid JSON for e2ectl ${args.join(' ')}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
+  return await runDbaasJsonCommand<T>(args, dbaasEnv, options);
 }
 
 async function updateManifest(

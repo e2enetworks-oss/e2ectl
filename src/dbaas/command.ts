@@ -209,7 +209,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       .argument('[dbaasId]', 'DBaaS cluster ID.')
       .argument(
         '[action]',
-        'Network action: show, attach-vpc, detach-vpc, attach-public-ip, or detach-public-ip.'
+        'Network action: attach-vpc, detach-vpc, attach-public-ip, or detach-public-ip.'
       )
       .argument('[target]', 'VPC network_id for attach-vpc or detach-vpc.')
       .option(
@@ -276,16 +276,16 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
 
   const whitelistCommand = addContextOptions(
     command
-      .command('whitelist')
+      .command('whitelist-ip')
       .description('Manage DBaaS whitelisted IPs.')
       .usage('<dbaasId> <action> [ip] [options]')
       .argument('[dbaasId]', 'DBaaS cluster ID.')
-      .argument('[action]', 'Whitelist action: list, add, or remove.')
+      .argument('[action]', 'Whitelist IP action: list, add, or remove.')
       .argument('[ip]', 'IPv4 address or CIDR for add or remove.')
   );
   whitelistCommand.helpCommand(
     'help [command]',
-    'Show help for a dbaas whitelist command'
+    'Show help for a dbaas whitelist-ip command'
   );
 
   whitelistCommand.action(
@@ -406,7 +406,7 @@ function normalizeDbaasWhitelistAction(action: string): DbaasWhitelistAction {
     details: ['Valid actions: list, add, remove'],
     exitCode: EXIT_CODES.usage,
     suggestion:
-      'Use dbaas whitelist <dbaas-id> <action>, for example dbaas whitelist 7869 add 203.0.113.10.'
+      'Use dbaas whitelist-ip <dbaas-id> <action>, for example dbaas whitelist-ip 7869 add 203.0.113.10.'
   });
 }
 
@@ -433,11 +433,14 @@ function requireWhitelistIp(
     return ip;
   }
 
-  throw new CliError(`IP address is required for dbaas whitelist ${action}.`, {
-    code: 'MISSING_DBAAS_WHITELIST_IP',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Use dbaas whitelist <dbaas-id> ${action} <ip>.`
-  });
+  throw new CliError(
+    `IP address is required for dbaas whitelist-ip ${action}.`,
+    {
+      code: 'MISSING_DBAAS_WHITELIST_IP',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Use dbaas whitelist-ip <dbaas-id> ${action} <ip>.`
+    }
+  );
 }
 
 async function readAllFromStdin(): Promise<string> {

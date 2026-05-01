@@ -152,19 +152,19 @@ e2ectl dbaas network <dbaas-id> detach-public-ip --force
 Whitelist an IP or CIDR:
 
 ```bash
-e2ectl dbaas whitelist <dbaas-id> add 203.0.113.10
+e2ectl dbaas whitelist-ip <dbaas-id> add 203.0.113.10
 ```
 
 List whitelisted IPs:
 
 ```bash
-e2ectl dbaas whitelist <dbaas-id> list
+e2ectl dbaas whitelist-ip <dbaas-id> list
 ```
 
 Remove a whitelisted IP:
 
 ```bash
-e2ectl dbaas whitelist <dbaas-id> remove 203.0.113.10
+e2ectl dbaas whitelist-ip <dbaas-id> remove 203.0.113.10
 ```
 
 ### Reset The Admin Password
@@ -230,7 +230,7 @@ e2ectl --json dbaas list
 
 - Use `dbaas list-types --json` to enumerate available engine families and versions.
 - Use `dbaas plans --json --type <type> --db-version <version>` when automation needs exact template-plan rows and committed SKU IDs before creating a cluster. Both hourly plans and committed SKUs are included in the same response.
-- Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist`, or `delete`.
+- Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist-ip`, or `delete`.
 - Use `dbaas get --json <id>` when automation needs plan name, price, DBaaS configuration, VPC details, whitelisted IPs, public IP information, and connection port.
 - Prefer `--password-file <path>` or `--password-file -` over `--password <password>` so DBaaS admin passwords do not end up in shell history or CI logs.
 - In non-interactive environments, pass `--force` to `dbaas delete`. For public IP detach, `--force` means you accept that external DBaaS connectivity will be removed.

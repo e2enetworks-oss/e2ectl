@@ -62,6 +62,10 @@ Run only after `make build`.
 Command:
 
 ```bash
+read -r -s -p "DBaaS password: " E2ECTL_MANUAL_DBAAS_PASSWORD
+printf '\n'
+export E2ECTL_MANUAL_DBAAS_PASSWORD
+
 E2ECTL_RUN_MANUAL_E2E=1 \
 E2E_API_KEY=... \
 E2E_AUTH_TOKEN=... \
@@ -148,8 +152,9 @@ E2ECTL_MANUAL_DBAAS_TYPE=postgres \
 E2ECTL_MANUAL_DBAAS_VERSION=16 \
 E2ECTL_MANUAL_DBAAS_PLAN="DBS.16GB" \
 E2ECTL_MANUAL_DBAAS_DATABASE_NAME=testdb \
-E2ECTL_MANUAL_DBAAS_PASSWORD='Testing@1234567890' \
 npm run test:manual:dbaas
+
+unset E2ECTL_MANUAL_DBAAS_PASSWORD
 ```
 
 Required env vars:
@@ -165,7 +170,7 @@ Required env vars:
 - `E2ECTL_MANUAL_DBAAS_DATABASE_NAME`
 - `E2ECTL_MANUAL_DBAAS_PASSWORD`
 
-Use the full DBaaS plan name from `dbaas plans`, for example `DBS.16GB`. The password must satisfy the platform policy.
+Use the full DBaaS plan name from `dbaas plans`, for example `DBS.16GB`. The password must satisfy the platform policy. The manual test reads the password from `E2ECTL_MANUAL_DBAAS_PASSWORD`, then passes it to the built CLI through stdin with `--password-file -` so it does not appear in the child process argv.
 
 If a DBaaS operation fails because the cluster is not yet running, wait for `dbaas get <id>` to report `Running` before retrying. On failure, check `.manual-dbaas/*-manifest.json` before doing any manual cleanup.
 

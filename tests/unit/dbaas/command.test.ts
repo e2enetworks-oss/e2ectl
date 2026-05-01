@@ -366,7 +366,7 @@ describe('dbaas commands', () => {
     expect(help).toContain('plans');
     expect(help).toContain('reset-password');
     expect(help).toContain('network');
-    expect(help).toContain('whitelist');
+    expect(help).toContain('whitelist-ip');
   });
 
   it('shows safer DBaaS password file options in create help', async () => {
@@ -471,7 +471,7 @@ describe('dbaas commands', () => {
     expect(stdout.buffer).toContain('"cancelled": false');
   });
 
-  it('gets DBaaS details and manages whitelist/public IP commands', async () => {
+  it('gets DBaaS details and manages whitelist-ip/public IP commands', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -490,7 +490,7 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist',
+      'whitelist-ip',
       '7869',
       'add',
       '203.0.113.10',
@@ -581,7 +581,7 @@ describe('dbaas commands', () => {
     expect(stub.attachPublicIp).toHaveBeenCalledWith(7869);
   });
 
-  it('lists and removes whitelisted IPs through the command surface', async () => {
+  it('lists and removes whitelisted IPs through the whitelist-ip command surface', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -591,7 +591,7 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist',
+      'whitelist-ip',
       '7869',
       'list',
       '--alias',
@@ -602,7 +602,7 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist',
+      'whitelist-ip',
       '7869',
       'remove',
       '203.0.113.10',
@@ -622,14 +622,15 @@ describe('dbaas commands', () => {
     });
   });
 
-  it('shows help for network and whitelist action groups', async () => {
+  it('shows help for network and whitelist-ip action groups', async () => {
     const networkHelp = await renderHelp(['dbaas', 'network', '--help']);
-    const whitelistHelp = await renderHelp(['dbaas', 'whitelist', '--help']);
+    const whitelistHelp = await renderHelp(['dbaas', 'whitelist-ip', '--help']);
 
     expect(networkHelp).toContain('attach-vpc');
     expect(networkHelp).toContain('detach-vpc');
     expect(networkHelp).toContain('attach-public-ip');
     expect(networkHelp).toContain('detach-public-ip');
+    expect(networkHelp).not.toContain('Network action: show');
     expect(whitelistHelp).toContain('list');
     expect(whitelistHelp).toContain('add');
     expect(whitelistHelp).toContain('remove');
@@ -712,9 +713,9 @@ describe('dbaas commands', () => {
     );
   });
 
-  it('outputs help when network or whitelist are invoked without arguments', async () => {
+  it('outputs help when network or whitelist-ip are invoked without arguments', async () => {
     const networkHelp = await renderHelp(['dbaas', 'network']);
-    const whitelistHelp = await renderHelp(['dbaas', 'whitelist']);
+    const whitelistHelp = await renderHelp(['dbaas', 'whitelist-ip']);
 
     expect(networkHelp).toContain('attach-vpc');
     expect(whitelistHelp).toContain('add');
