@@ -149,7 +149,7 @@ e2ectl dbaas network <dbaas-id> detach-public-ip --force
 
 ### Manage Whitelisted IPs
 
-Whitelist an IP or CIDR:
+Whitelist an IPv4 address:
 
 ```bash
 e2ectl dbaas whitelist-ip <dbaas-id> add 203.0.113.10
