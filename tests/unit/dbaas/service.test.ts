@@ -310,7 +310,12 @@ describe('DbaasService', () => {
           id: 10005,
           master_node: { cluster_id: 10005 },
           name: 'no-version',
-          software: { engine: 'Relational', id: 999, name: 'MySQL', version: '' }
+          software: {
+            engine: 'Relational',
+            id: 999,
+            name: 'MySQL',
+            version: ''
+          }
         }
       ],
       total_count: 5,
