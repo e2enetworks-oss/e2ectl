@@ -185,9 +185,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
         new Option(
           '--committed-renewal <committedRenewal>',
           'What happens when the committed term ends: auto-renew (default) or hourly.'
-        )
-          .choices(['auto-renew', 'hourly'])
-          .default('auto-renew')
+        ).choices(['auto-renew', 'hourly'])
       )
       .option(
         '--vpc-id <vpcId>',
@@ -239,8 +237,24 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       commandInstance: Command
     ) => {
       const input = requireDbaasNetworkInput(dbaasId, action);
+      const normalizedNetworkAction = normalizeDbaasNetworkAction(input.action);
 
-      switch (normalizeDbaasNetworkAction(input.action)) {
+      if (
+        (options as { force?: boolean }).force &&
+        normalizedNetworkAction !== 'detach-public-ip'
+      ) {
+        throw new CliError(
+          `--force is only supported for detach-public-ip, not ${normalizedNetworkAction}.`,
+          {
+            code: 'UNSUPPORTED_DBAAS_NETWORK_FORCE',
+            exitCode: EXIT_CODES.usage,
+            suggestion:
+              'Remove --force. It only skips the confirmation prompt for detach-public-ip.'
+          }
+        );
+      }
+
+      switch (normalizedNetworkAction) {
         case 'attach-vpc':
           await runDbaasAction(commandInstance, () =>
             service.attachVpc(input.dbaasId, {

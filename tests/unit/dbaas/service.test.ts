@@ -287,6 +287,42 @@ describe('DbaasService', () => {
     });
   });
 
+  it('skips rows with missing or partial software data rather than crashing', async () => {
+    const { listDbaas, service } = createServiceFixture();
+
+    listDbaas.mockResolvedValue({
+      items: [
+        createMysqlCluster(),
+        { id: 10002, master_node: { cluster_id: 10002 }, name: 'no-software' },
+        {
+          id: 10003,
+          master_node: { cluster_id: 10003 },
+          name: 'null-software',
+          software: null
+        },
+        {
+          id: 10004,
+          master_node: { cluster_id: 10004 },
+          name: 'empty-name',
+          software: { engine: 'Relational', id: 999, name: '', version: '8.0' }
+        },
+        {
+          id: 10005,
+          master_node: { cluster_id: 10005 },
+          name: 'no-version',
+          software: { engine: 'Relational', id: 999, name: 'MySQL', version: '' }
+        }
+      ],
+      total_count: 5,
+      total_page_number: 1
+    });
+
+    const result = await service.listDbaas({ alias: 'prod' });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.id).toBe(7869);
+  });
+
   it('returns empty list with page count zero when all items are filtered out', async () => {
     const { listDbaas, service } = createServiceFixture();
 
@@ -1054,8 +1090,7 @@ describe('DbaasService', () => {
     expect(result).toEqual({
       action: 'public-ip-detach',
       cancelled: true,
-      dbaas_id: 7869,
-      message: null
+      dbaas_id: 7869
     });
   });
 
@@ -1266,6 +1301,25 @@ describe('DbaasService', () => {
     ).rejects.toThrow('Billing type must be one of: hourly, committed.');
   });
 
+  it('rejects --committed-renewal when billing type is not committed', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.createDbaas({
+        alias: 'prod',
+        committedRenewal: 'hourly',
+        databaseName: 'appdb',
+        dbVersion: '8.0',
+        name: 'customer-db',
+        password: 'ValidPassword1!A',
+        plan: 'General Purpose Small',
+        type: 'sql'
+      })
+    ).rejects.toThrow(
+      '--committed-renewal can only be used with --billing-type committed.'
+    );
+  });
+
   it('rejects --committed-plan-id when billing type is not committed', async () => {
     const { service } = createServiceFixture();
 
@@ -1422,6 +1476,14 @@ describe('DbaasService', () => {
     await expect(service.getDbaas('', { alias: 'prod' })).rejects.toThrow(
       'DBaaS ID cannot be empty.'
     );
+  });
+
+  it('rejects DBaaS IDs above Number.MAX_SAFE_INTEGER', async () => {
+    const { service } = createServiceFixture();
+
+    await expect(
+      service.getDbaas('99999999999999999', { alias: 'prod' })
+    ).rejects.toThrow('DBaaS ID is too large to represent safely.');
   });
 
   it('rejects empty IP address for whitelist', async () => {

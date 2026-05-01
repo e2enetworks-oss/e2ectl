@@ -225,7 +225,12 @@ export function summarizeSupportedCluster(
 export function summarizeSupportedClusterOrNull(
   cluster: DbaasClusterSummary
 ): DbaasSummaryItem | null {
-  const type = normalizeSupportedDatabaseTypeOrNull(cluster.software.name);
+  const software = cluster.software as DbaasClusterSummary['software'] | null | undefined;
+  if (!software?.name || !software?.version) {
+    return null;
+  }
+
+  const type = normalizeSupportedDatabaseTypeOrNull(software.name);
   if (type === null) {
     return null;
   }
@@ -249,7 +254,7 @@ export function summarizeSupportedClusterOrNull(
     name: cluster.name,
     type,
     username,
-    version: cluster.software.version
+    version: software.version
   };
 }
 

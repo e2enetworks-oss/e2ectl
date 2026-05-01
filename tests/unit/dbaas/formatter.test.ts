@@ -504,7 +504,6 @@ describe('dbaas formatter', () => {
       {
         action: 'vpc-detach',
         dbaas_id: 7869,
-        message: null,
         vpc: { id: 501, name: 'app-vpc', subnet_id: 44 }
       },
       false
@@ -562,7 +561,7 @@ describe('dbaas formatter', () => {
       false
     );
     const withoutMessage = renderDbaasResult(
-      { action: 'public-ip-attach', dbaas_id: 7869, message: null },
+      { action: 'public-ip-attach', dbaas_id: 7869 },
       false
     );
 
@@ -625,8 +624,7 @@ describe('dbaas formatter', () => {
       {
         action: 'whitelist-remove',
         dbaas_id: 7869,
-        ip: '203.0.113.10',
-        message: null
+        ip: '203.0.113.10'
       },
       false
     );
@@ -793,8 +791,7 @@ describe('dbaas formatter', () => {
       {
         action: 'public-ip-detach',
         cancelled: true,
-        dbaas_id: 7869,
-        message: null
+        dbaas_id: 7869
       },
       false
     );
@@ -1034,13 +1031,12 @@ describe('dbaas formatter', () => {
     expect(table).not.toContain('null');
   });
 
-  it('renders whitelist-add with null message and whitelist-remove with message', () => {
+  it('renders whitelist-add with no message and whitelist-remove with message', () => {
     const addNoMessage = renderDbaasResult(
       {
         action: 'whitelist-add',
         dbaas_id: 7869,
-        ip: '10.0.0.1',
-        message: null
+        ip: '10.0.0.1'
       },
       false
     );
@@ -1072,8 +1068,7 @@ describe('dbaas formatter', () => {
       {
         action: 'public-ip-detach',
         cancelled: false,
-        dbaas_id: 7869,
-        message: null
+        dbaas_id: 7869
       },
       false
     );

@@ -736,6 +736,28 @@ describe('dbaas commands', () => {
     });
   });
 
+  it('rejects --force for non-detach-public-ip network actions', async () => {
+    const fixture = createRuntimeFixture();
+    await seedProfile(fixture.runtime);
+    const program = createProgram(fixture.runtime);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'dbaas',
+        'network',
+        '7869',
+        'attach-public-ip',
+        '--alias',
+        'prod',
+        '--force'
+      ])
+    ).rejects.toMatchObject({
+      code: 'UNSUPPORTED_DBAAS_NETWORK_FORCE'
+    });
+  });
+
   it('prompts for confirmation when deleting without --force', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);

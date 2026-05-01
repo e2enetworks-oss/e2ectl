@@ -173,13 +173,13 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
     case 'public-ip-attach':
       return (
         `Public IP attach requested for DBaaS ${result.dbaas_id}.\n` +
-        (result.message === null ? '' : `Message: ${result.message}\n`)
+        (result.message == null ? '' : `Message: ${result.message}\n`)
       );
     case 'public-ip-detach':
       return result.cancelled
         ? 'Public IP detach cancelled.\n'
         : `Public IP detach requested for DBaaS ${result.dbaas_id}.\n` +
-            (result.message === null ? '' : `Message: ${result.message}\n`);
+            (result.message == null ? '' : `Message: ${result.message}\n`);
     case 'whitelist-list':
       return result.items.length === 0
         ? `No whitelisted IPs found for DBaaS ${result.dbaas_id}.\n`
@@ -187,12 +187,12 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
     case 'whitelist-add':
       return (
         `Whitelisted IP ${result.ip} for DBaaS ${result.dbaas_id}.\n` +
-        (result.message === null ? '' : `Message: ${result.message}\n`)
+        (result.message == null ? '' : `Message: ${result.message}\n`)
       );
     case 'whitelist-remove':
       return (
         `Removed whitelisted IP ${result.ip} from DBaaS ${result.dbaas_id}.\n` +
-        (result.message === null ? '' : `Message: ${result.message}\n`)
+        (result.message == null ? '' : `Message: ${result.message}\n`)
       );
   }
 }
@@ -290,7 +290,7 @@ function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
     (result.vpc.subnet_id === null
       ? ''
       : `Subnet ID: ${result.vpc.subnet_id}\n`) +
-    (result.message === null ? '' : `Message: ${result.message}\n`)
+    (result.message == null ? '' : `Message: ${result.message}\n`)
   );
 }
 
@@ -446,7 +446,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
       return {
         action: 'vpc-detach',
         dbaas_id: result.dbaas_id,
-        message: result.message,
+        ...(result.message === undefined ? {} : { message: result.message }),
         vpc: {
           id: result.vpc.id,
           name: result.vpc.name,
@@ -457,14 +457,14 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
       return {
         action: 'public-ip-attach',
         dbaas_id: result.dbaas_id,
-        message: result.message
+        ...(result.message === undefined ? {} : { message: result.message })
       };
     case 'public-ip-detach':
       return {
         action: 'public-ip-detach',
         cancelled: result.cancelled,
         dbaas_id: result.dbaas_id,
-        message: result.message
+        ...(result.message === undefined ? {} : { message: result.message })
       };
     case 'whitelist-list':
       return {
@@ -481,7 +481,7 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         action: result.action,
         dbaas_id: result.dbaas_id,
         ip: result.ip,
-        message: result.message
+        ...(result.message === undefined ? {} : { message: result.message })
       };
   }
 }

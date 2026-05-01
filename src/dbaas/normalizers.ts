@@ -83,11 +83,11 @@ export function normalizeCommittedPlanId(
 export function normalizeCommittedRenewal(
   value: string | undefined
 ): DbaasCommittedRenewal {
-  if (value === undefined || value === 'auto-renew') {
+  if (value === undefined || value.trim() === 'auto-renew') {
     return 'auto_renew';
   }
 
-  if (value === 'hourly') {
+  if (value.trim() === 'hourly') {
     return 'hourly_billing';
   }
 
@@ -239,7 +239,16 @@ export function normalizeRequiredNumericId(
     });
   }
 
-  return Number(normalized);
+  const parsed = Number(normalized);
+  if (parsed > Number.MAX_SAFE_INTEGER) {
+    throw new CliError(`${label} is too large to represent safely.`, {
+      code: 'INVALID_DBAAS_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass the numeric ${label.toLowerCase()} as ${flagDescription}.`
+    });
+  }
+
+  return parsed;
 }
 
 export function normalizeIpAddress(value: string): string {
@@ -275,6 +284,19 @@ export function normalizeDbaasCreateInput(
     billingType,
     options.committedPlanId
   );
+
+  if (options.committedRenewal !== undefined && billingType !== 'committed') {
+    throw new CliError(
+      '--committed-renewal can only be used with --billing-type committed.',
+      {
+        code: 'UNEXPECTED_COMMITTED_RENEWAL',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --committed-renewal, or add --billing-type committed.'
+      }
+    );
+  }
+
   const committedRenewal = normalizeCommittedRenewal(options.committedRenewal);
   const vpcId =
     options.vpcId === undefined

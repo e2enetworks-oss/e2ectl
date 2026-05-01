@@ -187,7 +187,7 @@ export interface DbaasVpcAttachCommandResult {
 export interface DbaasVpcDetachCommandResult {
   action: 'vpc-detach';
   dbaas_id: number;
-  message: string | null;
+  message?: string;
   vpc: {
     id: number;
     name: string;
@@ -198,14 +198,14 @@ export interface DbaasVpcDetachCommandResult {
 export interface DbaasPublicIpAttachCommandResult {
   action: 'public-ip-attach';
   dbaas_id: number;
-  message: string | null;
+  message?: string;
 }
 
 export interface DbaasPublicIpDetachCommandResult {
   action: 'public-ip-detach';
   cancelled: boolean;
   dbaas_id: number;
-  message: string | null;
+  message?: string;
 }
 
 export interface DbaasWhitelistListCommandResult {
@@ -219,7 +219,7 @@ export interface DbaasWhitelistUpdateCommandResult {
   action: 'whitelist-add' | 'whitelist-remove';
   dbaas_id: number;
   ip: string;
-  message: string | null;
+  message?: string;
 }
 
 export type DbaasCommandResult =

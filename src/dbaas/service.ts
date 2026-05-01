@@ -354,10 +354,11 @@ export class DbaasService {
       vpcs: [vpcEntry]
     });
 
+    const detachVpcMessage = normalizeOptionalString(result.message);
     return {
       action: 'vpc-detach',
       dbaas_id: normalizedDbaasId,
-      message: normalizeOptionalString(result.message),
+      ...(detachVpcMessage === null ? {} : { message: detachVpcMessage }),
       vpc: { id: vpcId, name: vpcEntry.vpc_name, subnet_id: subnetId }
     };
   }
@@ -370,10 +371,11 @@ export class DbaasService {
     const client = await this.createClient(options);
     const result = await client.attachPublicIp(normalizedDbaasId);
 
+    const attachIpMessage = normalizeOptionalString(result.message);
     return {
       action: 'public-ip-attach',
       dbaas_id: normalizedDbaasId,
-      message: normalizeOptionalString(result.message)
+      ...(attachIpMessage === null ? {} : { message: attachIpMessage })
     };
   }
 
@@ -393,8 +395,7 @@ export class DbaasService {
         return {
           action: 'public-ip-detach',
           cancelled: true,
-          dbaas_id: normalizedDbaasId,
-          message: null
+          dbaas_id: normalizedDbaasId
         };
       }
     }
@@ -402,11 +403,12 @@ export class DbaasService {
     const client = await this.createClient(options);
     const result = await client.detachPublicIp(normalizedDbaasId);
 
+    const detachIpMessage = normalizeOptionalString(result.message);
     return {
       action: 'public-ip-detach',
       cancelled: false,
       dbaas_id: normalizedDbaasId,
-      message: normalizeOptionalString(result.message)
+      ...(detachIpMessage === null ? {} : { message: detachIpMessage })
     };
   }
 
@@ -509,11 +511,12 @@ export class DbaasService {
       }
     );
 
+    const whitelistMessage = normalizeOptionalString(result.message);
     return {
       action: action === 'attach' ? 'whitelist-add' : 'whitelist-remove',
       dbaas_id: normalizedDbaasId,
       ip,
-      message: normalizeOptionalString(result.message)
+      ...(whitelistMessage === null ? {} : { message: whitelistMessage })
     };
   }
 
