@@ -278,7 +278,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
       .usage('<dbaasId> <action> [ip] [options]')
       .argument('[dbaasId]', 'DBaaS cluster ID.')
       .argument('[action]', 'Whitelist IP action: list, add, or remove.')
-      .argument('[ip]', 'IPv4 address or CIDR for add or remove.')
+      .argument('[ip]', 'IPv4 address for add or remove.')
   );
   whitelistCommand.helpCommand(
     'help [command]',

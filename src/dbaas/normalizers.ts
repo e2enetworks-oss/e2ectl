@@ -1,8 +1,9 @@
+import { isIPv4 } from 'node:net';
+
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import {
   DBAAS_CREATE_BILLING_TYPES,
-  DBAAS_IP_REGEX,
   DBAAS_NAME_REGEX,
   DBAAS_PASSWORD_REGEX,
   DBAAS_USERNAME_REGEX,
@@ -247,12 +248,11 @@ export function normalizeIpAddress(value: string): string {
     'IP address',
     'the IP address argument'
   );
-  if (!DBAAS_IP_REGEX.test(normalized)) {
-    throw new CliError('IP address must be a valid IPv4 address or CIDR.', {
+  if (!isIPv4(normalized)) {
+    throw new CliError('IP address must be a valid IPv4 address.', {
       code: 'INVALID_DBAAS_WHITELIST_IP',
       exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Pass an IPv4 address such as 203.0.113.10, or a CIDR such as 203.0.113.0/24.'
+      suggestion: 'Pass an IPv4 address such as 203.0.113.10.'
     });
   }
 

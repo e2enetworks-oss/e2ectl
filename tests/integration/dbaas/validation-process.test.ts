@@ -233,7 +233,12 @@ describe('dbaas validation through the built CLI', () => {
     {
       args: ['dbaas', 'whitelist-ip', '7869', 'add', '999.1.1.1'],
       stderr:
-        'Error: IP address must be a valid IPv4 address or CIDR.\n\nNext step: Pass an IPv4 address such as 203.0.113.10, or a CIDR such as 203.0.113.0/24.\n'
+        'Error: IP address must be a valid IPv4 address.\n\nNext step: Pass an IPv4 address such as 203.0.113.10.\n'
+    },
+    {
+      args: ['dbaas', 'whitelist-ip', '7869', 'add', '203.0.113.0/24'],
+      stderr:
+        'Error: IP address must be a valid IPv4 address.\n\nNext step: Pass an IPv4 address such as 203.0.113.10.\n'
     },
     {
       args: ['dbaas', 'network', '7869', 'detach-public-ip'],

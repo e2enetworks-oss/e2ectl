@@ -901,7 +901,13 @@ describe('DbaasService', () => {
         alias: 'prod',
         ip: 'not-an-ip'
       })
-    ).rejects.toThrow('IP address must be a valid IPv4 address or CIDR.');
+    ).rejects.toThrow('IP address must be a valid IPv4 address.');
+    await expect(
+      service.addWhitelistedIp('7869', {
+        alias: 'prod',
+        ip: '203.0.113.0/24'
+      })
+    ).rejects.toThrow('IP address must be a valid IPv4 address.');
 
     expect(updateWhitelistedIps).not.toHaveBeenCalled();
   });

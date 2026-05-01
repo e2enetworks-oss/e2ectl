@@ -89,7 +89,7 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
             id: 9901,
             master_node: {
               allowed_ip_address: {
-                whitelisted_ips: ['203.0.113.20', ' ', '198.51.100.0/24']
+                whitelisted_ips: ['203.0.113.20', ' ', '198.51.100.24']
               },
               cluster_id: 9901,
               database: {
@@ -197,7 +197,7 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
                 ip: '203.0.113.20'
               },
               {
-                ip: '198.51.100.0/24'
+                ip: '198.51.100.24'
               }
             ]
           }
@@ -207,7 +207,7 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
       expect(humanResult.stdout).toContain('VPC Connections: none');
       expect(humanResult.stdout).toContain('Whitelisted IPs:');
       expect(humanResult.stdout).toContain('203.0.113.20');
-      expect(humanResult.stdout).toContain('198.51.100.0/24');
+      expect(humanResult.stdout).toContain('198.51.100.24');
     } finally {
       await server.close();
       await tempHome.cleanup();
