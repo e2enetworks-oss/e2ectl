@@ -212,7 +212,7 @@ e2ectl dbaas create \
   --name prod-db \
   --type sql \
   --db-version 8.0 \
-  --plan "General Purpose Small" \
+  --plan <plan-name> \
   --database-name appdb \
   --password-file /secure/path/dbaas-password.txt \
   --billing-type committed \
