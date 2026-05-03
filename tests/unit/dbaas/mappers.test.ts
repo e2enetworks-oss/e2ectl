@@ -1,4 +1,5 @@
 import {
+  buildConnectionEndpoint,
   buildConnectionPort,
   buildConnectionString,
   normalizeDbaasStatusTitle,
@@ -255,6 +256,48 @@ describe('dbaas mappers', () => {
     expect(buildConnectionPort({ ...nodeWithStringPort, port: '3306' })).toBe(
       '3306'
     );
+  });
+
+  it('builds connection endpoint: prefers domain, falls back to public IP, never uses private IP', () => {
+    const base = createMysqlCluster().master_node;
+
+    // domain takes priority
+    expect(
+      buildConnectionEndpoint({
+        ...base,
+        domain: 'db.example.com',
+        public_ip_address: '1.2.3.4'
+      })
+    ).toBe('db.example.com (1.2.3.4)');
+
+    // no domain → public IP only
+    expect(
+      buildConnectionEndpoint({
+        ...base,
+        domain: null,
+        public_ip_address: '1.2.3.4',
+        private_ip_address: '10.0.0.10'
+      })
+    ).toBe('1.2.3.4');
+
+    // no domain, no public IP (e.g. Creating state) → null, even if private IP exists
+    expect(
+      buildConnectionEndpoint({
+        ...base,
+        domain: null,
+        public_ip_address: null,
+        private_ip_address: '10.0.0.10'
+      })
+    ).toBeNull();
+
+    // domain equals public IP → no parenthetical
+    expect(
+      buildConnectionEndpoint({
+        ...base,
+        domain: '1.2.3.4',
+        public_ip_address: '1.2.3.4'
+      })
+    ).toBe('1.2.3.4');
   });
 
   it('normalizes whitelist shapes returned by the DBaaS API', () => {

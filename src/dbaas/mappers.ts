@@ -360,7 +360,6 @@ export function buildConnectionEndpoint(
 ): string | null {
   const endpoint =
     normalizeHost(masterNode.domain) ??
-    normalizeHost(masterNode.private_ip_address) ??
     normalizeHost(masterNode.public_ip_address);
   const publicIp = normalizeHost(masterNode.public_ip_address);
 
