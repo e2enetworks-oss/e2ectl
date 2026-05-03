@@ -5,7 +5,7 @@ import { runBuiltCli } from '../../helpers/process.js';
 import { startTestHttpServer } from '../../helpers/http-server.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
-describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
+describe('dbaas get/whitelist against a fake MyAccount API', () => {
   it('shows detailed DBaaS fields in json and human output', async () => {
     await withDbaasNetworkApi(async ({ env }) => {
       const getResult = await runBuiltCli(['--json', 'dbaas', 'get', '7869'], {
@@ -214,26 +214,26 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
     }
   });
 
-  it('lists, adds, and removes DBaaS IPs through the whitelist-ip command', async () => {
+  it('lists, adds, and removes DBaaS IPs through the whitelist command', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const whitelistListResult = await runBuiltCli(
-        ['dbaas', 'whitelist-ip', '7869', 'list'],
+        ['dbaas', 'whitelist', 'list', '7869'],
         { env }
       );
       const whitelistListJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist-ip', '7869', 'list'],
+        ['--json', 'dbaas', 'whitelist', 'list', '7869'],
         { env }
       );
       const whitelistAddResult = await runBuiltCli(
-        ['--json', 'dbaas', 'whitelist-ip', '7869', 'add', '203.0.113.10'],
+        ['--json', 'dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
         { env }
       );
       const whitelistAddHumanResult = await runBuiltCli(
-        ['dbaas', 'whitelist-ip', '7869', 'add', '203.0.113.10'],
+        ['dbaas', 'whitelist', 'add', '7869', '--ip', '203.0.113.10'],
         { env }
       );
       const whitelistRemoveResult = await runBuiltCli(
-        ['dbaas', 'whitelist-ip', '7869', 'remove', '203.0.113.10'],
+        ['dbaas', 'whitelist', 'remove', '7869', '--ip', '203.0.113.10'],
         { env }
       );
 
@@ -283,19 +283,27 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
   it('attaches and detaches DBaaS public IPs through the expected endpoints', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const attachPublicIpResult = await runBuiltCli(
-        ['dbaas', 'network', '7869', 'attach-public-ip'],
+        ['dbaas', 'network', 'public-ip', 'attach', '7869'],
         { env }
       );
       const attachPublicIpJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', '7869', 'attach-public-ip'],
+        ['--json', 'dbaas', 'network', 'public-ip', 'attach', '7869'],
         { env }
       );
       const detachPublicIpResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', '7869', 'detach-public-ip', '--force'],
+        [
+          '--json',
+          'dbaas',
+          'network',
+          'public-ip',
+          'detach',
+          '7869',
+          '--force'
+        ],
         { env }
       );
       const detachPublicIpHumanResult = await runBuiltCli(
-        ['dbaas', 'network', '7869', 'detach-public-ip', '--force'],
+        ['dbaas', 'network', 'public-ip', 'detach', '7869', '--force'],
         { env }
       );
 
@@ -338,19 +346,47 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
   it('attaches and detaches VPCs with resolved VPC metadata', async () => {
     await withDbaasNetworkApi(async ({ env, server }) => {
       const attachVpcResult = await runBuiltCli(
-        ['dbaas', 'network', '7869', 'attach-vpc', '501'],
+        ['dbaas', 'network', 'vpc', 'attach', '7869', '--vpc-id', '501'],
         { env }
       );
       const attachVpcJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', '7869', 'attach-vpc', '501'],
+        [
+          '--json',
+          'dbaas',
+          'network',
+          'vpc',
+          'attach',
+          '7869',
+          '--vpc-id',
+          '501'
+        ],
         { env }
       );
       const detachVpcResult = await runBuiltCli(
-        ['dbaas', 'network', '7869', 'detach-vpc', '501', '--subnet-id', '44'],
+        [
+          'dbaas',
+          'network',
+          'vpc',
+          'detach',
+          '7869',
+          '--vpc-id',
+          '501',
+          '--subnet-id',
+          '44'
+        ],
         { env }
       );
       const detachVpcJsonResult = await runBuiltCli(
-        ['--json', 'dbaas', 'network', '7869', 'detach-vpc', '501'],
+        [
+          '--json',
+          'dbaas',
+          'network',
+          'vpc',
+          'detach',
+          '7869',
+          '--vpc-id',
+          '501'
+        ],
         { env }
       );
 

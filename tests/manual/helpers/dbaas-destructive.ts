@@ -148,8 +148,10 @@ export async function runDbaasDestructiveCleanup(
         [
           'dbaas',
           'network',
+          'vpc',
+          'detach',
           String(dbaasToDelete),
-          'detach-vpc',
+          '--vpc-id',
           String(vpcToDelete)
         ],
         stderr

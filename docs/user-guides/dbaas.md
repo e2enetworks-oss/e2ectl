@@ -113,16 +113,16 @@ When a VPC is attached during creation, public IP access is enabled by default. 
 
 ### Attach A VPC To An Existing Cluster
 
-The cluster must be in Running state. Attach with the network command:
+The cluster must be in Running state. Attach with the network vpc command:
 
 ```bash
-e2ectl dbaas network <dbaas-id> attach-vpc <network-id>
+e2ectl dbaas network vpc attach <dbaas-id> --vpc-id <vpc-id>
 ```
 
 Detach a VPC:
 
 ```bash
-e2ectl dbaas network <dbaas-id> detach-vpc <network-id>
+e2ectl dbaas network vpc detach <dbaas-id> --vpc-id <vpc-id>
 ```
 
 For non-default VPCs, add `--subnet-id <subnet-id>`.
@@ -132,19 +132,19 @@ For non-default VPCs, add `--subnet-id <subnet-id>`.
 Attaching a public IP enables external access:
 
 ```bash
-e2ectl dbaas network <dbaas-id> attach-public-ip
+e2ectl dbaas network public-ip attach <dbaas-id>
 ```
 
 Detaching a public IP removes external access. The CLI warns that connectivity will be lost and asks for confirmation:
 
 ```bash
-e2ectl dbaas network <dbaas-id> detach-public-ip
+e2ectl dbaas network public-ip detach <dbaas-id>
 ```
 
 For non-interactive automation, pass `--force` only when you explicitly accept the connectivity loss:
 
 ```bash
-e2ectl dbaas network <dbaas-id> detach-public-ip --force
+e2ectl dbaas network public-ip detach <dbaas-id> --force
 ```
 
 ### Manage Whitelisted IPs
@@ -152,19 +152,19 @@ e2ectl dbaas network <dbaas-id> detach-public-ip --force
 Whitelist an IPv4 address:
 
 ```bash
-e2ectl dbaas whitelist-ip <dbaas-id> add 203.0.113.10
+e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10
 ```
 
 List whitelisted IPs:
 
 ```bash
-e2ectl dbaas whitelist-ip <dbaas-id> list
+e2ectl dbaas whitelist list <dbaas-id>
 ```
 
 Remove a whitelisted IP:
 
 ```bash
-e2ectl dbaas whitelist-ip <dbaas-id> remove 203.0.113.10
+e2ectl dbaas whitelist remove <dbaas-id> --ip 203.0.113.10
 ```
 
 ### Reset The Admin Password
@@ -230,7 +230,7 @@ e2ectl --json dbaas list
 
 - Use `dbaas types --json` to enumerate available engine families and versions.
 - Use `dbaas plans --json --type <type> --db-version <version>` when automation needs exact template-plan rows and committed SKU IDs before creating a cluster. Both hourly plans and committed SKUs are included in the same response.
-- Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist-ip`, or `delete`.
+- Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist`, or `delete`.
 - Use `dbaas get --json <id>` when automation needs plan name, price, DBaaS configuration, VPC details, whitelisted IPs, public IP information, and connection port.
 - Prefer `--password-file <path>` or `--password-file -` over `--password <password>` so DBaaS admin passwords do not end up in shell history or CI logs.
 - In non-interactive environments, pass `--force` to `dbaas delete`. For public IP detach, `--force` means you accept that external DBaaS connectivity will be removed.

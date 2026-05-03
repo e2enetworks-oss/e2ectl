@@ -356,7 +356,7 @@ async function attachPublicIpStep(
   }
 ): Promise<void> {
   await runJsonCommand<DbaasNetworkAttachJson>(
-    ['dbaas', 'network', String(options.dbaasId), 'attach-public-ip'],
+    ['dbaas', 'network', 'public-ip', 'attach', String(options.dbaasId)],
     context.dbaasEnv
   );
 
@@ -375,8 +375,9 @@ async function detachPublicIpStep(
     [
       'dbaas',
       'network',
+      'public-ip',
+      'detach',
       String(options.dbaasId),
-      'detach-public-ip',
       '--force'
     ],
     context.dbaasEnv
@@ -398,8 +399,10 @@ async function detachVpcStep(
     [
       'dbaas',
       'network',
+      'vpc',
+      'detach',
       String(options.dbaasId),
-      'detach-vpc',
+      '--vpc-id',
       String(options.vpcId)
     ],
     context.dbaasEnv

@@ -366,7 +366,7 @@ describe('dbaas commands', () => {
     expect(help).toContain('plans');
     expect(help).toContain('reset-password');
     expect(help).toContain('network');
-    expect(help).toContain('whitelist-ip');
+    expect(help).toContain('whitelist');
   });
 
   it('shows safer DBaaS password file options in create help', async () => {
@@ -471,7 +471,7 @@ describe('dbaas commands', () => {
     expect(stdout.buffer).toContain('"cancelled": false');
   });
 
-  it('gets DBaaS details and manages whitelist-ip/public IP commands', async () => {
+  it('gets DBaaS details and manages whitelist/public IP commands', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -490,9 +490,10 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist-ip',
-      '7869',
+      'whitelist',
       'add',
+      '7869',
+      '--ip',
       '203.0.113.10',
       '--alias',
       'prod'
@@ -503,8 +504,9 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
+      'public-ip',
+      'detach',
       '7869',
-      'detach-public-ip',
       '--alias',
       'prod',
       '--force'
@@ -571,8 +573,9 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
+      'public-ip',
+      'attach',
       '7869',
-      'attach-public-ip',
       '--alias',
       'prod'
     ]);
@@ -581,7 +584,7 @@ describe('dbaas commands', () => {
     expect(stub.attachPublicIp).toHaveBeenCalledWith(7869);
   });
 
-  it('lists and removes whitelisted IPs through the whitelist-ip command surface', async () => {
+  it('lists and removes whitelisted IPs through the whitelist command surface', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -591,9 +594,9 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist-ip',
-      '7869',
+      'whitelist',
       'list',
+      '7869',
       '--alias',
       'prod'
     ]);
@@ -602,9 +605,10 @@ describe('dbaas commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'dbaas',
-      'whitelist-ip',
-      '7869',
+      'whitelist',
       'remove',
+      '7869',
+      '--ip',
       '203.0.113.10',
       '--alias',
       'prod'
@@ -622,15 +626,23 @@ describe('dbaas commands', () => {
     });
   });
 
-  it('shows help for network and whitelist-ip action groups', async () => {
+  it('shows help for network and whitelist action groups', async () => {
     const networkHelp = await renderHelp(['dbaas', 'network', '--help']);
-    const whitelistHelp = await renderHelp(['dbaas', 'whitelist-ip', '--help']);
+    const whitelistHelp = await renderHelp(['dbaas', 'whitelist', '--help']);
+    const vpcHelp = await renderHelp(['dbaas', 'network', 'vpc', '--help']);
+    const publicIpHelp = await renderHelp([
+      'dbaas',
+      'network',
+      'public-ip',
+      '--help'
+    ]);
 
-    expect(networkHelp).toContain('attach-vpc');
-    expect(networkHelp).toContain('detach-vpc');
-    expect(networkHelp).toContain('attach-public-ip');
-    expect(networkHelp).toContain('detach-public-ip');
-    expect(networkHelp).not.toContain('Network action: show');
+    expect(networkHelp).toContain('vpc');
+    expect(networkHelp).toContain('public-ip');
+    expect(vpcHelp).toContain('attach');
+    expect(vpcHelp).toContain('detach');
+    expect(publicIpHelp).toContain('attach');
+    expect(publicIpHelp).toContain('detach');
     expect(whitelistHelp).toContain('list');
     expect(whitelistHelp).toContain('add');
     expect(whitelistHelp).toContain('remove');
@@ -673,8 +685,10 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
+      'vpc',
+      'attach',
       '7869',
-      'attach-vpc',
+      '--vpc-id',
       '501',
       '--alias',
       'prod'
@@ -699,8 +713,10 @@ describe('dbaas commands', () => {
       '--json',
       'dbaas',
       'network',
+      'vpc',
+      'detach',
       '7869',
-      'detach-vpc',
+      '--vpc-id',
       '501',
       '--alias',
       'prod'
@@ -713,14 +729,19 @@ describe('dbaas commands', () => {
     );
   });
 
-  it('reports usage errors when network or whitelist-ip are invoked without required arguments', async () => {
-    const networkFixture = createRuntimeFixture();
-    const networkProgram = createProgram(networkFixture.runtime);
+  it('reports commander errors when network vpc attach or whitelist add are invoked without required arguments', async () => {
+    const vpcAttachFixture = createRuntimeFixture();
+    const vpcAttachProgram = createProgram(vpcAttachFixture.runtime);
     await expect(
-      networkProgram.parseAsync(['node', CLI_COMMAND_NAME, 'dbaas', 'network'])
-    ).rejects.toMatchObject({
-      code: 'MISSING_DBAAS_NETWORK_ID'
-    });
+      vpcAttachProgram.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'dbaas',
+        'network',
+        'vpc',
+        'attach'
+      ])
+    ).rejects.toThrow();
 
     const whitelistFixture = createRuntimeFixture();
     const whitelistProgram = createProgram(whitelistFixture.runtime);
@@ -729,33 +750,10 @@ describe('dbaas commands', () => {
         'node',
         CLI_COMMAND_NAME,
         'dbaas',
-        'whitelist-ip'
+        'whitelist',
+        'add'
       ])
-    ).rejects.toMatchObject({
-      code: 'MISSING_DBAAS_WHITELIST_ID'
-    });
-  });
-
-  it('rejects --force for non-detach-public-ip network actions', async () => {
-    const fixture = createRuntimeFixture();
-    await seedProfile(fixture.runtime);
-    const program = createProgram(fixture.runtime);
-
-    await expect(
-      program.parseAsync([
-        'node',
-        CLI_COMMAND_NAME,
-        'dbaas',
-        'network',
-        '7869',
-        'attach-public-ip',
-        '--alias',
-        'prod',
-        '--force'
-      ])
-    ).rejects.toMatchObject({
-      code: 'UNSUPPORTED_DBAAS_NETWORK_FORCE'
-    });
+    ).rejects.toThrow();
   });
 
   it('prompts for confirmation when deleting without --force', async () => {

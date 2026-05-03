@@ -172,7 +172,7 @@ describe('manual DBaaS destructive helpers', () => {
 
     expect(result.exitCode).toBe(0);
     expect(runJsonCommand.mock.calls.map(([args]) => args)).toEqual([
-      ['dbaas', 'network', '7869', 'detach-vpc', '9876'],
+      ['dbaas', 'network', 'vpc', 'detach', '7869', '--vpc-id', '9876'],
       ['dbaas', 'delete', '7869', '--force'],
       ['vpc', 'delete', '9876', '--force']
     ]);
