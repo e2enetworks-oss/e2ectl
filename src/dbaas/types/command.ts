@@ -115,7 +115,7 @@ export interface DbaasGetCommandResult {
 }
 
 export interface DbaasListTypesCommandResult {
-  action: 'list-types';
+  action: 'types';
   filters: {
     type: SupportedDatabaseType | null;
   };

@@ -143,7 +143,7 @@ export function resolveSoftware(
       code: 'DBAAS_VERSION_NOT_FOUND',
       details: [`Available versions: ${versionsSummary}`],
       exitCode: EXIT_CODES.usage,
-      suggestion: `Run ${formatCliCommand(`dbaas list-types --type ${typeToFlagValue(requestedType)}`)} to inspect valid versions.`
+      suggestion: `Run ${formatCliCommand(`dbaas types --type ${typeToFlagValue(requestedType)}`)} to inspect valid versions.`
     }
   );
 }

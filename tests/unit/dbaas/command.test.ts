@@ -529,7 +529,7 @@ describe('dbaas commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'dbaas',
-      'list-types',
+      'types',
       '--alias',
       'prod'
     ]);

@@ -50,11 +50,11 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
         };
 
         const listTypes = await runJsonCommand<DbaasListTypesJson>(
-          ['dbaas', 'list-types'],
+          ['dbaas', 'types'],
           configBackedCliEnv
         );
 
-        expect(listTypes.action).toBe('list-types');
+        expect(listTypes.action).toBe('types');
         expect(listTypes.items.length).toBeGreaterThan(0);
 
         const engine = listTypes.items[0];
@@ -132,10 +132,10 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
   );
 
   it(
-    'renders dbaas list-types in human mode',
+    'renders dbaas types in human mode',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const result = await runBuiltCli(['dbaas', 'list-types'], {
+      const result = await runBuiltCli(['dbaas', 'types'], {
         env: readOnlyEnv.cliEnv,
         timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
       });

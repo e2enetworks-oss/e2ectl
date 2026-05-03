@@ -39,7 +39,7 @@ describe('dbaas plans against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['--json', 'dbaas', 'list-types'], {
+      const result = await runBuiltCli(['--json', 'dbaas', 'types'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -49,7 +49,7 @@ describe('dbaas plans against a fake MyAccount API', () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe(
         `${stableStringify({
-          action: 'list-types',
+          action: 'types',
           filters: {
             type: null
           },
@@ -115,7 +115,7 @@ describe('dbaas plans against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['dbaas', 'list-types'], {
+      const result = await runBuiltCli(['dbaas', 'types'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`

@@ -255,7 +255,7 @@ export class DbaasService {
         : allItems.filter((item) => item.type === requestedType);
 
     return {
-      action: 'list-types',
+      action: 'types',
       filters: { type: requestedType },
       items,
       total_count: items.length

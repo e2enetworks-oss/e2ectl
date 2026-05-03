@@ -223,7 +223,7 @@ describe('dbaas formatter', () => {
   it('renders plans guidance for both engine discovery and template selection', () => {
     const engineOutput = renderDbaasResult(
       {
-        action: 'list-types',
+        action: 'types',
         filters: {
           type: null
         },
@@ -383,10 +383,10 @@ describe('dbaas formatter', () => {
     expect(deletedWithoutSummary).toBe('Deleted DBaaS 7869.\n');
   });
 
-  it('renders list-types in json mode', () => {
+  it('renders types in json mode', () => {
     const json = renderDbaasResult(
       {
-        action: 'list-types',
+        action: 'types',
         filters: {
           type: null
         },
@@ -408,7 +408,7 @@ describe('dbaas formatter', () => {
       action: string;
       items: Array<{ software_id: number; engine: string }>;
     };
-    expect(parsed.action).toBe('list-types');
+    expect(parsed.action).toBe('types');
     expect(parsed.items[0]?.software_id).toBe(401);
     expect(parsed.items[0]?.engine).toBe('Relational');
   });
@@ -819,10 +819,10 @@ describe('dbaas formatter', () => {
     expect(table).not.toContain('null');
   });
 
-  it('renders empty list-types output', () => {
+  it('renders empty types output', () => {
     const output = renderDbaasResult(
       {
-        action: 'list-types',
+        action: 'types',
         filters: {
           type: null
         },
@@ -1124,10 +1124,10 @@ describe('dbaas formatter', () => {
     expect(output).toContain('--');
   });
 
-  it('renders list-types output with non-null type filter', () => {
+  it('renders types output with non-null type filter', () => {
     const output = renderDbaasResult(
       {
-        action: 'list-types',
+        action: 'types',
         filters: { type: 'MySQL' },
         items: [
           {

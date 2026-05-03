@@ -148,7 +148,7 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return result.items.length === 0
         ? 'No supported DBaaS clusters found.\n'
         : `${formatDbaasListTable(result.items)}\n`;
-    case 'list-types':
+    case 'types':
       return renderListTypesHuman(result);
     case 'plans':
       return renderTemplatePlansHuman(result);
@@ -388,9 +388,9 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         total_count: result.total_count,
         total_page_number: result.total_page_number
       };
-    case 'list-types':
+    case 'types':
       return {
-        action: 'list-types',
+        action: 'types',
         filters: { type: result.filters.type },
         items: result.items.map((item) => ({
           description: item.description,

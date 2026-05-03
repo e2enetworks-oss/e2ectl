@@ -69,7 +69,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
-      .command('list-types')
+      .command('types')
       .description(
         'List supported DBaaS engine types and versions available for your account.'
       )
@@ -85,7 +85,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     command
       .command('plans')
       .description(
-        `List hourly template plans and committed SKU options for a specific engine version. Run ${formatCliCommand('dbaas list-types')} first to find valid --type and --db-version values.`
+        `List hourly template plans and committed SKU options for a specific engine version. Run ${formatCliCommand('dbaas types')} first to find valid --type and --db-version values.`
       )
       .requiredOption(
         '--type <databaseType>',
@@ -130,7 +130,7 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     command
       .command('create')
       .description(
-        `Create a DBaaS cluster. Run ${formatCliCommand('dbaas list-types')} then ${formatCliCommand('dbaas plans --type <type> --db-version <version>')} first to discover plan names and committed SKU IDs.`
+        `Create a DBaaS cluster. Run ${formatCliCommand('dbaas types')} then ${formatCliCommand('dbaas plans --type <type> --db-version <version>')} first to discover plan names and committed SKU IDs.`
       )
       .requiredOption('--name <name>', 'DBaaS cluster name.')
       .requiredOption(

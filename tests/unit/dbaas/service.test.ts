@@ -682,7 +682,7 @@ describe('DbaasService', () => {
 
     expect(listPlans).toHaveBeenCalledOnce();
     expect(result).toEqual({
-      action: 'list-types',
+      action: 'types',
       filters: {
         type: null
       },
@@ -800,7 +800,7 @@ describe('DbaasService', () => {
     });
 
     expect(result).toEqual({
-      action: 'list-types',
+      action: 'types',
       filters: {
         type: 'PostgreSQL'
       },

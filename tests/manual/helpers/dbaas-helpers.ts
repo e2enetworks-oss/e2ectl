@@ -1,7 +1,7 @@
 // Shared utilities for DBaaS manual live tests
 
 export interface DbaasListTypesJson {
-  action: 'list-types';
+  action: 'types';
   items: Array<{
     type: string;
     version: string;

@@ -7,7 +7,7 @@
 ## Before You Start
 
 - Choose the intended project and location first.
-- Run `dbaas list-types` to see available engine types and versions, then `dbaas plans --type <type> --db-version <version>` to see all hourly plans and committed SKU options for that version.
+- Run `dbaas types` to see available engine types and versions, then `dbaas plans --type <type> --db-version <version>` to see all hourly plans and committed SKU options for that version.
 - Supported user-facing database types are `maria`, `sql`, and `postgres`.
 
 ## Common Tasks
@@ -15,13 +15,13 @@
 ### Discover Supported Engine Types
 
 ```bash
-e2ectl dbaas list-types
+e2ectl dbaas types
 ```
 
 Filter to one database family:
 
 ```bash
-e2ectl dbaas list-types --type postgres
+e2ectl dbaas types --type postgres
 ```
 
 ### Discover Plans For An Engine Version
@@ -187,7 +187,7 @@ Full discovery-to-create flow for a PostgreSQL cluster:
 
 ```bash
 # 1. See what versions are available
-e2ectl dbaas list-types --type postgres
+e2ectl dbaas types --type postgres
 
 # 2. See hourly plans and committed options for that version
 e2ectl dbaas plans --type postgres --db-version 16
@@ -228,7 +228,7 @@ e2ectl --json dbaas list
 
 ## Automation Notes
 
-- Use `dbaas list-types --json` to enumerate available engine families and versions.
+- Use `dbaas types --json` to enumerate available engine families and versions.
 - Use `dbaas plans --json --type <type> --db-version <version>` when automation needs exact template-plan rows and committed SKU IDs before creating a cluster. Both hourly plans and committed SKUs are included in the same response.
 - Use `dbaas list --json` when later steps need the numeric DBaaS id for `get`, `reset-password`, `network`, `whitelist-ip`, or `delete`.
 - Use `dbaas get --json <id>` when automation needs plan name, price, DBaaS configuration, VPC details, whitelisted IPs, public IP information, and connection port.
