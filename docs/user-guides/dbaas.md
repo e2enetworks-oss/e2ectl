@@ -44,7 +44,7 @@ Filter the list to one supported engine family:
 e2ectl dbaas list --type sql
 ```
 
-List output includes the cluster name, DB version, connection endpoint with the public IP in brackets when available, connection port, and status.
+List output includes the cluster name, DB version, connection endpoint with the public IP in parentheses when available, connection port, and status.
 
 ### Get DBaaS Details
 

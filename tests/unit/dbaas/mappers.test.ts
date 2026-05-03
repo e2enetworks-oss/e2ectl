@@ -100,7 +100,7 @@ describe('dbaas mappers', () => {
     ).toBeNull();
   });
 
-  it('uses status_title as the DBaaS status source', () => {
+  it('prefers status_title and falls back to status when blank', () => {
     expect(
       normalizeDbaasStatusTitle({
         status: 'Running',
@@ -111,6 +111,13 @@ describe('dbaas mappers', () => {
     expect(
       normalizeDbaasStatusTitle({
         status: 'Running',
+        status_title: ''
+      } as DbaasClusterSummary)
+    ).toBe('Running');
+
+    expect(
+      normalizeDbaasStatusTitle({
+        status: '',
         status_title: ''
       } as DbaasClusterSummary)
     ).toBeNull();

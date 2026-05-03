@@ -287,9 +287,12 @@ export function summarizeDbaasDetail(
 }
 
 export function normalizeDbaasStatusTitle(
-  cluster: Pick<DbaasClusterSummary, 'status_title'>
+  cluster: Pick<DbaasClusterSummary, 'status' | 'status_title'>
 ): string | null {
-  return normalizeOptionalString(cluster.status_title);
+  return (
+    normalizeOptionalString(cluster.status_title) ??
+    normalizeOptionalString(cluster.status)
+  );
 }
 
 export function summarizePlan(

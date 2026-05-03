@@ -62,10 +62,6 @@ Run only after `make build`.
 Command:
 
 ```bash
-read -r -s -p "DBaaS password: " E2ECTL_MANUAL_DBAAS_PASSWORD
-printf '\n'
-export E2ECTL_MANUAL_DBAAS_PASSWORD
-
 E2ECTL_RUN_MANUAL_E2E=1 \
 E2E_API_KEY=... \
 E2E_AUTH_TOKEN=... \
@@ -203,6 +199,10 @@ This lane creates and deletes an actual DBaaS cluster and VPC. Run it only with 
 Command:
 
 ```bash
+read -r -s -p "DBaaS password: " E2ECTL_MANUAL_DBAAS_PASSWORD
+printf '\n'
+export E2ECTL_MANUAL_DBAAS_PASSWORD
+
 E2ECTL_RUN_MANUAL_E2E=1 \
 E2E_API_KEY=... \
 E2E_AUTH_TOKEN=... \
