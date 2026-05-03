@@ -373,7 +373,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               version: '5.7'
             },
             {
-              connection_endpoint: '10.10.0.3',
+              connection_endpoint: null,
               connection_port: '5432',
               connection_string:
                 'psql -h 10.10.0.3 -p 5432 -U admin -d analytics',
