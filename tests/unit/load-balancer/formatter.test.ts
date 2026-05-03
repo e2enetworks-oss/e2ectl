@@ -1,6 +1,6 @@
 import { renderLoadBalancerResult } from '../../../src/load-balancer/formatter.js';
 import { stableStringify } from '../../../src/core/json.js';
-import type { LoadBalancerCommandResult } from '../../../src/load-balancer/service.js';
+import type { LoadBalancerCommandResult } from '../../../src/load-balancer/types/index.js';
 
 describe('renderLoadBalancerResult', () => {
   describe('list', () => {

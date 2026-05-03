@@ -1,77 +1,28 @@
-import type {
-  ApiEnvelope,
-  ApiResponse,
-  MyAccountTransport
-} from '../myaccount/index.js';
+import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
 
 import type {
+  LoadBalancerClient,
   LoadBalancerCreateRequest,
   LoadBalancerCreateResult,
+  LoadBalancerDeleteQuery,
   LoadBalancerDetails,
+  LoadBalancerListApiItem,
+  LoadBalancerListApiResponse,
   LoadBalancerPlan,
+  LoadBalancerRawDetails,
   LoadBalancerSummary,
   LoadBalancerUpdateRequest
-} from './types.js';
+} from './types/index.js';
+
+export type {
+  LoadBalancerClient,
+  LoadBalancerDeleteQuery
+} from './types/index.js';
 
 const LOAD_BALANCERS_PATH = '/appliances/load-balancers/';
 const LOAD_BALANCER_PLANS_PATH = '/appliance-type/';
 const APPLIANCES_PATH = '/appliances/';
 const LOAD_BALANCER_LIST_PAGE_SIZE = 100;
-
-interface LoadBalancerListContext {
-  lb_reserve_ip?: string | null;
-  lb_mode?: string;
-  lb_type?: string;
-  tcp_backend?: unknown[];
-}
-
-interface LoadBalancerListApiItem {
-  id: number;
-  appliance_name?: string;
-  name?: string;
-  status: string;
-  lb_mode?: string;
-  lb_type?: string;
-  public_ip?: string | null;
-  private_ip?: string | null;
-  node_detail?: {
-    allow_reserve_ip?: {
-      is_already_reserved?: boolean;
-    };
-    public_ip?: string | null;
-    private_ip?: string | null;
-  };
-  appliance_instance?: Array<{
-    context?: LoadBalancerListContext;
-  }>;
-}
-
-type LoadBalancerListApiResponse = ApiResponse<
-  LoadBalancerListApiItem[],
-  {
-    total_count?: number;
-    total_page_number?: number;
-  }
->;
-
-export type LoadBalancerDeleteQuery = Record<'reserve_ip_required', 'true'>;
-
-export interface LoadBalancerClient {
-  createLoadBalancer(
-    body: LoadBalancerCreateRequest
-  ): Promise<LoadBalancerCreateResult>;
-  deleteLoadBalancer(
-    lbId: string,
-    query?: LoadBalancerDeleteQuery
-  ): Promise<{ message: string }>;
-  getLoadBalancer(lbId: string): Promise<LoadBalancerDetails>;
-  listLoadBalancerPlans(): Promise<LoadBalancerPlan[]>;
-  listLoadBalancers(): Promise<LoadBalancerSummary[]>;
-  updateLoadBalancer(
-    lbId: string,
-    body: LoadBalancerUpdateRequest
-  ): Promise<{ message: string }>;
-}
 
 export class LoadBalancerApiClient implements LoadBalancerClient {
   constructor(private readonly transport: MyAccountTransport) {}
@@ -99,29 +50,9 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
   }
 
   async getLoadBalancer(lbId: string): Promise<LoadBalancerDetails> {
-    type RawDetail = Omit<LoadBalancerDetails, 'appliance_name' | 'context'> & {
-      appliance_name?: string;
-      name?: string;
-      node_detail?: {
-        allow_reserve_ip?: {
-          is_already_reserved?: boolean;
-        };
-        public_ip?: string | null;
-        private_ip?: string | null;
-      };
-      private_ip?: string | null;
-      appliance_instance?: Array<{
-        context?: LoadBalancerDetails['context'] extends
-          | Array<infer T>
-          | undefined
-          ? T
-          : never;
-      }>;
-    };
-
-    const response = await this.transport.get<ApiEnvelope<RawDetail>>(
-      buildAppliancePath(lbId)
-    );
+    const response = await this.transport.get<
+      ApiEnvelope<LoadBalancerRawDetails>
+    >(buildAppliancePath(lbId));
 
     const data = response.data;
     const context = data.appliance_instance

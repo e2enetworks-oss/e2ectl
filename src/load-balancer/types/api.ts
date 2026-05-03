@@ -29,7 +29,6 @@ export interface LoadBalancerServer {
   backend_name: string;
   backend_ip: string;
   backend_port: number;
-  target?: string;
 }
 
 export interface LoadBalancerBackend {
@@ -42,8 +41,6 @@ export interface LoadBalancerBackend {
   check_url: string;
   servers: LoadBalancerServer[];
   websocket_timeout?: number | null;
-  target?: string;
-  checkbox_enable?: boolean;
   scaler_port?: string | null;
   scaler_id?: string | null;
 }
@@ -65,12 +62,6 @@ export interface LoadBalancerAclMapRule {
   acl_name: string;
   acl_condition_state: boolean | string;
   acl_backend: string;
-}
-
-export interface LoadBalancerPlansCommandResult {
-  action: 'plans';
-  items: LoadBalancerPlanItem[];
-  message?: string;
 }
 
 export interface LoadBalancerVpcAttachment {
@@ -97,7 +88,6 @@ export interface LoadBalancerCreateRequest {
   server_timeout: number;
   connection_timeout: number;
   http_keep_alive_timeout: number;
-  checkbox_enable?: string;
   cn_id?: number | null;
   cn_status?: LoadBalancerCommittedStatus | null;
   custom_sku?: Record<string, unknown>;

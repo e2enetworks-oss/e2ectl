@@ -229,11 +229,9 @@ describe('lb create against a fake MyAccount API', () => {
         acl_map: [],
         backends: [
           {
-            target: 'networkMappingNode',
             backend_mode: 'http',
             backend_ssl: false,
             balance: 'roundrobin',
-            checkbox_enable: true,
             check_url: '/',
             domain_name: 'localhost',
             http_check: true,
@@ -244,14 +242,12 @@ describe('lb create against a fake MyAccount API', () => {
               {
                 backend_ip: '10.0.0.1',
                 backend_name: 'server-1',
-                backend_port: 8080,
-                target: 'backend'
+                backend_port: 8080
               }
             ],
             websocket_timeout: null
           }
         ],
-        checkbox_enable: '',
         client_timeout: 60,
         connection_timeout: 60,
         http_keep_alive_timeout: 60,
@@ -324,7 +320,6 @@ describe('lb create against a fake MyAccount API', () => {
         acl_list: [],
         acl_map: [],
         backends: [],
-        checkbox_enable: '',
         client_timeout: 60,
         connection_timeout: 60,
         http_keep_alive_timeout: 60,
@@ -350,8 +345,7 @@ describe('lb create against a fake MyAccount API', () => {
               {
                 backend_ip: '10.0.0.2',
                 backend_name: 'srv-1',
-                backend_port: 8080,
-                target: 'backend'
+                backend_port: 8080
               }
             ]
           }
@@ -565,11 +559,9 @@ describe('lb create against a fake MyAccount API', () => {
         acl_map: [],
         backends: [
           {
-            target: 'networkMappingNode',
             backend_mode: 'http',
             backend_ssl: false,
             balance: 'roundrobin',
-            checkbox_enable: true,
             check_url: '/',
             domain_name: 'localhost',
             http_check: true,
@@ -580,14 +572,12 @@ describe('lb create against a fake MyAccount API', () => {
               {
                 backend_ip: '10.0.0.1',
                 backend_name: 'server-1',
-                backend_port: 80,
-                target: 'backend'
+                backend_port: 80
               }
             ],
             websocket_timeout: null
           }
         ],
-        checkbox_enable: '',
         client_timeout: 60,
         cn_id: 901,
         cn_status: 'hourly_billing',

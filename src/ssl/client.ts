@@ -1,5 +1,5 @@
 import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
-import type { SslCertificateSummary } from './types.js';
+import type { SslCertificateSummary } from './types/index.js';
 
 const SSL_CERTIFICATES_PATH = '/ssl/import-certificate/';
 

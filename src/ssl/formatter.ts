@@ -1,8 +1,8 @@
 import Table from 'cli-table3';
 
 import { stableStringify, type JsonValue } from '../core/json.js';
-import type { SslCommandResult } from './service.js';
-import type { SslCertificateSummary } from './types.js';
+import type { SslCertificateSummary } from './types/index.js';
+import type { SslCommandResult } from './types/index.js';
 
 export function renderSslResult(
   result: SslCommandResult,

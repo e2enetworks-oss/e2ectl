@@ -2,30 +2,29 @@ import { Command, Option } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
 import type { CliRuntime } from '../app/index.js';
-import { renderLoadBalancerResult } from './formatter.js';
 import {
-  LoadBalancerService,
-  type LoadBalancerBackendGroupCreateOptions,
-  type LoadBalancerBackendGroupUpdateOptions,
-  type LoadBalancerBackendServerAddOptions,
-  type LoadBalancerBackendServerDeleteOptions,
-  type LoadBalancerBackendServerUpdateOptions,
-  type LoadBalancerContextOptions,
-  type LoadBalancerCreateOptions,
-  type LoadBalancerDeleteOptions,
-  type LoadBalancerUpdateOptions,
-  type LoadBalancerVpcAttachOptions,
-  type LoadBalancerVpcDetachOptions
-} from './service.js';
-
-interface GlobalOptions {
-  json?: boolean;
-}
-
-const FRONTEND_PROTOCOL_CHOICES = ['HTTP', 'HTTPS', 'BOTH', 'TCP'] as const;
-const LB_ALGORITHM_CHOICES = ['roundrobin', 'leastconn', 'source'] as const;
-const ALB_BACKEND_PROTOCOL_CHOICES = ['HTTP', 'HTTPS'] as const;
-const LB_BILLING_TYPE_CHOICES = ['hourly', 'committed'] as const;
+  LOAD_BALANCER_ALB_BACKEND_PROTOCOLS,
+  LOAD_BALANCER_BILLING_TYPES,
+  LOAD_BALANCER_COMMAND_ALGORITHMS,
+  LOAD_BALANCER_FRONTEND_PROTOCOLS,
+  LOAD_BALANCER_POST_COMMIT_BEHAVIORS
+} from './constants.js';
+import { renderLoadBalancerResult } from './formatter.js';
+import type {
+  LoadBalancerBackendGroupCreateOptions,
+  LoadBalancerBackendGroupUpdateOptions,
+  LoadBalancerBackendServerAddOptions,
+  LoadBalancerBackendServerDeleteOptions,
+  LoadBalancerBackendServerUpdateOptions,
+  LoadBalancerContextOptions,
+  LoadBalancerCreateOptions,
+  LoadBalancerDeleteOptions,
+  LoadBalancerGlobalOptions,
+  LoadBalancerUpdateOptions,
+  LoadBalancerVpcAttachOptions,
+  LoadBalancerVpcDetachOptions
+} from './types/index.js';
+import { LoadBalancerService } from './service.js';
 
 export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
   const service = new LoadBalancerService({
@@ -94,7 +93,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           '--frontend-protocol <protocol>',
           'Frontend protocol. HTTP/HTTPS/BOTH creates an ALB; TCP creates an NLB.'
         )
-          .choices(FRONTEND_PROTOCOL_CHOICES)
+          .choices(LOAD_BALANCER_FRONTEND_PROTOCOLS)
           .makeOptionMandatory()
       )
       .option(
@@ -105,7 +104,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         new Option(
           '--billing-type <billingType>',
           'Billing type for the load balancer.'
-        ).choices(LB_BILLING_TYPE_CHOICES)
+        ).choices(LOAD_BALANCER_BILLING_TYPES)
       )
       .option(
         '--committed-plan <name>',
@@ -119,7 +118,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         new Option(
           '--post-commit-behavior <behavior>',
           'What should happen after the committed term ends.'
-        ).choices(['auto-renew', 'hourly-billing'])
+        ).choices(LOAD_BALANCER_POST_COMMIT_BEHAVIORS)
       )
       .option(
         '--vpc <vpcId>',
@@ -138,14 +137,14 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           '--algorithm <algorithm>',
           'Load balancing algorithm for the initial backend group.'
         )
-          .choices(LB_ALGORITHM_CHOICES)
+          .choices(LOAD_BALANCER_COMMAND_ALGORITHMS)
           .default('roundrobin')
       )
       .addOption(
         new Option(
           '--backend-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(ALB_BACKEND_PROTOCOL_CHOICES)
+        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
       )
       .option(
         '--reserve-ip <ip>',
@@ -175,7 +174,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         new Option(
           '--frontend-protocol <protocol>',
           'ALB frontend protocol: HTTP, HTTPS, or BOTH.'
-        ).choices(FRONTEND_PROTOCOL_CHOICES)
+        ).choices(LOAD_BALANCER_FRONTEND_PROTOCOLS)
       )
       .option('--ssl-certificate-id <id>', 'SSL certificate ID for ALB.')
       .option(
@@ -348,13 +347,13 @@ function buildBackendGroupCommand(
         new Option(
           '--algorithm <algorithm>',
           'Load balancing algorithm.'
-        ).choices(LB_ALGORITHM_CHOICES)
+        ).choices(LOAD_BALANCER_COMMAND_ALGORITHMS)
       )
       .addOption(
         new Option(
           '--backend-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(ALB_BACKEND_PROTOCOL_CHOICES)
+        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
       )
       .requiredOption(
         '--backend-server <name:ip:port>',
@@ -381,13 +380,13 @@ function buildBackendGroupCommand(
         new Option(
           '--algorithm <algorithm>',
           'Load balancing algorithm.'
-        ).choices(LB_ALGORITHM_CHOICES)
+        ).choices(LOAD_BALANCER_COMMAND_ALGORITHMS)
       )
       .addOption(
         new Option(
           '--backend-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(ALB_BACKEND_PROTOCOL_CHOICES)
+        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
       )
   ).action(
     async (
@@ -511,7 +510,7 @@ function writeResult(
   runtime.stdout.write(
     renderLoadBalancerResult(
       result,
-      commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      commandInstance.optsWithGlobals<LoadBalancerGlobalOptions>().json ?? false
     )
   );
 }

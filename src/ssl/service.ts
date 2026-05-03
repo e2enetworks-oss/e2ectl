@@ -4,20 +4,7 @@ import {
   type ResolvedCredentials
 } from '../config/index.js';
 import type { SslClient } from './client.js';
-import type { SslCertificateSummary } from './types.js';
-
-export interface SslContextOptions {
-  alias?: string;
-  location?: string;
-  projectId?: string;
-}
-
-export interface SslListCommandResult {
-  action: 'list';
-  items: SslCertificateSummary[];
-}
-
-export type SslCommandResult = SslListCommandResult;
+import type { SslContextOptions, SslListCommandResult } from './types/index.js';
 
 interface SslStore {
   readonly configPath: string;

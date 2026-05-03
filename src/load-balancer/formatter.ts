@@ -1,15 +1,15 @@
 import Table from 'cli-table3';
 
 import { stableStringify, type JsonValue } from '../core/json.js';
-import type { LoadBalancerCommittedPlan } from './types.js';
 import type {
   LoadBalancerBackendGroupCreateCommandResult,
   LoadBalancerBackendGroupListCommandResult,
+  LoadBalancerCommittedPlan,
   LoadBalancerCreateCommandResult,
   LoadBalancerCommandResult,
   LoadBalancerListCommandResult,
   LoadBalancerPlansCommandResult
-} from './service.js';
+} from './types/index.js';
 
 export function renderLoadBalancerResult(
   result: LoadBalancerCommandResult,

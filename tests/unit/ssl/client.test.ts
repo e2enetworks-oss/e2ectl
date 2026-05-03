@@ -4,7 +4,7 @@ import type {
   MyAccountTransport
 } from '../../../src/myaccount/index.js';
 import { SslApiClient } from '../../../src/ssl/client.js';
-import type { SslCertificateSummary } from '../../../src/ssl/types.js';
+import type { SslCertificateSummary } from '../../../src/ssl/types/index.js';
 
 class StubTransport implements MyAccountTransport {
   readonly getMock = vi.fn();

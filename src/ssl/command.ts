@@ -4,7 +4,8 @@ import { addContextOptions } from '../app/context-options.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderSslResult } from './formatter.js';
-import { SslService, type SslContextOptions } from './service.js';
+import { SslService } from './service.js';
+import type { SslContextOptions } from './types/index.js';
 
 interface GlobalOptions {
   json?: boolean;
