@@ -187,7 +187,7 @@ describe('dbaas get/whitelist-ip against a fake MyAccount API', () => {
               enabled: false,
               ip_address: null
             },
-            status: null,
+            status: 'provisioning',
             type: 'PostgreSQL',
             username: null,
             version: '16',

@@ -355,7 +355,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               name: 'shared-name',
               private_ips: [],
               public_ip: '198.51.100.10',
-              status: null,
+              status: 'pending',
               type: 'MySQL',
               version: '8.0'
             },
