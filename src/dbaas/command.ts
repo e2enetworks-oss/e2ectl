@@ -415,7 +415,6 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
   return command;
 }
 
-
 async function readAllFromStdin(): Promise<string> {
   process.stdin.setEncoding('utf8');
 
