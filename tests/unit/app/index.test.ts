@@ -53,6 +53,9 @@ describe('runCli', () => {
             'SSH key client should not be created for this test.'
           );
         }),
+        createSslClient: vi.fn(() => {
+          throw new Error('SSL client should not be created for this test.');
+        }) as unknown as CliRuntime['createSslClient'],
         createLoadBalancerClient: vi.fn(() => {
           throw new Error(
             'Load balancer client should not be created for this test.'

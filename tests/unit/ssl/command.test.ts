@@ -22,6 +22,7 @@ async function createRuntimeWithSslClient(
   const runtime: CliRuntime = {
     confirm: vi.fn(),
     createImageClient: vi.fn() as unknown as CliRuntime['createImageClient'],
+    createDbaasClient: vi.fn() as unknown as CliRuntime['createDbaasClient'],
     createLoadBalancerClient:
       vi.fn() as unknown as CliRuntime['createLoadBalancerClient'],
     createNodeClient: vi.fn() as unknown as CliRuntime['createNodeClient'],
@@ -99,6 +100,4 @@ describe('ssl commands', () => {
 
     expect(stdout.buffer).toContain('No SSL certificates found.');
   });
-
-
 });

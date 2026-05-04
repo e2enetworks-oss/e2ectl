@@ -82,6 +82,9 @@ describe('config commands', () => {
           new SecurityGroupApiClient(new MyAccountApiTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
           new SshKeyApiClient(new MyAccountApiTransport(credentials)),
+        createSslClient: vi.fn(() => {
+          throw new Error('SSL client should not be created for this test.');
+        }) as unknown as CliRuntime['createSslClient'],
         createVolumeClient: (credentials: ResolvedCredentials) =>
           new VolumeApiClient(new MyAccountApiTransport(credentials)),
         createLoadBalancerClient: (credentials: ResolvedCredentials) =>

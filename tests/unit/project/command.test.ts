@@ -10,6 +10,7 @@ import type {
 } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient } from '../../../src/node/index.js';
+import type { SslClient } from '../../../src/ssl/index.js';
 import type { ProjectClient } from '../../../src/project/index.js';
 import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
@@ -102,6 +103,9 @@ describe('project commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
+      createSslClient: vi.fn(() => {
+        throw new Error('SSL client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => SslClient,
       createLoadBalancerClient: vi.fn(() => {
         throw new Error(
           'Load balancer client should not be created for this test.'

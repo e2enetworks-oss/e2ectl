@@ -7,10 +7,12 @@ import type {
   LoadBalancerClient,
   LoadBalancerDetails
 } from '../../../src/load-balancer/index.js';
+import type { DbaasClient } from '../../../src/dbaas/index.js';
 import type { ImageClient } from '../../../src/image/index.js';
 import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
+import type { SslClient } from '../../../src/ssl/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
@@ -200,6 +202,9 @@ describe('lb commands', () => {
       createImageClient: vi.fn() as unknown as (
         c: ResolvedCredentials
       ) => ImageClient,
+      createDbaasClient: vi.fn() as unknown as (
+        c: ResolvedCredentials
+      ) => DbaasClient,
       createLoadBalancerClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return lbStub.stub;
@@ -219,6 +224,9 @@ describe('lb commands', () => {
       createSshKeyClient: vi.fn() as unknown as (
         c: ResolvedCredentials
       ) => SshKeyClient,
+      createSslClient: vi.fn() as unknown as (
+        c: ResolvedCredentials
+      ) => SslClient,
       createVolumeClient: vi.fn() as unknown as (
         c: ResolvedCredentials
       ) => VolumeClient,

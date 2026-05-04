@@ -172,6 +172,9 @@ describe('reserved-ip commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as CliRuntime['createSshKeyClient'],
+      createSslClient: vi.fn(() => {
+        throw new Error('SSL client should not be created for this test.');
+      }) as unknown as CliRuntime['createSslClient'],
       createLoadBalancerClient: vi.fn(() => {
         throw new Error(
           'Load balancer client should not be created for this test.'
