@@ -95,7 +95,7 @@ function baseCreateArgs(overrides: string[] = []) {
 }
 
 describe('lb create against a fake MyAccount API', () => {
-  it('fails before network when --reserve-ip is combined with --vpc', async () => {
+  it('fails before network when --reserve-ip is combined with --lb-type internal', async () => {
     const result = await runBuiltCli([
       'lb',
       'create',
@@ -105,6 +105,8 @@ describe('lb create against a fake MyAccount API', () => {
       'LB-2',
       '--frontend-protocol',
       'HTTP',
+      '--lb-type',
+      'internal',
       '--vpc',
       '12345',
       '--reserve-ip',
@@ -117,7 +119,9 @@ describe('lb create against a fake MyAccount API', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toContain('--reserve-ip cannot be used with --vpc.');
+    expect(result.stderr).toContain(
+      '--reserve-ip cannot be used with --lb-type internal.'
+    );
   });
 
   it('fails before network when TCP create omits --port', async () => {
@@ -492,6 +496,8 @@ describe('lb create against a fake MyAccount API', () => {
           'LB-2',
           '--frontend-protocol',
           'HTTP',
+          '--lb-type',
+          'internal',
           '--port',
           '80',
           '--vpc',

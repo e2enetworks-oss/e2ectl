@@ -7,7 +7,8 @@ import {
   LOAD_BALANCER_BILLING_TYPES,
   LOAD_BALANCER_COMMAND_ALGORITHMS,
   LOAD_BALANCER_FRONTEND_PROTOCOLS,
-  LOAD_BALANCER_POST_COMMIT_BEHAVIORS
+  LOAD_BALANCER_POST_COMMIT_BEHAVIORS,
+  LOAD_BALANCER_TYPES
 } from './constants.js';
 import { renderLoadBalancerResult } from './formatter.js';
 import type {
@@ -120,9 +121,17 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           'What should happen after the committed term ends.'
         ).choices(LOAD_BALANCER_POST_COMMIT_BEHAVIORS)
       )
+      .addOption(
+        new Option(
+          '--lb-type <type>',
+          'Load balancer type. "external" for public-facing (default), "internal" for private VPC-only.'
+        )
+          .choices(LOAD_BALANCER_TYPES)
+          .default('external')
+      )
       .option(
         '--vpc <vpcId>',
-        'VPC or network ID to attach. Creates an internal load balancer.'
+        'VPC or network ID to attach. Required when --lb-type is internal.'
       )
       .option('--subnet <subnetId>', 'Subnet ID for --vpc.')
       .requiredOption('--backend-group <name>', 'Initial backend group name.')
@@ -148,7 +157,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       )
       .option(
         '--reserve-ip <ip>',
-        'Unattached reserved public IP to use for an external load balancer.'
+        'Unattached reserved public IP for an external load balancer. Cannot be used with --lb-type internal.'
       )
       .option(
         '--ssl-certificate-id <id>',

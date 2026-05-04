@@ -538,8 +538,7 @@ describe('LoadBalancerService', () => {
         frontendProtocol: 'TCP',
         port: '80',
         backendGroup: 'tcp-grp',
-        backendServer: ['srv-1:10.0.0.2:8080'],
-        backendPort: '8080'
+        backendServer: ['srv-1:10.0.0.2:8080']
       });
 
       const body = createLoadBalancer.mock
@@ -574,6 +573,7 @@ describe('LoadBalancerService', () => {
       const { service, createLoadBalancer, getVpc } = createServiceFixture();
 
       await service.createLoadBalancer({
+        lbType: 'internal',
         name: 'internal-alb',
         plan: 'LB-2',
         frontendProtocol: 'HTTP',
@@ -829,6 +829,7 @@ describe('LoadBalancerService', () => {
       const { service, createLoadBalancer, getVpc } = createServiceFixture();
 
       await service.createLoadBalancer({
+        lbType: 'internal',
         name: 'internal-alb',
         plan: 'LB-2',
         frontendProtocol: 'HTTP',

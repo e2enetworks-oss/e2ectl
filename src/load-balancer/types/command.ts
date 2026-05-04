@@ -26,6 +26,7 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   billingType?: string;
   committedPlan?: string;
   committedPlanId?: string;
+  lbType?: string;
   name: string;
   plan: string;
   frontendProtocol?: string;
@@ -41,13 +42,6 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   reserveIp?: string;
   securityGroupId?: string;
   sslCertificateId?: string;
-  backendName?: string;
-  backendPort?: string;
-  httpCheck?: boolean;
-  mode?: string;
-  serverIp?: string;
-  serverName?: string;
-  serverPort?: string;
 }
 
 export interface LoadBalancerDeleteOptions extends LoadBalancerContextOptions {
@@ -90,10 +84,6 @@ export interface LoadBalancerBackendGroupUpdateOptions extends LoadBalancerConte
 export interface LoadBalancerBackendServerAddOptions extends LoadBalancerContextOptions {
   backendGroup?: string;
   backendServer?: string;
-  backendName?: string;
-  serverIp?: string;
-  serverName?: string;
-  serverPort?: string;
 }
 
 export interface LoadBalancerBackendServerUpdateOptions extends LoadBalancerContextOptions {

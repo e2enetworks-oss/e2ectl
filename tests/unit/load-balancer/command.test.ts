@@ -419,6 +419,8 @@ describe('lb commands', () => {
       'LB-2',
       '--frontend-protocol',
       'HTTP',
+      '--lb-type',
+      'internal',
       '--port',
       '80',
       '--vpc',

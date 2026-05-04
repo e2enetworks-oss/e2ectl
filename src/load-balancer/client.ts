@@ -127,7 +127,7 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
       );
 
       items.push(...response.data.map(normalizeLoadBalancerSummary));
-      totalPages = response.total_page_number ?? totalPages;
+      totalPages = response.total_page_number || totalPages;
 
       if (totalPages !== undefined) {
         if (pageNumber >= totalPages) {

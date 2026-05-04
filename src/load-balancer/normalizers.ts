@@ -7,8 +7,10 @@ import type { ReservedIpSummary } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_BACKEND_PROTOCOLS,
   LOAD_BALANCER_ALGORITHMS,
+  LOAD_BALANCER_BILLING_TYPES,
   LOAD_BALANCER_DEFAULT_POST_COMMIT_BEHAVIOR,
-  LOAD_BALANCER_FRONTEND_PROTOCOLS
+  LOAD_BALANCER_FRONTEND_PROTOCOLS,
+  LOAD_BALANCER_TYPES
 } from './constants.js';
 import type {
   LoadBalancerAlgorithm,
@@ -19,10 +21,28 @@ import type {
   LoadBalancerDetails,
   LoadBalancerMode,
   LoadBalancerPlan,
+  LoadBalancerVpc,
   ResolvedLoadBalancerCreateBilling,
   LoadBalancerServer,
   LoadBalancerUpdateOptions
 } from './types/index.js';
+
+export function assertLbType(lbType: string | undefined): LoadBalancerVpc {
+  if (lbType === undefined) return 'external';
+  const lower = lbType.toLowerCase() as LoadBalancerVpc;
+  if (
+    !LOAD_BALANCER_TYPES.includes(lower as (typeof LOAD_BALANCER_TYPES)[number])
+  ) {
+    throw new CliError(
+      `Invalid --lb-type "${lbType}". Must be one of: ${LOAD_BALANCER_TYPES.join(', ')}.`,
+      {
+        code: 'INVALID_LB_TYPE',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+  return lower;
+}
 
 export function assertFrontendProtocol(
   mode: string | undefined
@@ -391,6 +411,21 @@ export function resolveCreateBillingFromPlans(
 export function assertCreateBillingOptionShape(
   options: LoadBalancerCreateBillingSelectionOptions
 ): void {
+  if (
+    options.billingType !== undefined &&
+    !LOAD_BALANCER_BILLING_TYPES.includes(
+      options.billingType as (typeof LOAD_BALANCER_BILLING_TYPES)[number]
+    )
+  ) {
+    throw new CliError(
+      `Invalid --billing-type "${options.billingType}". Must be one of: ${LOAD_BALANCER_BILLING_TYPES.join(', ')}.`,
+      {
+        code: 'INVALID_BILLING_TYPE',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+
   const hasCommittedSelector =
     options.committedPlan !== undefined ||
     options.committedPlanId !== undefined;

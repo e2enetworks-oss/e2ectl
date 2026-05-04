@@ -25,6 +25,7 @@ e2ectl lb get <lbId>
 Use `e2ectl node list` to find the private IP of your backend nodes.
 Use `e2ectl reserved-ip list` to find an unattached reserved IP for `--reserve-ip`.
 If `--reserve-ip` is not specified, a random public IP is automatically allocated as part of the selected plan.
+Use `e2ectl security-group list` to find a security group ID for `--security-group`.
 
 ```bash
 e2ectl lb create \
@@ -35,7 +36,8 @@ e2ectl lb create \
   --backend-protocol HTTP \
   --backend-server web-1:192.168.1.1:8080 \
   --backend-server web-2:192.168.1.2:8080 \
-  --reserve-ip 203.0.113.10
+  --reserve-ip 203.0.113.10 \
+  --security-group 42
 ```
 
 ALB frontend protocols are `HTTP`, `HTTPS`, and `BOTH`. ALB backend protocols are `HTTP` and `HTTPS`. ALB health checks are always enabled with check URL `/`.
@@ -75,20 +77,24 @@ NLB has no backend protocol. The backend group port follows the frontend port.
 
 ## Create An Internal LB
 
-Use `e2ectl vpc list` to find the VPC ID for `--vpc`.
+Use `e2ectl vpc list` to find the VPC ID for `--vpc`. The `--vpc` flag is required with `--lb-type internal`.
+`--reserve-ip` cannot be used with internal LBs.
 
 ```bash
 e2ectl lb create \
   --name internal-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
+  --lb-type internal \
   --vpc 123 \
   --backend-group web \
   --backend-protocol HTTP \
   --backend-server web-1:192.168.1.1:8080
 ```
 
-`--reserve-ip` is only for external load balancers and cannot be combined with `--vpc`.
+## External LBs With VPC
+
+External LBs can optionally attach to a VPC with `--vpc`. Both `--vpc` and `--reserve-ip` can be used together on external LBs.
 
 ## Update LB Settings
 

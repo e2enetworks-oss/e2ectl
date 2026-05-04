@@ -24,18 +24,17 @@ export const LOAD_BALANCER_ALB_MODES: LoadBalancerMode[] = [
 export const LOAD_BALANCER_SSL_MODES: LoadBalancerMode[] = ['HTTPS', 'BOTH'];
 
 export const LOAD_BALANCER_ALGORITHMS: LoadBalancerAlgorithm[] = [
-  'source',
-  'roundrobin',
-  'leastconn'
-];
-
-export const LOAD_BALANCER_COMMAND_ALGORITHMS: LoadBalancerAlgorithm[] = [
   'roundrobin',
   'leastconn',
   'source'
 ];
 
+export const LOAD_BALANCER_COMMAND_ALGORITHMS: LoadBalancerAlgorithm[] =
+  LOAD_BALANCER_ALGORITHMS;
+
 export const LOAD_BALANCER_ALB_BACKEND_PROTOCOLS = ['HTTP', 'HTTPS'] as const;
+
+export const LOAD_BALANCER_TYPES = ['external', 'internal'] as const;
 
 export const LOAD_BALANCER_BILLING_TYPES = ['hourly', 'committed'] as const;
 export const LOAD_BALANCER_POST_COMMIT_BEHAVIORS = [

@@ -16,6 +16,7 @@ import {
   assertCreateBillingOptionShape,
   assertFrontendProtocol,
   assertIp,
+  assertLbType,
   assertNonEmpty,
   assertPort,
   defaultPortForProtocol,
@@ -81,7 +82,6 @@ import type {
   LoadBalancerVpcAttachOptions,
   LoadBalancerVpcAttachment,
   LoadBalancerVpcDetachOptions,
-  LoadBalancerVpc,
   ResolvedLoadBalancerCreateBilling
 } from './types/index.js';
 import type { VpcClient } from '../vpc/index.js';
@@ -123,13 +123,25 @@ export class LoadBalancerService {
   ): Promise<LoadBalancerCreateCommandResult> {
     const requestedVpcId = options.networkId ?? options.vpc;
     const mode = assertFrontendProtocol(options.frontendProtocol);
-    if (requestedVpcId !== undefined && options.reserveIp !== undefined) {
-      throw new CliError('--reserve-ip cannot be used with --vpc.', {
-        code: 'RESERVE_IP_REQUIRES_EXTERNAL_LB',
+    const lbType = assertLbType(options.lbType);
+    if (lbType === 'internal' && requestedVpcId === undefined) {
+      throw new CliError('--vpc is required when --lb-type is internal.', {
+        code: 'INTERNAL_LB_REQUIRES_VPC',
         exitCode: EXIT_CODES.usage,
         suggestion:
-          'Create either an external load balancer with --reserve-ip or an internal load balancer with --vpc.'
+          'Provide --vpc <vpcId> with --lb-type internal, or omit --lb-type (defaults to external).'
       });
+    }
+    if (lbType === 'internal' && options.reserveIp !== undefined) {
+      throw new CliError(
+        '--reserve-ip cannot be used with --lb-type internal.',
+        {
+          code: 'INTERNAL_LB_NO_RESERVE_IP',
+          exitCode: EXIT_CODES.usage,
+          suggestion:
+            'Internal load balancers cannot have a public reserved IP.'
+        }
+      );
     }
     const networkId = requestedVpcId
       ? normalizeRequiredNumericId(requestedVpcId, 'Network ID', '--vpc')
@@ -138,8 +150,6 @@ export class LoadBalancerService {
       options.subnet === undefined
         ? null
         : normalizeRequiredNumericId(options.subnet, 'Subnet ID', '--subnet');
-    const lbType: LoadBalancerVpc =
-      networkId !== null ? 'internal' : 'external';
     const resolvedPort = options.port ?? defaultPortForProtocol(mode);
     if (resolvedPort === undefined) {
       throw new CliError('--port is required for TCP load balancers.', {

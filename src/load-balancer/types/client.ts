@@ -67,7 +67,10 @@ export type LoadBalancerRawDetails = Omit<
   }>;
 };
 
-export type LoadBalancerDeleteQuery = Record<'reserve_ip_required', 'true'>;
+export interface LoadBalancerDeleteQuery {
+  [key: string]: string | undefined;
+  reserve_ip_required?: string;
+}
 
 export interface LoadBalancerClient {
   createLoadBalancer(
