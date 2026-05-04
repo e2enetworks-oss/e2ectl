@@ -75,7 +75,6 @@ export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerConte
   name: string;
   algorithm?: string;
   backendProtocol?: string;
-  backendPort?: string;
   backendServer?: string[];
   httpCheck?: boolean;
   serverIp?: string;

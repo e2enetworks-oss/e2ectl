@@ -1338,7 +1338,6 @@ describe('LoadBalancerService', () => {
 
       const result = await service.createBackendGroup('40', {
         name: 'tcp-grp',
-        backendPort: '8080',
         backendServer: ['srv-1:10.0.0.2:8080']
       });
 
@@ -1347,7 +1346,7 @@ describe('LoadBalancerService', () => {
         .calls[0]![1] as LoadBalancerCreateRequest;
       expect(body.tcp_backend).toHaveLength(1);
       expect(body.tcp_backend[0]?.backend_name).toBe('tcp-grp');
-      expect(body.tcp_backend[0]?.port).toBe(8080);
+      expect(body.tcp_backend[0]?.port).toBe(80);
     });
 
     it('throws BACKEND_GROUP_EXISTS if group name already exists on ALB', async () => {
@@ -1369,7 +1368,6 @@ describe('LoadBalancerService', () => {
       await expect(
         service.createBackendGroup('20', {
           name: 'new-group',
-          backendPort: '9000',
           backendServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'NLB_SINGLE_BACKEND_GROUP' });

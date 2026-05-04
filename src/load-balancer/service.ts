@@ -517,10 +517,7 @@ export class LoadBalancerService {
     const servers = parseBackendServerSpecs(options.backendServer);
 
     if (isNlb) {
-      const backendPort = assertPort(
-        options.backendPort ?? lbPort,
-        '--backend-port'
-      );
+      const backendPort = assertPort(lbPort, '--backend-port');
       const newTcpGroup = buildTcpBackendGroup({
         algorithm,
         name: options.name,
