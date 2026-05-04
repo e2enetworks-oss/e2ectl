@@ -55,8 +55,8 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
     >(buildAppliancePath(lbId));
 
     const data = response.data;
-    const context = data.appliance_instance
-      ?.map((instance) => instance.context)
+    const context = (data.appliance_instance ?? [])
+      .map((instance) => instance.context)
       .filter((item): item is NonNullable<typeof item> => item !== undefined);
     const primaryContext = context?.[0] as
       | { lb_mode?: string; lb_type?: string; lb_reserve_ip?: string | null }

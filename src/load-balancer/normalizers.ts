@@ -215,7 +215,7 @@ export function normalizeOptionalPublicIp(value: unknown): string | undefined {
 }
 
 export function isAvailableReservedIp(item: ReservedIpSummary): boolean {
-  const normalizedStatus = item.status?.trim().toLowerCase();
+  const normalizedStatus = item.status?.trim()?.toLowerCase();
   const hasAttachedNode =
     (item.floating_ip_attached_nodes ?? []).length > 0 ||
     (item.vm_id !== undefined && item.vm_id !== null);
