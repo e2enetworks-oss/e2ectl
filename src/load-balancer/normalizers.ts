@@ -3,6 +3,7 @@ import { isIPv4 } from 'node:net';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { normalizeRequiredNumericId } from '../node/normalizers.js';
+import type { ReservedIpSummary } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_BACKEND_PROTOCOLS,
   LOAD_BALANCER_ALGORITHMS,
@@ -14,10 +15,13 @@ import type {
   LoadBalancerCommittedPlan,
   LoadBalancerCommittedStatus,
   LoadBalancerCreateBillingSelectionOptions,
+  LoadBalancerContextPayload,
+  LoadBalancerDetails,
   LoadBalancerMode,
   LoadBalancerPlan,
   ResolvedLoadBalancerCreateBilling,
-  LoadBalancerServer
+  LoadBalancerServer,
+  LoadBalancerUpdateOptions
 } from './types/index.js';
 
 export function assertFrontendProtocol(
@@ -208,6 +212,94 @@ export function normalizeOptionalPublicIp(value: unknown): string | undefined {
   return normalized.length === 0 || normalized === '[]'
     ? undefined
     : normalized;
+}
+
+export function isAvailableReservedIp(item: ReservedIpSummary): boolean {
+  const normalizedStatus = item.status?.trim().toLowerCase();
+  const hasAttachedNode =
+    (item.floating_ip_attached_nodes ?? []).length > 0 ||
+    (item.vm_id !== undefined && item.vm_id !== null);
+
+  return (
+    (normalizedStatus === 'reserved' || normalizedStatus === 'available') &&
+    !hasAttachedNode
+  );
+}
+
+function getLbPublicIp(lb: LoadBalancerDetails): string | undefined {
+  return normalizeOptionalPublicIp(lb.public_ip ?? lb.node_detail?.public_ip);
+}
+
+export function isLoadBalancerPublicIpReserved(
+  lb: LoadBalancerDetails,
+  context: LoadBalancerContextPayload
+): boolean {
+  if (lb.public_ip_reserved === true) {
+    return true;
+  }
+
+  const publicIp = getLbPublicIp(lb);
+  const reserveIp = normalizeOptionalPublicIp(context.lb_reserve_ip);
+  return publicIp !== undefined && reserveIp === publicIp;
+}
+
+export function getReservableLoadBalancerPublicIp(
+  lb: LoadBalancerDetails,
+  lbId: string
+): string {
+  const publicIp = getLbPublicIp(lb);
+  if (publicIp !== undefined && isIPv4(publicIp)) {
+    return publicIp;
+  }
+
+  throw new CliError(
+    `Load balancer ${lbId} does not have a public IPv4 address to reserve.`,
+    {
+      code: 'LOAD_BALANCER_PUBLIC_IP_MISSING',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect the current network state.`
+    }
+  );
+}
+
+export function getLoadBalancerVmId(
+  lb: LoadBalancerDetails,
+  lbId: string
+): number {
+  const vmId = lb.node_detail?.vm_id;
+  if (typeof vmId === 'number' && Number.isInteger(vmId) && vmId > 0) {
+    return vmId;
+  }
+
+  throw new CliError(
+    `Load balancer ${lbId} did not include the VM ID required to reserve its public IP.`,
+    {
+      code: 'LOAD_BALANCER_VM_ID_MISSING',
+      exitCode: EXIT_CODES.network,
+      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to confirm the API response includes node_detail.vm_id.`
+    }
+  );
+}
+
+export function getContextSslCertificateId(
+  context: LoadBalancerContextPayload
+): number | null {
+  const directValue = context.ssl_certificate_id;
+  if (typeof directValue === 'number') {
+    return directValue;
+  }
+  const contextValue = context.ssl_context?.['ssl_certificate_id'];
+  return typeof contextValue === 'number' ? contextValue : null;
+}
+
+export function hasSslCertificate(
+  options: LoadBalancerUpdateOptions,
+  context: LoadBalancerContextPayload
+): boolean {
+  return (
+    options.sslCertificateId !== undefined ||
+    getContextSslCertificateId(context) !== null
+  );
 }
 
 export function normalizeNodeListType(value: unknown): 'S' | 'D' {

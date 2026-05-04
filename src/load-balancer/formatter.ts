@@ -456,7 +456,7 @@ function renderLoadBalancerCreateHuman(
       : 'Hourly';
 
   const serverSummary = result.backend.servers
-    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
+    .map(formatServerEntry)
     .join(', ');
 
   const rows: Array<[string, string]> = [
@@ -537,13 +537,7 @@ function renderLoadBalancerGetHuman(
         bg.name,
         bg.backend_mode ?? 'http',
         bg.balance,
-        bg.servers.length === 0
-          ? '--'
-          : bg.servers
-              .map(
-                (s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`
-              )
-              .join('\n')
+        formatServerList(bg.servers)
       ]);
     }
     for (const bg of tcpBackends) {
@@ -551,13 +545,7 @@ function renderLoadBalancerGetHuman(
         bg.backend_name,
         'tcp',
         bg.balance,
-        bg.servers.length === 0
-          ? '--'
-          : bg.servers
-              .map(
-                (s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`
-              )
-              .join('\n')
+        formatServerList(bg.servers)
       ]);
     }
     backendSection = `Backend Groups (${backends.length + tcpBackends.length})\n${bgTable.toString()}\n\n`;
@@ -578,9 +566,7 @@ function renderLoadBalancerGetHuman(
 function renderBackendGroupCreateHuman(
   result: LoadBalancerBackendGroupCreateCommandResult
 ): string {
-  const serverSummary = result.group.servers
-    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
-    .join(', ');
+  const serverSummary = result.group.servers.map(formatServerEntry).join(', ');
 
   const rows: Array<[string, string]> = [
     ['Load Balancer ID', result.lb_id],
@@ -606,13 +592,19 @@ function renderBackendGroupCreateHuman(
   );
 }
 
+function formatServerEntry(s: {
+  backend_name: string;
+  backend_ip: string;
+  backend_port: number;
+}): string {
+  return `${s.backend_name} (${s.backend_ip}:${s.backend_port})`;
+}
+
 function formatServerList(
   servers: { backend_name: string; backend_ip: string; backend_port: number }[]
 ): string {
   if (servers.length === 0) return '--';
-  return servers
-    .map((s) => `${s.backend_name} (${s.backend_ip}:${s.backend_port})`)
-    .join('\n');
+  return servers.map(formatServerEntry).join('\n');
 }
 
 function formatLoadBalancerPlans(
@@ -645,11 +637,11 @@ function formatLoadBalancerBasePlansTable(
   for (const item of items) {
     table.push([
       item.name,
-      formatPlanScalar(item.vcpu),
-      formatPlanScalar(item.ram),
-      formatPlanScalar(item.disk),
-      formatPlanPrice(item.hourly),
-      formatPlanPrice(item.price)
+      formatPlanValue(item.vcpu),
+      formatPlanValue(item.ram),
+      formatPlanValue(item.disk),
+      formatPlanValue(item.hourly),
+      formatPlanValue(item.price)
     ]);
   }
 
@@ -680,7 +672,7 @@ function formatLoadBalancerCommittedPlansSection(
       String(item.plan.committed_sku_id),
       item.plan.committed_sku_name,
       formatCommittedPlanDays(item.plan),
-      formatPlanPrice(item.plan.committed_sku_price)
+      formatPlanValue(item.plan.committed_sku_price)
     ]);
   }
 
@@ -691,15 +683,7 @@ function formatCommittedPlanDays(plan: LoadBalancerCommittedPlan): string {
   return plan.committed_days === undefined ? '--' : String(plan.committed_days);
 }
 
-function formatPlanPrice(value: number | undefined): string {
-  if (value === undefined || value < 0) {
-    return '--';
-  }
-
-  return String(value);
-}
-
-function formatPlanScalar(value: number | undefined): string {
+function formatPlanValue(value: number | undefined): string {
   return value === undefined || value < 0 ? '--' : String(value);
 }
 

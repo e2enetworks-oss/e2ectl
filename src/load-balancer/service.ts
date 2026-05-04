@@ -1,5 +1,3 @@
-import { isIPv4 } from 'node:net';
-
 import {
   resolveStoredCredentials,
   type ResolvedCredentials
@@ -7,13 +5,9 @@ import {
 import { normalizeRequiredNumericId } from '../node/normalizers.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import type {
-  ReservedIpClient,
-  ReservedIpSummary
-} from '../reserved-ip/index.js';
+import type { ReservedIpClient } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_MODES,
-  LOAD_BALANCER_DEFAULT_TIMEOUT,
   LOAD_BALANCER_SSL_MODES
 } from './constants.js';
 import {
@@ -25,23 +19,31 @@ import {
   assertNonEmpty,
   assertPort,
   defaultPortForProtocol,
-  normalizeAlbBackendProtocol,
+  getContextSslCertificateId,
+  getLoadBalancerVmId,
+  getReservableLoadBalancerPublicIp,
+  hasSslCertificate,
+  isAvailableReservedIp,
+  isLoadBalancerPublicIpReserved,
   normalizeExistingMode,
-  normalizeOptionalPublicIp,
   parseBackendServerSpec,
   parseBackendServerSpecs,
   resolveCreateBillingFromPlans
 } from './normalizers.js';
 import {
+  buildAlbBackendGroup,
   buildBackendGroupDeleteMutation,
   buildBackendGroupUpdateMutation,
   buildBackendServerAddMutation,
   buildBackendServerDeleteMutation,
   buildBackendServerUpdateMutation,
+  buildLoadBalancerCreateRequest,
   buildLoadBalancerMutationRequest,
-  getContextSslCertificateId,
+  buildTcpBackendGroup,
   normalizeExistingLoadBalancerType,
-  resolveLoadBalancerMutationContext
+  resolveLoadBalancerMutationContext,
+  summarizeAlbBackendGroup,
+  summarizeTcpBackendGroup
 } from './mappers.js';
 import type {
   LoadBalancerBackendGroupCreateCommandResult,
@@ -56,9 +58,7 @@ import type {
   LoadBalancerBackendServerDeleteOptions,
   LoadBalancerBackendServerUpdateCommandResult,
   LoadBalancerBackendServerUpdateOptions,
-  LoadBalancerBackend,
   LoadBalancerClient,
-  LoadBalancerContextPayload,
   LoadBalancerContextOptions,
   LoadBalancerCreatedBackendSummary,
   LoadBalancerCreateCommandResult,
@@ -69,10 +69,11 @@ import type {
   LoadBalancerDetails,
   LoadBalancerGetCommandResult,
   LoadBalancerListCommandResult,
+  LoadBalancerMutationResponse,
+  LoadBalancerMutationState,
   LoadBalancerNetworkCommandResult,
   LoadBalancerPlansCommandResult,
   LoadBalancerServiceDependencies,
-  LoadBalancerTcpBackend,
   LoadBalancerUpdateRequestOverrides,
   ResolvedLoadBalancerMutationContext,
   LoadBalancerUpdateCommandResult,
@@ -84,8 +85,6 @@ import type {
   ResolvedLoadBalancerCreateBilling
 } from './types/index.js';
 import type { VpcClient } from '../vpc/index.js';
-
-export type { LoadBalancerServiceDependencies } from './types/index.js';
 
 export class LoadBalancerService {
   constructor(private readonly dependencies: LoadBalancerServiceDependencies) {}
@@ -203,50 +202,35 @@ export class LoadBalancerService {
     );
     const servers = parseBackendServerSpecs(options.backendServer);
 
-    const backends: LoadBalancerBackend[] = [];
-    const tcpBackend: LoadBalancerTcpBackend[] = [];
-    let backendSummary: LoadBalancerCreatedBackendSummary;
-
-    {
-      if (isAlb) {
-        backends.push({
+    const backends = isAlb
+      ? [
+          buildAlbBackendGroup({
+            algorithm,
+            backendProtocol: albBackendProtocol!,
+            includeScalerDefaults: true,
+            name: backendGroup,
+            servers
+          })
+        ]
+      : [];
+    const tcpBackend = isAlb
+      ? []
+      : [
+          buildTcpBackendGroup({ algorithm, name: backendGroup, port, servers })
+        ];
+    const backendSummary: LoadBalancerCreatedBackendSummary = isAlb
+      ? summarizeAlbBackendGroup({
+          algorithm,
+          backendProtocol: albBackendProtocol!,
           name: backendGroup,
-          backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
-          domain_name: 'localhost',
-          balance: algorithm,
-          backend_ssl: albBackendProtocol === 'HTTPS',
-          http_check: true,
-          check_url: '/',
-          servers,
-          scaler_port: null,
-          scaler_id: null,
-          websocket_timeout: null
-        });
-        backendSummary = {
-          backend_port: null,
-          health_check: true,
-          name: backendGroup,
-          protocol: albBackendProtocol!,
-          routing_policy: algorithm,
           servers
-        };
-      } else {
-        tcpBackend.push({
-          backend_name: backendGroup,
+        })
+      : summarizeTcpBackendGroup({
+          algorithm,
+          name: backendGroup,
           port,
-          balance: algorithm,
           servers
         });
-        backendSummary = {
-          backend_port: port,
-          health_check: null,
-          name: backendGroup,
-          protocol: 'TCP',
-          routing_policy: algorithm,
-          servers
-        };
-      }
-    }
 
     const billing = await resolveCreateBillingSelection(client, options.plan, {
       ...(options.billingType === undefined
@@ -283,42 +267,26 @@ export class LoadBalancerService {
           )
         : null;
 
-    const result = await client.createLoadBalancer({
-      lb_name: assertNonEmpty(options.name, '--name'),
-      lb_type: lbType,
-      lb_mode: mode,
-      lb_port: String(port),
-      plan_name: billing.basePlanName,
-      node_list_type: 'D',
-      backends,
-      tcp_backend: tcpBackend,
-      acl_list: [],
-      acl_map: [],
-      client_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
-      server_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
-      connection_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
-      http_keep_alive_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
-      default_backend: '',
-      enable_bitninja: false,
-      is_ipv6_attached: false,
-      lb_reserve_ip: reserveIp,
-      ssl_certificate_id: sslCertificateId,
-      ssl_context: { redirect_to_https: false },
-      vpc_list: vpcList ?? [],
-      ...(securityGroupId === null
-        ? {}
-        : { security_group_id: securityGroupId }),
-      ...(billing.committedPlanId === null
-        ? {}
-        : {
-            cn_id: billing.committedPlanId,
-            cn_status: billing.postCommitBehavior
-          })
-    });
+    const name = assertNonEmpty(options.name, '--name');
+    const result = await client.createLoadBalancer(
+      buildLoadBalancerCreateRequest({
+        backends,
+        billing,
+        lbType,
+        mode,
+        name,
+        port,
+        reserveIp,
+        securityGroupId,
+        sslCertificateId,
+        tcpBackend,
+        vpcList: vpcList ?? []
+      })
+    );
 
     return {
       action: 'create',
-      backend: backendSummary!,
+      backend: backendSummary,
       billing: {
         committed_plan_id: billing.committedPlanId,
         committed_plan_name: billing.committedPlanName,
@@ -328,7 +296,7 @@ export class LoadBalancerService {
       requested: {
         frontend_port: port,
         mode,
-        name: assertNonEmpty(options.name, '--name'),
+        name,
         plan_name: billing.basePlanName,
         type: lbType
       },
@@ -370,10 +338,10 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerUpdateOptions
   ): Promise<LoadBalancerUpdateCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const currentMode = mutation.isNlb
       ? 'TCP'
       : normalizeExistingMode(lb.lb_mode, 'HTTP');
@@ -496,12 +464,12 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendGroupCreateOptions
   ): Promise<LoadBalancerBackendGroupCreateCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
 
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const {
       backends: currentBackends,
       isNlb,
@@ -549,17 +517,16 @@ export class LoadBalancerService {
     const servers = parseBackendServerSpecs(options.backendServer);
 
     if (isNlb) {
-      // For NLB: backendPort is required (use backendPort ?? serverPort)
       const backendPort = assertPort(
         options.backendPort ?? lbPort,
         '--backend-port'
       );
-      const newTcpGroup: LoadBalancerTcpBackend = {
-        backend_name: options.name,
+      const newTcpGroup = buildTcpBackendGroup({
+        algorithm,
+        name: options.name,
         port: backendPort,
-        balance: algorithm,
         servers
-      };
+      });
 
       await this.applyMutation(lbId, client, lb, mutation, {
         lb_mode: 'TCP',
@@ -568,48 +535,41 @@ export class LoadBalancerService {
 
       return {
         action: 'backend-group-add',
-        group: {
-          backend_port: backendPort,
-          health_check: null,
+        group: summarizeTcpBackendGroup({
+          algorithm,
           name: options.name,
-          protocol: 'TCP',
-          routing_policy: algorithm,
+          port: backendPort,
           servers
-        },
-        lb_id: lbId,
-        lb_name: lb.appliance_name,
-        message: `Backend group "${options.name}" added.`
-      };
-    } else {
-      const newAlbGroup: LoadBalancerBackend = {
-        name: options.name,
-        domain_name: 'localhost',
-        backend_mode: normalizeAlbBackendProtocol(albBackendProtocol!),
-        balance: algorithm,
-        backend_ssl: albBackendProtocol === 'HTTPS',
-        http_check: true,
-        check_url: '/',
-        servers
-      };
-
-      await this.applyMutation(lbId, client, lb, mutation, {
-        backends: [...currentBackends, newAlbGroup]
-      });
-      return {
-        action: 'backend-group-add',
-        group: {
-          backend_port: null,
-          health_check: true,
-          name: options.name,
-          protocol: albBackendProtocol!,
-          routing_policy: algorithm,
-          servers
-        },
+        }),
         lb_id: lbId,
         lb_name: lb.appliance_name,
         message: `Backend group "${options.name}" added.`
       };
     }
+
+    const newAlbGroup = buildAlbBackendGroup({
+      algorithm,
+      backendProtocol: albBackendProtocol!,
+      name: options.name,
+      servers
+    });
+
+    await this.applyMutation(lbId, client, lb, mutation, {
+      backends: [...currentBackends, newAlbGroup]
+    });
+
+    return {
+      action: 'backend-group-add',
+      group: summarizeAlbBackendGroup({
+        algorithm,
+        backendProtocol: albBackendProtocol!,
+        name: options.name,
+        servers
+      }),
+      lb_id: lbId,
+      lb_name: lb.appliance_name,
+      message: `Backend group "${options.name}" added.`
+    };
   }
 
   async updateBackendGroup(
@@ -617,10 +577,10 @@ export class LoadBalancerService {
     groupName: string,
     options: LoadBalancerBackendGroupUpdateOptions
   ): Promise<LoadBalancerBackendGroupUpdateCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const algorithm =
       options.algorithm === undefined
         ? undefined
@@ -678,10 +638,10 @@ export class LoadBalancerService {
     groupName: string,
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerBackendGroupDeleteCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
 
     const mutationResult = buildBackendGroupDeleteMutation(mutation, groupName);
     if (!mutationResult.exists) {
@@ -706,16 +666,16 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerAddOptions
   ): Promise<LoadBalancerBackendServerAddCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const backendGroup = assertNonEmpty(
       options.backendGroup,
       '--backend-group'
     );
     const server = parseBackendServerSpec(options.backendServer!);
 
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
 
     const mutationResult = buildBackendServerAddMutation(
       mutation,
@@ -742,7 +702,6 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerBackendServerUpdateOptions
   ): Promise<LoadBalancerBackendServerUpdateCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const nextIp =
       options.ip === undefined ? undefined : assertIp(options.ip, '--ip');
     const nextPort =
@@ -760,9 +719,10 @@ export class LoadBalancerService {
       );
     }
 
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const mutationResult = buildBackendServerUpdateMutation(
       mutation,
       options.backendGroup,
@@ -806,10 +766,10 @@ export class LoadBalancerService {
       options.backendServerName,
       '--backend-server-name'
     );
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const mutationResult = buildBackendServerDeleteMutation(
       mutation,
       backendGroup,
@@ -930,11 +890,11 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerVpcDetachOptions
   ): Promise<LoadBalancerNetworkCommandResult> {
-    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
     const vpcId = normalizeRequiredNumericId(options.vpc, 'VPC ID', '--vpc');
-    const client = await this.createClient(options);
-    const lb = await client.getLoadBalancer(lbId);
-    const mutation = resolveLoadBalancerMutationContext(lb, lbId);
+    const { client, lb, mutation } = await this.resolveMutationState(
+      lbId,
+      options
+    );
     const currentVpcList = mutation.context.vpc_list ?? [];
     const vpcExists = currentVpcList.some(
       (item) => String(item.network_id) === String(vpcId)
@@ -974,14 +934,29 @@ export class LoadBalancerService {
     );
   }
 
+  private async resolveMutationState(
+    lbId: string,
+    options: LoadBalancerContextOptions
+  ): Promise<LoadBalancerMutationState> {
+    normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
+    const client = await this.createClient(options);
+    const lb = await client.getLoadBalancer(lbId);
+
+    return {
+      client,
+      lb,
+      mutation: resolveLoadBalancerMutationContext(lb, lbId)
+    };
+  }
+
   private async applyMutation(
     lbId: string,
     client: LoadBalancerClient,
     lb: LoadBalancerDetails,
     mutation: ResolvedLoadBalancerMutationContext,
     overrides: Partial<LoadBalancerUpdateRequestOverrides>
-  ): Promise<{ message: string }> {
-    return await client.updateLoadBalancer(
+  ): Promise<LoadBalancerMutationResponse> {
+    return client.updateLoadBalancer(
       lbId,
       buildLoadBalancerMutationRequest(lb, mutation, overrides)
     );
@@ -990,7 +965,7 @@ export class LoadBalancerService {
   private async resolveContext(
     options: LoadBalancerContextOptions
   ): Promise<ResolvedCredentials> {
-    return await resolveStoredCredentials(this.dependencies.store, options);
+    return resolveStoredCredentials(this.dependencies.store, options);
   }
 }
 
@@ -1049,80 +1024,6 @@ async function resolveAvailableReservedIp(
   }
 
   return match.ip_address;
-}
-
-function isAvailableReservedIp(item: ReservedIpSummary): boolean {
-  const normalizedStatus = item.status?.trim().toLowerCase();
-  const hasAttachedNode =
-    (item.floating_ip_attached_nodes ?? []).length > 0 ||
-    (item.vm_id !== undefined && item.vm_id !== null);
-
-  return (
-    (normalizedStatus === 'reserved' || normalizedStatus === 'available') &&
-    !hasAttachedNode
-  );
-}
-
-function isLoadBalancerPublicIpReserved(
-  lb: LoadBalancerDetails,
-  context: LoadBalancerContextPayload
-): boolean {
-  if (lb.public_ip_reserved === true) {
-    return true;
-  }
-
-  const publicIp = normalizeOptionalPublicIp(
-    lb.public_ip ?? lb.node_detail?.public_ip
-  );
-  const reserveIp = normalizeOptionalPublicIp(context.lb_reserve_ip);
-  return publicIp !== undefined && reserveIp === publicIp;
-}
-
-function getReservableLoadBalancerPublicIp(
-  lb: LoadBalancerDetails,
-  lbId: string
-): string {
-  const publicIp = normalizeOptionalPublicIp(
-    lb.public_ip ?? lb.node_detail?.public_ip
-  );
-  if (publicIp !== undefined && isIPv4(publicIp)) {
-    return publicIp;
-  }
-
-  throw new CliError(
-    `Load balancer ${lbId} does not have a public IPv4 address to reserve.`,
-    {
-      code: 'LOAD_BALANCER_PUBLIC_IP_MISSING',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to inspect the current network state.`
-    }
-  );
-}
-
-function getLoadBalancerVmId(lb: LoadBalancerDetails, lbId: string): number {
-  const vmId = lb.node_detail?.vm_id;
-  if (typeof vmId === 'number' && Number.isInteger(vmId) && vmId > 0) {
-    return vmId;
-  }
-
-  throw new CliError(
-    `Load balancer ${lbId} did not include the VM ID required to reserve its public IP.`,
-    {
-      code: 'LOAD_BALANCER_VM_ID_MISSING',
-      exitCode: EXIT_CODES.network,
-      suggestion: `Run ${formatCliCommand(`lb get ${lbId}`)} to confirm the API response includes node_detail.vm_id.`
-    }
-  );
-}
-
-function hasSslCertificate(
-  options: LoadBalancerUpdateOptions,
-  context: LoadBalancerContextPayload
-): boolean {
-  return (
-    options.sslCertificateId !== undefined ||
-    getContextSslCertificateId(context) !== null
-  );
 }
 
 function throwBackendGroupNotFound(lbId: string, groupName: string): never {

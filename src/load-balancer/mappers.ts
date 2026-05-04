@@ -9,6 +9,7 @@ import {
 import type {
   LoadBalancerAclMapRule,
   LoadBalancerAclRule,
+  LoadBalancerAlbBackendGroupInput,
   LoadBalancerBackend,
   LoadBalancerBackendGroupMutationResult,
   LoadBalancerBackendGroupUpdatePatch,
@@ -16,14 +17,135 @@ import type {
   LoadBalancerBackendServerPatch,
   LoadBalancerContextAclData,
   LoadBalancerContextPayload,
+  LoadBalancerCreatedBackendSummary,
+  LoadBalancerCreateRequestInput,
+  LoadBalancerCreateRequest,
   LoadBalancerDetails,
   LoadBalancerServer,
   LoadBalancerUpdateRequest,
   LoadBalancerUpdateRequestOverrides,
   ResolvedLoadBalancerMutationContext,
+  LoadBalancerTcpBackendGroupInput,
   LoadBalancerTcpBackend,
   LoadBalancerVpc
 } from './types/index.js';
+
+export function buildAlbBackendGroup({
+  algorithm,
+  backendProtocol,
+  includeScalerDefaults = false,
+  name,
+  servers
+}: LoadBalancerAlbBackendGroupInput): LoadBalancerBackend {
+  return {
+    name,
+    backend_mode: normalizeAlbBackendProtocol(backendProtocol),
+    domain_name: 'localhost',
+    balance: algorithm,
+    backend_ssl: backendProtocol === 'HTTPS',
+    http_check: true,
+    check_url: '/',
+    servers,
+    ...(includeScalerDefaults
+      ? {
+          scaler_port: null,
+          scaler_id: null,
+          websocket_timeout: null
+        }
+      : {})
+  };
+}
+
+export function buildTcpBackendGroup({
+  algorithm,
+  name,
+  port,
+  servers
+}: LoadBalancerTcpBackendGroupInput): LoadBalancerTcpBackend {
+  return {
+    backend_name: name,
+    port,
+    balance: algorithm,
+    servers
+  };
+}
+
+export function summarizeAlbBackendGroup({
+  algorithm,
+  backendProtocol,
+  name,
+  servers
+}: LoadBalancerAlbBackendGroupInput): LoadBalancerCreatedBackendSummary {
+  return {
+    backend_port: null,
+    health_check: true,
+    name,
+    protocol: backendProtocol,
+    routing_policy: algorithm,
+    servers
+  };
+}
+
+export function summarizeTcpBackendGroup({
+  algorithm,
+  name,
+  port,
+  servers
+}: LoadBalancerTcpBackendGroupInput): LoadBalancerCreatedBackendSummary {
+  return {
+    backend_port: port,
+    health_check: null,
+    name,
+    protocol: 'TCP',
+    routing_policy: algorithm,
+    servers
+  };
+}
+
+export function buildLoadBalancerCreateRequest({
+  backends,
+  billing,
+  lbType,
+  mode,
+  name,
+  port,
+  reserveIp,
+  securityGroupId,
+  sslCertificateId,
+  tcpBackend,
+  vpcList
+}: LoadBalancerCreateRequestInput): LoadBalancerCreateRequest {
+  return {
+    lb_name: name,
+    lb_type: lbType,
+    lb_mode: mode,
+    lb_port: String(port),
+    plan_name: billing.basePlanName,
+    node_list_type: 'D',
+    backends,
+    tcp_backend: tcpBackend,
+    acl_list: [],
+    acl_map: [],
+    client_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
+    server_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
+    connection_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
+    http_keep_alive_timeout: LOAD_BALANCER_DEFAULT_TIMEOUT,
+    default_backend: '',
+    enable_bitninja: false,
+    is_ipv6_attached: false,
+    lb_reserve_ip: reserveIp,
+    ssl_certificate_id: sslCertificateId,
+    ssl_context: { redirect_to_https: false },
+    vpc_list: vpcList,
+    ...(securityGroupId === null ? {} : { security_group_id: securityGroupId }),
+    ...(billing.committedPlanId === null
+      ? {}
+      : {
+          cn_id: billing.committedPlanId,
+          cn_status: billing.postCommitBehavior
+        })
+  };
+}
 
 export function buildLoadBalancerUpdateRequest(
   lb: LoadBalancerDetails,
@@ -424,17 +546,6 @@ export function normalizeExistingLoadBalancerType(
   return Array.isArray(context.vpc_list) && context.vpc_list.length > 0
     ? 'internal'
     : 'external';
-}
-
-export function getContextSslCertificateId(
-  context: LoadBalancerContextPayload
-): number | null {
-  const directValue = context.ssl_certificate_id;
-  if (typeof directValue === 'number') {
-    return directValue;
-  }
-  const contextValue = context.ssl_context?.['ssl_certificate_id'];
-  return typeof contextValue === 'number' ? contextValue : null;
 }
 
 function buildServerDeleteResult(

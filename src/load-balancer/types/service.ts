@@ -1,8 +1,12 @@
 import type { ConfigFile, ResolvedCredentials } from '../../config/index.js';
 import type { ReservedIpClient } from '../../reserved-ip/index.js';
 import type { VpcClient } from '../../vpc/index.js';
-import type { LoadBalancerCommittedStatus } from './api.js';
+import type {
+  LoadBalancerCommittedStatus,
+  LoadBalancerDetails
+} from './api.js';
 import type { LoadBalancerClient } from './client.js';
+import type { ResolvedLoadBalancerMutationContext } from './mapper.js';
 
 export interface LoadBalancerStore {
   readonly configPath: string;
@@ -33,4 +37,14 @@ export interface ResolvedLoadBalancerCreateBilling {
   committedPlanName: string | null;
   postCommitBehavior: LoadBalancerCommittedStatus | null;
   type: 'committed' | 'hourly';
+}
+
+export interface LoadBalancerMutationState {
+  client: LoadBalancerClient;
+  lb: LoadBalancerDetails;
+  mutation: ResolvedLoadBalancerMutationContext;
+}
+
+export interface LoadBalancerMutationResponse {
+  message: string;
 }
