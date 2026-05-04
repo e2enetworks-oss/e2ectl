@@ -1,3 +1,8 @@
+// TODO: Refactor into per-resource subdirectories per tests/manual/STRUCTURE.md
+// This file currently mixes: node, dbaas (moving out), volume, vpc, security-group, ssh-key, reserved-ip, project
+// Target structure: tests/manual/read-only/{resource}/read.test.ts
+// See: docs/maintainers/maintaining.md#test-file-organization
+
 import { access } from 'node:fs/promises';
 import path from 'node:path';
 

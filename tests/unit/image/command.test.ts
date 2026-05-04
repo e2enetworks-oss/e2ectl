@@ -89,6 +89,9 @@ describe('image commands', () => {
       createVpcClient: vi.fn(() => {
         throw new Error('VPC client should not be created for this test.');
       }) as unknown as CliRuntime['createVpcClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createLoadBalancerClient: vi.fn(() => {
         throw new Error(
           'Load balancer client should not be created for this test.'

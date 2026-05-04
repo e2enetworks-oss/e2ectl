@@ -11,6 +11,7 @@ describe('createProgram', () => {
     ).toEqual([
       'config',
       'project',
+      'dbaas',
       'lb',
       'node',
       'image',

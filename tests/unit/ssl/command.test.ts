@@ -5,7 +5,7 @@ import type { SslClient } from '../../../src/ssl/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 async function createRuntimeWithSslClient(
-  sslClient: SslClient | undefined
+  sslClient: SslClient
 ): Promise<{ runtime: CliRuntime; stdout: MemoryWriter }> {
   const configPath = createTestConfigPath('ssl-command-test');
   const store = new ConfigStore({ configPath });
@@ -32,15 +32,9 @@ async function createRuntimeWithSslClient(
     createSecurityGroupClient:
       vi.fn() as unknown as CliRuntime['createSecurityGroupClient'],
     createSshKeyClient: vi.fn() as unknown as CliRuntime['createSshKeyClient'],
-    ...(sslClient
-      ? {
-          createSslClient: vi
-            .fn()
-            .mockReturnValue(sslClient) as unknown as NonNullable<
-            CliRuntime['createSslClient']
-          >
-        }
-      : {}),
+    createSslClient: vi
+      .fn()
+      .mockReturnValue(sslClient) as unknown as CliRuntime['createSslClient'],
     createVolumeClient: vi.fn() as unknown as CliRuntime['createVolumeClient'],
     createVpcClient: vi.fn() as unknown as CliRuntime['createVpcClient'],
     credentialValidator: { validate: vi.fn() },
@@ -106,19 +100,5 @@ describe('ssl commands', () => {
     expect(stdout.buffer).toContain('No SSL certificates found.');
   });
 
-  it('throws CliError when createSslClient is not available in runtime', async () => {
-    const { runtime } = await createRuntimeWithSslClient(undefined);
-    const program = createProgram(runtime);
 
-    await expect(
-      program.parseAsync([
-        'node',
-        'e2ectl',
-        'ssl',
-        'list',
-        '--alias',
-        'default'
-      ])
-    ).rejects.toThrow('SSL client is not available in this runtime.');
-  });
 });

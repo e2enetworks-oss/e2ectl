@@ -43,6 +43,18 @@ Notes:
 
 Live lanes are strongly recommended before the first public release and future release candidates, but they are not mandatory CI or branch-protection gates.
 
+Build the CLI first:
+
+```bash
+make build
+```
+
+Live tests live under `tests/manual/` and are split by risk:
+
+- `npm run test:manual`: read-only API checks
+- `npm run test:manual:smoke`: destructive disposable-resource smoke checks
+- `npm run test:manual:dbaas`: destructive DBaaS lifecycle checks
+
 ### Safe Read-Only Lane
 
 Run only after `make build`.
@@ -84,8 +96,9 @@ Always-covered domains:
 - security-group
 - ssh-key
 
-Optional fixture env vars enable detail/get checks:
+Optional fixture env vars enable resource-specific get checks:
 
+- `E2ECTL_MANUAL_DBAAS_ID`
 - `E2ECTL_MANUAL_NODE_ID`
 - `E2ECTL_MANUAL_RESERVED_IP`
 - `E2ECTL_MANUAL_VOLUME_ID`
@@ -172,14 +185,54 @@ Cleanup order:
 10. security group delete
 11. temp rules file cleanup
 
-The cleanup script updates the manifest immediately after each create, attach, and mutate step in the smoke lane.
-
 Cleanup behavior:
 
 - cleanup still tries the built CLI first for supported delete and detach flows
 - it falls back to direct clients only when CLI cleanup fails
 - saved image cleanup should use `e2ectl image delete` first and fall back to the cleanup-only direct client path only if CLI cleanup fails
 - already-gone cleanup responses are treated as successful so interrupted smoke runs can be replayed safely
+
+### DBaaS Destructive Lane
+
+This lane creates and deletes an actual DBaaS cluster and VPC. Run it only with disposable quota and credentials.
+
+Command:
+
+```bash
+read -r -s -p "DBaaS password: " E2ECTL_MANUAL_DBAAS_PASSWORD
+printf '\n'
+export E2ECTL_MANUAL_DBAAS_PASSWORD
+
+E2ECTL_RUN_MANUAL_E2E=1 \
+E2E_API_KEY=... \
+E2E_AUTH_TOKEN=... \
+E2E_PROJECT_ID=... \
+E2E_LOCATION=... \
+E2ECTL_MANUAL_DBAAS_TYPE=postgres \
+E2ECTL_MANUAL_DBAAS_VERSION=16 \
+E2ECTL_MANUAL_DBAAS_PLAN="DBS.16GB" \
+E2ECTL_MANUAL_DBAAS_DATABASE_NAME=testdb \
+npm run test:manual:dbaas
+
+unset E2ECTL_MANUAL_DBAAS_PASSWORD
+```
+
+Required env vars:
+
+- `E2ECTL_RUN_MANUAL_E2E=1`
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+- `E2ECTL_MANUAL_DBAAS_TYPE`
+- `E2ECTL_MANUAL_DBAAS_VERSION`
+- `E2ECTL_MANUAL_DBAAS_PLAN`
+- `E2ECTL_MANUAL_DBAAS_DATABASE_NAME`
+- `E2ECTL_MANUAL_DBAAS_PASSWORD`
+
+Use the full DBaaS plan name from `dbaas plans`, for example `DBS.16GB`. The password must satisfy the platform policy. The manual test reads the password from `E2ECTL_MANUAL_DBAAS_PASSWORD`, then passes it to the built CLI through stdin with `--password-file -` so it does not appear in the child process argv.
+
+If a DBaaS operation fails because the cluster is not yet running, wait for `dbaas get <id>` to report `Running` before retrying. On failure, check `.manual-dbaas/*-manifest.json` before doing any manual cleanup.
 
 ## Promotion Checklist
 

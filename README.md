@@ -4,7 +4,7 @@
 
 `e2ectl` is the command-line interface for managing [E2E Networks](https://www.e2enetworks.com/) MyAccount resources from the terminal.
 
-It provides a unified CLI to manage E2E MyAccount resources—compute nodes, load balancers, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
+It provides a unified CLI to manage E2E MyAccount resources—compute nodes, databases, load balancers, networking, storage, and access—using reusable profiles, a shared default context, and deterministic --json output for automation.
 
 ## Requirements
 
@@ -76,6 +76,7 @@ Command guides:
 
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
+- [DBaaS](./docs/user-guides/dbaas.md)
 - [Load Balancer](./docs/user-guides/load-balancer.md)
 - [Node](./docs/user-guides/node.md)
 - [Image](./docs/user-guides/image.md)

@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { CLI_COMMAND_NAME, CLI_VERSION } from './metadata.js';
 import { buildConfigCommand } from '../config/index.js';
 import { buildImageCommand } from '../image/index.js';
+import { buildDbaasCommand } from '../dbaas/index.js';
 import { buildLoadBalancerCommand } from '../load-balancer/index.js';
 import { buildNodeCommand } from '../node/index.js';
 import { buildProjectCommand } from '../project/index.js';
@@ -27,6 +28,7 @@ export function createProgram(runtime: CliRuntime = createRuntime()): Command {
 
   program.addCommand(buildConfigCommand(runtime));
   program.addCommand(buildProjectCommand(runtime));
+  program.addCommand(buildDbaasCommand(runtime));
   program.addCommand(buildLoadBalancerCommand(runtime));
   program.addCommand(buildNodeCommand(runtime));
   program.addCommand(buildImageCommand(runtime));
