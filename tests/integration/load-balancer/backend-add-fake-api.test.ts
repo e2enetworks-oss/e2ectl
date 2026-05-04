@@ -417,9 +417,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '10',
           '--name',
           'web',
-          '--backend-protocol',
+          '--backend-group-protocol',
           'HTTPS',
-          '--backend-server',
+          '--backend-group-server',
           'server-2:10.0.0.5:8080'
         ],
         {
@@ -513,9 +513,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'add',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'server-2:10.0.0.5:8080'
         ],
         {
@@ -615,7 +615,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'web',
           '--algorithm',
           'leastconn',
-          '--backend-protocol',
+          '--backend-group-protocol',
           'HTTPS'
         ],
         {
@@ -673,9 +673,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'update',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'server-1',
           '--ip',
           '10.0.0.9',
@@ -724,9 +724,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
       'backend-server',
       'update',
       '10',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server-name',
+      '--backend-group-server-name',
       'server-1'
     ]);
 
@@ -820,9 +820,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'server-2'
         ],
         {
@@ -916,7 +916,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '20',
           '--name',
           'grp',
-          '--backend-server',
+          '--backend-group-server',
           'srv-1:10.0.0.5:80'
         ],
         {
@@ -1044,9 +1044,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'add',
           '20',
-          '--backend-group',
+          '--backend-group-name',
           'grp',
-          '--backend-server',
+          '--backend-group-server',
           'srv-2:10.0.0.5:8080'
         ],
         {
@@ -1135,9 +1135,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'update',
           '20',
-          '--backend-group',
+          '--backend-group-name',
           'grp',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'srv-1',
           '--port',
           '9090'
@@ -1244,9 +1244,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '20',
-          '--backend-group',
+          '--backend-group-name',
           'grp',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'srv-2'
         ],
         {
@@ -1284,7 +1284,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '10',
           '--name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'srv-1:10.0.0.5:80'
         ],
         {
@@ -1365,7 +1365,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '20',
           '--name',
           'newgrp',
-          '--backend-server',
+          '--backend-group-server',
           'srv-1:10.0.0.5:80'
         ],
         {
@@ -1384,7 +1384,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — fails when --backend-server is missing (required option)', async () => {
+  it('backend-group add — fails when --backend-group-server is missing (required option)', async () => {
     const nlbNoGroupsGetResponse = {
       code: 200,
       data: {
@@ -1433,7 +1433,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '20',
           '--name',
           'grp',
-          '--backend-server',
+          '--backend-group-server',
           ':10.0.0.1:80'
         ],
         {
@@ -1445,7 +1445,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       );
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain('--backend-server name');
+      expect(result.stderr).toContain('--backend-group-server name');
     } finally {
       await server.close();
       await tempHome.cleanup();
@@ -1535,7 +1535,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           '10',
           '--name',
           'api',
-          '--backend-server',
+          '--backend-group-server',
           'api-1:10.0.0.9:9000'
         ],
         {
@@ -1618,9 +1618,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'add',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'server-2:10.0.0.5:8080'
         ],
         {
@@ -1661,9 +1661,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'update',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'server-1',
           '--ip',
           '10.0.0.9'
@@ -1706,9 +1706,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'server-2'
         ],
         {
@@ -1746,7 +1746,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'update',
           '20',
           'grp',
-          '--backend-protocol',
+          '--backend-group-protocol',
           'HTTP'
         ],
         {
@@ -1759,7 +1759,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
 
       expect(result.exitCode).toBe(2);
       expect(result.stderr).toContain(
-        '--backend-protocol is only valid for ALB backend groups'
+        '--backend-group-protocol is only valid for ALB backend groups'
       );
     } finally {
       await server.close();
@@ -1916,9 +1916,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'update',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'missing',
           '--ip',
           '10.0.0.9'
@@ -1956,9 +1956,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'update',
           '20',
-          '--backend-group',
+          '--backend-group-name',
           'grp',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'missing',
           '--port',
           '9090'
@@ -1996,9 +1996,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'server-1'
         ],
         {
@@ -2034,9 +2034,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '20',
-          '--backend-group',
+          '--backend-group-name',
           'grp',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'srv-1'
         ],
         {
@@ -2072,9 +2072,9 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-server',
           'remove',
           '10',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server-name',
+          '--backend-group-server-name',
           'dup'
         ],
         {

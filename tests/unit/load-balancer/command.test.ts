@@ -308,9 +308,9 @@ describe('lb commands', () => {
       'HTTP',
       '--port',
       '80',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:8080'
     ]);
 
@@ -342,9 +342,9 @@ describe('lb commands', () => {
       '80',
       '--committed-plan',
       '90 Days',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:80'
     ]);
 
@@ -384,9 +384,9 @@ describe('lb commands', () => {
       'committed',
       '--committed-plan',
       '90 Days',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:80'
     ]);
 
@@ -425,9 +425,9 @@ describe('lb commands', () => {
       '80',
       '--vpc',
       '12345',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:80'
     ]);
 
@@ -655,9 +655,9 @@ describe('lb commands', () => {
       'prod',
       '--name',
       'web',
-      '--backend-protocol',
+      '--backend-group-protocol',
       'HTTPS',
-      '--backend-server',
+      '--backend-group-server',
       'server-2:10.0.0.5:8080'
     ]);
 
@@ -682,7 +682,7 @@ describe('lb commands', () => {
       'web',
       '--alias',
       'prod',
-      '--backend-protocol',
+      '--backend-group-protocol',
       'HTTPS',
       '--algorithm',
       'leastconn'
@@ -706,9 +706,9 @@ describe('lb commands', () => {
       '10',
       '--alias',
       'prod',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-2:10.0.0.5:8080'
     ]);
 
@@ -730,9 +730,9 @@ describe('lb commands', () => {
       '10',
       '--alias',
       'prod',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server-name',
+      '--backend-group-server-name',
       'server-1',
       '--ip',
       '10.0.0.30',
@@ -871,9 +871,9 @@ describe('lb commands', () => {
       '10',
       '--alias',
       'prod',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server-name',
+      '--backend-group-server-name',
       'server-2'
     ]);
 

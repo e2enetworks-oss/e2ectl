@@ -95,6 +95,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           'Frontend protocol. HTTP/HTTPS/BOTH creates an ALB; TCP creates an NLB.'
         )
           .choices(LOAD_BALANCER_FRONTEND_PROTOCOLS)
+          .argParser((v) => v.toUpperCase())
           .makeOptionMandatory()
       )
       .option(
@@ -134,9 +135,12 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         'VPC or network ID to attach. Required when --lb-type is internal.'
       )
       .option('--subnet <subnetId>', 'Subnet ID for --vpc.')
-      .requiredOption('--backend-group <name>', 'Initial backend group name.')
       .requiredOption(
-        '--backend-server <name:ip:port>',
+        '--backend-group-name <name>',
+        'Initial backend group name.'
+      )
+      .requiredOption(
+        '--backend-group-server <name:ip:port>',
         'Initial backend server. Repeat for multiple servers.',
         collectValues,
         []
@@ -151,9 +155,11 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
       )
       .addOption(
         new Option(
-          '--backend-protocol <protocol>',
+          '--backend-group-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+        )
+          .choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+          .argParser((v) => v.toUpperCase())
       )
       .option(
         '--reserve-ip <ip>',
@@ -183,7 +189,9 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
         new Option(
           '--frontend-protocol <protocol>',
           'ALB frontend protocol: HTTP, HTTPS, or BOTH.'
-        ).choices(LOAD_BALANCER_FRONTEND_PROTOCOLS)
+        )
+          .choices(LOAD_BALANCER_FRONTEND_PROTOCOLS)
+          .argParser((v) => v.toUpperCase())
       )
       .option('--ssl-certificate-id <id>', 'SSL certificate ID for ALB.')
       .option(
@@ -360,12 +368,14 @@ function buildBackendGroupCommand(
       )
       .addOption(
         new Option(
-          '--backend-protocol <protocol>',
+          '--backend-group-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+        )
+          .choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+          .argParser((v) => v.toUpperCase())
       )
       .requiredOption(
-        '--backend-server <name:ip:port>',
+        '--backend-group-server <name:ip:port>',
         'Initial backend server. Repeat for multiple servers.',
         collectValues,
         []
@@ -393,9 +403,11 @@ function buildBackendGroupCommand(
       )
       .addOption(
         new Option(
-          '--backend-protocol <protocol>',
+          '--backend-group-protocol <protocol>',
           'Backend protocol for ALB backend groups.'
-        ).choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+        )
+          .choices(LOAD_BALANCER_ALB_BACKEND_PROTOCOLS)
+          .argParser((v) => v.toUpperCase())
       )
   ).action(
     async (
@@ -444,10 +456,13 @@ function buildBackendServerCommand(
       .command('add <lbId>')
       .description('Add a server to an existing backend group.')
       .requiredOption(
-        '--backend-group <name>',
+        '--backend-group-name <name>',
         'Backend group name to add the server to.'
       )
-      .requiredOption('--backend-server <name:ip:port>', 'Backend server.')
+      .requiredOption(
+        '--backend-group-server <name:ip:port>',
+        'Backend server.'
+      )
   ).action(
     async (
       lbId: string,
@@ -463,9 +478,9 @@ function buildBackendServerCommand(
     command
       .command('update <lbId>')
       .description('Update a backend server.')
-      .requiredOption('--backend-group <name>', 'Backend group name.')
+      .requiredOption('--backend-group-name <name>', 'Backend group name.')
       .requiredOption(
-        '--backend-server-name <name>',
+        '--backend-group-server-name <name>',
         'Backend server name to update.'
       )
       .option('--ip <ip>', 'New backend server IP address.')
@@ -485,9 +500,9 @@ function buildBackendServerCommand(
     command
       .command('remove <lbId>')
       .description('Remove a server from an existing backend group.')
-      .requiredOption('--backend-group <name>', 'Backend group name.')
+      .requiredOption('--backend-group-name <name>', 'Backend group name.')
       .requiredOption(
-        '--backend-server-name <name>',
+        '--backend-group-server-name <name>',
         'Backend server name to remove.'
       )
   ).action(

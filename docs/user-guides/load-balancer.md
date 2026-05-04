@@ -32,10 +32,10 @@ e2ectl lb create \
   --name my-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
-  --backend-group web \
-  --backend-protocol HTTP \
-  --backend-server web-1:192.168.1.1:8080 \
-  --backend-server web-2:192.168.1.2:8080 \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080 \
+  --backend-group-server web-2:192.168.1.2:8080 \
   --reserve-ip 203.0.113.10 \
   --security-group 42
 ```
@@ -50,9 +50,9 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol HTTPS \
   --ssl-certificate-id 123 \
-  --backend-group web \
-  --backend-protocol HTTPS \
-  --backend-server web-1:192.168.1.1:8443
+  --backend-group-name web \
+  --backend-group-protocol HTTPS \
+  --backend-group-server web-1:192.168.1.1:8443
 ```
 
 ## Create An NLB
@@ -67,9 +67,9 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol TCP \
   --port 9000 \
-  --backend-group tcp-main \
-  --backend-server app-1:192.168.1.10:9000 \
-  --backend-server app-2:192.168.1.11:9000 \
+  --backend-group-name tcp-main \
+  --backend-group-server app-1:192.168.1.10:9000 \
+  --backend-group-server app-2:192.168.1.11:9000 \
   --reserve-ip 203.0.113.10
 ```
 
@@ -87,9 +87,9 @@ e2ectl lb create \
   --frontend-protocol HTTP \
   --lb-type internal \
   --vpc 123 \
-  --backend-group web \
-  --backend-protocol HTTP \
-  --backend-server web-1:192.168.1.1:8080
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080
 ```
 
 ## External LBs With VPC
@@ -130,11 +130,11 @@ e2ectl lb backend-group list <lbId>
 
 e2ectl lb backend-group add <lbId> \
   --name api \
-  --backend-protocol HTTP \
-  --backend-server api-1:192.168.2.1:9000
+  --backend-group-protocol HTTP \
+  --backend-group-server api-1:192.168.2.1:9000
 
 e2ectl lb backend-group update <lbId> web \
-  --backend-protocol HTTPS \
+  --backend-group-protocol HTTPS \
   --algorithm leastconn
 
 e2ectl lb backend-group remove <lbId> api
@@ -144,22 +144,22 @@ Creation supports one backend group with multiple backend servers. Add more back
 
 ## Backend Servers
 
-Use `e2ectl node list` to find node IPs for `--backend-server`.
+Use `e2ectl node list` to find node IPs for `--backend-group-server`.
 
 ```bash
 e2ectl lb backend-server add <lbId> \
-  --backend-group web \
-  --backend-server web-3:192.168.1.3:8080
+  --backend-group-name web \
+  --backend-group-server web-3:192.168.1.3:8080
 
 e2ectl lb backend-server update <lbId> \
-  --backend-group web \
-  --backend-server-name web-3 \
+  --backend-group-name web \
+  --backend-group-server-name web-3 \
   --ip 192.168.1.30 \
   --port 8081
 
 e2ectl lb backend-server remove <lbId> \
-  --backend-group web \
-  --backend-server-name web-3
+  --backend-group-name web \
+  --backend-group-server-name web-3
 ```
 
 The CLI refuses to remove the final backend server from a backend group.

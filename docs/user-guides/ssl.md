@@ -37,9 +37,9 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol HTTPS \
   --ssl-certificate-id <id> \
-  --backend-group web \
-  --backend-protocol HTTPS \
-  --backend-server web-1:192.168.1.1:8443
+  --backend-group-name web \
+  --backend-group-protocol HTTPS \
+  --backend-group-server web-1:192.168.1.1:8443
 
 # Switch an existing ALB to HTTPS
 e2ectl lb update <lbId> \

@@ -97,7 +97,7 @@ export function assertAlbBackendProtocol(
     ) === false
   ) {
     throw new CliError(
-      `Invalid --backend-protocol "${protocol}". Must be one of: ${LOAD_BALANCER_ALB_BACKEND_PROTOCOLS.join(', ')}.`,
+      `Invalid --backend-group-protocol "${protocol}". Must be one of: ${LOAD_BALANCER_ALB_BACKEND_PROTOCOLS.join(', ')}.`,
       {
         code: 'INVALID_LB_BACKEND_PROTOCOL',
         exitCode: EXIT_CODES.usage
@@ -151,7 +151,7 @@ export function parseBackendServerSpecs(
   values: string[] | undefined
 ): LoadBalancerServer[] {
   if (values === undefined || values.length === 0) {
-    throw new CliError('At least one --backend-server is required.', {
+    throw new CliError('At least one --backend-group-server is required.', {
       code: 'BACKEND_SERVER_REQUIRED',
       exitCode: EXIT_CODES.usage
     });
@@ -169,7 +169,7 @@ export function parseBackendServerSpec(value: string): LoadBalancerServer {
     extra.length > 0
   ) {
     throw new CliError(
-      `Invalid --backend-server "${value}". Expected name:ip:port.`,
+      `Invalid --backend-group-server "${value}". Expected name:ip:port.`,
       {
         code: 'INVALID_BACKEND_SERVER_SPEC',
         exitCode: EXIT_CODES.usage
@@ -178,9 +178,9 @@ export function parseBackendServerSpec(value: string): LoadBalancerServer {
   }
 
   return {
-    backend_name: assertNonEmpty(name, '--backend-server name'),
-    backend_ip: assertIp(ip, '--backend-server ip'),
-    backend_port: assertPort(port, '--backend-server port')
+    backend_name: assertNonEmpty(name, '--backend-group-server name'),
+    backend_ip: assertIp(ip, '--backend-group-server ip'),
+    backend_port: assertPort(port, '--backend-group-server port')
   };
 }
 

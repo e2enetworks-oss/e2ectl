@@ -121,9 +121,9 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
   --port 80 \
-  --backend-group web \
-  --backend-protocol HTTP \
-  --backend-server server-1:10.0.0.1:8080
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server server-1:10.0.0.1:8080
 
 # 3. List load balancers and capture the id
 e2ectl --json lb list > lbs.json
@@ -136,8 +136,8 @@ e2ectl --json lb get "$LB_ID" > lb-detail.json
 
 # 5. Add a second server to an existing group
 e2ectl lb backend-server add "$LB_ID" \
-  --backend-group web \
-  --backend-server server-2:10.0.0.2:8080
+  --backend-group-name web \
+  --backend-group-server server-2:10.0.0.2:8080
 
 # 6. Delete when done
 e2ectl lb delete "$LB_ID" --force

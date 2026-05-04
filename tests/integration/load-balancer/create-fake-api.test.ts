@@ -86,9 +86,9 @@ function baseCreateArgs(overrides: string[] = []) {
     'HTTP',
     '--port',
     '80',
-    '--backend-group',
+    '--backend-group-name',
     'web',
-    '--backend-server',
+    '--backend-group-server',
     's1:10.0.0.1:8080',
     ...overrides
   ];
@@ -111,9 +111,9 @@ describe('lb create against a fake MyAccount API', () => {
       '12345',
       '--reserve-ip',
       '1.2.3.4',
-      '--backend-group',
+      '--backend-group-name',
       'web',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:8080'
     ]);
 
@@ -134,9 +134,9 @@ describe('lb create against a fake MyAccount API', () => {
       'LB-2',
       '--frontend-protocol',
       'TCP',
-      '--backend-group',
+      '--backend-group-name',
       'tcp',
-      '--backend-server',
+      '--backend-group-server',
       'server-1:10.0.0.1:8080'
     ]);
 
@@ -174,9 +174,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'server-1:10.0.0.1:8080'
         ],
         {
@@ -304,9 +304,9 @@ describe('lb create against a fake MyAccount API', () => {
           'TCP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'tcp-grp',
-          '--backend-server',
+          '--backend-group-server',
           'srv-1:10.0.0.2:8080'
         ],
         {
@@ -402,9 +402,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           's1:10.0.0.1:8080',
           '--reserve-ip',
           '9.9.9.9'
@@ -506,9 +506,9 @@ describe('lb create against a fake MyAccount API', () => {
           '90 Days',
           '--post-commit-behavior',
           'hourly-billing',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'server-1:10.0.0.1:80'
         ],
         {
@@ -643,9 +643,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           'server-1:10.0.0.1:8080'
         ],
         {
@@ -689,9 +689,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTPS',
           '--port',
           '443',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           's1:10.0.0.1:8080'
         ],
         {
@@ -736,9 +736,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           's1:10.0.0.1:8080',
           '--committed-plan',
           '90 Days',
@@ -787,9 +787,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           's1:10.0.0.1:8080',
           '--post-commit-behavior',
           'auto-renew'
@@ -853,9 +853,9 @@ describe('lb create against a fake MyAccount API', () => {
           'HTTP',
           '--port',
           '80',
-          '--backend-group',
+          '--backend-group-name',
           'web',
-          '--backend-server',
+          '--backend-group-server',
           's1:10.0.0.1:8080'
         ],
         {

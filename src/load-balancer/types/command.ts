@@ -35,10 +35,10 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   postCommitBehavior?: string;
   vpc?: string;
   subnet?: string;
-  backendGroup?: string;
-  backendServer?: string[];
+  backendGroupName?: string;
+  backendGroupServer?: string[];
   algorithm?: string;
-  backendProtocol?: string;
+  backendGroupProtocol?: string;
   reserveIp?: string;
   securityGroupId?: string;
   sslCertificateId?: string;
@@ -68,8 +68,8 @@ export interface LoadBalancerVpcDetachOptions extends LoadBalancerContextOptions
 export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerContextOptions {
   name: string;
   algorithm?: string;
-  backendProtocol?: string;
-  backendServer?: string[];
+  backendGroupProtocol?: string;
+  backendGroupServer?: string[];
   httpCheck?: boolean;
   serverIp?: string;
   serverName?: string;
@@ -78,24 +78,24 @@ export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerConte
 
 export interface LoadBalancerBackendGroupUpdateOptions extends LoadBalancerContextOptions {
   algorithm?: string;
-  backendProtocol?: string;
+  backendGroupProtocol?: string;
 }
 
 export interface LoadBalancerBackendServerAddOptions extends LoadBalancerContextOptions {
-  backendGroup?: string;
-  backendServer?: string;
+  backendGroupName?: string;
+  backendGroupServer?: string;
 }
 
 export interface LoadBalancerBackendServerUpdateOptions extends LoadBalancerContextOptions {
-  backendGroup: string;
-  backendServerName: string;
+  backendGroupName: string;
+  backendGroupServerName: string;
   ip?: string;
   port?: string;
 }
 
 export interface LoadBalancerBackendServerDeleteOptions extends LoadBalancerContextOptions {
-  backendGroup?: string;
-  backendServerName?: string;
+  backendGroupName?: string;
+  backendGroupServerName?: string;
   backendName?: string;
   serverIp?: string;
   serverName?: string;

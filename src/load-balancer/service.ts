@@ -192,25 +192,25 @@ export class LoadBalancerService {
       : null;
 
     const isAlb = LOAD_BALANCER_ALB_MODES.includes(mode);
-    if (!isAlb && options.backendProtocol !== undefined) {
+    if (!isAlb && options.backendGroupProtocol !== undefined) {
       throw new CliError(
-        '--backend-protocol is only valid for ALB protocols.',
+        '--backend-group-protocol is only valid for ALB protocols.',
         {
           code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
           exitCode: EXIT_CODES.usage,
           suggestion:
-            'Remove --backend-protocol when --frontend-protocol is TCP.'
+            'Remove --backend-group-protocol when --frontend-protocol is TCP.'
         }
       );
     }
     const albBackendProtocol = isAlb
-      ? assertAlbBackendProtocol(options.backendProtocol)
+      ? assertAlbBackendProtocol(options.backendGroupProtocol)
       : null;
     const backendGroup = assertNonEmpty(
-      options.backendGroup,
-      '--backend-group'
+      options.backendGroupName,
+      '--backend-group-name'
     );
-    const servers = parseBackendServerSpecs(options.backendServer);
+    const servers = parseBackendServerSpecs(options.backendGroupServer);
 
     const backends = isAlb
       ? [
@@ -489,10 +489,10 @@ export class LoadBalancerService {
 
     const albBackendProtocol = isNlb
       ? null
-      : assertAlbBackendProtocol(options.backendProtocol);
-    if (isNlb && options.backendProtocol !== undefined) {
+      : assertAlbBackendProtocol(options.backendGroupProtocol);
+    if (isNlb && options.backendGroupProtocol !== undefined) {
       throw new CliError(
-        '--backend-protocol is only valid for ALB backend groups.',
+        '--backend-group-protocol is only valid for ALB backend groups.',
         {
           code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
           exitCode: EXIT_CODES.usage
@@ -524,7 +524,7 @@ export class LoadBalancerService {
       );
     }
 
-    const servers = parseBackendServerSpecs(options.backendServer);
+    const servers = parseBackendServerSpecs(options.backendGroupServer);
 
     if (isNlb) {
       const backendPort = assertPort(lbPort, '--backend-port');
@@ -595,9 +595,9 @@ export class LoadBalancerService {
     let backendProtocol: 'HTTP' | 'HTTPS' | undefined;
 
     if (mutation.isNlb) {
-      if (options.backendProtocol !== undefined) {
+      if (options.backendGroupProtocol !== undefined) {
         throw new CliError(
-          '--backend-protocol is only valid for ALB backend groups.',
+          '--backend-group-protocol is only valid for ALB backend groups.',
           {
             code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
             exitCode: EXIT_CODES.usage
@@ -606,9 +606,9 @@ export class LoadBalancerService {
       }
     } else {
       backendProtocol =
-        options.backendProtocol === undefined
+        options.backendGroupProtocol === undefined
           ? undefined
-          : assertAlbBackendProtocol(options.backendProtocol);
+          : assertAlbBackendProtocol(options.backendGroupProtocol);
     }
 
     const mutationResult = buildBackendGroupUpdateMutation(
@@ -634,9 +634,9 @@ export class LoadBalancerService {
       ...(options.algorithm === undefined
         ? {}
         : { algorithm: options.algorithm }),
-      ...(options.backendProtocol === undefined
+      ...(options.backendGroupProtocol === undefined
         ? {}
-        : { backend_protocol: options.backendProtocol })
+        : { backend_protocol: options.backendGroupProtocol })
     };
   }
 
@@ -674,10 +674,14 @@ export class LoadBalancerService {
     options: LoadBalancerBackendServerAddOptions
   ): Promise<LoadBalancerBackendServerAddCommandResult> {
     const backendGroup = assertNonEmpty(
-      options.backendGroup,
-      '--backend-group'
+      options.backendGroupName,
+      '--backend-group-name'
     );
-    const server = parseBackendServerSpec(options.backendServer!);
+    const rawServer = assertNonEmpty(
+      options.backendGroupServer,
+      '--backend-group-server'
+    );
+    const server = parseBackendServerSpec(rawServer);
 
     const { client, lb, mutation } = await this.resolveMutationState(
       lbId,
@@ -732,8 +736,8 @@ export class LoadBalancerService {
     );
     const mutationResult = buildBackendServerUpdateMutation(
       mutation,
-      options.backendGroup,
-      options.backendServerName,
+      options.backendGroupName,
+      options.backendGroupServerName,
       {
         ...(nextIp === undefined ? {} : { backend_ip: nextIp }),
         ...(nextPort === undefined ? {} : { backend_port: nextPort })
@@ -742,8 +746,8 @@ export class LoadBalancerService {
     if (!mutationResult.serverFound) {
       throwBackendServerNotFound(
         lbId,
-        options.backendGroup,
-        options.backendServerName
+        options.backendGroupName,
+        options.backendGroupServerName
       );
     }
     const overrides = mutationResult.overrides!;
@@ -751,11 +755,11 @@ export class LoadBalancerService {
 
     return {
       action: 'backend-server-update',
-      group_name: options.backendGroup,
+      group_name: options.backendGroupName,
       lb_id: lbId,
       lb_name: lb.appliance_name,
-      message: `Server "${options.backendServerName}" updated in backend group "${options.backendGroup}".`,
-      server_name: options.backendServerName,
+      message: `Server "${options.backendGroupServerName}" updated in backend group "${options.backendGroupName}".`,
+      server_name: options.backendGroupServerName,
       ...(options.ip === undefined ? {} : { ip: options.ip }),
       ...(options.port === undefined ? {} : { port: options.port })
     };
@@ -766,12 +770,12 @@ export class LoadBalancerService {
     options: LoadBalancerBackendServerDeleteOptions
   ): Promise<LoadBalancerBackendServerDeleteCommandResult> {
     const backendGroup = assertNonEmpty(
-      options.backendGroup,
-      '--backend-group'
+      options.backendGroupName,
+      '--backend-group-name'
     );
     const backendServerName = assertNonEmpty(
-      options.backendServerName,
-      '--backend-server-name'
+      options.backendGroupServerName,
+      '--backend-group-server-name'
     );
     const { client, lb, mutation } = await this.resolveMutationState(
       lbId,
