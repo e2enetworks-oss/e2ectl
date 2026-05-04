@@ -66,7 +66,7 @@ export interface LoadBalancerVpcDetachOptions extends LoadBalancerContextOptions
 }
 
 export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerContextOptions {
-  name: string;
+  backendGroupName?: string;
   algorithm?: string;
   backendGroupProtocol?: string;
   backendGroupServer?: string[];

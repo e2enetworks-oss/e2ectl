@@ -653,7 +653,7 @@ describe('lb commands', () => {
       '10',
       '--alias',
       'prod',
-      '--name',
+      '--backend-group-name',
       'web',
       '--backend-group-protocol',
       'HTTPS',

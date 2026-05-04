@@ -359,7 +359,7 @@ function buildBackendGroupCommand(
     command
       .command('add <lbId>')
       .description('Add a backend group to a load balancer.')
-      .requiredOption('--name <name>', 'Backend group name.')
+      .requiredOption('--backend-group-name <name>', 'Backend group name.')
       .addOption(
         new Option(
           '--algorithm <algorithm>',

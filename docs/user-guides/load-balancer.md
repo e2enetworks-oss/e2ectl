@@ -129,7 +129,7 @@ Reserving a public IP is for external load balancers with an assigned public IPv
 e2ectl lb backend-group list <lbId>
 
 e2ectl lb backend-group add <lbId> \
-  --name api \
+  --backend-group-name api \
   --backend-group-protocol HTTP \
   --backend-group-server api-1:192.168.2.1:9000
 

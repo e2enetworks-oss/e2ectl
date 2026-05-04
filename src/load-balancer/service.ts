@@ -512,10 +512,15 @@ export class LoadBalancerService {
       );
     }
 
+    const groupName = assertNonEmpty(
+      options.backendGroupName,
+      '--backend-group-name'
+    );
+
     // ALB guard: group name must be unique
-    if (!isNlb && currentBackends.some((g) => g.name === options.name)) {
+    if (!isNlb && currentBackends.some((g) => g.name === groupName)) {
       throw new CliError(
-        `Backend group "${options.name}" already exists on load balancer ${lbId}. Use \`lb backend-server add\` to add a server to it.`,
+        `Backend group "${groupName}" already exists on load balancer ${lbId}. Use \`lb backend-server add\` to add a server to it.`,
         {
           code: 'BACKEND_GROUP_EXISTS',
           exitCode: EXIT_CODES.usage,
@@ -530,7 +535,7 @@ export class LoadBalancerService {
       const backendPort = assertPort(lbPort, '--backend-port');
       const newTcpGroup = buildTcpBackendGroup({
         algorithm,
-        name: options.name,
+        name: groupName,
         port: backendPort,
         servers
       });
@@ -544,20 +549,20 @@ export class LoadBalancerService {
         action: 'backend-group-add',
         group: summarizeTcpBackendGroup({
           algorithm,
-          name: options.name,
+          name: groupName,
           port: backendPort,
           servers
         }),
         lb_id: lbId,
         lb_name: lb.appliance_name,
-        message: `Backend group "${options.name}" added.`
+        message: `Backend group "${groupName}" added.`
       };
     }
 
     const newAlbGroup = buildAlbBackendGroup({
       algorithm,
       backendProtocol: albBackendProtocol!,
-      name: options.name,
+      name: groupName,
       servers
     });
 
@@ -570,12 +575,12 @@ export class LoadBalancerService {
       group: summarizeAlbBackendGroup({
         algorithm,
         backendProtocol: albBackendProtocol!,
-        name: options.name,
+        name: groupName,
         servers
       }),
       lb_id: lbId,
       lb_name: lb.appliance_name,
-      message: `Backend group "${options.name}" added.`
+      message: `Backend group "${groupName}" added.`
     };
   }
 

@@ -1287,7 +1287,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createEmptyAlbDetails());
 
       const result = await service.createBackendGroup('30', {
-        name: 'web',
+        backendGroupName: 'web',
         backendGroupServer: ['server-1:10.0.0.5:8080']
       });
 
@@ -1329,7 +1329,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1354,7 +1354,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createEmptyNlbDetails());
 
       const result = await service.createBackendGroup('40', {
-        name: 'tcp-grp',
+        backendGroupName: 'tcp-grp',
         backendGroupServer: ['srv-1:10.0.0.2:8080']
       });
 
@@ -1372,7 +1372,7 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.createBackendGroup('10', {
-          name: 'web',
+          backendGroupName: 'web',
           backendGroupServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_EXISTS' });
@@ -1384,7 +1384,7 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.createBackendGroup('20', {
-          name: 'new-group',
+          backendGroupName: 'new-group',
           backendGroupServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'NLB_SINGLE_BACKEND_GROUP' });
@@ -1399,7 +1399,7 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.createBackendGroup('10', {
-          name: 'api',
+          backendGroupName: 'api',
           backendGroupServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
@@ -1411,7 +1411,7 @@ describe('LoadBalancerService', () => {
 
       await expect(
         service.createBackendGroup('30', {
-          name: 'api',
+          backendGroupName: 'api',
           backendGroupServer: [':10.0.0.1:80']
         })
       ).rejects.toMatchObject({ code: 'MISSING_REQUIRED_OPTION' });
@@ -1439,7 +1439,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1459,7 +1459,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1490,7 +1490,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1505,7 +1505,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue(createEmptyAlbDetails({ lb_mode: '' }));
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1522,7 +1522,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });
 
@@ -1549,7 +1549,7 @@ describe('LoadBalancerService', () => {
       );
 
       await service.createBackendGroup('30', {
-        name: 'api',
+        backendGroupName: 'api',
         backendGroupProtocol: 'HTTP',
         backendGroupServer: ['srv-1:10.0.0.1:80']
       });

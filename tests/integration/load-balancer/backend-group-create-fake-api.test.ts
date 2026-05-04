@@ -101,7 +101,7 @@ describe('lb backend-group create against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '10',
-          '--name',
+          '--backend-group-name',
           'mygroup',
           '--backend-group-protocol',
           'HTTP',
@@ -161,7 +161,7 @@ describe('lb backend-group create against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '20',
-          '--name',
+          '--backend-group-name',
           'mygroup',
           '--backend-group-server',
           'srv-1:10.0.0.5:80'
