@@ -75,6 +75,9 @@ describe('ssh-key commands', () => {
       createImageClient: vi.fn(() => {
         throw new Error('Image client should not be created for this test.');
       }) as unknown as CliRuntime['createImageClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,

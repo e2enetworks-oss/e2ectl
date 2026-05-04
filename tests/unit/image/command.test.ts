@@ -88,6 +88,9 @@ describe('image commands', () => {
       createVpcClient: vi.fn(() => {
         throw new Error('VPC client should not be created for this test.');
       }) as unknown as CliRuntime['createVpcClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       credentialValidator: { validate: vi.fn() },
       isInteractive: true,
       prompt: vi.fn(() => Promise.resolve('')),

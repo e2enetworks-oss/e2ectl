@@ -1,3 +1,5 @@
 coverage:
   ignore:
+    - 'src/**/*-types.ts'
     - 'src/**/types.ts'
+    - 'src/**/types/**'
