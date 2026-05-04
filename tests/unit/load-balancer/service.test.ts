@@ -1015,6 +1015,22 @@ describe('LoadBalancerService', () => {
       ).rejects.toMatchObject({ code: 'INVALID_LB_BACKEND_PROTOCOL' });
     });
 
+    it('throws INVALID_LB_TYPE for unknown lb-type', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'lb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          port: '80',
+          lbType: 'bogus',
+          backendGroupName: 'web',
+          backendGroupServer: ['srv-1:10.0.0.1:80']
+        })
+      ).rejects.toMatchObject({ code: 'INVALID_LB_TYPE' });
+    });
+
     it('throws MISSING_SERVER_IP when serverIp is empty string', async () => {
       const { service } = createServiceFixture();
 
