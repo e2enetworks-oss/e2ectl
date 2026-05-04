@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 
 import { addContextOptions } from '../app/context-options.js';
-import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderSslResult } from './formatter.js';
 import { SslService } from './service.js';
@@ -13,16 +12,7 @@ interface GlobalOptions {
 
 export function buildSslCommand(runtime: CliRuntime): Command {
   const service = new SslService({
-    createSslClient: (credentials) => {
-      if (runtime.createSslClient === undefined) {
-        throw new CliError('SSL client is not available in this runtime.', {
-          code: 'SSL_CLIENT_UNAVAILABLE',
-          exitCode: EXIT_CODES.general
-        });
-      }
-
-      return runtime.createSslClient(credentials);
-    },
+    createSslClient: (credentials) => runtime.createSslClient(credentials),
     store: runtime.store
   });
   const command = new Command('ssl').description(

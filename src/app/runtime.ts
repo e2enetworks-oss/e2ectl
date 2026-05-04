@@ -48,7 +48,7 @@ export interface CliRuntime {
     credentials: ResolvedCredentials
   ): SecurityGroupClient;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
-  createSslClient?(credentials: ResolvedCredentials): SslClient;
+  createSslClient(credentials: ResolvedCredentials): SslClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   credentialValidator: CredentialValidator;
