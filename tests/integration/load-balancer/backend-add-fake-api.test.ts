@@ -415,7 +415,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '10',
-          '--name',
+          '--backend-group-name',
           'web',
           '--backend-group-protocol',
           'HTTPS',
@@ -914,7 +914,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '20',
-          '--name',
+          '--backend-group-name',
           'grp',
           '--backend-group-server',
           'srv-1:10.0.0.5:80'
@@ -1282,7 +1282,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '10',
-          '--name',
+          '--backend-group-name',
           'web',
           '--backend-group-server',
           'srv-1:10.0.0.5:80'
@@ -1363,7 +1363,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '20',
-          '--name',
+          '--backend-group-name',
           'newgrp',
           '--backend-group-server',
           'srv-1:10.0.0.5:80'
@@ -1431,7 +1431,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '20',
-          '--name',
+          '--backend-group-name',
           'grp',
           '--backend-group-server',
           ':10.0.0.1:80'
@@ -1533,7 +1533,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
           'backend-group',
           'add',
           '10',
-          '--name',
+          '--backend-group-name',
           'api',
           '--backend-group-server',
           'api-1:10.0.0.9:9000'
