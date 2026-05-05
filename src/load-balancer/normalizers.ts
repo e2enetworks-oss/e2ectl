@@ -2,7 +2,7 @@ import { isIPv4 } from 'node:net';
 
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import { normalizeRequiredNumericId } from '../node/normalizers.js';
+import { normalizeRequiredNumericId } from '../node/index.js';
 import type { ReservedIpSummary } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_BACKEND_PROTOCOLS,

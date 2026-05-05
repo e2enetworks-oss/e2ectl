@@ -2,7 +2,7 @@ import {
   resolveStoredCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
-import { normalizeRequiredNumericId } from '../node/normalizers.js';
+import { normalizeRequiredNumericId } from '../node/index.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
