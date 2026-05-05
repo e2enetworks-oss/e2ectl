@@ -1,4 +1,8 @@
 import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
+import {
+  isLoadBalancerPublicIpReservedClient,
+  normalizeLoadBalancerDetails
+} from './mappers.js';
 
 import type {
   LoadBalancerClient,
@@ -8,6 +12,7 @@ import type {
   LoadBalancerDetails,
   LoadBalancerListApiItem,
   LoadBalancerListApiResponse,
+  LoadBalancerListPageResult,
   LoadBalancerPlan,
   LoadBalancerRawDetails,
   LoadBalancerSummary,
@@ -22,7 +27,6 @@ export type {
 const LOAD_BALANCERS_PATH = '/appliances/load-balancers/';
 const LOAD_BALANCER_PLANS_PATH = '/appliance-type/';
 const APPLIANCES_PATH = '/appliances/';
-const LOAD_BALANCER_LIST_PAGE_SIZE = 100;
 
 export class LoadBalancerApiClient implements LoadBalancerClient {
   constructor(private readonly transport: MyAccountTransport) {}
@@ -54,47 +58,7 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
       ApiEnvelope<LoadBalancerRawDetails>
     >(buildAppliancePath(lbId));
 
-    const data = response.data;
-    const context = (data.appliance_instance ?? [])
-      .map((instance) => instance.context)
-      .filter((item): item is NonNullable<typeof item> => item !== undefined);
-    const primaryContext = context?.[0] as
-      | { lb_mode?: string; lb_type?: string; lb_reserve_ip?: string | null }
-      | undefined;
-    const result: LoadBalancerDetails = {
-      ...data,
-      appliance_name: data.appliance_name ?? data.name ?? String(data.id),
-      context
-    };
-
-    const lbMode = data.lb_mode ?? primaryContext?.lb_mode;
-    if (lbMode !== undefined) {
-      result.lb_mode = lbMode;
-    }
-
-    const lbType = data.lb_type ?? primaryContext?.lb_type;
-    if (lbType !== undefined) {
-      result.lb_type = lbType;
-    }
-
-    const publicIp = data.public_ip ?? data.node_detail?.public_ip;
-    if (publicIp !== undefined) {
-      result.public_ip = publicIp;
-    }
-    result.public_ip_reserved = isPublicIpReserved(
-      data.node_detail?.allow_reserve_ip?.is_already_reserved,
-      publicIp,
-      primaryContext?.lb_reserve_ip
-    );
-
-    const privateIp = data.private_ip ?? data.node_detail?.private_ip;
-    if (privateIp !== undefined) {
-      (
-        result as LoadBalancerDetails & { private_ip?: string | null }
-      ).private_ip = privateIp;
-    }
-
-    return result;
+    return normalizeLoadBalancerDetails(response.data);
   }
 
   async listLoadBalancerPlans(): Promise<LoadBalancerPlan[]> {
@@ -108,39 +72,27 @@ export class LoadBalancerApiClient implements LoadBalancerClient {
       : [];
   }
 
-  async listLoadBalancers(): Promise<LoadBalancerSummary[]> {
-    const items: LoadBalancerSummary[] = [];
-    let pageNumber = 1;
-    let totalPages: number | undefined;
-    const MAX_PAGES = 50;
-
-    while (pageNumber <= MAX_PAGES) {
-      const response = await this.transport.get<LoadBalancerListApiResponse>(
-        APPLIANCES_PATH,
-        {
-          query: {
-            advance_search_string: 'false',
-            page_no: String(pageNumber),
-            per_page: String(LOAD_BALANCER_LIST_PAGE_SIZE)
-          }
+  async listLoadBalancersPage(
+    pageNumber: number,
+    perPage: number
+  ): Promise<LoadBalancerListPageResult> {
+    const response = await this.transport.get<LoadBalancerListApiResponse>(
+      APPLIANCES_PATH,
+      {
+        query: {
+          advance_search_string: 'false',
+          page_no: String(pageNumber),
+          per_page: String(perPage)
         }
-      );
-
-      items.push(...response.data.map(normalizeLoadBalancerSummary));
-      totalPages = response.total_page_number || totalPages;
-
-      if (totalPages !== undefined) {
-        if (pageNumber >= totalPages) {
-          break;
-        }
-      } else if (response.data.length < LOAD_BALANCER_LIST_PAGE_SIZE) {
-        break;
       }
+    );
 
-      pageNumber += 1;
-    }
-
-    return items;
+    return {
+      items: response.data.map(normalizeLoadBalancerSummary),
+      ...(response.total_page_number === undefined
+        ? {}
+        : { total_page_number: response.total_page_number })
+    };
   }
 
   async updateLoadBalancer(
@@ -187,7 +139,7 @@ function normalizeLoadBalancerSummary(
     ...(lbMode === undefined ? {} : { lb_mode: lbMode }),
     ...(lbType === undefined ? {} : { lb_type: lbType }),
     ...(publicIp === undefined ? {} : { public_ip: publicIp }),
-    public_ip_reserved: isPublicIpReserved(
+    public_ip_reserved: isLoadBalancerPublicIpReservedClient(
       item.node_detail?.allow_reserve_ip?.is_already_reserved,
       publicIp,
       context?.lb_reserve_ip
@@ -238,21 +190,4 @@ function normalizePublicIp(
 
   const normalized = publicIp.trim();
   return normalized.length === 0 || normalized === '[]' ? null : normalized;
-}
-
-function isPublicIpReserved(
-  allowReserveIpFlag: boolean | undefined,
-  publicIp: string | null | undefined,
-  lbReserveIp: unknown
-): boolean {
-  if (allowReserveIpFlag === true) {
-    return true;
-  }
-
-  return (
-    typeof publicIp === 'string' &&
-    publicIp.trim().length > 0 &&
-    typeof lbReserveIp === 'string' &&
-    lbReserveIp.trim() === publicIp.trim()
-  );
 }

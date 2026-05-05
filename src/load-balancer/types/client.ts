@@ -72,6 +72,11 @@ export interface LoadBalancerDeleteQuery {
   reserve_ip_required?: string;
 }
 
+export interface LoadBalancerListPageResult {
+  items: LoadBalancerSummary[];
+  total_page_number?: number;
+}
+
 export interface LoadBalancerClient {
   createLoadBalancer(
     body: LoadBalancerCreateRequest
@@ -82,7 +87,10 @@ export interface LoadBalancerClient {
   ): Promise<{ message: string }>;
   getLoadBalancer(lbId: string): Promise<LoadBalancerDetails>;
   listLoadBalancerPlans(): Promise<LoadBalancerPlan[]>;
-  listLoadBalancers(): Promise<LoadBalancerSummary[]>;
+  listLoadBalancersPage(
+    pageNumber: number,
+    perPage: number
+  ): Promise<LoadBalancerListPageResult>;
   updateLoadBalancer(
     lbId: string,
     body: LoadBalancerUpdateRequest

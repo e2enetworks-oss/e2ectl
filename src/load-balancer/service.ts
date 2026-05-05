@@ -8,6 +8,8 @@ import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_MODES,
+  LOAD_BALANCER_LIST_MAX_PAGES,
+  LOAD_BALANCER_LIST_PAGE_SIZE,
   LOAD_BALANCER_SSL_MODES
 } from './constants.js';
 import {
@@ -79,6 +81,7 @@ import type {
   LoadBalancerVpcAttachOptions,
   LoadBalancerVpcAttachment,
   LoadBalancerVpcDetachOptions,
+  LoadBalancerSummary,
   ResolvedLoadBalancerCreateBilling
 } from './types/index.js';
 import type { VpcClient } from '../vpc/index.js';
@@ -90,7 +93,7 @@ export class LoadBalancerService {
     options: LoadBalancerContextOptions
   ): Promise<LoadBalancerListCommandResult> {
     const client = await this.createClient(options);
-    const items = await client.listLoadBalancers();
+    const items = await this.fetchAllLoadBalancers(client);
 
     return { action: 'list', items };
   }
@@ -982,6 +985,34 @@ export class LoadBalancerService {
       lbId,
       buildLoadBalancerMutationPayload(lb, mutation, overrides)
     );
+  }
+
+  private async fetchAllLoadBalancers(
+    client: LoadBalancerClient
+  ): Promise<LoadBalancerSummary[]> {
+    const items: LoadBalancerSummary[] = [];
+
+    for (
+      let pageNumber = 1;
+      pageNumber <= LOAD_BALANCER_LIST_MAX_PAGES;
+      pageNumber += 1
+    ) {
+      const response = await client.listLoadBalancersPage(
+        pageNumber,
+        LOAD_BALANCER_LIST_PAGE_SIZE
+      );
+      items.push(...response.items);
+
+      if (response.total_page_number !== undefined) {
+        if (pageNumber >= response.total_page_number) {
+          break;
+        }
+      } else if (response.items.length < LOAD_BALANCER_LIST_PAGE_SIZE) {
+        break;
+      }
+    }
+
+    return items;
   }
 
   private async resolveContext(

@@ -1276,4 +1276,21 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('Committed (90 Days)');
     });
   });
+
+  describe('plans – JSON with empty items', () => {
+    it('renders JSON plans with empty items correctly', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'plans',
+        items: []
+      };
+
+      const output = renderLoadBalancerResult(result, true);
+
+      expect(output).toContain('"action"');
+      expect(output).toContain('"plans"');
+      expect(output).toContain('"items"');
+      const parsed = JSON.parse(output) as { items: unknown[] };
+      expect(parsed.items).toEqual([]);
+    });
+  });
 });

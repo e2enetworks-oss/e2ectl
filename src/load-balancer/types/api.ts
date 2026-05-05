@@ -111,7 +111,43 @@ export interface LoadBalancerCreateRequest {
   vpc_list?: LoadBalancerVpcAttachment[];
 }
 
-export type LoadBalancerUpdateRequest = LoadBalancerCreateRequest;
+export interface LoadBalancerUpdateRequest {
+  lb_name: string;
+  lb_type: LoadBalancerVpc;
+  lb_mode: LoadBalancerMode;
+  lb_port: string;
+  plan_name: string;
+  node_list_type: 'S' | 'D';
+  backends: LoadBalancerBackend[];
+  tcp_backend: LoadBalancerTcpBackend[];
+  acl_list: LoadBalancerAclRule[];
+  acl_map: LoadBalancerAclMapRule[];
+  client_timeout: number;
+  server_timeout: number;
+  connection_timeout: number;
+  http_keep_alive_timeout: number;
+  cn_id?: number | null;
+  cn_status?: LoadBalancerCommittedStatus | null;
+  custom_sku?: Record<string, unknown>;
+  default_backend?: string;
+  enable_bitninja?: boolean;
+  enable_eos_logger?: Record<string, unknown>;
+  encryption_passphrase?: string;
+  eos_log_enable?: boolean;
+  host_ids?: number[];
+  host_target_ipv6?: string;
+  isEncryptionEnabled?: boolean;
+  is_ipv6_attached?: boolean;
+  is_private?: boolean;
+  lb_reserve_ip?: string | null;
+  maxconn?: number;
+  scaler_id?: string | null;
+  scaler_port?: string | null;
+  security_group_id?: number | null;
+  ssl_certificate_id?: number | null;
+  ssl_context?: Record<string, unknown>;
+  vpc_list?: LoadBalancerVpcAttachment[];
+}
 
 export interface LoadBalancerSummary {
   id: number;

@@ -133,7 +133,7 @@ describe('LoadBalancerApiClient', () => {
       total_page_number: 1
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
     expect(transport.getMock).toHaveBeenCalledWith('/appliances/', {
       query: {
@@ -142,10 +142,10 @@ describe('LoadBalancerApiClient', () => {
         per_page: '100'
       }
     });
-    expect(result).toHaveLength(1);
-    expect(result[0]!.appliance_name).toBe('my-alb');
-    expect(result[0]!.lb_mode).toBe('HTTP');
-    expect(result[0]!.lb_type).toBe('external');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.appliance_name).toBe('my-alb');
+    expect(result.items[0]!.lb_mode).toBe('HTTP');
+    expect(result.items[0]!.lb_type).toBe('external');
   });
 
   it('creates a load balancer via POST /appliances/load-balancers/', async () => {
@@ -288,32 +288,31 @@ describe('LoadBalancerApiClient', () => {
     });
   });
 
-  it('fetches multiple pages when total_page_number > 1', async () => {
+  it('returns a page with items and total_page_number', async () => {
     const transport = new StubTransport();
     const client = new LoadBalancerApiClient(transport);
 
-    transport.getMock
-      .mockResolvedValueOnce({
-        code: 200,
-        data: [{ id: 1, name: 'lb-1', status: 'RUNNING' }],
-        errors: {},
-        message: 'OK',
-        total_page_number: 2
-      })
-      .mockResolvedValueOnce({
-        code: 200,
-        data: [{ id: 2, name: 'lb-2', status: 'RUNNING' }],
-        errors: {},
-        message: 'OK',
-        total_page_number: 2
-      });
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [{ id: 1, name: 'lb-1', status: 'RUNNING' }],
+      errors: {},
+      message: 'OK',
+      total_page_number: 2
+    });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
-    expect(transport.getMock).toHaveBeenCalledTimes(2);
-    expect(result).toHaveLength(2);
-    expect(result[0]!.appliance_name).toBe('lb-1');
-    expect(result[1]!.appliance_name).toBe('lb-2');
+    expect(transport.getMock).toHaveBeenCalledTimes(1);
+    expect(transport.getMock).toHaveBeenCalledWith('/appliances/', {
+      query: {
+        advance_search_string: 'false',
+        page_no: '1',
+        per_page: '100'
+      }
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.appliance_name).toBe('lb-1');
+    expect(result.total_page_number).toBe(2);
   });
 
   it('stops at first page when data length is less than page size', async () => {
@@ -331,10 +330,10 @@ describe('LoadBalancerApiClient', () => {
       message: 'OK'
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
     expect(transport.getMock).toHaveBeenCalledTimes(1);
-    expect(result).toHaveLength(3);
+    expect(result.items).toHaveLength(3);
   });
 
   it('normalizes public_ip "[]" to null', async () => {
@@ -349,9 +348,9 @@ describe('LoadBalancerApiClient', () => {
       total_page_number: 1
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
-    expect(result[0]!.public_ip).toBeNull();
+    expect(result.items[0]!.public_ip).toBeNull();
   });
 
   it('normalizes empty string public_ip to null', async () => {
@@ -373,9 +372,9 @@ describe('LoadBalancerApiClient', () => {
       total_page_number: 1
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
-    expect(result[0]!.public_ip).toBeNull();
+    expect(result.items[0]!.public_ip).toBeNull();
   });
 
   it('returns empty array when listLoadBalancerPlans response has no appliance_config', async () => {
@@ -444,9 +443,9 @@ describe('LoadBalancerApiClient', () => {
       total_page_number: 1
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
-    expect(result[0]!.lb_mode).toBe('TCP');
+    expect(result.items[0]!.lb_mode).toBe('TCP');
   });
 
   it('normalizes explicit null public_ip from node_detail to null', async () => {
@@ -468,8 +467,55 @@ describe('LoadBalancerApiClient', () => {
       total_page_number: 1
     });
 
-    const result = await client.listLoadBalancers();
+    const result = await client.listLoadBalancersPage(1, 100);
 
-    expect(result[0]!.public_ip).toBeNull();
+    expect(result.items[0]!.public_ip).toBeNull();
+  });
+
+  describe('API error propagation', () => {
+    it('propagates transport errors from getLoadBalancer', async () => {
+      const transport = new StubTransport();
+      const client = new LoadBalancerApiClient(transport);
+      transport.getMock.mockRejectedValue(new Error('Connection refused'));
+
+      await expect(client.getLoadBalancer('42')).rejects.toThrow(
+        'Connection refused'
+      );
+    });
+
+    it('propagates transport errors from listLoadBalancersPage', async () => {
+      const transport = new StubTransport();
+      const client = new LoadBalancerApiClient(transport);
+      transport.getMock.mockRejectedValue(new Error('Timeout'));
+
+      await expect(client.listLoadBalancersPage(1, 100)).rejects.toThrow(
+        'Timeout'
+      );
+    });
+
+    it('propagates transport errors from createLoadBalancer', async () => {
+      const transport = new StubTransport();
+      const client = new LoadBalancerApiClient(transport);
+      transport.postMock.mockRejectedValue(new Error('Bad request'));
+
+      await expect(
+        client.createLoadBalancer({
+          lb_name: 'test',
+          lb_type: 'external',
+          lb_mode: 'HTTP',
+          lb_port: '80',
+          plan_name: 'LB-2',
+          node_list_type: 'D',
+          backends: [],
+          tcp_backend: [],
+          acl_list: [],
+          acl_map: [],
+          client_timeout: 60,
+          server_timeout: 60,
+          connection_timeout: 60,
+          http_keep_alive_timeout: 60
+        })
+      ).rejects.toThrow('Bad request');
+    });
   });
 });

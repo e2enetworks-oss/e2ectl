@@ -32,6 +32,7 @@ e2ectl lb create \
   --name my-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
+  --algorithm roundrobin \
   --backend-group-name web \
   --backend-group-protocol HTTP \
   --backend-group-server web-1:192.168.1.1:8080 \
@@ -173,3 +174,105 @@ e2ectl lb delete <lbId> --force --reserve-public-ip
 ```
 
 Without `--force`, interactive terminals are prompted for confirmation. `--reserve-public-ip` asks the backend to preserve the LB public IP when deleting.
+
+## Billing Options
+
+By default, load balancers are created with hourly billing. Use `--billing-type committed` to select a committed (term-based) plan instead.
+
+```bash
+# Hourly billing (default)
+e2ectl lb create \
+  --name my-lb \
+  --plan E2E-LB-2 \
+  --frontend-protocol HTTP \
+  --billing-type hourly \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080
+```
+
+```bash
+# Committed billing with a named plan
+e2ectl lb create \
+  --name my-lb \
+  --plan E2E-LB-2 \
+  --frontend-protocol HTTP \
+  --billing-type committed \
+  --committed-plan "90 Days" \
+  --post-commit-behavior auto-renew \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080
+```
+
+```bash
+# Committed billing with a plan ID
+e2ectl lb create \
+  --name my-lb \
+  --plan E2E-LB-2 \
+  --frontend-protocol HTTP \
+  --billing-type committed \
+  --committed-plan-id 901 \
+  --post-commit-behavior hourly-billing \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080
+```
+
+Use `e2ectl lb plans` to see available committed options for each base plan. The `--post-commit-behavior` flag controls what happens when the committed term ends:
+
+- `auto-renew` — automatically renew the committed term
+- `hourly-billing` — switch to hourly billing after the term expires
+
+You cannot use `--committed-plan` and `--committed-plan-id` together — pick one.
+
+## Load Balancing Algorithms
+
+The `--algorithm` flag controls how traffic is distributed across backend servers. Available algorithms:
+
+| Algorithm              | Behavior                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `roundrobin` (default) | Distributes requests evenly across all backend servers in rotation              |
+| `leastconn`            | Sends requests to the backend server with the fewest active connections         |
+| `source`               | Routes requests based on the client's source IP address for session persistence |
+
+```bash
+e2ectl lb create \
+  --name my-lb \
+  --plan E2E-LB-2 \
+  --frontend-protocol HTTP \
+  --algorithm leastconn \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server web-1:192.168.1.1:8080
+```
+
+The algorithm can also be changed later:
+
+```bash
+e2ectl lb backend group update <lbId> <groupName> --algorithm source
+```
+
+## Related Guides
+
+- [SSL certificates](./ssl.md)
+- [Reserved IPs](./reserved-ip.md)
+- [VPC networking](./vpc.md)
+- [Security groups](./security-group.md)
+- [Automation cookbook](./automation.md)
+
+## Troubleshooting Pointers
+
+- [412 during `lb create`](./troubleshooting.md#412-during-lb-create)
+- [NLB single backend group](./troubleshooting.md#nlbsinglebackendgroup)
+- [Last backend group not deletable](./troubleshooting.md#lastbackendgroupnotdeletable)
+- [Last backend server not deletable](./troubleshooting.md#lastbackendservernotdeletable)
+- [Duplicate backend server name](./troubleshooting.md#backendserverduplicatename)
+- [Backend group exists](./troubleshooting.md#backendgroupexists)
+- [Backend group and server not found](./troubleshooting.md#backendgroupnotfound-and-backendservernotfound)
+- [Backend server ambiguous](./troubleshooting.md#backendserverambiguous)
+- [Reserved IP errors](./troubleshooting.md#reserveipnotfound-reserveipnotavailable)
+- [Public IP already reserved](./troubleshooting.md#loadbalancerpublicipalreadyreserved)
+- [Reserve IP requires external LB](./troubleshooting.md#reserveiprequiresexternallb)
+- [Attachment and identifier mix-ups](./troubleshooting.md#attachment-and-identifier-mix-ups)
+- [Non-interactive and automation failures](./troubleshooting.md#non-interactive-and-automation-failures)

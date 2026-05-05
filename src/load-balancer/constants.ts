@@ -41,3 +41,5 @@ export const LOAD_BALANCER_POST_COMMIT_BEHAVIORS = [
   'auto-renew',
   'hourly-billing'
 ] as const;
+export const LOAD_BALANCER_LIST_PAGE_SIZE = 100;
+export const LOAD_BALANCER_LIST_MAX_PAGES = 50;

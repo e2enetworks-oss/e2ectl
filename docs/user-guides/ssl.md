@@ -1,4 +1,4 @@
-# SSL Guide
+# SSL
 
 The `ssl` command group manages SSL certificate metadata from your MyAccount account. It is read-only — certificates are imported through the MyAccount web portal; `e2ectl` lets you discover their IDs so you can reference them when creating or updating load balancers.
 
@@ -54,3 +54,13 @@ e2ectl lb update <lbId> \
 ```
 
 See the [Load Balancer Guide](./load-balancer.md) for full details on LB commands.
+
+## Related Guides
+
+- [Load balancer](./load-balancer.md)
+- [Automation cookbook](./automation.md)
+
+## Troubleshooting Pointers
+
+- [Non-interactive and automation failures](./troubleshooting.md#non-interactive-and-automation-failures)
+- [Attachment and identifier mix-ups](./troubleshooting.md#attachment-and-identifier-mix-ups)

@@ -23,7 +23,7 @@ function createLbClientStub(): {
   deleteLoadBalancer: ReturnType<typeof vi.fn>;
   getLoadBalancer: ReturnType<typeof vi.fn>;
   listLoadBalancerPlans: ReturnType<typeof vi.fn>;
-  listLoadBalancers: ReturnType<typeof vi.fn>;
+  listLoadBalancersPage: ReturnType<typeof vi.fn>;
   updateLoadBalancer: ReturnType<typeof vi.fn>;
 } {
   const createLoadBalancer = vi.fn(() =>
@@ -34,7 +34,9 @@ function createLbClientStub(): {
       label_id: 'label-1'
     })
   );
-  const listLoadBalancers = vi.fn(() => Promise.resolve([]));
+  const listLoadBalancersPage = vi.fn(() =>
+    Promise.resolve({ items: [], total_page_number: 1 })
+  );
   const listLoadBalancerPlans = vi.fn(() =>
     Promise.resolve([
       {
@@ -107,7 +109,7 @@ function createLbClientStub(): {
     deleteLoadBalancer,
     getLoadBalancer,
     listLoadBalancerPlans,
-    listLoadBalancers,
+    listLoadBalancersPage,
     updateLoadBalancer
   };
 
@@ -117,7 +119,7 @@ function createLbClientStub(): {
     deleteLoadBalancer,
     getLoadBalancer,
     listLoadBalancerPlans,
-    listLoadBalancers,
+    listLoadBalancersPage,
     updateLoadBalancer
   };
 }
@@ -263,16 +265,19 @@ describe('lb commands', () => {
   it('lists load balancers in human-readable mode', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
-    lbStub.listLoadBalancers.mockResolvedValue([
-      {
-        id: 1,
-        appliance_name: 'alb-1',
-        status: 'RUNNING',
-        lb_mode: 'HTTP',
-        lb_type: 'external',
-        public_ip: '1.2.3.4'
-      }
-    ]);
+    lbStub.listLoadBalancersPage.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          appliance_name: 'alb-1',
+          status: 'RUNNING',
+          lb_mode: 'HTTP',
+          lb_type: 'external',
+          public_ip: '1.2.3.4'
+        }
+      ],
+      total_page_number: 1
+    });
     const program = createProgram(runtime);
 
     await program.parseAsync([
@@ -891,5 +896,122 @@ describe('lb commands', () => {
     await expect(
       program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend', 'server'])
     ).resolves.not.toThrow();
+  });
+
+  describe('lb backend group list', () => {
+    it('lists backend groups in human-readable mode', async () => {
+      const { runtime, stdout } = createRuntimeFixture();
+      await seedProfile(runtime);
+      const program = createProgram(runtime);
+
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'lb',
+        'backend',
+        'group',
+        'list',
+        '10',
+        '--alias',
+        'prod'
+      ]);
+
+      expect(stdout.buffer).toContain('Backend Group');
+    });
+  });
+
+  describe('lb network vpc detach', () => {
+    it('detaches a VPC from a load balancer', async () => {
+      const { runtime, stdout, lbStub } = createRuntimeFixture();
+      await seedProfile(runtime);
+
+      lbStub.getLoadBalancer.mockResolvedValue({
+        id: 10,
+        appliance_name: 'my-alb',
+        status: 'RUNNING',
+        lb_mode: 'HTTP',
+        lb_type: 'internal',
+        public_ip: '1.2.3.4',
+        node_detail: { public_ip: '1.2.3.4', vm_id: 1001 },
+        context: [
+          {
+            backends: [],
+            plan_name: 'LB-2',
+            lb_port: '80',
+            vpc_list: [
+              {
+                ipv4_cidr: '10.10.0.0/16',
+                network_id: 100,
+                vpc_name: 'my-vpc'
+              }
+            ]
+          }
+        ]
+      });
+      lbStub.updateLoadBalancer.mockResolvedValue({
+        message: 'VPC detached.'
+      });
+
+      const program = createProgram(runtime);
+
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'lb',
+        'network',
+        'vpc',
+        'detach',
+        '10',
+        '--vpc-id',
+        '100',
+        '--alias',
+        'prod'
+      ]);
+
+      expect(stdout.buffer).toContain('VPC detached.');
+    });
+  });
+
+  describe('--json output', () => {
+    it('outputs JSON for lb list', async () => {
+      const { runtime, stdout } = createRuntimeFixture();
+      await seedProfile(runtime);
+      const program = createProgram(runtime);
+
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'lb',
+        'list',
+        '--json',
+        '--alias',
+        'prod'
+      ]);
+
+      const output = stdout.buffer;
+      expect(output).toContain('"action"');
+      expect(output).toContain('"list"');
+    });
+
+    it('outputs JSON for lb get', async () => {
+      const { runtime, stdout } = createRuntimeFixture();
+      await seedProfile(runtime);
+      const program = createProgram(runtime);
+
+      await program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'lb',
+        'get',
+        '10',
+        '--json',
+        '--alias',
+        'prod'
+      ]);
+
+      const output = stdout.buffer;
+      expect(output).toContain('"action"');
+      expect(output).toContain('"get"');
+    });
   });
 });

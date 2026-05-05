@@ -20,6 +20,7 @@ import type {
   LoadBalancerCreateRequestInput,
   LoadBalancerCreateRequest,
   LoadBalancerDetails,
+  LoadBalancerRawDetails,
   LoadBalancerServer,
   LoadBalancerUpdateRequest,
   LoadBalancerUpdateRequestOverrides,
@@ -701,4 +702,66 @@ function assignIfDefined<TKey extends keyof LoadBalancerUpdateRequest>(
   if (value !== undefined) {
     target[key] = value;
   }
+}
+
+export function normalizeLoadBalancerDetails(
+  data: LoadBalancerRawDetails
+): LoadBalancerDetails {
+  const context = (data.appliance_instance ?? [])
+    .map((instance) => instance.context)
+    .filter((item): item is NonNullable<typeof item> => item !== undefined);
+  const primaryContext = context?.[0] as
+    | { lb_mode?: string; lb_type?: string; lb_reserve_ip?: string | null }
+    | undefined;
+  const result: LoadBalancerDetails = {
+    ...data,
+    appliance_name: data.appliance_name ?? data.name ?? String(data.id),
+    context
+  };
+
+  const lbMode = data.lb_mode ?? primaryContext?.lb_mode;
+  if (lbMode !== undefined) {
+    result.lb_mode = lbMode;
+  }
+
+  const lbType = data.lb_type ?? primaryContext?.lb_type;
+  if (lbType !== undefined) {
+    result.lb_type = lbType;
+  }
+
+  const publicIp = data.public_ip ?? data.node_detail?.public_ip;
+  if (publicIp !== undefined) {
+    result.public_ip = publicIp;
+  }
+  result.public_ip_reserved = isLoadBalancerPublicIpReservedClient(
+    data.node_detail?.allow_reserve_ip?.is_already_reserved,
+    publicIp,
+    primaryContext?.lb_reserve_ip
+  );
+
+  const privateIp = data.private_ip ?? data.node_detail?.private_ip;
+  if (privateIp !== undefined) {
+    (
+      result as LoadBalancerDetails & { private_ip?: string | null }
+    ).private_ip = privateIp;
+  }
+
+  return result;
+}
+
+export function isLoadBalancerPublicIpReservedClient(
+  allowReserveIpFlag: boolean | undefined,
+  publicIp: string | null | undefined,
+  lbReserveIp: unknown
+): boolean {
+  if (allowReserveIpFlag === true) {
+    return true;
+  }
+
+  return (
+    typeof publicIp === 'string' &&
+    publicIp.trim().length > 0 &&
+    typeof lbReserveIp === 'string' &&
+    lbReserveIp.trim() === publicIp.trim()
+  );
 }

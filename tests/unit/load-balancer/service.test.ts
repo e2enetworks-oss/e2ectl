@@ -6,7 +6,8 @@ import type { LoadBalancerClient } from '../../../src/load-balancer/client.js';
 import { LoadBalancerService } from '../../../src/load-balancer/service.js';
 import type {
   LoadBalancerCreateRequest,
-  LoadBalancerDetails
+  LoadBalancerDetails,
+  LoadBalancerUpdateRequest
 } from '../../../src/load-balancer/index.js';
 import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
@@ -238,8 +239,8 @@ function createServiceFixture(options?: {
   getVpc: ReturnType<typeof vi.fn>;
   lbClient: LoadBalancerClient;
   listReservedIps: ReturnType<typeof vi.fn>;
-  listLoadBalancers: ReturnType<typeof vi.fn>;
   listLoadBalancerPlans: ReturnType<typeof vi.fn>;
+  listLoadBalancersPage: ReturnType<typeof vi.fn>;
   reserveNodePublicIp: ReturnType<typeof vi.fn>;
   readConfig: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
@@ -254,7 +255,9 @@ function createServiceFixture(options?: {
       label_id: 'label-1'
     })
   );
-  const listLoadBalancers = vi.fn(() => Promise.resolve([]));
+  const listLoadBalancersPage = vi.fn(() =>
+    Promise.resolve({ items: [], total_page_number: 1 })
+  );
   const getLoadBalancer = vi.fn(() => Promise.resolve(createAlbDetails()));
   const deleteLoadBalancer = vi.fn(() =>
     Promise.resolve({ message: 'Deleted.' })
@@ -289,7 +292,7 @@ function createServiceFixture(options?: {
     deleteLoadBalancer,
     getLoadBalancer,
     listLoadBalancerPlans,
-    listLoadBalancers,
+    listLoadBalancersPage,
     updateLoadBalancer
   };
 
@@ -368,7 +371,7 @@ function createServiceFixture(options?: {
     getVpc,
     lbClient,
     listReservedIps,
-    listLoadBalancers,
+    listLoadBalancersPage,
     listLoadBalancerPlans,
     readConfig,
     receivedCredentials: () => capturedCredentials,
@@ -404,10 +407,13 @@ describe('LoadBalancerService', () => {
 
   describe('listLoadBalancers', () => {
     it('returns a list result', async () => {
-      const { service, listLoadBalancers } = createServiceFixture();
-      listLoadBalancers.mockResolvedValue([
-        { id: 1, appliance_name: 'alb-1', status: 'RUNNING', lb_mode: 'HTTP' }
-      ]);
+      const { service, listLoadBalancersPage } = createServiceFixture();
+      listLoadBalancersPage.mockResolvedValue({
+        items: [
+          { id: 1, appliance_name: 'alb-1', status: 'RUNNING', lb_mode: 'HTTP' }
+        ],
+        total_page_number: 1
+      });
 
       const result = await service.listLoadBalancers({});
 
@@ -2419,6 +2425,235 @@ describe('LoadBalancerService', () => {
           backendGroupServer: ['srv-1:10.0.0.1:80']
         })
       ).rejects.toThrow('--port is required for TCP load balancers');
+    });
+  });
+
+  describe('getLoadBalancer', () => {
+    it('returns a get result with LB details', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+
+      const result = await service.getLoadBalancer('10', {});
+
+      expect(result.action).toBe('get');
+      expect(result.item.appliance_name).toBe('my-alb');
+      expect(result.item.id).toBe(10);
+      expect(getLoadBalancer).toHaveBeenCalledWith('10');
+    });
+
+    it('resolves credentials and passes them to client factory', async () => {
+      const { service, receivedCredentials } = createServiceFixture();
+
+      await service.getLoadBalancer('10', { alias: 'prod' });
+
+      expect(receivedCredentials()).toMatchObject({
+        api_key: 'api-key',
+        auth_token: 'auth-token'
+      });
+    });
+  });
+
+  describe('createLoadBalancer – internal LB errors', () => {
+    it('throws INTERNAL_LB_REQUIRES_VPC when internal LB has no --vpc-id', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'internal-lb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          lbType: 'internal',
+          backendGroupName: 'web',
+          backendGroupServer: ['srv-1:10.0.0.1:80']
+        })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_LB_REQUIRES_VPC'
+      });
+    });
+
+    it('throws INTERNAL_LB_NO_RESERVE_IP when internal LB has --reserve-ip', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'internal-lb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          lbType: 'internal',
+          vpcId: '123',
+          reserveIp: '203.0.113.10',
+          backendGroupName: 'web',
+          backendGroupServer: ['srv-1:10.0.0.1:80']
+        })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_LB_NO_RESERVE_IP'
+      });
+    });
+  });
+
+  describe('createLoadBalancer – NLB backend protocol error', () => {
+    it('throws NLB_BACKEND_PROTOCOL_NOT_SUPPORTED when TCP LB has --backend-group-protocol', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'nlb',
+          plan: 'LB-2',
+          frontendProtocol: 'TCP',
+          port: '9000',
+          backendGroupName: 'tcp-main',
+          backendGroupServer: ['srv-1:10.0.0.1:9000'],
+          backendGroupProtocol: 'HTTP'
+        })
+      ).rejects.toMatchObject({
+        code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED'
+      });
+    });
+  });
+
+  describe('updateLoadBalancer – redirect HTTP to HTTPS', () => {
+    it('succeeds with redirectHttpToHttps when frontend-protocol is BOTH', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+
+      const details = createAlbDetails({
+        lb_mode: 'HTTP',
+        context: [
+          {
+            backends: [
+              {
+                name: 'web',
+                domain_name: 'localhost',
+                backend_mode: 'http',
+                balance: 'roundrobin',
+                backend_ssl: false,
+                http_check: true,
+                check_url: '/',
+                servers: [
+                  {
+                    backend_name: 'srv',
+                    backend_ip: '10.0.0.1',
+                    backend_port: 80
+                  }
+                ]
+              }
+            ],
+            plan_name: 'LB-2',
+            lb_port: '80'
+          }
+        ]
+      });
+      getLoadBalancer.mockResolvedValue(details);
+
+      const result = await service.updateLoadBalancer('10', {
+        frontendProtocol: 'BOTH',
+        sslCertificateId: '99',
+        redirectHttpToHttps: true
+      });
+
+      expect(result.action).toBe('update');
+      expect(updateLoadBalancer).toHaveBeenCalled();
+    });
+  });
+
+  describe('listBackendGroups – lb_mode undefined', () => {
+    it('returns unknown lb_mode when field is absent', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+
+      getLoadBalancer.mockResolvedValue({
+        id: 10,
+        appliance_name: 'no-mode-lb',
+        status: 'RUNNING',
+        context: []
+      });
+
+      const result = await service.listBackendGroups('10', {});
+
+      expect(result.action).toBe('backend-group-list');
+      expect(result.lb_mode).toBe('unknown');
+      expect(result.backends).toEqual([]);
+    });
+  });
+
+  describe('detachVpc – lb_type flip', () => {
+    it('flips lb_type to external when last VPC is detached', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+
+      const details = createAlbDetails({
+        lb_type: 'internal',
+        context: [
+          {
+            backends: [
+              {
+                name: 'web',
+                domain_name: 'localhost',
+                backend_mode: 'http',
+                balance: 'roundrobin',
+                backend_ssl: false,
+                http_check: true,
+                check_url: '/',
+                servers: [
+                  {
+                    backend_name: 'srv',
+                    backend_ip: '10.0.0.1',
+                    backend_port: 80
+                  }
+                ]
+              }
+            ],
+            plan_name: 'LB-2',
+            lb_port: '80',
+            vpc_list: [
+              {
+                ipv4_cidr: '10.0.0.0/24',
+                network_id: 100,
+                vpc_name: 'my-vpc'
+              }
+            ]
+          }
+        ]
+      });
+      getLoadBalancer.mockResolvedValue(details);
+
+      await service.detachVpc('10', { vpcId: '100' });
+
+      expect(updateLoadBalancer).toHaveBeenCalled();
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerUpdateRequest;
+      expect(body.lb_type).toBe('external');
+    });
+  });
+
+  describe('API error propagation', () => {
+    it('propagates client errors from getLoadBalancer', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockRejectedValue(new Error('Network failure'));
+
+      await expect(service.getLoadBalancer('10', {})).rejects.toThrow(
+        'Network failure'
+      );
+    });
+
+    it('propagates client errors from createLoadBalancer', async () => {
+      const { service, createLoadBalancer } = createServiceFixture();
+      createLoadBalancer.mockRejectedValue(new Error('API unavailable'));
+
+      await expect(
+        service.createLoadBalancer({
+          name: 'lb',
+          plan: 'LB-2',
+          frontendProtocol: 'HTTP',
+          backendGroupName: 'web',
+          backendGroupServer: ['srv-1:10.0.0.1:80']
+        })
+      ).rejects.toThrow('API unavailable');
+    });
+
+    it('propagates client errors from listLoadBalancers', async () => {
+      const { service, listLoadBalancersPage } = createServiceFixture();
+      listLoadBalancersPage.mockRejectedValue(new Error('Timeout'));
+
+      await expect(service.listLoadBalancers({})).rejects.toThrow('Timeout');
     });
   });
 });
