@@ -25,5 +25,4 @@ describe('built CLI help', () => {
     expect(result.stdout).toContain('remove');
     expect(result.stdout).not.toMatch(/^\s+add\b/m);
   });
-
 });

@@ -30,5 +30,4 @@ describe('built CLI errors', () => {
       'Error: Deleting a node requires confirmation in an interactive terminal.\n\nNext step: Re-run the command with --force to skip the prompt.\n'
     );
   });
-
 });
