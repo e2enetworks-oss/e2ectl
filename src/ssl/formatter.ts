@@ -51,6 +51,9 @@ function toJson(result: SslCommandResult): JsonValue {
 
 function getCertificateName(item: SslCertificateSummary): string {
   return (
-    item.ssl_cert_name ?? item.certificate_name ?? item.name ?? String(item.id)
+    item.ssl_cert_name?.trim() ||
+    item.certificate_name?.trim() ||
+    item.name?.trim() ||
+    String(item.id)
   );
 }

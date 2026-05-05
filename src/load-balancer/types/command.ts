@@ -70,10 +70,6 @@ export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerConte
   algorithm?: string;
   backendGroupProtocol?: string;
   backendGroupServer?: string[];
-  httpCheck?: boolean;
-  serverIp?: string;
-  serverName?: string;
-  serverPort?: string;
 }
 
 export interface LoadBalancerBackendGroupUpdateOptions extends LoadBalancerContextOptions {
@@ -96,10 +92,6 @@ export interface LoadBalancerBackendServerUpdateOptions extends LoadBalancerCont
 export interface LoadBalancerBackendServerDeleteOptions extends LoadBalancerContextOptions {
   backendGroupName?: string;
   backendGroupServerName?: string;
-  backendName?: string;
-  serverIp?: string;
-  serverName?: string;
-  serverPort?: string;
 }
 
 export interface LoadBalancerListCommandResult {

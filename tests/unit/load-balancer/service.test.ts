@@ -2029,16 +2029,14 @@ describe('LoadBalancerService', () => {
       ).rejects.toMatchObject({ code: 'LOAD_BALANCER_CONTEXT_MISSING' });
     });
 
-    it('deletes a server using serverIp and serverPort for disambiguation', async () => {
+    it('deletes one server from a dual-server ALB group', async () => {
       const { service, getLoadBalancer, updateLoadBalancer } =
         createServiceFixture();
       getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
 
       const result = await service.deleteBackendServer('10', {
         backendGroupName: 'web',
-        backendGroupServerName: 'server-1',
-        serverIp: '10.0.0.1',
-        serverPort: '8080'
+        backendGroupServerName: 'server-1'
       });
 
       expect(result.action).toBe('backend-server-remove');
