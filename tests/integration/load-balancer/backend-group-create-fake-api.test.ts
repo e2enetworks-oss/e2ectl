@@ -98,7 +98,8 @@ describe('lb backend group create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '10',
           '--backend-group-name',
@@ -158,7 +159,8 @@ describe('lb backend group create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '20',
           '--backend-group-name',

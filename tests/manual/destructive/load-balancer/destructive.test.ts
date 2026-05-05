@@ -255,8 +255,7 @@ describeManual('manual LB destructive built CLI checks', () => {
 
       try {
         // 1. Resolve VPC ID
-        vpcIdToUse =
-          lbConfig.vpcId ?? (await findAvailableVpc(context));
+        vpcIdToUse = lbConfig.vpcId ?? (await findAvailableVpc(context));
 
         // 2. Create load balancer
         const lbResult = await createLbStep(context, {
@@ -354,9 +353,7 @@ describeManual('manual LB destructive built CLI checks', () => {
   );
 });
 
-async function prepareLbContext(
-  runPrefix: string
-): Promise<LbTestContext> {
+async function prepareLbContext(runPrefix: string): Promise<LbTestContext> {
   const manifestDir = path.resolve(process.cwd(), '.manual-lb');
   await mkdir(manifestDir, { recursive: true });
 
@@ -370,7 +367,9 @@ async function prepareLbContext(
   };
 }
 
-async function findAvailableVpc(context: LbTestContext): Promise<string | undefined> {
+async function findAvailableVpc(
+  context: LbTestContext
+): Promise<string | undefined> {
   const vpcList = await runJsonCommand<VpcListJson>(
     ['vpc', 'list'],
     context.lbEnv
@@ -457,10 +456,7 @@ async function waitForLbRunningStep(
   throw new Error(`Timed out waiting for LB ${lbId} to become RUNNING`);
 }
 
-async function getLbStep(
-  context: LbTestContext,
-  lbId: number
-): Promise<void> {
+async function getLbStep(context: LbTestContext, lbId: number): Promise<void> {
   const lbGet = await runJsonCommand<LbGetJson>(
     ['lb', 'get', String(lbId)],
     context.lbEnv

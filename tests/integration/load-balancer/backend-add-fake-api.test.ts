@@ -319,12 +319,15 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '10'], {
-        env: {
-          HOME: tempHome.path,
-          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+      const result = await runBuiltCli(
+        ['lb', 'backend', 'group', 'list', '10'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
         }
-      });
+      );
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('No backend groups configured');
@@ -345,12 +348,15 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '10'], {
-        env: {
-          HOME: tempHome.path,
-          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+      const result = await runBuiltCli(
+        ['lb', 'backend', 'group', 'list', '10'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
         }
-      });
+      );
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Backend Group');
@@ -374,12 +380,15 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '20'], {
-        env: {
-          HOME: tempHome.path,
-          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+      const result = await runBuiltCli(
+        ['lb', 'backend', 'group', 'list', '20'],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
         }
-      });
+      );
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('grp');
@@ -412,7 +421,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '10',
           '--backend-group-name',
@@ -510,7 +520,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'add',
           '10',
           '--backend-group-name',
@@ -609,7 +620,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'update',
           '10',
           'web',
@@ -730,7 +742,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -824,7 +837,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '20',
           '--backend-group-name',
@@ -954,7 +968,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'add',
           '20',
           '--backend-group-name',
@@ -995,7 +1010,16 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend', 'group', 'update', '20', 'grp', '--algorithm', 'source'],
+        [
+          'lb',
+          'backend',
+          'group',
+          'update',
+          '20',
+          'grp',
+          '--algorithm',
+          'source'
+        ],
         {
           env: {
             HOME: tempHome.path,
@@ -1090,7 +1114,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '20',
           '--backend-group-name',
@@ -1128,7 +1153,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '10',
           '--backend-group-name',
@@ -1209,7 +1235,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '20',
           '--backend-group-name',
@@ -1277,7 +1304,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '20',
           '--backend-group-name',
@@ -1379,7 +1407,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'add',
           '10',
           '--backend-group-name',
@@ -1422,7 +1451,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'update',
           '10',
           'web',
@@ -1464,7 +1494,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'add',
           '10',
           '--backend-group-name',
@@ -1507,7 +1538,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -1546,7 +1578,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'update',
           '20',
           'grp',
@@ -1585,7 +1618,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'update',
           '20',
           'missing',
@@ -1622,7 +1656,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'group',
+          'backend',
+          'group',
           'update',
           '10',
           'missing',
@@ -1717,7 +1752,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -1755,7 +1791,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '20',
           '--backend-group-name',
@@ -1793,7 +1830,8 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend', 'server',
+          'backend',
+          'server',
           'remove',
           '10',
           '--backend-group-name',
