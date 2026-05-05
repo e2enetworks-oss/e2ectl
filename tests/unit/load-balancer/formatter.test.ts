@@ -333,7 +333,7 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-list', () => {
+  describe('backend group list', () => {
     it('renders "No backend groups" when empty', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-list',
@@ -407,7 +407,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('srv-1 (10.0.0.2:8080)');
     });
 
-    it('renders JSON for backend-group-list', () => {
+    it('renders JSON for backend group list', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-list',
         lb_id: '10',
@@ -422,8 +422,8 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-add', () => {
-    it('renders backend-group-add summary (human)', () => {
+  describe('backend group add', () => {
+    it('renders backend group add summary (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-add',
         group: {
@@ -451,7 +451,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('api-1');
     });
 
-    it('renders JSON for backend-group-add', () => {
+    it('renders JSON for backend group add', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-add',
         group: {
@@ -500,8 +500,8 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-server-add', () => {
-    it('renders backend-server-add message (human)', () => {
+  describe('backend server add', () => {
+    it('renders backend server add message (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-add',
         group_name: 'web',
@@ -515,7 +515,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('10');
     });
 
-    it('renders JSON for backend-server-add', () => {
+    it('renders JSON for backend server add', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-add',
         group_name: 'web',
@@ -536,8 +536,8 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-server-remove', () => {
-    it('renders backend-server-remove message (human)', () => {
+  describe('backend server remove', () => {
+    it('renders backend server remove message (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-remove',
         group_name: 'web',
@@ -554,7 +554,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('srv-2');
     });
 
-    it('renders JSON for backend-server-remove', () => {
+    it('renders JSON for backend server remove', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-server-remove',
         group_name: 'web',
@@ -577,8 +577,8 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-remove', () => {
-    it('renders backend-group-remove message (human)', () => {
+  describe('backend group remove', () => {
+    it('renders backend group remove message (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-remove',
         lb_id: '10',
@@ -592,7 +592,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('api');
     });
 
-    it('renders JSON for backend-group-remove', () => {
+    it('renders JSON for backend group remove', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-remove',
         lb_id: '10',
@@ -970,8 +970,8 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-update', () => {
-    it('renders backend-group-update message (human)', () => {
+  describe('backend group update', () => {
+    it('renders backend group update message (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-update',
         lb_id: '10',
@@ -989,7 +989,7 @@ describe('renderLoadBalancerResult', () => {
       expect(output).toContain('e2ectl lb get 10');
     });
 
-    it('renders JSON for backend-group-update', () => {
+    it('renders JSON for backend group update', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-update',
         lb_id: '10',
@@ -1006,7 +1006,7 @@ describe('renderLoadBalancerResult', () => {
       expect(parsed.group_name).toBe('grp1');
     });
 
-    it('renders backend-group-update with name change (human)', () => {
+    it('renders backend group update with name change (human)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-update',
         lb_id: '10',
@@ -1080,7 +1080,7 @@ describe('renderLoadBalancerResult', () => {
     });
   });
 
-  describe('backend-group-list with empty servers', () => {
+  describe('backend group list with empty servers', () => {
     it('renders "--" when backend group has no servers (ALB)', () => {
       const result: LoadBalancerCommandResult = {
         action: 'backend-group-list',

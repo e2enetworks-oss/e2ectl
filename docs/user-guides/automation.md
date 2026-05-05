@@ -135,7 +135,7 @@ LB_ID=42
 e2ectl --json lb get "$LB_ID" > lb-detail.json
 
 # 5. Add a second server to an existing group
-e2ectl lb backend-server add "$LB_ID" \
+e2ectl lb backend server add "$LB_ID" \
   --backend-group-name web \
   --backend-group-server server-2:10.0.0.2:8080
 

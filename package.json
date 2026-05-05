@@ -40,6 +40,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:manual": "vitest run --config vitest.manual.config.ts",
     "test:manual:dbaas": "vitest run --config vitest.manual-destructive.config.ts tests/manual/destructive/dbaas/",
+    "test:manual:lb": "vitest run --config vitest.manual-destructive.config.ts tests/manual/destructive/load-balancer/",
     "test:manual:smoke": "vitest run --config vitest.manual-smoke.config.ts",
     "test:manual:smoke:cleanup": "node ./scripts/manual-smoke-cleanup.mjs",
     "test:watch": "vitest",

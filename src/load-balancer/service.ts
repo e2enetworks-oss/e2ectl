@@ -504,7 +504,7 @@ export class LoadBalancerService {
         {
           code: 'NLB_SINGLE_BACKEND_GROUP',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId} --backend-group-name <name> --backend-group-server <name:ip:port>`)} to add a server.`
+          suggestion: `Use ${formatCliCommand(`lb backend server add ${lbId} --backend-group-name <name> --backend-group-server <name:ip:port>`)} to add a server.`
         }
       );
     }
@@ -521,7 +521,7 @@ export class LoadBalancerService {
         {
           code: 'BACKEND_GROUP_EXISTS',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId} --backend-group-name ${groupName} --backend-group-server <name:ip:port>`)} to add a server.`
+          suggestion: `Use ${formatCliCommand(`lb backend server add ${lbId} --backend-group-name ${groupName} --backend-group-server <name:ip:port>`)} to add a server.`
         }
       );
     }
@@ -1067,7 +1067,7 @@ function throwBackendGroupNotFoundForServerMutation(
     {
       code: 'BACKEND_GROUP_NOT_FOUND',
       exitCode: EXIT_CODES.usage,
-      suggestion: `Use ${formatCliCommand(`lb backend-group add ${lbId}`)} to create a new backend group.`
+      suggestion: `Use ${formatCliCommand(`lb backend group add ${lbId}`)} to create a new backend group.`
     }
   );
 }

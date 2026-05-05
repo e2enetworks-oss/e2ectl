@@ -77,8 +77,8 @@ function buildEmptyNlbGetResponse() {
   };
 }
 
-describe('lb backend-group create against a fake MyAccount API', () => {
-  it('ALB backend-group add — PUT body has backends entry and empty tcp_backend', async () => {
+describe('lb backend group create against a fake MyAccount API', () => {
+  it('ALB backend group add — PUT body has backends entry and empty tcp_backend', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -98,7 +98,7 @@ describe('lb backend-group create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '10',
           '--backend-group-name',
@@ -158,7 +158,7 @@ describe('lb backend-group create against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '20',
           '--backend-group-name',

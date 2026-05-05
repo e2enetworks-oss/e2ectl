@@ -229,8 +229,7 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
   );
 
   command.addCommand(buildNetworkCommand(service, runtime));
-  command.addCommand(buildBackendGroupCommand(service, runtime));
-  command.addCommand(buildBackendServerCommand(service, runtime));
+  command.addCommand(buildBackendCommand(service, runtime));
 
   command.action(() => {
     command.outputHelp();
@@ -331,11 +330,27 @@ function buildVpcCommand(
   return command;
 }
 
+function buildBackendCommand(
+  service: LoadBalancerService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('backend').description(
+    'Manage backend groups and servers on a load balancer.'
+  );
+  command.helpCommand('help [command]', 'Show help for lb backend commands');
+  command.addCommand(buildBackendGroupCommand(service, runtime));
+  command.addCommand(buildBackendServerCommand(service, runtime));
+  command.action(() => {
+    command.outputHelp();
+  });
+  return command;
+}
+
 function buildBackendGroupCommand(
   service: LoadBalancerService,
   runtime: CliRuntime
 ): Command {
-  const command = new Command('backend-group').description(
+  const command = new Command('group').description(
     'Manage backend groups on a load balancer.'
   );
 
@@ -447,7 +462,7 @@ function buildBackendServerCommand(
   service: LoadBalancerService,
   runtime: CliRuntime
 ): Command {
-  const command = new Command('backend-server').description(
+  const command = new Command('server').description(
     'Manage backend servers on a load balancer.'
   );
 

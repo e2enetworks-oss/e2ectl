@@ -308,7 +308,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group list — renders empty ALB backend groups', async () => {
+  it('backend group list — renders empty ALB backend groups', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildEmptyAlbGetResponse()
@@ -319,7 +319,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend-group', 'list', '10'], {
+      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '10'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -334,7 +334,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group list — renders ALB backend groups', async () => {
+  it('backend group list — renders ALB backend groups', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -345,7 +345,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend-group', 'list', '10'], {
+      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '10'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -363,7 +363,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group list — renders NLB backend groups', async () => {
+  it('backend group list — renders NLB backend groups', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -374,7 +374,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     try {
       await seedDefaultProfile(tempHome);
 
-      const result = await runBuiltCli(['lb', 'backend-group', 'list', '20'], {
+      const result = await runBuiltCli(['lb', 'backend', 'group', 'list', '20'], {
         env: {
           HOME: tempHome.path,
           [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
@@ -392,7 +392,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — GET then PUT for new group', async () => {
+  it('backend group add — GET then PUT for new group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -412,7 +412,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '10',
           '--backend-group-name',
@@ -490,7 +490,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server add — GET then PUT adding server to existing group', async () => {
+  it('backend server add — GET then PUT adding server to existing group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -510,7 +510,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'add',
           '10',
           '--backend-group-name',
@@ -589,7 +589,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — ALB changes algorithm and protocol', async () => {
+  it('backend group update — ALB changes algorithm and protocol', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -609,7 +609,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'update',
           '10',
           'web',
@@ -650,7 +650,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group remove — GET then PUT removing group and stale ACLs', async () => {
+  it('backend group remove — GET then PUT removing group and stale ACLs', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -668,7 +668,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend-group', 'remove', '10', 'api'],
+        ['lb', 'backend', 'group', 'remove', '10', 'api'],
         {
           env: {
             HOME: tempHome.path,
@@ -710,7 +710,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — GET then PUT removing one server from group', async () => {
+  it('backend server remove — GET then PUT removing one server from group', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -730,7 +730,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -777,7 +777,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — NLB', async () => {
+  it('backend group add — NLB', async () => {
     const nlbGetResponse = {
       code: 200,
       data: {
@@ -824,7 +824,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '20',
           '--backend-group-name',
@@ -849,7 +849,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group remove — NLB with multiple groups', async () => {
+  it('backend group remove — NLB with multiple groups', async () => {
     const nlbTwoGroupsGetResponse = {
       code: 200,
       data: {
@@ -919,7 +919,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend-group', 'remove', '20', 'grp1'],
+        ['lb', 'backend', 'group', 'remove', '20', 'grp1'],
         {
           env: {
             HOME: tempHome.path,
@@ -937,7 +937,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server add — NLB', async () => {
+  it('backend server add — NLB', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -954,7 +954,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'add',
           '20',
           '--backend-group-name',
@@ -977,7 +977,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — NLB changes algorithm', async () => {
+  it('backend group update — NLB changes algorithm', async () => {
     const receivedPutBodies: unknown[] = [];
 
     const server = await startTestHttpServer({
@@ -995,7 +995,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend-group', 'update', '20', 'grp', '--algorithm', 'source'],
+        ['lb', 'backend', 'group', 'update', '20', 'grp', '--algorithm', 'source'],
         {
           env: {
             HOME: tempHome.path,
@@ -1025,7 +1025,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — NLB', async () => {
+  it('backend server remove — NLB', async () => {
     const nlbGetResponse = {
       code: 200,
       data: {
@@ -1090,7 +1090,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '20',
           '--backend-group-name',
@@ -1114,7 +1114,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — fails when ALB group name already exists (BACKEND_GROUP_EXISTS)', async () => {
+  it('backend group add — fails when ALB group name already exists (BACKEND_GROUP_EXISTS)', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1128,7 +1128,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '10',
           '--backend-group-name',
@@ -1152,7 +1152,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — fails when NLB already has a group (NLB_SINGLE_BACKEND_GROUP)', async () => {
+  it('backend group add — fails when NLB already has a group (NLB_SINGLE_BACKEND_GROUP)', async () => {
     const nlbOneGroupGetResponse = {
       code: 200,
       data: {
@@ -1209,7 +1209,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '20',
           '--backend-group-name',
@@ -1233,7 +1233,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — fails when --backend-group-server is missing (required option)', async () => {
+  it('backend group add — fails when --backend-group-server is missing (required option)', async () => {
     const nlbNoGroupsGetResponse = {
       code: 200,
       data: {
@@ -1277,7 +1277,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '20',
           '--backend-group-name',
@@ -1328,7 +1328,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group remove — JSON output', async () => {
+  it('backend group remove — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbWithTwoGroupsGetResponse()
@@ -1343,7 +1343,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['--json', 'lb', 'backend-group', 'remove', '10', 'api'],
+        ['--json', 'lb', 'backend', 'group', 'remove', '10', 'api'],
         {
           env: {
             HOME: tempHome.path,
@@ -1361,7 +1361,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group add — JSON output', async () => {
+  it('backend group add — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildEmptyAlbGetResponse()
@@ -1379,7 +1379,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend-group',
+          'backend', 'group',
           'add',
           '10',
           '--backend-group-name',
@@ -1404,7 +1404,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — JSON output', async () => {
+  it('backend group update — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1422,7 +1422,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend-group',
+          'backend', 'group',
           'update',
           '10',
           'web',
@@ -1446,7 +1446,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server add — JSON output', async () => {
+  it('backend server add — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1464,7 +1464,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend-server',
+          'backend', 'server',
           'add',
           '10',
           '--backend-group-name',
@@ -1489,7 +1489,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — JSON output', async () => {
+  it('backend server remove — JSON output', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbWithTwoGroupsGetResponse()
@@ -1507,7 +1507,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
         [
           '--json',
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -1532,7 +1532,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — fails when backend protocol is sent to an NLB', async () => {
+  it('backend group update — fails when backend protocol is sent to an NLB', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -1546,7 +1546,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'update',
           '20',
           'grp',
@@ -1571,7 +1571,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — fails when an NLB group is missing', async () => {
+  it('backend group update — fails when an NLB group is missing', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -1585,7 +1585,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'update',
           '20',
           'missing',
@@ -1608,7 +1608,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group update — fails when an ALB group is missing', async () => {
+  it('backend group update — fails when an ALB group is missing', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1622,7 +1622,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-group',
+          'backend', 'group',
           'update',
           '10',
           'missing',
@@ -1645,7 +1645,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group remove — fails when removing the final ALB group', async () => {
+  it('backend group remove — fails when removing the final ALB group', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1657,7 +1657,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend-group', 'remove', '10', 'web'],
+        ['lb', 'backend', 'group', 'remove', '10', 'web'],
         {
           env: {
             HOME: tempHome.path,
@@ -1674,7 +1674,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-group remove — fails when removing the final NLB group', async () => {
+  it('backend group remove — fails when removing the final NLB group', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -1686,7 +1686,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'backend-group', 'remove', '20', 'grp'],
+        ['lb', 'backend', 'group', 'remove', '20', 'grp'],
         {
           env: {
             HOME: tempHome.path,
@@ -1703,7 +1703,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — fails when removing the final ALB server', async () => {
+  it('backend server remove — fails when removing the final ALB server', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbGetResponse()
@@ -1717,7 +1717,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '10',
           '--backend-group-name',
@@ -1741,7 +1741,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — fails when removing the final NLB server', async () => {
+  it('backend server remove — fails when removing the final NLB server', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/20/': () => ({
         body: buildNlbGetResponse()
@@ -1755,7 +1755,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '20',
           '--backend-group-name',
@@ -1779,7 +1779,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
     }
   });
 
-  it('backend-server remove — fails when a server name is ambiguous', async () => {
+  it('backend server remove — fails when a server name is ambiguous', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/appliances/10/': () => ({
         body: buildAlbWithDuplicateServersGetResponse()
@@ -1793,7 +1793,7 @@ describe('lb backend commands against a fake MyAccount API', () => {
       const result = await runBuiltCli(
         [
           'lb',
-          'backend-server',
+          'backend', 'server',
           'remove',
           '10',
           '--backend-group-name',

@@ -622,7 +622,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('Updated.');
   });
 
-  it('creates a new backend group via backend-group add', async () => {
+  it('creates a new backend group via backend group add', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     // Return ALB with no existing group named 'api'
@@ -648,7 +648,8 @@ describe('lb commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'lb',
-      'backend-group',
+      'backend',
+      'group',
       'add',
       '10',
       '--alias',
@@ -667,7 +668,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('server-2');
   });
 
-  it('updates a backend group via backend-group update', async () => {
+  it('updates a backend group via backend group update', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -676,7 +677,8 @@ describe('lb commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'lb',
-      'backend-group',
+      'backend',
+      'group',
       'update',
       '10',
       'web',
@@ -692,7 +694,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('Backend group "web" updated.');
   });
 
-  it('adds a server to an existing backend group via backend-server add', async () => {
+  it('adds a server to an existing backend group via backend server add', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -701,7 +703,8 @@ describe('lb commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'lb',
-      'backend-server',
+      'backend',
+      'server',
       'add',
       '10',
       '--alias',
@@ -716,7 +719,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('web');
   });
 
-  it('deletes a backend group via backend-group remove', async () => {
+  it('deletes a backend group via backend group remove', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     lbStub.getLoadBalancer.mockResolvedValue({
@@ -777,7 +780,8 @@ describe('lb commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'lb',
-      'backend-group',
+      'backend',
+      'group',
       'remove',
       '10',
       'api',
@@ -788,7 +792,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('Backend group "api" removed.');
   });
 
-  it('deletes a server from an existing backend group via backend-server remove', async () => {
+  it('deletes a server from an existing backend group via backend server remove', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     lbStub.getLoadBalancer.mockResolvedValue({
@@ -836,7 +840,8 @@ describe('lb commands', () => {
       'node',
       CLI_COMMAND_NAME,
       'lb',
-      'backend-server',
+      'backend',
+      'server',
       'remove',
       '10',
       '--alias',
@@ -875,7 +880,7 @@ describe('lb commands', () => {
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend-group'])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend', 'group'])
     ).resolves.not.toThrow();
   });
 
@@ -884,7 +889,7 @@ describe('lb commands', () => {
     const program = createProgram(runtime);
 
     await expect(
-      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend-server'])
+      program.parseAsync(['node', CLI_COMMAND_NAME, 'lb', 'backend', 'server'])
     ).resolves.not.toThrow();
   });
 });

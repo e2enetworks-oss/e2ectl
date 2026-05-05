@@ -110,7 +110,7 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
           ['Backend Group', result.group_name]
         ])}\n` +
         hint(
-          `Run "e2ectl lb backend-group add ${result.lb_id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add a new group.`
+          `Run "e2ectl lb backend group add ${result.lb_id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add a new group.`
         )
       );
 
@@ -136,7 +136,7 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
           ['Server', result.server_name]
         ])}\n` +
         hint(
-          `Run "e2ectl lb backend-server add ${result.lb_id} --backend-group-name ${result.group_name} --backend-group-server <name:ip:port>" to add a replacement server.`
+          `Run "e2ectl lb backend server add ${result.lb_id} --backend-group-name ${result.group_name} --backend-group-server <name:ip:port>" to add a replacement server.`
         )
       );
 
@@ -382,7 +382,7 @@ function renderBackendGroupListHuman(
     return (
       `No backend groups configured for load balancer ${result.lb_id}.\n` +
       hint(
-        `Run "e2ectl lb backend-group add ${result.lb_id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add one.`
+        `Run "e2ectl lb backend group add ${result.lb_id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add one.`
       )
     );
   }
@@ -452,7 +452,7 @@ function renderLoadBalancerCreateHuman(
     `Load balancer created.\n${formatFieldTable(rows)}\n` +
     hint(
       `Run "e2ectl lb get ${result.result.id}" to view details, or ` +
-        `"e2ectl lb backend-group add ${result.result.id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add more backend groups.`
+        `"e2ectl lb backend group add ${result.result.id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add more backend groups.`
     )
   );
 }
@@ -532,7 +532,7 @@ function renderLoadBalancerGetHuman(
     backendSection +
     hint(
       `Run "e2ectl lb update ${item.id} --name <name>" to rename, ` +
-        `"e2ectl lb backend-group add ${item.id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add a backend group, ` +
+        `"e2ectl lb backend group add ${item.id} --backend-group-name <group> --backend-group-server <name:ip:port>" to add a backend group, ` +
         `or "e2ectl lb delete ${item.id}" to delete.`
     )
   );
@@ -562,7 +562,7 @@ function renderBackendGroupCreateHuman(
   return (
     `${result.message}\n${formatFieldTable(rows)}\n` +
     hint(
-      `Run "e2ectl lb backend-server add ${result.lb_id} --backend-group-name ${result.group.name} --backend-group-server <name:ip:port>" to add more servers.`
+      `Run "e2ectl lb backend server add ${result.lb_id} --backend-group-name ${result.group.name} --backend-group-server <name:ip:port>" to add more servers.`
     )
   );
 }

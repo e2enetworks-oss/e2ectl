@@ -126,22 +126,22 @@ Reserving a public IP is for external load balancers with an assigned public IPv
 ## Backend Groups
 
 ```bash
-e2ectl lb backend-group list <lbId>
+e2ectl lb backend group list <lbId>
 
-e2ectl lb backend-group add <lbId> \
+e2ectl lb backend group add <lbId> \
   --backend-group-name api \
   --backend-group-protocol HTTP \
   --backend-group-server api-1:192.168.2.1:9000
 
-e2ectl lb backend-group update <lbId> web \
+e2ectl lb backend group update <lbId> web \
   --backend-group-protocol HTTPS \
   --algorithm leastconn
 
 # Rename a backend group
-e2ectl lb backend-group update <lbId> web \
+e2ectl lb backend group update <lbId> web \
   --backend-group-name web-v2
 
-e2ectl lb backend-group remove <lbId> api
+e2ectl lb backend group remove <lbId> api
 ```
 
 Creation supports one backend group with multiple backend servers. Add more backend groups after creation for ALB workflows. The CLI refuses to remove the final backend group.
@@ -151,11 +151,11 @@ Creation supports one backend group with multiple backend servers. Add more back
 Use `e2ectl node list` to find node IPs for `--backend-group-server`.
 
 ```bash
-e2ectl lb backend-server add <lbId> \
+e2ectl lb backend server add <lbId> \
   --backend-group-name web \
   --backend-group-server web-3:192.168.1.3:8080
 
-e2ectl lb backend-server remove <lbId> \
+e2ectl lb backend server remove <lbId> \
   --backend-group-name web \
   --backend-group-server-name web-3
 ```
