@@ -2224,6 +2224,99 @@ describe('LoadBalancerService', () => {
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
     });
+
+    it('renames an ALB backend group', async () => {
+      const { service, updateLoadBalancer } = createServiceFixture();
+
+      const result = await service.updateBackendGroup('10', 'web', {
+        backendGroupName: 'web-v2'
+      });
+
+      expect(result.action).toBe('backend-group-update');
+      expect(result.group_name).toBe('web-v2');
+      expect(result.backend_group_name).toBe('web-v2');
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.backends?.some((b) => b.name === 'web-v2')).toBe(true);
+      expect(body.backends?.some((b) => b.name === 'web')).toBe(false);
+    });
+
+    it('renames an NLB backend group', async () => {
+      const { service, getLoadBalancer, updateLoadBalancer } =
+        createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      const result = await service.updateBackendGroup('20', 'tcp-grp', {
+        backendGroupName: 'tcp-v2'
+      });
+
+      expect(result.action).toBe('backend-group-update');
+      expect(result.group_name).toBe('tcp-v2');
+      expect(result.backend_group_name).toBe('tcp-v2');
+      const body = updateLoadBalancer.mock
+        .calls[0]![1] as LoadBalancerCreateRequest;
+      expect(body.tcp_backend?.some((b) => b.backend_name === 'tcp-v2')).toBe(
+        true
+      );
+    });
+
+    it('throws BACKEND_GROUP_EXISTS when renaming to an existing ALB group name', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createAlbDetailsWithTwoGroups());
+
+      await expect(
+        service.updateBackendGroup('10', 'web', {
+          backendGroupName: 'api'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_EXISTS' });
+    });
+
+    it('throws BACKEND_GROUP_EXISTS when renaming to an existing NLB group name', async () => {
+      const nlbTwoGroups = {
+        ...createNlbDetails(),
+        context: [
+          {
+            backends: [],
+            tcp_backend: [
+              {
+                backend_name: 'tcp-grp',
+                port: 3000,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-1',
+                    backend_ip: '10.0.0.2',
+                    backend_port: 8080
+                  }
+                ]
+              },
+              {
+                backend_name: 'tcp-other',
+                port: 3001,
+                balance: 'roundrobin',
+                servers: [
+                  {
+                    backend_name: 'srv-2',
+                    backend_ip: '10.0.0.3',
+                    backend_port: 8080
+                  }
+                ]
+              }
+            ],
+            lb_port: '3000',
+            plan_name: 'LB-2'
+          }
+        ]
+      } as LoadBalancerDetails;
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(nlbTwoGroups);
+
+      await expect(
+        service.updateBackendGroup('20', 'tcp-grp', {
+          backendGroupName: 'tcp-other'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_GROUP_EXISTS' });
+    });
   });
 
   describe('attachVpc', () => {

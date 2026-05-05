@@ -137,6 +137,10 @@ e2ectl lb backend-group update <lbId> web \
   --backend-group-protocol HTTPS \
   --algorithm leastconn
 
+# Rename a backend group
+e2ectl lb backend-group update <lbId> web \
+  --backend-group-name web-v2
+
 e2ectl lb backend-group remove <lbId> api
 ```
 
@@ -157,6 +161,8 @@ e2ectl lb backend-server remove <lbId> \
 ```
 
 The CLI refuses to remove the final backend server from a backend group.
+
+Server names must be unique within a backend group. The CLI rejects duplicate server names when adding.
 
 ## Delete
 

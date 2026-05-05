@@ -92,6 +92,8 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         bgUpdateRows.push(['Algorithm', result.algorithm]);
       if (result.backend_protocol !== undefined)
         bgUpdateRows.push(['Backend Protocol', result.backend_protocol]);
+      if (result.backend_group_name !== undefined)
+        bgUpdateRows.push(['New Name', result.backend_group_name]);
       return (
         `${result.message}\n${formatFieldTable(bgUpdateRows)}\n` +
         hint(

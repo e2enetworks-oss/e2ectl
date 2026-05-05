@@ -504,7 +504,7 @@ export class LoadBalancerService {
         {
           code: 'NLB_SINGLE_BACKEND_GROUP',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId}`)} to add a server to the existing group.`
+          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId} --backend-group-name <name> --backend-group-server <name:ip:port>`)} to add a server.`
         }
       );
     }
@@ -517,11 +517,11 @@ export class LoadBalancerService {
     // ALB guard: group name must be unique
     if (!isNlb && currentBackends.some((g) => g.name === groupName)) {
       throw new CliError(
-        `Backend group "${groupName}" already exists on load balancer ${lbId}. Use \`lb backend-server add\` to add a server to it.`,
+        `Backend group "${groupName}" already exists on load balancer ${lbId}.`,
         {
           code: 'BACKEND_GROUP_EXISTS',
           exitCode: EXIT_CODES.usage,
-          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId}`)} to add a server to the existing group.`
+          suggestion: `Use ${formatCliCommand(`lb backend-server add ${lbId} --backend-group-name ${groupName} --backend-group-server <name:ip:port>`)} to add a server.`
         }
       );
     }
@@ -613,12 +613,44 @@ export class LoadBalancerService {
           : assertAlbBackendProtocol(options.backendGroupProtocol);
     }
 
+    const nextName = options.backendGroupName?.trim();
+    if (nextName !== undefined && nextName.length === 0) {
+      throw new CliError('--backend-group-name cannot be empty.', {
+        code: 'INVALID_BACKEND_GROUP_NAME',
+        exitCode: EXIT_CODES.usage
+      });
+    }
+    if (nextName !== undefined && nextName !== groupName) {
+      if (mutation.isNlb) {
+        if (mutation.tcpBackends.some((g) => g.backend_name === nextName)) {
+          throw new CliError(
+            `Backend group "${nextName}" already exists on load balancer ${lbId}.`,
+            {
+              code: 'BACKEND_GROUP_EXISTS',
+              exitCode: EXIT_CODES.usage
+            }
+          );
+        }
+      } else {
+        if (mutation.backends.some((g) => g.name === nextName)) {
+          throw new CliError(
+            `Backend group "${nextName}" already exists on load balancer ${lbId}.`,
+            {
+              code: 'BACKEND_GROUP_EXISTS',
+              exitCode: EXIT_CODES.usage
+            }
+          );
+        }
+      }
+    }
+
     const mutationResult = buildBackendGroupUpdateMutation(
       mutation,
       groupName,
       {
         ...(algorithm === undefined ? {} : { algorithm }),
-        ...(backendProtocol === undefined ? {} : { backendProtocol })
+        ...(backendProtocol === undefined ? {} : { backendProtocol }),
+        ...(nextName === undefined ? {} : { name: nextName })
       }
     );
     if (!mutationResult.exists) {
@@ -629,10 +661,11 @@ export class LoadBalancerService {
 
     return {
       action: 'backend-group-update',
-      group_name: groupName,
+      group_name: nextName ?? groupName,
       lb_id: lbId,
       lb_name: lb.appliance_name,
       message: `Backend group "${groupName}" updated.`,
+      ...(nextName === undefined ? {} : { backend_group_name: nextName }),
       ...(options.algorithm === undefined
         ? {}
         : { algorithm: options.algorithm }),
@@ -1068,8 +1101,7 @@ function throwDuplicateBackendServer(
     {
       code: 'BACKEND_SERVER_DUPLICATE_NAME',
       exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Use a unique server name or update the existing server with --ip and --port.'
+      suggestion: 'Use a unique server name instead.'
     }
   );
 }

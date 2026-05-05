@@ -1005,6 +1005,21 @@ describe('renderLoadBalancerResult', () => {
       expect(parsed.action).toBe('backend-group-update');
       expect(parsed.group_name).toBe('grp1');
     });
+
+    it('renders backend-group-update with name change (human)', () => {
+      const result: LoadBalancerCommandResult = {
+        action: 'backend-group-update',
+        lb_id: '10',
+        lb_name: 'my-alb',
+        group_name: 'grp-v2',
+        message: 'Backend group updated.',
+        backend_group_name: 'grp-v2'
+      };
+      const output = renderLoadBalancerResult(result, false);
+      expect(output).toContain('Backend group updated.');
+      expect(output).toContain('grp-v2');
+      expect(output).toContain('New Name');
+    });
   });
 
   describe('network actions', () => {

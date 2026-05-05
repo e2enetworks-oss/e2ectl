@@ -394,6 +394,7 @@ function buildBackendGroupCommand(
     command
       .command('update <lbId> <groupName>')
       .description('Update a backend group.')
+      .option('--backend-group-name <name>', 'New backend group name.')
       .addOption(
         new Option(
           '--algorithm <algorithm>',

@@ -64,6 +64,7 @@ export interface LoadBalancerBackendGroupMutationResult {
 export interface LoadBalancerBackendGroupUpdatePatch {
   algorithm?: LoadBalancerAlgorithm;
   backendProtocol?: 'HTTP' | 'HTTPS';
+  name?: string;
 }
 
 export interface LoadBalancerBackendServerMutationResult {

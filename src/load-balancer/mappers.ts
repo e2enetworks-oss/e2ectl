@@ -287,8 +287,16 @@ export function buildBackendGroupUpdateMutation(
         ? {
             lb_mode: 'TCP',
             tcp_backend: mutation.tcpBackends.map((group) =>
-              group.backend_name === groupName && patch.algorithm !== undefined
-                ? { ...group, balance: patch.algorithm }
+              group.backend_name === groupName
+                ? {
+                    ...group,
+                    ...(patch.name === undefined
+                      ? {}
+                      : { backend_name: patch.name }),
+                    ...(patch.algorithm === undefined
+                      ? {}
+                      : { balance: patch.algorithm })
+                  }
                 : group
             )
           }
@@ -307,6 +315,7 @@ export function buildBackendGroupUpdateMutation(
             group.name === groupName
               ? {
                   ...group,
+                  ...(patch.name === undefined ? {} : { name: patch.name }),
                   ...(patch.algorithm === undefined
                     ? {}
                     : { balance: patch.algorithm }),

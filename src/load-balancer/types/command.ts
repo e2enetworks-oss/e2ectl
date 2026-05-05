@@ -74,6 +74,7 @@ export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerConte
 
 export interface LoadBalancerBackendGroupUpdateOptions extends LoadBalancerContextOptions {
   algorithm?: string;
+  backendGroupName?: string;
   backendGroupProtocol?: string;
 }
 
@@ -154,6 +155,7 @@ export interface LoadBalancerBackendGroupUpdateCommandResult {
   message: string;
   algorithm?: string;
   backend_protocol?: string;
+  backend_group_name?: string;
 }
 
 export interface LoadBalancerBackendGroupDeleteCommandResult {

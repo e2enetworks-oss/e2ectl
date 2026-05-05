@@ -94,6 +94,14 @@ Cause: You tried to delete the only remaining server in a backend group. The API
 
 Fix: Either add another server first (`e2ectl lb backend-server add <lbId>`), or delete the entire backend group with `e2ectl lb backend-group remove <lbId> <groupName>` if you no longer need the group.
 
+### BACKEND_SERVER_DUPLICATE_NAME
+
+Symptom: `A server named "<name>" already exists in backend group "<group>".`
+
+Cause: You tried to add a backend server with a name that already exists in the group. Server names must be unique within a backend group.
+
+Fix: Use a unique server name instead. Each server in a backend group needs a distinct name.
+
 ## Attachment And Identifier Mix-Ups
 
 Symptoms:
