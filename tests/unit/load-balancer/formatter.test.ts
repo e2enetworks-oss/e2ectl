@@ -18,7 +18,7 @@ describe('renderLoadBalancerResult', () => {
           {
             id: 1,
             appliance_name: 'my-alb',
-            status: 'RUNNING',
+            status: 'Running',
             lb_mode: 'HTTP',
             lb_type: 'external',
             public_ip: '1.2.3.4',
@@ -29,7 +29,7 @@ describe('renderLoadBalancerResult', () => {
       };
       const output = renderLoadBalancerResult(result, false);
       expect(output).toContain('my-alb');
-      expect(output).toContain('RUNNING');
+      expect(output).toContain('Running');
       expect(output).toContain('HTTP');
       expect(output).toContain('1.2.3.4 (Reserved)');
       expect(output).toContain('10.0.0.1');
@@ -42,7 +42,7 @@ describe('renderLoadBalancerResult', () => {
           {
             id: 3,
             appliance_name: 'private-lb',
-            status: 'RUNNING',
+            status: 'Running',
             public_ip: '',
             private_ip: null
           }
@@ -62,7 +62,7 @@ describe('renderLoadBalancerResult', () => {
           {
             id: 2,
             appliance_name: 'my-nlb',
-            status: 'RUNNING',
+            status: 'Running',
             lb_mode: 'TCP',
             lb_type: 'external',
             public_ip: null,
@@ -83,7 +83,7 @@ describe('renderLoadBalancerResult', () => {
               private_ip: '10.0.0.2',
               public_ip: null,
               public_ip_reserved: false,
-              status: 'RUNNING'
+              status: 'Running'
             }
           ]
         }) + '\n'
@@ -1004,45 +1004,6 @@ describe('renderLoadBalancerResult', () => {
       };
       expect(parsed.action).toBe('backend-group-update');
       expect(parsed.group_name).toBe('grp1');
-    });
-  });
-
-  describe('backend-server-update', () => {
-    it('renders backend-server-update with ip and port changes (human)', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'backend-server-update',
-        lb_id: '10',
-        lb_name: 'my-alb',
-        group_name: 'grp1',
-        server_name: 'web1',
-        message: 'Backend server updated.',
-        ip: '10.0.0.9',
-        port: '9090'
-      };
-      const output = renderLoadBalancerResult(result, false);
-      expect(output).toContain('Backend server updated.');
-      expect(output).toContain('web1');
-      expect(output).toContain('10.0.0.9');
-      expect(output).toContain('9090');
-      expect(output).toContain('e2ectl lb get 10');
-    });
-
-    it('renders JSON for backend-server-update', () => {
-      const result: LoadBalancerCommandResult = {
-        action: 'backend-server-update',
-        lb_id: '10',
-        lb_name: 'my-alb',
-        group_name: 'grp1',
-        server_name: 'web1',
-        message: 'Backend server updated.',
-        ip: '10.0.0.9'
-      };
-      const parsed = JSON.parse(renderLoadBalancerResult(result, true)) as {
-        action: string;
-        server_name: string;
-      };
-      expect(parsed.action).toBe('backend-server-update');
-      expect(parsed.server_name).toBe('web1');
     });
   });
 

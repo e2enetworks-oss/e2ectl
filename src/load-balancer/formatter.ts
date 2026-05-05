@@ -125,24 +125,6 @@ function renderLoadBalancerHuman(result: LoadBalancerCommandResult): string {
         )
       );
 
-    case 'backend-server-update': {
-      const bsUpdateRows: Array<[string, string]> = [
-        ['Load Balancer ID', result.lb_id],
-        ['Name', result.lb_name],
-        ['Backend Group', result.group_name],
-        ['Server', result.server_name]
-      ];
-      if (result.ip !== undefined) bsUpdateRows.push(['New IP', result.ip]);
-      if (result.port !== undefined)
-        bsUpdateRows.push(['New Port', result.port]);
-      return (
-        `${result.message}\n${formatFieldTable(bsUpdateRows)}\n` +
-        hint(
-          `Run "e2ectl lb get ${result.lb_id}" to view the updated server configuration.`
-        )
-      );
-    }
-
     case 'backend-server-remove':
       return (
         `${result.message}\n${formatFieldTable([
@@ -308,15 +290,6 @@ function normalizeLoadBalancerJson(
     case 'backend-server-add':
       return {
         action: 'backend-server-add',
-        group_name: result.group_name,
-        lb_id: result.lb_id,
-        message: result.message,
-        server_name: result.server_name
-      };
-
-    case 'backend-server-update':
-      return {
-        action: 'backend-server-update',
         group_name: result.group_name,
         lb_id: result.lb_id,
         message: result.message,

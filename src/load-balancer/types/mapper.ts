@@ -66,11 +66,6 @@ export interface LoadBalancerBackendGroupUpdatePatch {
   backendProtocol?: 'HTTP' | 'HTTPS';
 }
 
-export interface LoadBalancerBackendServerPatch {
-  backend_ip?: string;
-  backend_port?: number;
-}
-
 export interface LoadBalancerBackendServerMutationResult {
   ambiguous: boolean;
   groupFound: boolean;

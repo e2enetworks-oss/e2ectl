@@ -716,36 +716,6 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('web');
   });
 
-  it('updates a backend server via backend-server update', async () => {
-    const { runtime, stdout, lbStub } = createRuntimeFixture();
-    await seedProfile(runtime);
-    const program = createProgram(runtime);
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      'lb',
-      'backend-server',
-      'update',
-      '10',
-      '--alias',
-      'prod',
-      '--backend-group-name',
-      'web',
-      '--backend-group-server-name',
-      'server-1',
-      '--ip',
-      '10.0.0.30',
-      '--port',
-      '8081'
-    ]);
-
-    expect(lbStub.updateLoadBalancer).toHaveBeenCalled();
-    expect(stdout.buffer).toContain(
-      'Server "server-1" updated in backend group "web".'
-    );
-  });
-
   it('deletes a backend group via backend-group remove', async () => {
     const { runtime, stdout, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);

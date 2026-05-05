@@ -14,7 +14,6 @@ import type {
   LoadBalancerBackendGroupMutationResult,
   LoadBalancerBackendGroupUpdatePatch,
   LoadBalancerBackendServerMutationResult,
-  LoadBalancerBackendServerPatch,
   LoadBalancerContextAclData,
   LoadBalancerContextPayload,
   LoadBalancerCreatedBackendSummary,
@@ -426,69 +425,6 @@ export function buildBackendServerAddMutation(
           )
         }
       : null
-  };
-}
-
-export function buildBackendServerUpdateMutation(
-  mutation: ResolvedLoadBalancerMutationContext,
-  backendGroup: string,
-  backendServerName: string,
-  patch: LoadBalancerBackendServerPatch
-): LoadBalancerBackendServerMutationResult {
-  let serverFound = false;
-
-  if (mutation.isNlb) {
-    const updatedTcpBackends = mutation.tcpBackends.map((group) => {
-      if (group.backend_name !== backendGroup) return group;
-      serverFound = group.servers.some(
-        (server) => server.backend_name === backendServerName
-      );
-      return {
-        ...group,
-        servers: group.servers.map((server) =>
-          server.backend_name === backendServerName
-            ? { ...server, ...patch }
-            : server
-        )
-      };
-    });
-
-    return {
-      ambiguous: false,
-      groupFound: mutation.tcpBackends.some(
-        (group) => group.backend_name === backendGroup
-      ),
-      lastServer: false,
-      removedServer: null,
-      serverFound,
-      overrides: serverFound
-        ? { lb_mode: 'TCP', tcp_backend: updatedTcpBackends }
-        : null
-    };
-  }
-
-  const updatedBackends = mutation.backends.map((group) => {
-    if (group.name !== backendGroup) return group;
-    serverFound = group.servers.some(
-      (server) => server.backend_name === backendServerName
-    );
-    return {
-      ...group,
-      servers: group.servers.map((server) =>
-        server.backend_name === backendServerName
-          ? { ...server, ...patch }
-          : server
-      )
-    };
-  });
-
-  return {
-    ambiguous: false,
-    groupFound: mutation.backends.some((group) => group.name === backendGroup),
-    lastServer: false,
-    removedServer: null,
-    serverFound,
-    overrides: serverFound ? { backends: updatedBackends } : null
   };
 }
 

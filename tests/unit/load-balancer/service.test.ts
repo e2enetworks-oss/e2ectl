@@ -1762,6 +1762,29 @@ describe('LoadBalancerService', () => {
       expect(updatedBody.tcp_backend?.[0]?.servers).toHaveLength(2);
     });
 
+    it('throws BACKEND_SERVER_DUPLICATE_NAME when server name already exists in ALB group', async () => {
+      const { service } = createServiceFixture();
+
+      await expect(
+        service.addBackendServer('10', {
+          backendGroupName: 'web',
+          backendGroupServer: 'server-1:10.0.0.5:8080'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_DUPLICATE_NAME' });
+    });
+
+    it('throws BACKEND_SERVER_DUPLICATE_NAME when server name already exists in NLB group', async () => {
+      const { service, getLoadBalancer } = createServiceFixture();
+      getLoadBalancer.mockResolvedValue(createNlbDetails());
+
+      await expect(
+        service.addBackendServer('20', {
+          backendGroupName: 'tcp-grp',
+          backendGroupServer: 'srv-1:10.0.0.5:8080'
+        })
+      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_DUPLICATE_NAME' });
+    });
+
     it('throws BACKEND_GROUP_NOT_FOUND when group does not exist on ALB', async () => {
       const { service } = createServiceFixture();
 
@@ -2200,75 +2223,6 @@ describe('LoadBalancerService', () => {
           algorithm: 'roundrobin'
         })
       ).rejects.toMatchObject({ code: 'BACKEND_GROUP_NOT_FOUND' });
-    });
-  });
-
-  describe('updateBackendServer', () => {
-    it('updates ALB server IP', async () => {
-      const { service, updateLoadBalancer } = createServiceFixture();
-
-      const result = await service.updateBackendServer('10', {
-        backendGroupName: 'web',
-        backendGroupServerName: 'server-1',
-        ip: '10.0.0.9'
-      });
-
-      expect(result.action).toBe('backend-server-update');
-      expect(result.server_name).toBe('server-1');
-      expect(result.ip).toBe('10.0.0.9');
-      expect(updateLoadBalancer).toHaveBeenCalledOnce();
-    });
-
-    it('updates NLB server port', async () => {
-      const { service, getLoadBalancer, updateLoadBalancer } =
-        createServiceFixture();
-      getLoadBalancer.mockResolvedValue(createNlbDetails());
-
-      const result = await service.updateBackendServer('20', {
-        backendGroupName: 'tcp-grp',
-        backendGroupServerName: 'srv-1',
-        port: '9090'
-      });
-
-      expect(result.action).toBe('backend-server-update');
-      expect(result.port).toBe('9090');
-      expect(updateLoadBalancer).toHaveBeenCalledOnce();
-    });
-
-    it('throws BACKEND_SERVER_UPDATE_EMPTY when neither ip nor port is provided', async () => {
-      const { service } = createServiceFixture();
-
-      await expect(
-        service.updateBackendServer('10', {
-          backendGroupName: 'web',
-          backendGroupServerName: 'server-1'
-        })
-      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_UPDATE_EMPTY' });
-    });
-
-    it('throws BACKEND_SERVER_NOT_FOUND when server does not exist on ALB', async () => {
-      const { service } = createServiceFixture();
-
-      await expect(
-        service.updateBackendServer('10', {
-          backendGroupName: 'web',
-          backendGroupServerName: 'nonexistent',
-          ip: '10.0.0.1'
-        })
-      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
-    });
-
-    it('throws BACKEND_SERVER_NOT_FOUND when server does not exist on NLB', async () => {
-      const { service, getLoadBalancer } = createServiceFixture();
-      getLoadBalancer.mockResolvedValue(createNlbDetails());
-
-      await expect(
-        service.updateBackendServer('20', {
-          backendGroupName: 'tcp-grp',
-          backendGroupServerName: 'nonexistent',
-          port: '8080'
-        })
-      ).rejects.toMatchObject({ code: 'BACKEND_SERVER_NOT_FOUND' });
     });
   });
 

@@ -12,8 +12,6 @@ export type {
   LoadBalancerBackendServerAddOptions,
   LoadBalancerBackendServerDeleteCommandResult,
   LoadBalancerBackendServerDeleteOptions,
-  LoadBalancerBackendServerUpdateCommandResult,
-  LoadBalancerBackendServerUpdateOptions,
   LoadBalancerCommandResult,
   LoadBalancerCommittedPlan,
   LoadBalancerCommittedStatus,

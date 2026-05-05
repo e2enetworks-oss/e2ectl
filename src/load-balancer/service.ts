@@ -37,7 +37,6 @@ import {
   buildBackendGroupUpdateMutation,
   buildBackendServerAddMutation,
   buildBackendServerDeleteMutation,
-  buildBackendServerUpdateMutation,
   buildLoadBalancerCreateRequest,
   buildLoadBalancerMutationRequest,
   buildTcpBackendGroup,
@@ -57,8 +56,6 @@ import type {
   LoadBalancerBackendServerAddOptions,
   LoadBalancerBackendServerDeleteCommandResult,
   LoadBalancerBackendServerDeleteOptions,
-  LoadBalancerBackendServerUpdateCommandResult,
-  LoadBalancerBackendServerUpdateOptions,
   LoadBalancerClient,
   LoadBalancerContextOptions,
   LoadBalancerCreatedBackendSummary,
@@ -693,6 +690,30 @@ export class LoadBalancerService {
       options
     );
 
+    if (mutation.isNlb) {
+      const existingGroup = mutation.tcpBackends.find(
+        (g) => g.backend_name === backendGroup
+      );
+      if (
+        existingGroup?.servers.some(
+          (s) => s.backend_name === server.backend_name
+        )
+      ) {
+        throwDuplicateBackendServer(server.backend_name, backendGroup);
+      }
+    } else {
+      const existingGroup = mutation.backends.find(
+        (g) => g.name === backendGroup
+      );
+      if (
+        existingGroup?.servers.some(
+          (s) => s.backend_name === server.backend_name
+        )
+      ) {
+        throwDuplicateBackendServer(server.backend_name, backendGroup);
+      }
+    }
+
     const mutationResult = buildBackendServerAddMutation(
       mutation,
       backendGroup,
@@ -711,62 +732,6 @@ export class LoadBalancerService {
       lb_name: lb.appliance_name,
       message: `Server "${server.backend_name}" added to backend group "${backendGroup}".`,
       server_name: server.backend_name
-    };
-  }
-
-  async updateBackendServer(
-    lbId: string,
-    options: LoadBalancerBackendServerUpdateOptions
-  ): Promise<LoadBalancerBackendServerUpdateCommandResult> {
-    const nextIp =
-      options.ip === undefined ? undefined : assertIp(options.ip, '--ip');
-    const nextPort =
-      options.port === undefined
-        ? undefined
-        : assertPort(options.port, '--port');
-
-    if (nextIp === undefined && nextPort === undefined) {
-      throw new CliError(
-        'Provide --ip, --port, or both to update a backend server.',
-        {
-          code: 'BACKEND_SERVER_UPDATE_EMPTY',
-          exitCode: EXIT_CODES.usage
-        }
-      );
-    }
-
-    const { client, lb, mutation } = await this.resolveMutationState(
-      lbId,
-      options
-    );
-    const mutationResult = buildBackendServerUpdateMutation(
-      mutation,
-      options.backendGroupName,
-      options.backendGroupServerName,
-      {
-        ...(nextIp === undefined ? {} : { backend_ip: nextIp }),
-        ...(nextPort === undefined ? {} : { backend_port: nextPort })
-      }
-    );
-    if (!mutationResult.serverFound) {
-      throwBackendServerNotFound(
-        lbId,
-        options.backendGroupName,
-        options.backendGroupServerName
-      );
-    }
-    const overrides = mutationResult.overrides!;
-    await this.applyMutation(lbId, client, lb, mutation, overrides);
-
-    return {
-      action: 'backend-server-update',
-      group_name: options.backendGroupName,
-      lb_id: lbId,
-      lb_name: lb.appliance_name,
-      message: `Server "${options.backendGroupServerName}" updated in backend group "${options.backendGroupName}".`,
-      server_name: options.backendGroupServerName,
-      ...(options.ip === undefined ? {} : { ip: options.ip }),
-      ...(options.port === undefined ? {} : { port: options.port })
     };
   }
 
@@ -1090,6 +1055,21 @@ function throwBackendServerNotFound(
     {
       code: 'BACKEND_SERVER_NOT_FOUND',
       exitCode: EXIT_CODES.usage
+    }
+  );
+}
+
+function throwDuplicateBackendServer(
+  serverName: string,
+  groupName: string
+): never {
+  throw new CliError(
+    `A server named "${serverName}" already exists in backend group "${groupName}".`,
+    {
+      code: 'BACKEND_SERVER_DUPLICATE_NAME',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Use a unique server name or update the existing server with --ip and --port.'
     }
   );
 }

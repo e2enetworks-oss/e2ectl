@@ -16,7 +16,6 @@ import type {
   LoadBalancerBackendGroupUpdateOptions,
   LoadBalancerBackendServerAddOptions,
   LoadBalancerBackendServerDeleteOptions,
-  LoadBalancerBackendServerUpdateOptions,
   LoadBalancerContextOptions,
   LoadBalancerCreateOptions,
   LoadBalancerDeleteOptions,
@@ -470,28 +469,6 @@ function buildBackendServerCommand(
       commandInstance: Command
     ) => {
       const result = await service.addBackendServer(lbId, options);
-      writeResult(runtime, commandInstance, result);
-    }
-  );
-
-  addContextOptions(
-    command
-      .command('update <lbId>')
-      .description('Update a backend server.')
-      .requiredOption('--backend-group-name <name>', 'Backend group name.')
-      .requiredOption(
-        '--backend-group-server-name <name>',
-        'Backend server name to update.'
-      )
-      .option('--ip <ip>', 'New backend server IP address.')
-      .option('--port <port>', 'New backend server port.')
-  ).action(
-    async (
-      lbId: string,
-      options: LoadBalancerBackendServerUpdateOptions,
-      commandInstance: Command
-    ) => {
-      const result = await service.updateBackendServer(lbId, options);
       writeResult(runtime, commandInstance, result);
     }
   );

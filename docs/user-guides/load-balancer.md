@@ -151,12 +151,6 @@ e2ectl lb backend-server add <lbId> \
   --backend-group-name web \
   --backend-group-server web-3:192.168.1.3:8080
 
-e2ectl lb backend-server update <lbId> \
-  --backend-group-name web \
-  --backend-group-server-name web-3 \
-  --ip 192.168.1.30 \
-  --port 8081
-
 e2ectl lb backend-server remove <lbId> \
   --backend-group-name web \
   --backend-group-server-name web-3

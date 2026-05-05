@@ -82,13 +82,6 @@ export interface LoadBalancerBackendServerAddOptions extends LoadBalancerContext
   backendGroupServer?: string;
 }
 
-export interface LoadBalancerBackendServerUpdateOptions extends LoadBalancerContextOptions {
-  backendGroupName: string;
-  backendGroupServerName: string;
-  ip?: string;
-  port?: string;
-}
-
 export interface LoadBalancerBackendServerDeleteOptions extends LoadBalancerContextOptions {
   backendGroupName?: string;
   backendGroupServerName?: string;
@@ -180,17 +173,6 @@ export interface LoadBalancerBackendServerAddCommandResult {
   server_name: string;
 }
 
-export interface LoadBalancerBackendServerUpdateCommandResult {
-  action: 'backend-server-update';
-  group_name: string;
-  lb_id: string;
-  lb_name: string;
-  message: string;
-  server_name: string;
-  ip?: string;
-  port?: string;
-}
-
 export interface LoadBalancerBackendServerDeleteCommandResult {
   action: 'backend-server-remove';
   group_name: string;
@@ -247,6 +229,5 @@ export type LoadBalancerCommandResult =
   | LoadBalancerBackendGroupUpdateCommandResult
   | LoadBalancerBackendGroupDeleteCommandResult
   | LoadBalancerBackendServerAddCommandResult
-  | LoadBalancerBackendServerUpdateCommandResult
   | LoadBalancerBackendServerDeleteCommandResult
   | LoadBalancerNetworkCommandResult;
