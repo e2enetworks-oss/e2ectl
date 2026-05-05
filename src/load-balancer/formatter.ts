@@ -444,7 +444,7 @@ function renderBackendGroupListHuman(
     }
   }
 
-  return table.toString();
+  return table.toString() + '\n';
 }
 
 function renderLoadBalancerCreateHuman(
