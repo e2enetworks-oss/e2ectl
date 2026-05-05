@@ -301,7 +301,7 @@ describe('lb update and network commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'network', 'vpc', 'attach', '10', '--vpc', '12345'],
+        ['lb', 'network', 'vpc', 'attach', '10', '--vpc-id', '12345'],
         {
           env: {
             HOME: tempHome.path,
@@ -489,7 +489,7 @@ describe('lb update and network commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'network', 'vpc', 'detach', '10', '--vpc', '12345'],
+        ['lb', 'network', 'vpc', 'detach', '10', '--vpc-id', '12345'],
         {
           env: {
             HOME: tempHome.path,
@@ -520,7 +520,7 @@ describe('lb update and network commands against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['lb', 'network', 'vpc', 'detach', '10', '--vpc', '12345'],
+        ['lb', 'network', 'vpc', 'detach', '10', '--vpc-id', '12345'],
         {
           env: {
             HOME: tempHome.path,

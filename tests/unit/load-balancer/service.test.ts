@@ -825,7 +825,7 @@ describe('LoadBalancerService', () => {
       });
     });
 
-    it('creates an internal LB using --vpc option instead of networkId', async () => {
+    it('creates an internal LB using --vpc-id option instead of networkId', async () => {
       const { service, createLoadBalancer, getVpc } = createServiceFixture();
 
       await service.createLoadBalancer({
@@ -833,7 +833,7 @@ describe('LoadBalancerService', () => {
         name: 'internal-alb',
         plan: 'LB-2',
         frontendProtocol: 'HTTP',
-        vpc: '12345',
+        vpcId: '12345',
         port: '80',
         backendGroupName: 'web',
         backendGroupServer: ['srv-1:10.0.0.1:80']
@@ -2324,7 +2324,7 @@ describe('LoadBalancerService', () => {
       const { service, updateLoadBalancer, createVpcClient } =
         createServiceFixture();
 
-      const result = await service.attachVpc('10', { vpc: '12345' });
+      const result = await service.attachVpc('10', { vpcId: '12345' });
 
       expect(result.action).toBe('network-vpc-attach');
       expect(result.lb_id).toBe('10');
@@ -2337,7 +2337,7 @@ describe('LoadBalancerService', () => {
       const { service, updateLoadBalancer } = createServiceFixture();
 
       const result = await service.attachVpc('10', {
-        vpc: '12345',
+        vpcId: '12345',
         subnet: '1'
       });
 
@@ -2372,7 +2372,7 @@ describe('LoadBalancerService', () => {
         })
       );
 
-      const result = await service.detachVpc('10', { vpc: '100' });
+      const result = await service.detachVpc('10', { vpcId: '100' });
 
       expect(result.action).toBe('network-vpc-detach');
       expect(result.lb_id).toBe('10');
@@ -2384,7 +2384,7 @@ describe('LoadBalancerService', () => {
       const { service } = createServiceFixture();
 
       await expect(
-        service.detachVpc('10', { vpc: '9999' })
+        service.detachVpc('10', { vpcId: '9999' })
       ).rejects.toMatchObject({ code: 'VPC_NOT_ATTACHED' });
     });
   });

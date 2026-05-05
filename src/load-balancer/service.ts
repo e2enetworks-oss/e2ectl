@@ -118,15 +118,15 @@ export class LoadBalancerService {
   async createLoadBalancer(
     options: LoadBalancerCreateOptions
   ): Promise<LoadBalancerCreateCommandResult> {
-    const requestedVpcId = options.networkId ?? options.vpc;
+    const requestedVpcId = options.networkId ?? options.vpcId;
     const mode = assertFrontendProtocol(options.frontendProtocol);
     const lbType = assertLbType(options.lbType);
     if (lbType === 'internal' && requestedVpcId === undefined) {
-      throw new CliError('--vpc is required when --lb-type is internal.', {
+      throw new CliError('--vpc-id is required when --lb-type is internal.', {
         code: 'INTERNAL_LB_REQUIRES_VPC',
         exitCode: EXIT_CODES.usage,
         suggestion:
-          'Provide --vpc <vpcId> with --lb-type internal, or omit --lb-type (defaults to external).'
+          'Provide --vpc-id <vpcId> with --lb-type internal, or omit --lb-type (defaults to external).'
       });
     }
     if (lbType === 'internal' && options.reserveIp !== undefined) {
@@ -141,7 +141,7 @@ export class LoadBalancerService {
       );
     }
     const networkId = requestedVpcId
-      ? normalizeRequiredNumericId(requestedVpcId, 'Network ID', '--vpc')
+      ? normalizeRequiredNumericId(requestedVpcId, 'Network ID', '--vpc-id')
       : null;
     const subnetId =
       options.subnet === undefined
@@ -870,7 +870,11 @@ export class LoadBalancerService {
     options: LoadBalancerVpcAttachOptions
   ): Promise<LoadBalancerNetworkCommandResult> {
     normalizeRequiredNumericId(lbId, 'Load balancer ID', '<lbId>');
-    const vpcId = normalizeRequiredNumericId(options.vpc, 'VPC ID', '--vpc');
+    const vpcId = normalizeRequiredNumericId(
+      options.vpcId,
+      'VPC ID',
+      '--vpc-id'
+    );
     const subnetId =
       options.subnet === undefined
         ? null
@@ -904,7 +908,11 @@ export class LoadBalancerService {
     lbId: string,
     options: LoadBalancerVpcDetachOptions
   ): Promise<LoadBalancerNetworkCommandResult> {
-    const vpcId = normalizeRequiredNumericId(options.vpc, 'VPC ID', '--vpc');
+    const vpcId = normalizeRequiredNumericId(
+      options.vpcId,
+      'VPC ID',
+      '--vpc-id'
+    );
     const { client, lb, mutation } = await this.resolveMutationState(
       lbId,
       options

@@ -104,7 +104,7 @@ e2ectl dbaas create \
   --plan <plan-name> \
   --database-name <database-name> \
   --password-file /secure/path/dbaas-password.txt \
-  --vpc-id <network-id>
+  --vpc-id <vpc-id>
 ```
 
 For non-default VPCs that require a specific subnet, also pass `--subnet-id <subnet-id>`.

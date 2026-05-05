@@ -77,7 +77,7 @@ NLB has no backend protocol. The backend group port follows the frontend port.
 
 ## Create An Internal LB
 
-Use `e2ectl vpc list` to find the VPC ID for `--vpc`. The `--vpc` flag is required with `--lb-type internal`.
+Use `e2ectl vpc list` to find the VPC ID for `--vpc-id`. The `--vpc-id` flag is required with `--lb-type internal`.
 `--reserve-ip` cannot be used with internal LBs.
 
 ```bash
@@ -86,7 +86,7 @@ e2ectl lb create \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
   --lb-type internal \
-  --vpc 123 \
+  --vpc-id 123 \
   --backend-group-name web \
   --backend-group-protocol HTTP \
   --backend-group-server web-1:192.168.1.1:8080
@@ -94,7 +94,7 @@ e2ectl lb create \
 
 ## External LBs With VPC
 
-External LBs can optionally attach to a VPC with `--vpc`. Both `--vpc` and `--reserve-ip` can be used together on external LBs.
+External LBs can optionally attach to a VPC with `--vpc-id`. Both `--vpc-id` and `--reserve-ip` can be used together on external LBs.
 
 ## Update LB Settings
 
@@ -116,9 +116,9 @@ Use `e2ectl vpc list` to find the VPC ID for `vpc attach/detach`.
 
 ```bash
 e2ectl lb network reserve-ip reserve <lbId>
-e2ectl lb network vpc attach <lbId> --vpc <vpcId>
-e2ectl lb network vpc attach <lbId> --vpc <vpcId> --subnet <subnetId>
-e2ectl lb network vpc detach <lbId> --vpc <vpcId>
+e2ectl lb network vpc attach <lbId> --vpc-id <vpcId>
+e2ectl lb network vpc attach <lbId> --vpc-id <vpcId> --subnet <subnetId>
+e2ectl lb network vpc detach <lbId> --vpc-id <vpcId>
 ```
 
 Reserving a public IP is for external load balancers with an assigned public IPv4 address. If the public IP is already reserved, `lb get` and `lb list` show `(Reserved)` next to the public IP. VPC attachment switches the LB to internal and clears the reserved public IP field.

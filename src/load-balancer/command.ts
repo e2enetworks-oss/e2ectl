@@ -130,10 +130,10 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
           .default('external')
       )
       .option(
-        '--vpc <vpcId>',
+        '--vpc-id <vpcId>',
         'VPC or network ID to attach. Required when --lb-type is internal.'
       )
-      .option('--subnet <subnetId>', 'Subnet ID for --vpc.')
+      .option('--subnet <subnetId>', 'Subnet ID for --vpc-id.')
       .requiredOption(
         '--backend-group-name <name>',
         'Initial backend group name.'
@@ -296,7 +296,7 @@ function buildVpcCommand(
     command
       .command('attach <lbId>')
       .description('Attach a load balancer to a VPC.')
-      .requiredOption('--vpc <vpcId>', 'VPC or network ID to attach.')
+      .requiredOption('--vpc-id <vpcId>', 'VPC or network ID to attach.')
       .option('--subnet <subnetId>', 'Subnet ID to attach.')
   ).action(
     async (
@@ -313,7 +313,7 @@ function buildVpcCommand(
     command
       .command('detach <lbId>')
       .description('Detach a load balancer from a VPC.')
-      .requiredOption('--vpc <vpcId>', 'VPC or network ID to detach.')
+      .requiredOption('--vpc-id <vpcId>', 'VPC or network ID to detach.')
   ).action(
     async (
       lbId: string,

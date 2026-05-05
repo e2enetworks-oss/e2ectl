@@ -33,7 +33,7 @@ export interface LoadBalancerCreateOptions extends LoadBalancerContextOptions {
   port?: string;
   networkId?: string;
   postCommitBehavior?: string;
-  vpc?: string;
+  vpcId?: string;
   subnet?: string;
   backendGroupName?: string;
   backendGroupServer?: string[];
@@ -58,11 +58,11 @@ export interface LoadBalancerUpdateOptions extends LoadBalancerContextOptions {
 
 export interface LoadBalancerVpcAttachOptions extends LoadBalancerContextOptions {
   subnet?: string;
-  vpc: string;
+  vpcId: string;
 }
 
 export interface LoadBalancerVpcDetachOptions extends LoadBalancerContextOptions {
-  vpc: string;
+  vpcId: string;
 }
 
 export interface LoadBalancerBackendGroupCreateOptions extends LoadBalancerContextOptions {

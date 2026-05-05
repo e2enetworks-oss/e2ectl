@@ -401,7 +401,7 @@ describe('lb commands', () => {
     expect(stdout.buffer).toContain('90 Days');
   });
 
-  it('creates an internal LB when --vpc is provided', async () => {
+  it('creates an internal LB when --vpc-id is provided', async () => {
     const { runtime, lbStub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -423,7 +423,7 @@ describe('lb commands', () => {
       'internal',
       '--port',
       '80',
-      '--vpc',
+      '--vpc-id',
       '12345',
       '--backend-group-name',
       'web',
@@ -612,7 +612,7 @@ describe('lb commands', () => {
       'vpc',
       'attach',
       '10',
-      '--vpc',
+      '--vpc-id',
       '12345',
       '--alias',
       'prod'
