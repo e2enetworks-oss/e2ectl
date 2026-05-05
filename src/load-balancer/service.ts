@@ -38,7 +38,7 @@ import {
   buildBackendServerAddMutation,
   buildBackendServerDeleteMutation,
   buildLoadBalancerCreateRequest,
-  buildLoadBalancerMutationRequest,
+  buildLoadBalancerMutationPayload,
   buildTcpBackendGroup,
   normalizeExistingLoadBalancerType,
   resolveLoadBalancerMutationContext,
@@ -980,7 +980,7 @@ export class LoadBalancerService {
   ): Promise<LoadBalancerMutationResponse> {
     return client.updateLoadBalancer(
       lbId,
-      buildLoadBalancerMutationRequest(lb, mutation, overrides)
+      buildLoadBalancerMutationPayload(lb, mutation, overrides)
     );
   }
 

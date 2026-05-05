@@ -146,7 +146,7 @@ export function buildLoadBalancerCreateRequest({
   };
 }
 
-export function buildLoadBalancerUpdateRequest(
+export function buildLoadBalancerPutPayload(
   lb: LoadBalancerDetails,
   context: LoadBalancerContextPayload,
   overrides: LoadBalancerUpdateRequestOverrides
@@ -199,7 +199,7 @@ export function buildLoadBalancerUpdateRequest(
   };
 }
 
-export function buildLoadBalancerMutationRequest(
+export function buildLoadBalancerMutationPayload(
   lb: LoadBalancerDetails,
   mutation: ResolvedLoadBalancerMutationContext,
   overrides: Partial<LoadBalancerUpdateRequestOverrides> = {}
@@ -214,7 +214,7 @@ export function buildLoadBalancerMutationRequest(
     tcp_backend: mutation.tcpBackends
   };
 
-  return buildLoadBalancerUpdateRequest(lb, mutation.context, {
+  return buildLoadBalancerPutPayload(lb, mutation.context, {
     ...baseOverrides,
     ...overrides
   });
