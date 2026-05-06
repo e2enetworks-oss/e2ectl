@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.5.0...v0.6.0) (2026-05-06)
+
+### New Features
+
+- Manage DBaaS from the terminal: discover engines and plans, create databases, view connection details, reset passwords, manage network access, and delete databases without opening the MyAccount UI.
+- Operate load balancers from the CLI: create public or internal load balancers, configure billing and routing, manage backends, attach VPCs, reserve public IPs, and update or delete load balancers as your application changes.
+- Find SSL certificate IDs with `e2ectl ssl list` and use them directly when creating or updating HTTPS load balancers.
+- Use the new DBaaS, load balancer, and SSL guides for copy-ready examples across interactive workflows and automation.
+
 ## [0.5.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.4.0...v0.5.0) (2026-04-26)
 
 ### Added
