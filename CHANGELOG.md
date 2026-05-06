@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1](https://github.com/e2enetworks-oss/e2ectl/compare/v0.6.0...v0.6.1) (2026-05-06)
+
+### Improvements
+
+- DBaaS list and get output now show the database name and username, making it easier to identify databases and copy connection details into scripts or runbooks.
+
 ## [0.6.0](https://github.com/e2enetworks-oss/e2ectl/compare/v0.5.0...v0.6.0) (2026-05-06)
 
 ### New Features
