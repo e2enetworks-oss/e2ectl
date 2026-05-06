@@ -12,8 +12,10 @@ import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient } from '../../../src/node/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
+import type { SslClient } from '../../../src/ssl/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
+import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createSecurityGroupClientStub() {
@@ -100,6 +102,9 @@ describe('security-group commands', () => {
       createImageClient: vi.fn(() => {
         throw new Error('Image client should not be created for this test.');
       }) as unknown as CliRuntime['createImageClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: vi.fn(() => {
         throw new Error('Node client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => NodeClient,
@@ -118,9 +123,17 @@ describe('security-group commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SshKeyClient,
+      createSslClient: vi.fn(() => {
+        throw new Error('SSL client should not be created for this test.');
+      }) as unknown as (credentials: ResolvedCredentials) => SslClient,
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
+      createLoadBalancerClient: vi.fn(() => {
+        throw new Error(
+          'Load balancer client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => LoadBalancerClient,
       createVpcClient: vi.fn(() => {
         throw new Error('VPC client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VpcClient,

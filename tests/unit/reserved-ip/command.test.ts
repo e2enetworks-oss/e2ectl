@@ -9,6 +9,7 @@ import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient } from '../../../src/node/index.js';
 import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
+import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
 function createReservedIpClientStub() {
@@ -149,6 +150,9 @@ describe('reserved-ip commands', () => {
       createImageClient: vi.fn(() => {
         throw new Error('Image client should not be created for this test.');
       }) as unknown as CliRuntime['createImageClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeClient;
@@ -168,6 +172,14 @@ describe('reserved-ip commands', () => {
       createSshKeyClient: vi.fn(() => {
         throw new Error('SSH key client should not be created for this test.');
       }) as unknown as CliRuntime['createSshKeyClient'],
+      createSslClient: vi.fn(() => {
+        throw new Error('SSL client should not be created for this test.');
+      }) as unknown as CliRuntime['createSslClient'],
+      createLoadBalancerClient: vi.fn(() => {
+        throw new Error(
+          'Load balancer client should not be created for this test.'
+        );
+      }) as unknown as (credentials: ResolvedCredentials) => LoadBalancerClient,
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as CliRuntime['createVolumeClient'],

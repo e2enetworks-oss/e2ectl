@@ -8,6 +8,7 @@ import {
 } from './manual-env.js';
 
 export const OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS = {
+  dbaasId: 'E2ECTL_MANUAL_DBAAS_ID',
   nodeId: 'E2ECTL_MANUAL_NODE_ID',
   reservedIp: 'E2ECTL_MANUAL_RESERVED_IP',
   securityGroupId: 'E2ECTL_MANUAL_SECURITY_GROUP_ID',
@@ -26,6 +27,7 @@ export interface ReadOnlyEnv {
     defaultProjectId: string;
   };
   fixtures: {
+    dbaasId?: string;
     nodeId?: string;
     reservedIp?: string;
     securityGroupId?: string;
@@ -43,6 +45,9 @@ export function readReadOnlyEnv(
     purpose: 'Manual read-only checks',
     requiredVars: REQUIRED_MANUAL_BASE_ENV_VARS
   });
+  const dbaasId = normalizeOptionalEnvValue(
+    env[OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS.dbaasId]
+  );
   const nodeId = normalizeOptionalEnvValue(
     env[OPTIONAL_READ_ONLY_FIXTURE_ENV_VARS.nodeId]
   );
@@ -76,6 +81,7 @@ export function readReadOnlyEnv(
       defaultProjectId
     },
     fixtures: {
+      ...(dbaasId === undefined ? {} : { dbaasId }),
       ...(nodeId === undefined ? {} : { nodeId }),
       ...(reservedIp === undefined ? {} : { reservedIp }),
       ...(securityGroupId === undefined ? {} : { securityGroupId }),

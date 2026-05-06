@@ -410,6 +410,9 @@ describe('node commands', () => {
       createImageClient: vi.fn(() => {
         throw new Error('Image client should not be created for this test.');
       }) as unknown as CliRuntime['createImageClient'],
+      createDbaasClient: vi.fn(() => {
+        throw new Error('DBaaS client should not be created for this test.');
+      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
@@ -420,7 +423,11 @@ describe('node commands', () => {
       createReservedIpClient: vi.fn(() => reservedIpStub.stub),
       createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
+      createSslClient: vi.fn(() => {
+        throw new Error('SSL client should not be created for this test.');
+      }) as unknown as CliRuntime['createSslClient'],
       createVolumeClient: vi.fn(() => volumeStub.stub),
+      createLoadBalancerClient: vi.fn(),
       createVpcClient: vi.fn(() => vpcStub.stub),
       credentialValidator: {
         validate: vi.fn()

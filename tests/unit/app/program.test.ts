@@ -11,13 +11,16 @@ describe('createProgram', () => {
     ).toEqual([
       'config',
       'project',
+      'dbaas',
+      'lb',
       'node',
       'image',
       'reserved-ip',
       'volume',
       'vpc',
       'security-group',
-      'ssh-key'
+      'ssh-key',
+      'ssl'
     ]);
   });
 });

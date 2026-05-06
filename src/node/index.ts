@@ -32,3 +32,4 @@ export type {
   NodeUpgradeRequest,
   NodeUpgradeResult
 } from './types.js';
+export { normalizeRequiredNumericId } from './normalizers.js';
