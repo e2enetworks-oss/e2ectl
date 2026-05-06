@@ -137,6 +137,7 @@ describe('dbaas mappers', () => {
         public_ip: null,
         status: null,
         type: 'MySQL',
+        username: null,
         version: '5.7'
       },
       {
@@ -150,6 +151,7 @@ describe('dbaas mappers', () => {
         public_ip: null,
         status: null,
         type: 'MySQL',
+        username: null,
         version: '8.0'
       },
       {
@@ -163,6 +165,7 @@ describe('dbaas mappers', () => {
         public_ip: null,
         status: null,
         type: 'PostgreSQL',
+        username: null,
         version: '16'
       }
     ]);

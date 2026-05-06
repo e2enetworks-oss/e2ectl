@@ -21,6 +21,7 @@ describe('dbaas formatter', () => {
         public_ip: '1.2.3.4',
         status: 'Running',
         type: 'MySQL',
+        username: 'admin',
         version: '8.0'
       }
     ]);
@@ -30,6 +31,10 @@ describe('dbaas formatter', () => {
     expect(table).toContain('db.example.com (1.2.3.4)');
     expect(table).toContain('3306');
     expect(table).toContain('Running');
+    expect(table).toContain('Database Name');
+    expect(table).toContain('Username');
+    expect(table).toContain('appdb');
+    expect(table).toContain('admin');
   });
 
   it('renders engine and template plan tables', () => {
