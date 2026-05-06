@@ -12,6 +12,7 @@ export interface DbaasListItem {
   public_ip: string | null;
   status: string | null;
   type: SupportedDatabaseType;
+  username: string | null;
   version: string;
 }
 

@@ -356,6 +356,7 @@ describe('dbaas commands', () => {
             public_ip: null,
             status: 'Running',
             type: 'MySQL',
+            username: 'admin',
             version: '8.0'
           }
         ],

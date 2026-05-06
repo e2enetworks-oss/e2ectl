@@ -122,6 +122,7 @@ describe('dbaas list against a fake MyAccount API', () => {
                 'psql -h pg.example.com -p 5432 -U admin -d analytics',
               database_name: 'analytics',
               id: 9901,
+              username: 'admin',
               name: 'analytics-db',
               private_ips: [],
               public_ip: null,
@@ -135,6 +136,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               connection_string: 'mysql -h db.example.com -P 3306 -u admin -p',
               database_name: 'appdb',
               id: 7869,
+              username: 'admin',
               name: 'customer-db',
               private_ips: [],
               public_ip: null,
@@ -234,6 +236,10 @@ describe('dbaas list against a fake MyAccount API', () => {
       expect(result.stdout).toContain('Public Endpoint');
       expect(result.stdout).toContain('db.example.com');
       expect(result.stdout).toContain('3306');
+      expect(result.stdout).toContain('Database Name');
+      expect(result.stdout).toContain('Username');
+      expect(result.stdout).toContain('appdb');
+      expect(result.stdout).toContain('admin');
     } finally {
       await server.close();
       await tempHome.cleanup();
@@ -352,6 +358,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               connection_string: 'mysql -h 198.51.100.10 -u admin -p',
               database_name: 'appdb',
               id: 101,
+              username: 'admin',
               name: 'shared-name',
               private_ips: [],
               public_ip: '198.51.100.10',
@@ -365,6 +372,7 @@ describe('dbaas list against a fake MyAccount API', () => {
               connection_string: null,
               database_name: 'legacy',
               id: 202,
+              username: 'admin',
               name: 'shared-name',
               private_ips: [],
               public_ip: null,
@@ -379,6 +387,7 @@ describe('dbaas list against a fake MyAccount API', () => {
                 'psql -h 10.10.0.3 -p 5432 -U admin -d analytics',
               database_name: 'analytics',
               id: 303,
+              username: 'admin',
               name: 'shared-name',
               private_ips: ['10.10.0.3'],
               public_ip: null,
