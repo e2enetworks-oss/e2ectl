@@ -61,11 +61,23 @@ For a first node, an hourly path keeps the decision surface smaller. You can rev
 
 ## 5. Create The Node
 
+**From a catalog image (standard):**
+
 ```bash
 e2ectl node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>
+```
+
+**From a saved image** — use the same `--plan` and `--image` as above, plus the `Template ID` from `e2ectl image list`:
+
+```bash
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --image <image> \
+  --saved-image-template-id <template-id>
 ```
 
 If the selected plan is `E1` or `E1WC`, also pass `--disk <size-gb>`.

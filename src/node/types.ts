@@ -168,6 +168,7 @@ export interface NodeCreateRequest {
   name: string;
   number_of_instances: number;
   plan: string;
+  saved_image_template_id?: string;
   ssh_keys: string[];
   start_scripts: string[];
 }

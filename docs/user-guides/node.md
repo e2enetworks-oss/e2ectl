@@ -48,6 +48,18 @@ For committed billing, add `--billing-type committed --committed-plan-id <commit
 
 For `E1` and `E1WC` plans, also pass `--disk <size-gb>`.
 
+To create from a saved image, use the same `--image` value as a regular node create and add `--saved-image-template-id`:
+
+```bash
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --image <catalog-image> \
+  --saved-image-template-id <template-id>
+```
+
+`<catalog-image>` is the same image identifier from `node catalog plans` (e.g. `Ubuntu-24.04-Distro`). Find `<template-id>` in the `Template ID` column of `e2ectl image list`.
+
 ### Upgrade A Node
 
 ```bash
@@ -68,6 +80,8 @@ e2ectl node action power-on <node-id>
 ```bash
 e2ectl node action save-image <node-id> --name <image-name>
 ```
+
+Manage saved images later with `e2ectl image list`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
 
 ### Detach The Current Primary Public IP
 
@@ -117,6 +131,7 @@ e2ectl node action security-group attach <node-id> \
 - [Quickstart](./quickstart.md)
 - [Create your first node](./workflows/first-node.md)
 - [Networking and storage workflow](./workflows/networking-and-storage.md)
+- [Image](./image.md)
 - [Reserved IP](./reserved-ip.md)
 - [Volume](./volume.md)
 - [VPC](./vpc.md)

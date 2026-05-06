@@ -61,9 +61,10 @@ export interface NodeCreateOptions extends NodeContextOptions {
   billingType?: string;
   committedPlanId?: string;
   disk?: string;
-  image: string;
+  image?: string;
   name: string;
   plan: string;
+  savedImageTemplateId?: string;
   sshKeyIds?: string[];
 }
 
@@ -382,6 +383,7 @@ interface NodeCreatePayloadInput {
   disk: number | null;
   image: string;
   name: string;
+  savedImageTemplateId?: number;
   plan: string;
 }
 
@@ -1094,13 +1096,34 @@ function normalizeNodeCreatePayloadInput(
 ): NodeCreatePayloadInput {
   const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
   const disk = normalizeOptionalNodeDiskSize(options.disk);
+  if (options.image === undefined) {
+    throw new CliError(
+      '--image is required for node create, including saved-image launches.',
+      {
+        code: 'MISSING_IMAGE_FLAG',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Pass the catalog image with --image. For saved-image launches, keep --image and add --saved-image-template-id. Run node catalog plans to find a valid plan/image pair.'
+      }
+    );
+  }
+  const image = normalizeRequiredString(options.image, 'Image', '--image');
+  const savedImageTemplateId =
+    options.savedImageTemplateId !== undefined
+      ? normalizeRequiredNumericId(
+          options.savedImageTemplateId,
+          'Saved image template ID',
+          '--saved-image-template-id'
+        )
+      : undefined;
 
   assertNodeCreateDiskCompatibility(plan, disk);
 
   return {
     committedPlanId,
     disk,
-    image: normalizeRequiredString(options.image, 'Image', '--image'),
+    image,
+    ...(savedImageTemplateId !== undefined ? { savedImageTemplateId } : {}),
     name: normalizeRequiredString(options.name, 'Name', '--name'),
     plan
   };
@@ -1272,19 +1295,27 @@ function buildNodeCreatePayload(
   input: NodeCreatePayloadInput,
   resolvedKeys: ResolvedSshKey[]
 ): NodeCreateRequest {
+  const isSavedImage = input.savedImageTemplateId !== undefined;
+  const baseRequest = buildDefaultNodeCreateRequest({
+    ...(input.committedPlanId === null
+      ? {}
+      : {
+          cn_id: input.committedPlanId,
+          cn_status: COMMITTED_NODE_CREATE_STATUS
+        }),
+    image: input.image,
+    name: input.name,
+    plan: input.plan
+  });
+
   return {
-    ...buildDefaultNodeCreateRequest({
-      ...(input.committedPlanId === null
-        ? {}
-        : {
-            cn_id: input.committedPlanId,
-            cn_status: COMMITTED_NODE_CREATE_STATUS
-          }),
-      image: input.image,
-      name: input.name,
-      plan: input.plan
-    }),
+    ...baseRequest,
     ...(input.disk === null ? {} : { disk: input.disk }),
+    image: input.image,
+    is_saved_image: isSavedImage,
+    ...(isSavedImage
+      ? { saved_image_template_id: String(input.savedImageTemplateId) }
+      : {}),
     ssh_keys: mapResolvedSshKeysToCreatePayload(resolvedKeys)
   };
 }

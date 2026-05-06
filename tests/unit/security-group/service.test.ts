@@ -223,6 +223,53 @@ describe('SecurityGroupService', () => {
     });
   });
 
+  it('fails safe when created security-group ids cannot be resolved uniquely', async () => {
+    const noMatches = createServiceFixture();
+    noMatches.createSecurityGroup.mockResolvedValue({
+      message: 'Security Group created successfully.',
+      result: {
+        id: null,
+        label_id: null,
+        resource_type: null
+      }
+    });
+    noMatches.listSecurityGroups.mockResolvedValue([]);
+
+    await expect(
+      noMatches.service.createSecurityGroup({
+        alias: 'prod',
+        name: 'missing-id-sg',
+        rulesFile: '/tmp/rules.json'
+      })
+    ).rejects.toMatchObject({
+      code: 'SECURITY_GROUP_ID_LOOKUP_FAILED'
+    });
+
+    const duplicateMatches = createServiceFixture();
+    duplicateMatches.createSecurityGroup.mockResolvedValue({
+      message: 'Security Group created successfully.',
+      result: {
+        id: null,
+        label_id: null,
+        resource_type: null
+      }
+    });
+    duplicateMatches.listSecurityGroups.mockResolvedValue([
+      { ...sampleSummary(), name: 'duplicate-sg' },
+      { ...sampleSummary(), id: 57360, name: 'duplicate-sg' }
+    ]);
+
+    await expect(
+      duplicateMatches.service.createSecurityGroup({
+        alias: 'prod',
+        name: 'duplicate-sg',
+        rulesFile: '/tmp/rules.json'
+      })
+    ).rejects.toMatchObject({
+      code: 'SECURITY_GROUP_ID_LOOKUP_FAILED'
+    });
+  });
+
   it('uses the backend-returned id directly when create already returns one', async () => {
     const { createSecurityGroup, listSecurityGroups, service } =
       createServiceFixture();
@@ -317,6 +364,25 @@ describe('SecurityGroupService', () => {
         name: 'edge-sg',
         rule_count: 2
       }
+    });
+  });
+
+  it('normalizes blank descriptions during update without fetching the current security group', async () => {
+    const { getSecurityGroup, service, updateSecurityGroup } =
+      createServiceFixture();
+
+    await service.updateSecurityGroup('57358', {
+      alias: 'prod',
+      description: '   ',
+      name: 'blank-desc-sg',
+      rulesFile: '/tmp/rules.json'
+    });
+
+    expect(getSecurityGroup).not.toHaveBeenCalled();
+    expect(updateSecurityGroup).toHaveBeenCalledWith(57358, {
+      description: '',
+      name: 'blank-desc-sg',
+      rules: sampleRules()
     });
   });
 
@@ -471,6 +537,37 @@ describe('SecurityGroupService', () => {
     expect(createSecurityGroupClient).not.toHaveBeenCalled();
   });
 
+  it('wraps rule read failures from files and stdin with actionable errors', async () => {
+    const fileFixture = createServiceFixture();
+    fileFixture.readRulesFile.mockRejectedValue(new Error('permission denied'));
+
+    await expect(
+      fileFixture.service.createSecurityGroup({
+        alias: 'prod',
+        name: 'web-sg',
+        rulesFile: '/tmp/missing-rules.json'
+      })
+    ).rejects.toMatchObject({
+      code: 'RULES_FILE_READ_FAILED',
+      message:
+        'Could not read security-group rules file: /tmp/missing-rules.json'
+    });
+
+    const stdinFixture = createServiceFixture();
+    stdinFixture.readRulesFromStdin.mockRejectedValue(new Error('broken pipe'));
+
+    await expect(
+      stdinFixture.service.createSecurityGroup({
+        alias: 'prod',
+        name: 'stdin-sg',
+        rulesFile: '-'
+      })
+    ).rejects.toMatchObject({
+      code: 'RULES_FILE_READ_FAILED',
+      message: 'Could not read security-group rules from stdin.'
+    });
+  });
+
   it('rejects invalid security-group ids for get before client creation', async () => {
     const { createSecurityGroupClient, getSecurityGroup, service } =
       createServiceFixture();
@@ -507,6 +604,23 @@ describe('SecurityGroupService', () => {
     expect(updateSecurityGroup).not.toHaveBeenCalled();
   });
 
+  it('rejects security-group ids that exceed the safe integer range', async () => {
+    const { createSecurityGroupClient, deleteSecurityGroup, service } =
+      createServiceFixture();
+
+    await expect(
+      service.deleteSecurityGroup('9007199254740992', {
+        alias: 'prod',
+        force: true
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SECURITY_GROUP_ID'
+    });
+
+    expect(createSecurityGroupClient).not.toHaveBeenCalled();
+    expect(deleteSecurityGroup).not.toHaveBeenCalled();
+  });
+
   it('deletes one security group with an explicit force flag', async () => {
     const { deleteSecurityGroup, service } = createServiceFixture();
 
@@ -524,6 +638,96 @@ describe('SecurityGroupService', () => {
         id: 57358,
         name: 'web-sg'
       }
+    });
+  });
+
+  it('normalizes null backend fields when listing, getting, and deleting security groups', async () => {
+    const {
+      deleteSecurityGroup,
+      getSecurityGroup,
+      listSecurityGroups,
+      service
+    } = createServiceFixture();
+
+    getSecurityGroup.mockResolvedValue({
+      description: undefined,
+      id: 57358,
+      is_all_traffic_rule: undefined,
+      is_default: false,
+      name: 'web-sg',
+      rules: [
+        {
+          description: undefined,
+          id: undefined,
+          network: undefined,
+          network_cidr: undefined,
+          network_size: undefined,
+          port_range: undefined,
+          protocol_name: undefined,
+          rule_type: undefined,
+          vpc_id: undefined
+        }
+      ]
+    });
+    listSecurityGroups.mockResolvedValue([
+      {
+        description: undefined,
+        id: 57358,
+        is_all_traffic_rule: undefined,
+        is_default: false,
+        name: 'web-sg',
+        rules: undefined
+      }
+    ]);
+    deleteSecurityGroup.mockResolvedValue({
+      message: 'Security Group deleted successfully.',
+      result: {
+        name: null
+      }
+    });
+
+    const getResult = await service.getSecurityGroup('57358', {
+      alias: 'prod'
+    });
+    const listResult = await service.listSecurityGroups({ alias: 'prod' });
+    const deleteResult = await service.deleteSecurityGroup('57358', {
+      alias: 'prod',
+      force: true
+    });
+
+    expect(getResult.security_group).toEqual({
+      description: '',
+      id: 57358,
+      is_all_traffic_rule: false,
+      is_default: false,
+      name: 'web-sg',
+      rules: [
+        {
+          description: '',
+          id: null,
+          network: '',
+          network_cidr: '',
+          network_size: null,
+          port_range: '',
+          protocol_name: '',
+          rule_type: '',
+          vpc_id: null
+        }
+      ]
+    });
+    expect(listResult.items).toEqual([
+      {
+        description: '',
+        id: 57358,
+        is_all_traffic_rule: false,
+        is_default: false,
+        name: 'web-sg',
+        rules: []
+      }
+    ]);
+    expect(deleteResult.security_group).toEqual({
+      id: 57358,
+      name: null
     });
   });
 

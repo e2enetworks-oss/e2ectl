@@ -22,7 +22,11 @@ The guides are split into two paths:
 
 - [Config](./config.md)
 - [Project](./project.md)
+- [DBaaS](./dbaas.md)
+- [Load Balancer](./load-balancer.md)
+- [SSL](./ssl.md)
 - [Node](./node.md)
+- [Image](./image.md)
 - [Reserved IP](./reserved-ip.md)
 - [Volume](./volume.md)
 - [VPC](./vpc.md)

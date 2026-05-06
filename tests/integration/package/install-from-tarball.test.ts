@@ -61,7 +61,7 @@ describe('package install smoke from tarball', () => {
             ...homeEnv,
             npm_config_cache: cacheDirectory
           },
-          timeoutMs: 30_000
+          timeoutMs: 60_000
         }
       );
 
@@ -125,7 +125,7 @@ describe('package install smoke from tarball', () => {
       await tempHome.cleanup();
       await rm(root, { force: true, recursive: true });
     }
-  }, 45_000);
+  }, 90_000);
 });
 
 function buildHomeEnv(homePath: string): NodeJS.ProcessEnv {

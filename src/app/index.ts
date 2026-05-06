@@ -69,6 +69,7 @@ export function pathsReferToSameFile(
 }
 
 function prepareProgramForCli(program: Command): void {
+  program.allowExcessArguments(false);
   program.configureOutput({
     outputError: () => {},
     writeErr: () => {}

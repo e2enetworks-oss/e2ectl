@@ -92,6 +92,61 @@ e2ectl node create \
 
 The exact `plan`, `image`, and committed-plan identifiers should come from the current catalog output for the branch you are operating on.
 
+## Recipe: Create A Node From A Saved Image
+
+```bash
+# 1. Find the template_id of the saved image
+e2ectl --json image list > images.json
+
+# 2. Create using the same --plan and --image as a regular node create,
+#    plus --saved-image-template-id from the Template ID column
+e2ectl node create \
+  --name <node-name> \
+  --plan <plan> \
+  --image <image> \
+  --saved-image-template-id <template-id>
+```
+
+`--image` is the catalog image identifier (e.g. `Ubuntu-24.04-Distro`), the same value used for a regular node create. `--saved-image-template-id` is the integer `template_id` from `image list` output.
+
+## Recipe: Provision And Inspect A Load Balancer
+
+```bash
+# 1. Discover available plans
+e2ectl --json lb plans > lb-plans.json
+
+# 2. Create an ALB (plan name from plans output)
+e2ectl lb create \
+  --name my-alb \
+  --plan E2E-LB-2 \
+  --frontend-protocol HTTP \
+  --port 80 \
+  --backend-group-name web \
+  --backend-group-protocol HTTP \
+  --backend-group-server server-1:10.0.0.1:8080
+
+# 3. List load balancers and capture the id
+e2ectl --json lb list > lbs.json
+# { "action": "list", "items": [{ "id": 42, "appliance_name": "my-alb", ... }] }
+
+LB_ID=42
+
+# 4. Inspect backend groups and servers in the full LB detail
+e2ectl --json lb get "$LB_ID" > lb-detail.json
+
+# 5. Add a second server to an existing group
+e2ectl lb backend server add "$LB_ID" \
+  --backend-group-name web \
+  --backend-group-server server-2:10.0.0.2:8080
+
+# 6. Delete when done
+e2ectl lb delete "$LB_ID" --force
+```
+
+The `--json` flag on `lb list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, `public_ip_reserved`, and `private_ip`.
+
+The `--json` flag on `lb get` returns the backend load balancer detail object. For ALBs, backend groups live under `context[0].backends`; for NLBs, they live under `context[0].tcp_backend`. Each server inside a group has `backend_name`, `backend_ip`, and `backend_port`.
+
 ## Recipe: Keep Cleanup Explicit
 
 Destructive commands should stay obvious and targeted:
@@ -117,4 +172,5 @@ Prefer recording the ids you create so teardown steps know exactly what to delet
 - [Quickstart](./quickstart.md)
 - [Config](./config.md)
 - [Node](./node.md)
+- [Load Balancer](./load-balancer.md)
 - [Troubleshooting](./troubleshooting.md)

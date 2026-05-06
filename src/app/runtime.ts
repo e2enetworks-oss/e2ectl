@@ -11,6 +11,12 @@ import {
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
+import { ImageApiClient, type ImageClient } from '../image/index.js';
+import { DbaasApiClient, type DbaasClient } from '../dbaas/index.js';
+import {
+  LoadBalancerApiClient,
+  type LoadBalancerClient
+} from '../load-balancer/index.js';
 import { NodeApiClient, type NodeClient } from '../node/index.js';
 import { ProjectApiClient, type ProjectClient } from '../project/index.js';
 import {
@@ -22,6 +28,7 @@ import {
   type SecurityGroupClient
 } from '../security-group/index.js';
 import { SshKeyApiClient, type SshKeyClient } from '../ssh-key/index.js';
+import { SslApiClient, type SslClient } from '../ssl/index.js';
 import { VolumeApiClient, type VolumeClient } from '../volume/index.js';
 import { VpcApiClient, type VpcClient } from '../vpc/index.js';
 
@@ -31,6 +38,11 @@ export interface OutputWriter {
 
 export interface CliRuntime {
   confirm(message: string): Promise<boolean>;
+  createImageClient(credentials: ResolvedCredentials): ImageClient;
+  createDbaasClient(credentials: ResolvedCredentials): DbaasClient;
+  createLoadBalancerClient(
+    credentials: ResolvedCredentials
+  ): LoadBalancerClient;
   createNodeClient(credentials: ResolvedCredentials): NodeClient;
   createProjectClient(credentials: ResolvedAccountCredentials): ProjectClient;
   createReservedIpClient(credentials: ResolvedCredentials): ReservedIpClient;
@@ -38,6 +50,7 @@ export interface CliRuntime {
     credentials: ResolvedCredentials
   ): SecurityGroupClient;
   createSshKeyClient(credentials: ResolvedCredentials): SshKeyClient;
+  createSslClient(credentials: ResolvedCredentials): SslClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   credentialValidator: CredentialValidator;
@@ -56,6 +69,18 @@ export function createRuntime(): CliRuntime {
 
   return {
     confirm: promptForConfirmation,
+    createImageClient: (credentials) =>
+      new ImageApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createDbaasClient: (credentials) =>
+      new DbaasApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createLoadBalancerClient: (credentials) =>
+      new LoadBalancerApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
@@ -74,6 +99,10 @@ export function createRuntime(): CliRuntime {
       ),
     createSshKeyClient: (credentials) =>
       new SshKeyApiClient(
+        new MyAccountApiTransport(credentials, apiClientOptions)
+      ),
+    createSslClient: (credentials) =>
+      new SslApiClient(
         new MyAccountApiTransport(credentials, apiClientOptions)
       ),
     createVolumeClient: (credentials) =>

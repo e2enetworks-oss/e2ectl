@@ -250,6 +250,41 @@ describe('VolumeApiClient', () => {
       message: 'Deleted'
     });
   });
+
+  it('returns volume list without pagination metadata when API omits it', async () => {
+    const transport = new StubTransport();
+    const client = new VolumeApiClient(transport);
+
+    transport.getMock.mockResolvedValue(
+      envelope([
+        {
+          block_id: 25550,
+          name: 'data-01',
+          size: 238419,
+          size_string: '250 GB',
+          status: 'Available',
+          vm_detail: {}
+        }
+      ])
+    );
+
+    const result = await client.listVolumes(1, 100);
+
+    expect(result).toEqual({
+      items: [
+        {
+          block_id: 25550,
+          name: 'data-01',
+          size: 238419,
+          size_string: '250 GB',
+          status: 'Available',
+          vm_detail: {}
+        }
+      ]
+    });
+    expect(result).not.toHaveProperty('total_count');
+    expect(result).not.toHaveProperty('total_page_number');
+  });
 });
 
 function envelope<TData>(

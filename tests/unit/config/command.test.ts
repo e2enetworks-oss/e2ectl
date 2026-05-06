@@ -17,6 +17,7 @@ import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
 import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
 import { VolumeApiClient } from '../../../src/volume/index.js';
 import { VpcApiClient } from '../../../src/vpc/index.js';
+import { LoadBalancerApiClient } from '../../../src/load-balancer/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
 
@@ -62,6 +63,12 @@ describe('config commands', () => {
       prompt,
       runtime: {
         confirm,
+        createImageClient: vi.fn(() => {
+          throw new Error('Image client should not be created for this test.');
+        }) as unknown as CliRuntime['createImageClient'],
+        createDbaasClient: vi.fn(() => {
+          throw new Error('DBaaS client should not be created for this test.');
+        }) as unknown as CliRuntime['createDbaasClient'],
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(new MyAccountApiTransport(credentials)),
         createProjectClient: vi.fn(() => {
@@ -75,8 +82,13 @@ describe('config commands', () => {
           new SecurityGroupApiClient(new MyAccountApiTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
           new SshKeyApiClient(new MyAccountApiTransport(credentials)),
+        createSslClient: vi.fn(() => {
+          throw new Error('SSL client should not be created for this test.');
+        }) as unknown as CliRuntime['createSslClient'],
         createVolumeClient: (credentials: ResolvedCredentials) =>
           new VolumeApiClient(new MyAccountApiTransport(credentials)),
+        createLoadBalancerClient: (credentials: ResolvedCredentials) =>
+          new LoadBalancerApiClient(new MyAccountApiTransport(credentials)),
         createVpcClient: (credentials: ResolvedCredentials) =>
           new VpcApiClient(new MyAccountApiTransport(credentials)),
         credentialValidator: validator,
