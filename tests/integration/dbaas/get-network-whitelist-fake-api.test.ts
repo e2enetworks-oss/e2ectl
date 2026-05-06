@@ -76,6 +76,10 @@ describe('dbaas get/whitelist against a fake MyAccount API', () => {
       expect(humanGetResult.stdout).toContain('4 vCPU, 16 GB RAM, 100 GB disk');
       expect(humanGetResult.stdout).toContain('VPC Connections:');
       expect(humanGetResult.stdout).toContain('Whitelisted IPs:');
+      expect(humanGetResult.stdout).toContain('Database Name');
+      expect(humanGetResult.stdout).toContain('Username');
+      expect(humanGetResult.stdout).toContain('appdb');
+      expect(humanGetResult.stdout).toContain('admin');
     });
   });
 
@@ -206,6 +210,8 @@ describe('dbaas get/whitelist against a fake MyAccount API', () => {
       expect(humanResult.exitCode).toBe(0);
       expect(humanResult.stdout).toContain('VPC Connections: none');
       expect(humanResult.stdout).toContain('Whitelisted IPs:');
+      expect(humanResult.stdout).toContain('Database Name');
+      expect(humanResult.stdout).toContain('Username');
       expect(humanResult.stdout).toContain('203.0.113.20');
       expect(humanResult.stdout).toContain('198.51.100.24');
     } finally {

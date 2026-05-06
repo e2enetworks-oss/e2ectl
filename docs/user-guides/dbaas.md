@@ -44,7 +44,7 @@ Filter the list to one supported engine family:
 e2ectl dbaas list --type sql
 ```
 
-List output includes the cluster name, DB version, connection endpoint with the public IP in parentheses when available, connection port, and status.
+List output includes the cluster name, DB version, database name, admin username, connection endpoint with the public IP in parentheses when available, connection port, and status.
 
 ### Get DBaaS Details
 
@@ -52,7 +52,7 @@ List output includes the cluster name, DB version, connection endpoint with the 
 e2ectl dbaas get <dbaas-id>
 ```
 
-The detail view includes the list fields plus plan name, price, DBaaS configuration, VPC connections, whitelisted IPs, public IP state, and connection port.
+The detail view includes the list fields (including database name and admin username) plus plan name, price, configuration, VPC connections, whitelisted IPs, public IP state, and connection port.
 
 ```bash
 e2ectl --json dbaas get <dbaas-id>

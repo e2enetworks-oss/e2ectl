@@ -266,6 +266,7 @@ describe('DbaasService', () => {
           public_ip: '5.6.7.8',
           status: 'Running',
           type: 'PostgreSQL',
+          username: 'admin',
           version: '16'
         },
         {
@@ -279,6 +280,7 @@ describe('DbaasService', () => {
           public_ip: '1.2.3.4',
           status: 'Running',
           type: 'MySQL',
+          username: 'admin',
           version: '8.0'
         }
       ],

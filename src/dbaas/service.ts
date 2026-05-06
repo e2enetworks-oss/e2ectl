@@ -224,6 +224,7 @@ export class DbaasService {
             public_ip: normalizeHost(item.master_node.public_ip_address),
             status: normalizeDbaasStatusTitle(item),
             type: normalized.type,
+            username: normalized.username,
             version: normalized.version
           }
         ];
