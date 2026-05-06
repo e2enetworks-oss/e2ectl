@@ -46,6 +46,7 @@ src/
   myaccount/
   config/
   project/
+  load-balancer/
   node/
   dbaas/
   reserved-ip/

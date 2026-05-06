@@ -54,6 +54,7 @@ Live tests live under `tests/manual/` and are split by risk:
 - `npm run test:manual`: read-only API checks
 - `npm run test:manual:smoke`: destructive disposable-resource smoke checks
 - `npm run test:manual:dbaas`: destructive DBaaS lifecycle checks
+- `npm run test:manual:lb`: destructive LB lifecycle checks
 
 ### Safe Read-Only Lane
 
@@ -95,10 +96,13 @@ Always-covered domains:
 - vpc
 - security-group
 - ssh-key
+- load-balancer
+- ssl
 
 Optional fixture env vars enable resource-specific get checks:
 
 - `E2ECTL_MANUAL_DBAAS_ID`
+- `E2ECTL_MANUAL_LB_ID`
 - `E2ECTL_MANUAL_NODE_ID`
 - `E2ECTL_MANUAL_RESERVED_IP`
 - `E2ECTL_MANUAL_VOLUME_ID`
@@ -233,6 +237,54 @@ Required env vars:
 Use the full DBaaS plan name from `dbaas plans`, for example `DBS.16GB`. The password must satisfy the platform policy. The manual test reads the password from `E2ECTL_MANUAL_DBAAS_PASSWORD`, then passes it to the built CLI through stdin with `--password-file -` so it does not appear in the child process argv.
 
 If a DBaaS operation fails because the cluster is not yet running, wait for `dbaas get <id>` to report `Running` before retrying. On failure, check `.manual-dbaas/*-manifest.json` before doing any manual cleanup.
+
+### LB Destructive Lane
+
+This lane creates and deletes an actual load balancer, performing the full lifecycle: create, VPC attach/detach, backend group add/update/remove, backend server add/remove, network reserve-ip, and delete. Run it only with disposable quota and credentials.
+
+Command:
+
+```bash
+E2ECTL_RUN_MANUAL_E2E=1 \
+E2E_API_KEY=... \
+E2E_AUTH_TOKEN=... \
+E2E_PROJECT_ID=... \
+E2E_LOCATION=... \
+E2ECTL_LB_BACKEND_SERVER=srv-1:10.0.0.1:8080 \
+npm run test:manual:lb
+```
+
+Required env vars:
+
+- `E2ECTL_RUN_MANUAL_E2E=1`
+- `E2E_API_KEY`
+- `E2E_AUTH_TOKEN`
+- `E2E_PROJECT_ID`
+- `E2E_LOCATION`
+- `E2ECTL_LB_BACKEND_SERVER` — format `name:ip:port` (e.g. `srv-1:10.0.0.1:8080`)
+
+Optional env vars:
+
+- `E2ECTL_LB_PLAN` — default `E2E-LB-2`
+- `E2ECTL_LB_BACKEND_GROUP_NAME` — default `web`
+- `E2ECTL_LB_VPC_ID` — auto-detected from `vpc list` if not set
+- `E2ECTL_LB_PREFIX` — default `manual-lb`
+
+Destructive proof surface:
+
+- `lb list`, `lb plans`, `ssl list`
+- `lb create` (HTTP, hourly, external)
+- `lb get` (status polling until RUNNING)
+- `lb update` (rename)
+- `lb network vpc attach` / `lb network vpc detach`
+- `lb backend group add` / `lb backend group list` / `lb backend group update` / `lb backend group remove`
+- `lb backend server add` / `lb backend server remove`
+- `lb network reserve-ip reserve`
+- `lb delete --force`
+
+On failure, the test prints the manifest path (`.manual-lb/*-manifest.json`) and the LB ID for manual cleanup. Cleanup attempts `lb delete --force` in `finally` if the LB was not already deleted.
+
+If an operation fails because the LB is not yet running, the test polls `lb get <id>` every 10 seconds with a 15-minute timeout.
 
 ## Promotion Checklist
 
