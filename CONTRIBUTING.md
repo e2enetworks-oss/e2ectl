@@ -54,6 +54,7 @@ src/
   volume/
   vpc/
   ssh-key/
+  support-ticket/
 docs/
   user-guides/
   maintainers/
