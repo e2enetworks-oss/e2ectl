@@ -162,55 +162,57 @@ describe('support-ticket get/replies against a fake MyAccount API', () => {
 
   it('lists replies, normalizes attachments, and expands truncated thread summaries', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/': () => ({
-        body: {
-          code: 200,
-          data: [
-            {
-              attachment_list: {
-                data: [
-                  {
-                    attachment_index: 0,
-                    download_url: 'https://example.com/foo.png',
-                    file_name: 'foo.png'
-                  }
-                ]
+      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/':
+        () => ({
+          body: {
+            code: 200,
+            data: [
+              {
+                attachment_list: {
+                  data: [
+                    {
+                      attachment_index: 0,
+                      download_url: 'https://example.com/foo.png',
+                      file_name: 'foo.png'
+                    }
+                  ]
+                },
+                author: {
+                  email: 'engineer@example.com',
+                  name: 'Engineer'
+                },
+                canReply: true,
+                channel: 'EMAIL',
+                contentType: 'text/html',
+                createdTime: '2026-05-13T16:09:19.307Z',
+                direction: 'out',
+                id: 'thread-1',
+                isDescriptionThread: false,
+                summary: 'Hello',
+                to: 'customer@example.com',
+                visibility: 'public'
               },
-              author: {
-                email: 'engineer@example.com',
-                name: 'Engineer'
-              },
-              canReply: true,
-              channel: 'EMAIL',
-              contentType: 'text/html',
-              createdTime: '2026-05-13T16:09:19.307Z',
-              direction: 'out',
-              id: 'thread-1',
-              isDescriptionThread: false,
-              summary: 'Hello',
-              to: 'customer@example.com',
-              visibility: 'public'
-            },
-            {
-              author: { email: 'cust@example.com', name: 'Customer' },
-              createdTime: '2026-05-14T10:00:00.000Z',
-              direction: 'in',
-              id: 'thread-2',
-              isDescriptionThread: false,
-              summary: 'Long reply truncated...',
-              visibility: 'public'
-            }
-          ],
-          errors: {},
-          message: 'Success'
-        }
-      }),
+              {
+                author: { email: 'cust@example.com', name: 'Customer' },
+                createdTime: '2026-05-14T10:00:00.000Z',
+                direction: 'in',
+                id: 'thread-2',
+                isDescriptionThread: false,
+                summary: 'Long reply truncated...',
+                visibility: 'public'
+              }
+            ],
+            errors: {},
+            message: 'Success'
+          }
+        }),
       'GET /myaccount/api/v1/ticket_management/ticket-thread-conservation/466/thread-2/':
         () => ({
           body: {
             code: 200,
             data: {
-              content: '<p>Long reply truncated&nbsp;but here is the full text.</p>',
+              content:
+                '<p>Long reply truncated&nbsp;but here is the full text.</p>',
               id: 'thread-2'
             },
             errors: {},
@@ -269,14 +271,15 @@ describe('support-ticket get/replies against a fake MyAccount API', () => {
 
   it('renders an empty replies state in human mode', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/': () => ({
-        body: {
-          code: 200,
-          data: [],
-          errors: {},
-          message: 'Success'
-        }
-      })
+      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/':
+        () => ({
+          body: {
+            code: 200,
+            data: [],
+            errors: {},
+            message: 'Success'
+          }
+        })
     });
     const tempHome = await createTempHome();
 
@@ -301,30 +304,29 @@ describe('support-ticket get/replies against a fake MyAccount API', () => {
 
   it('renders the replies table in human mode with author labels and attachment names', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/': () => ({
-        body: {
-          code: 200,
-          data: [
-            {
-              attachment_list: {
-                data: [
-                  { download_url: 'https://x/y', file_name: 'log.txt' }
-                ]
-              },
-              author: { email: 'engineer@example.com', name: 'Engineer' },
-              canReply: true,
-              createdTime: '2026-05-13T16:09:19.307Z',
-              direction: 'out',
-              id: 'thread-1',
-              isDescriptionThread: false,
-              summary: 'Hello there',
-              visibility: 'public'
-            }
-          ],
-          errors: {},
-          message: 'Success'
-        }
-      })
+      'GET /myaccount/api/v1/ticket_management/ticket-conservation/466/':
+        () => ({
+          body: {
+            code: 200,
+            data: [
+              {
+                attachment_list: {
+                  data: [{ download_url: 'https://x/y', file_name: 'log.txt' }]
+                },
+                author: { email: 'engineer@example.com', name: 'Engineer' },
+                canReply: true,
+                createdTime: '2026-05-13T16:09:19.307Z',
+                direction: 'out',
+                id: 'thread-1',
+                isDescriptionThread: false,
+                summary: 'Hello there',
+                visibility: 'public'
+              }
+            ],
+            errors: {},
+            message: 'Success'
+          }
+        })
     });
     const tempHome = await createTempHome();
 

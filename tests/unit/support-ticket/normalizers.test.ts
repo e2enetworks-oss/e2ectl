@@ -273,7 +273,9 @@ describe('detectMimeType', () => {
 describe('readAndEncodeAttachments', () => {
   it('returns undefined when no paths are supplied', async () => {
     await expect(
-      readAndEncodeAttachments(undefined, () => Promise.resolve(Buffer.alloc(0)))
+      readAndEncodeAttachments(undefined, () =>
+        Promise.resolve(Buffer.alloc(0))
+      )
     ).resolves.toBeUndefined();
     await expect(
       readAndEncodeAttachments([], () => Promise.resolve(Buffer.alloc(0)))
@@ -299,7 +301,9 @@ describe('readAndEncodeAttachments', () => {
 
   it('rejects unsupported extensions', async () => {
     await expect(
-      readAndEncodeAttachments(['/tmp/notes.txt'], () => Promise.resolve(Buffer.alloc(0)))
+      readAndEncodeAttachments(['/tmp/notes.txt'], () =>
+        Promise.resolve(Buffer.alloc(0))
+      )
     ).rejects.toMatchObject({ code: 'UNSUPPORTED_ATTACHMENT_TYPE' });
   });
 
@@ -315,9 +319,8 @@ describe('readAndEncodeAttachments', () => {
 
   it('rejects files exceeding the 5MB per-file limit', async () => {
     await expect(
-      readAndEncodeAttachments(
-        ['/tmp/big.pdf'],
-        () => Promise.resolve(Buffer.alloc(5 * 1024 * 1024 + 1))
+      readAndEncodeAttachments(['/tmp/big.pdf'], () =>
+        Promise.resolve(Buffer.alloc(5 * 1024 * 1024 + 1))
       )
     ).rejects.toMatchObject({ code: 'ATTACHMENT_TOO_LARGE' });
   });

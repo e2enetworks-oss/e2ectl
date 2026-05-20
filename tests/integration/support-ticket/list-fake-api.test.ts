@@ -59,7 +59,15 @@ describe('support-ticket list against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['--json', 'support-ticket', 'list', '--page-no', '1', '--per-page', '25'],
+        [
+          '--json',
+          'support-ticket',
+          'list',
+          '--page-no',
+          '1',
+          '--per-page',
+          '25'
+        ],
         {
           env: {
             HOME: tempHome.path,

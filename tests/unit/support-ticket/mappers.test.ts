@@ -85,9 +85,9 @@ describe('normalizeSupportTicketItem', () => {
   });
 
   it('drops non-array emails_cc_on_ticket gracefully', () => {
-    expect(
-      normalizeSupportTicketItem({ id: 1 }).emails_cc_on_ticket
-    ).toEqual([]);
+    expect(normalizeSupportTicketItem({ id: 1 }).emails_cc_on_ticket).toEqual(
+      []
+    );
     expect(
       normalizeSupportTicketItem({
         emails_cc_on_ticket: 'a@b.co' as unknown as string[],
@@ -271,16 +271,18 @@ describe('extractThreadText', () => {
   });
 
   it('falls back to plainText when content is null', () => {
-    expect(
-      extractThreadText({ content: null, plainText: 'plain only' })
-    ).toBe('plain only');
+    expect(extractThreadText({ content: null, plainText: 'plain only' })).toBe(
+      'plain only'
+    );
   });
 
   it('returns undefined when neither content nor plainText has text', () => {
     expect(
       extractThreadText({ content: null, plainText: null })
     ).toBeUndefined();
-    expect(extractThreadText({ content: '<br>', plainText: '' })).toBeUndefined();
+    expect(
+      extractThreadText({ content: '<br>', plainText: '' })
+    ).toBeUndefined();
   });
 
   it('collapses runs of blank lines and strips carriage returns', () => {

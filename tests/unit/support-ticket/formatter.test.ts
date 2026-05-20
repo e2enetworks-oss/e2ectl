@@ -298,9 +298,7 @@ describe('support-ticket formatter', () => {
         action: 'replies',
         threads: [
           sampleThread({
-            attachments: [
-              { download_url: 'https://x/y', file_name: 'log.txt' }
-            ]
+            attachments: [{ download_url: 'https://x/y', file_name: 'log.txt' }]
           })
         ],
         ticket_id: 466
