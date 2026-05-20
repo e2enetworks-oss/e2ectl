@@ -1,3 +1,5 @@
+import { parse as parseHtml } from 'node-html-parser';
+
 import type { SupportTicketListPage } from './client.js';
 import {
   normalizeOptionalInteger,
@@ -152,17 +154,18 @@ function normalizeDescription(value: unknown): string | null {
 }
 
 function htmlToText(html: string): string {
-  return html
+  // Insert newlines for break and block-close tags BEFORE parsing so the
+  // parser's text extraction preserves paragraph boundaries that the server
+  // expresses with <br> / </p> / </div> / </li> / </tr>.
+  const withLineBreaks = html
     .replace(/<br\s*\/?\s*>/gi, '\n')
-    .replace(/<\/(p|div|li|tr)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/gi, "'")
+    .replace(/<\/(p|div|li|tr)>/gi, '\n');
+
+  const root = parseHtml(withLineBreaks);
+  root.querySelectorAll('script, style').forEach((node) => node.remove());
+
+  return root.text
+    .replace(/ /g, ' ')
     .replace(/\r/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

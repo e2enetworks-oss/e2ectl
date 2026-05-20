@@ -76,6 +76,8 @@ export const ALLOWED_ATTACHMENT_EXTENSIONS: ReadonlySet<string> = new Set([
 export const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024;
 export const MAX_ATTACHMENT_COUNT = 5;
 
+export const THREAD_EXPANSION_CONCURRENCY = 5;
+
 export const MIME_TYPES: Record<string, string> = {
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',

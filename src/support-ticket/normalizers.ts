@@ -7,14 +7,41 @@ import {
   MIME_TYPES,
   PRIORITY_PRESETS,
   STATUS_PRESETS,
+  VALID_CONTACT_PERSON_TYPES,
   VALID_FILTER_CATEGORIES,
   VALID_PRIORITIES,
   VALID_STATUSES
 } from './constants.js';
 import type {
   SupportTicketCategory,
+  SupportTicketContactPersonType,
   SupportTicketResource
 } from './types/index.js';
+
+export interface SupportTicketContactContext {
+  contactEmail: string | undefined;
+  contactType: SupportTicketContactPersonType | undefined;
+}
+
+export function parseContactContext(options: {
+  contactEmail?: string;
+  contactType?: string;
+}): SupportTicketContactContext {
+  return {
+    contactEmail:
+      options.contactEmail === undefined
+        ? undefined
+        : assertEmail(options.contactEmail, '--contact-email'),
+    contactType:
+      options.contactType === undefined
+        ? undefined
+        : assertEnum(
+            options.contactType,
+            VALID_CONTACT_PERSON_TYPES,
+            '--contact-type'
+          )
+  };
+}
 
 export function assertPositiveInteger(value: string, flagName: string): number {
   const trimmed = value.trim();

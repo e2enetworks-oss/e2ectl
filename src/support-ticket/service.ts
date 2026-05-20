@@ -8,7 +8,7 @@ import {
   DEFAULT_CHANNEL,
   DESCRIPTION_MAX_LENGTH,
   SUBJECT_MAX_LENGTH,
-  VALID_CONTACT_PERSON_TYPES,
+  THREAD_EXPANSION_CONCURRENCY,
   VALID_PRIORITIES,
   VALID_TICKET_CATEGORIES
 } from './constants.js';
@@ -20,13 +20,13 @@ import {
   normalizeSupportTicketThread
 } from './mappers.js';
 import {
-  assertEmail,
   assertEnum,
   assertNonEmptyTrimmed,
   assertPositiveInteger,
   normalizeCcEmails,
   normalizeOptionalString,
   parseCategoryFilter,
+  parseContactContext,
   parsePriorityFilter,
   parseResources,
   parseStatusFilter,
@@ -81,18 +81,7 @@ export class SupportTicketService {
       options.priority === undefined
         ? undefined
         : assertEnum(options.priority, VALID_PRIORITIES, '--priority');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
+    const { contactEmail, contactType } = parseContactContext(options);
     const ccEmails = normalizeCcEmails(options.cc);
     const component = normalizeOptionalString(options.component);
     const channel = normalizeOptionalString(options.channel) ?? DEFAULT_CHANNEL;
@@ -179,18 +168,7 @@ export class SupportTicketService {
     options: SupportTicketGetOptions
   ): Promise<SupportTicketGetCommandResult> {
     const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
+    const { contactEmail, contactType } = parseContactContext(options);
     const client = await this.createClient(options);
     const { account_manager, ticket } = await client.getTicket(
       normalizedTicketId,
@@ -231,18 +209,7 @@ export class SupportTicketService {
     );
     const status = parseStatusFilter(options.status);
     const priority = parsePriorityFilter(options.priority);
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
+    const { contactEmail, contactType } = parseContactContext(options);
 
     const client = await this.createClient(options);
     const page = await client.listTickets({
@@ -272,18 +239,7 @@ export class SupportTicketService {
       COMMENT_MAX_LENGTH
     );
     const channel = normalizeOptionalString(options.channel);
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
+    const { contactEmail, contactType } = parseContactContext(options);
     const attachments = await readAndEncodeAttachments(
       options.attachment,
       (path) => this.dependencies.readAttachmentFile(path)
@@ -299,7 +255,6 @@ export class SupportTicketService {
       ...(attachments === undefined
         ? {}
         : {
-            file: `C:\\fakepath\\${attachments.fileNames[0]}`,
             file_name: attachments.fileNames,
             imagedata: attachments.imagedata
           })
@@ -322,18 +277,7 @@ export class SupportTicketService {
       '--comment',
       COMMENT_MAX_LENGTH
     );
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
+    const { contactEmail, contactType } = parseContactContext(options);
     const client = await this.createClient(options);
     const result = await client.closeTicket(normalizedTicketId, {
       comment,
@@ -355,18 +299,7 @@ export class SupportTicketService {
     options: SupportTicketGetOptions
   ): Promise<SupportTicketRepliesCommandResult> {
     const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
-    const contactEmail =
-      options.contactEmail === undefined
-        ? undefined
-        : assertEmail(options.contactEmail, '--contact-email');
-    const contactType =
-      options.contactType === undefined
-        ? undefined
-        : assertEnum(
-            options.contactType,
-            VALID_CONTACT_PERSON_TYPES,
-            '--contact-type'
-          );
+    const { contactEmail, contactType } = parseContactContext(options);
     const client = await this.createClient(options);
     const threads = await client.listReplies(normalizedTicketId, {
       ...(contactEmail === undefined
@@ -375,8 +308,10 @@ export class SupportTicketService {
       ...(contactType === undefined ? {} : { contact_person_type: contactType })
     });
 
-    const expandedThreads = await Promise.all(
-      threads.map(async (thread) => {
+    const expandedThreads = await mapWithConcurrency(
+      threads,
+      THREAD_EXPANSION_CONCURRENCY,
+      async (thread) => {
         if (!isSummaryTruncated(thread.summary)) {
           return thread;
         }
@@ -390,7 +325,7 @@ export class SupportTicketService {
         } catch {
           return thread;
         }
-      })
+      }
     );
 
     return {
@@ -409,4 +344,29 @@ export class SupportTicketService {
       await resolveStoredCredentials(this.dependencies.store, options)
     );
   }
+}
+
+async function mapWithConcurrency<TIn, TOut>(
+  items: readonly TIn[],
+  limit: number,
+  worker: (item: TIn, index: number) => Promise<TOut>
+): Promise<TOut[]> {
+  const results: TOut[] = new Array<TOut>(items.length);
+  let nextIndex = 0;
+
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (true) {
+        const current = nextIndex++;
+        if (current >= items.length) {
+          return;
+        }
+        results[current] = await worker(items[current] as TIn, current);
+      }
+    }
+  );
+
+  await Promise.all(runners);
+  return results;
 }

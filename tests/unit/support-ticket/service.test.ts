@@ -786,7 +786,6 @@ describe('SupportTicketService', () => {
       comment: 'hi',
       contact_person_email: 'me@example.com',
       contact_person_type: 'Admin',
-      file: 'C:\\fakepath\\photo.jpg',
       file_name: ['photo.jpg'],
       imagedata: ['data:image/jpeg;base64,/9j/']
     });
@@ -923,5 +922,37 @@ describe('SupportTicketService', () => {
     const result = await service.getReplies('466', { alias: 'prod' });
 
     expect(result.threads[0]?.summary).toBe('truncated...');
+  });
+
+  it('caps concurrent getThread calls at THREAD_EXPANSION_CONCURRENCY when many summaries are truncated', async () => {
+    const { getThread, listReplies, service } = createServiceFixture();
+
+    const truncatedThreads = Array.from({ length: 12 }, (_, index) => ({
+      author: { email: `${index}@example.com`, name: `User ${index}` },
+      createdTime: `2026-05-20T06:19:${String(index).padStart(2, '0')}.000Z`,
+      id: `thread-${index}`,
+      isDescriptionThread: false,
+      summary: `truncated content ${index}...`
+    }));
+    listReplies.mockResolvedValue(truncatedThreads);
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    getThread.mockImplementation(
+      async (_ticketId: number, threadId: string) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return { content: `<p>full ${threadId}</p>`, id: threadId };
+      }
+    );
+
+    const result = await service.getReplies('466', { alias: 'prod' });
+
+    expect(getThread).toHaveBeenCalledTimes(12);
+    expect(maxInFlight).toBeLessThanOrEqual(5);
+    expect(result.threads).toHaveLength(12);
+    expect(result.threads[0]?.summary).toBe('full thread-0');
   });
 });

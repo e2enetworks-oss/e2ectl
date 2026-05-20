@@ -302,4 +302,37 @@ describe('extractThreadText', () => {
       })
     ).toBe(`"hi'there'ok"`);
   });
+
+  it('drops <script> and <style> content rather than leaking it as text', () => {
+    expect(
+      extractThreadText({
+        content: '<p>before<script>alert(1)</script>after</p>',
+        plainText: null
+      })
+    ).toBe('beforeafter');
+    expect(
+      extractThreadText({
+        content: '<p>before<style>.x{color:red}</style>after</p>',
+        plainText: null
+      })
+    ).toBe('beforeafter');
+  });
+
+  it('strips HTML comments', () => {
+    expect(
+      extractThreadText({
+        content: '<p>before<!-- secret comment -->after</p>',
+        plainText: null
+      })
+    ).toBe('beforeafter');
+  });
+
+  it('handles nested and malformed tags without leaking tag fragments', () => {
+    expect(
+      extractThreadText({
+        content: '<p><p>nested</p></p><div>unclosed text',
+        plainText: null
+      })
+    ).toBe('nested\n\nunclosed text');
+  });
 });

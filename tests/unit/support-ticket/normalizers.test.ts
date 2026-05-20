@@ -8,6 +8,7 @@ import {
   normalizeOptionalInteger,
   normalizeOptionalString,
   parseCategoryFilter,
+  parseContactContext,
   parseCsvList,
   parsePriorityFilter,
   parseResourceSpec,
@@ -257,6 +258,36 @@ describe('parseResourceSpec and parseResources', () => {
       { id: '1', name: 'a' },
       { id: '2', ip_address: '9.9.9.9', name: 'b' }
     ]);
+  });
+});
+
+describe('parseContactContext', () => {
+  it('returns undefined for both fields when neither is provided', () => {
+    expect(parseContactContext({})).toEqual({
+      contactEmail: undefined,
+      contactType: undefined
+    });
+  });
+
+  it('trims the email and canonicalises the contact type case-insensitively', () => {
+    expect(
+      parseContactContext({
+        contactEmail: '  me@example.com  ',
+        contactType: 'technical lead'
+      })
+    ).toEqual({
+      contactEmail: 'me@example.com',
+      contactType: 'Technical Lead'
+    });
+  });
+
+  it('rejects malformed emails and unknown contact types', () => {
+    expect(() =>
+      parseContactContext({ contactEmail: 'not-an-email' })
+    ).toThrowError(/valid email/);
+    expect(() => parseContactContext({ contactType: 'owner' })).toThrowError(
+      /Unsupported value/
+    );
   });
 });
 

@@ -112,12 +112,12 @@ describe('support-ticket reply/close against a fake MyAccount API', () => {
       expect(server.requests[0]?.query).toMatchObject({ abuse_ticket: 'true' });
       const body = JSON.parse(server.requests[0]?.body ?? '{}') as {
         abuse_ticket: boolean;
-        file: string;
+        file?: string;
         file_name: string[];
         imagedata: string[];
       };
       expect(body.abuse_ticket).toBe(false);
-      expect(body.file).toBe('C:\\fakepath\\photo.jpg');
+      expect(body.file).toBeUndefined();
       expect(body.file_name).toEqual(['photo.jpg']);
       expect(body.imagedata[0]).toMatch(/^data:image\/jpeg;base64,/);
     } finally {

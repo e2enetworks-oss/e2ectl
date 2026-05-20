@@ -86,7 +86,6 @@ export interface SupportTicketReplyRequest {
   comment: string;
   contact_person_email: string;
   contact_person_type: SupportTicketContactPersonType | '';
-  file?: string;
   file_name?: string[];
   imagedata?: string[];
 }
