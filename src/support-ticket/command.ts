@@ -5,14 +5,14 @@ import { Command } from 'commander';
 import { addContextOptions } from '../app/context-options.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderSupportTicketResult } from './formatter.js';
-import {
-  SupportTicketService,
-  type SupportTicketCloseOptions,
-  type SupportTicketCreateOptions,
-  type SupportTicketGetOptions,
-  type SupportTicketListOptions,
-  type SupportTicketReplyOptions
-} from './service.js';
+import { SupportTicketService } from './service.js';
+import type {
+  SupportTicketCloseOptions,
+  SupportTicketCreateOptions,
+  SupportTicketGetOptions,
+  SupportTicketListOptions,
+  SupportTicketReplyOptions
+} from './types/index.js';
 
 interface GlobalOptions {
   json?: boolean;
@@ -52,7 +52,10 @@ export function buildSupportTicketCommand(runtime: CliRuntime): Command {
         '--priority <priorities>',
         'Priority filter. Preset: urgent (High,Medium). Or pass a comma-separated list of: High, Medium, Low.'
       )
-      .option('--year <year>', 'Restrict results to tickets opened in this year.')
+      .option(
+        '--year <year>',
+        'Restrict results to tickets opened in this year.'
+      )
       .option(
         '--contact-email <email>',
         'Restrict results to tickets with this contact person email.'
@@ -242,7 +245,10 @@ function buildSupportTicketReplyCommand(
       '--contact-type <type>',
       'Contact person type: Technical Lead, Billing, Manager, or Admin.'
     )
-    .option('--abuse-ticket', 'Flag this reply as belonging to an abuse ticket.');
+    .option(
+      '--abuse-ticket',
+      'Flag this reply as belonging to an abuse ticket.'
+    );
 
   command.action(
     async (
@@ -272,10 +278,7 @@ function buildSupportTicketCloseCommand(
       .description('Post a closing comment on a ticket and resolve it.')
       .argument('<ticketId>', 'Support ticket id.')
   )
-    .requiredOption(
-      '--comment <comment>',
-      'Closing comment (<= 6000 chars).'
-    )
+    .requiredOption('--comment <comment>', 'Closing comment (<= 6000 chars).')
     .option(
       '--contact-email <email>',
       'Contact person email scope for the closing comment.'

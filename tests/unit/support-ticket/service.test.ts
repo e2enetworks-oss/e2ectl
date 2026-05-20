@@ -395,7 +395,8 @@ describe('SupportTicketService', () => {
   });
 
   it('reads --attachment files, base64-encodes them, and sends imagedata + file_name', async () => {
-    const { createTicket, readAttachmentFile, service } = createServiceFixture();
+    const { createTicket, readAttachmentFile, service } =
+      createServiceFixture();
 
     createTicket.mockResolvedValue(sampleTicketDetail());
     readAttachmentFile.mockResolvedValueOnce(Buffer.from('hello', 'utf8'));
@@ -440,7 +441,8 @@ describe('SupportTicketService', () => {
   });
 
   it('rejects attachments above 5 MB', async () => {
-    const { createTicket, readAttachmentFile, service } = createServiceFixture();
+    const { createTicket, readAttachmentFile, service } =
+      createServiceFixture();
 
     readAttachmentFile.mockResolvedValueOnce(Buffer.alloc(5 * 1024 * 1024 + 1));
 

@@ -5,7 +5,7 @@ import type { ResolvedCredentials } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
 import { stableStringify } from '../../../src/core/json.js';
 import type { SupportTicketClient } from '../../../src/support-ticket/index.js';
-import type { SupportTicketDetail } from '../../../src/support-ticket/types.js';
+import type { SupportTicketDetail } from '../../../src/support-ticket/types/index.js';
 import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { SslClient } from '../../../src/ssl/index.js';

@@ -23,4 +23,4 @@ export type {
   SupportTicketThread,
   SupportTicketThreadAttachment,
   SupportTicketThreadAuthor
-} from './types.js';
+} from './types/index.js';

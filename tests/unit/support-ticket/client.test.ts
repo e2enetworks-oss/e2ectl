@@ -4,7 +4,7 @@ import type {
   MyAccountTransport
 } from '../../../src/myaccount/index.js';
 import { SupportTicketApiClient } from '../../../src/support-ticket/client.js';
-import type { SupportTicketDetail } from '../../../src/support-ticket/types.js';
+import type { SupportTicketDetail } from '../../../src/support-ticket/types/index.js';
 
 class StubTransport implements MyAccountTransport {
   readonly deleteMock = vi.fn();

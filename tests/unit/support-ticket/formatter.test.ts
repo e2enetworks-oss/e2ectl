@@ -3,7 +3,7 @@ import { renderSupportTicketResult } from '../../../src/support-ticket/formatter
 import type {
   SupportTicketDetailItem,
   SupportTicketItem
-} from '../../../src/support-ticket/service.js';
+} from '../../../src/support-ticket/types/index.js';
 
 function sampleItem(
   overrides: Partial<SupportTicketItem> = {}

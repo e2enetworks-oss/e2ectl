@@ -10,7 +10,7 @@ import type {
   SupportTicketSummary,
   SupportTicketThread,
   SupportTicketThreadDetail
-} from './types.js';
+} from './types/index.js';
 
 const TICKETS_PATH = '/ticket_management/tickets/';
 const TICKETS_FILTER_PATH = '/ticket_management/tickets/filter/';
@@ -131,15 +131,14 @@ export class SupportTicketApiClient implements SupportTicketClient {
     ticketId: number,
     query: SupportTicketGetQuery = {}
   ): Promise<SupportTicketThread[]> {
-    const response = await this.transport.get<ApiEnvelope<SupportTicketThread[]>>(
-      `${TICKET_CONVERSATION_PATH}${ticketId}/`,
-      {
-        query: {
-          contact_person_email: query.contact_person_email,
-          contact_person_type: query.contact_person_type
-        }
+    const response = await this.transport.get<
+      ApiEnvelope<SupportTicketThread[]>
+    >(`${TICKET_CONVERSATION_PATH}${ticketId}/`, {
+      query: {
+        contact_person_email: query.contact_person_email,
+        contact_person_type: query.contact_person_type
       }
-    );
+    });
 
     return Array.isArray(response.data) ? response.data : [];
   }

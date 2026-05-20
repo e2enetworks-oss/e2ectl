@@ -7,7 +7,7 @@ import type {
   SupportTicketDetailItem,
   SupportTicketItem,
   SupportTicketThreadItem
-} from './service.js';
+} from './types/index.js';
 
 export function renderSupportTicketResult(
   result: SupportTicketCommandResult,
