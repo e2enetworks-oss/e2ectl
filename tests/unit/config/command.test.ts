@@ -85,6 +85,11 @@ describe('config commands', () => {
         createSslClient: vi.fn(() => {
           throw new Error('SSL client should not be created for this test.');
         }) as unknown as CliRuntime['createSslClient'],
+        createSupportTicketClient: vi.fn(() => {
+          throw new Error(
+            'Support ticket client should not be created for this test.'
+          );
+        }) as unknown as CliRuntime['createSupportTicketClient'],
         createVolumeClient: (credentials: ResolvedCredentials) =>
           new VolumeApiClient(new MyAccountApiTransport(credentials)),
         createLoadBalancerClient: (credentials: ResolvedCredentials) =>

@@ -32,5 +32,6 @@ The guides are split into two paths:
 - [VPC](./vpc.md)
 - [Security group](./security-group.md)
 - [SSH key](./ssh-key.md)
+- [Support ticket](./support-ticket.md)
 
 Command-guide filenames match the CLI command families so you can jump from `e2ectl <command> --help` directly into the matching page.

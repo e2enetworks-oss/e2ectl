@@ -86,6 +86,11 @@ describe('image commands', () => {
       createSslClient: vi.fn(() => {
         throw new Error('SSL client should not be created for this test.');
       }) as unknown as CliRuntime['createSslClient'],
+      createSupportTicketClient: vi.fn(() => {
+        throw new Error(
+          'Support ticket client should not be created for this test.'
+        );
+      }) as unknown as CliRuntime['createSupportTicketClient'],
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as CliRuntime['createVolumeClient'],

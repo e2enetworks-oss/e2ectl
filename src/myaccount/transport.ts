@@ -251,6 +251,7 @@ export class MyAccountApiTransport implements MyAccountTransport {
 
   private buildHeaders(body: unknown): Record<string, string> {
     return {
+      Accept: 'application/json',
       Authorization: `Bearer ${this.credentials.auth_token}`,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' })
     };
