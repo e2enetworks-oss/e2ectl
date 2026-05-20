@@ -153,6 +153,12 @@ function normalizeDescription(value: unknown): string | null {
   return cleaned.length === 0 ? null : cleaned;
 }
 
+// node-html-parser decodes &nbsp; to U+00A0 (non-breaking space); the original
+// regex stripper produced an ASCII space, so we normalize back to keep the
+// public output stable across the swap. Built via fromCharCode so the source
+// stays pure ASCII and survives every formatter / encoding round-trip.
+const NBSP_REGEX = new RegExp(String.fromCharCode(0xa0), 'g');
+
 function htmlToText(html: string): string {
   // Insert newlines for break and block-close tags BEFORE parsing so the
   // parser's text extraction preserves paragraph boundaries that the server
@@ -165,7 +171,7 @@ function htmlToText(html: string): string {
   root.querySelectorAll('script, style').forEach((node) => node.remove());
 
   return root.text
-    .replace(/ /g, ' ')
+    .replace(NBSP_REGEX, ' ')
     .replace(/\r/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
