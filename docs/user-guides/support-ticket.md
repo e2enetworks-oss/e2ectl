@@ -24,13 +24,15 @@ Common filters on `list`:
 
 ```bash
 e2ectl support-ticket list --status open --priority urgent
-e2ectl support-ticket list --category Cloud,Billing --year 2026
+e2ectl support-ticket list --category Cloud --category Billing --year 2026
 e2ectl support-ticket list --page-no 2 --per-page 25
 ```
 
-`--status open` expands to `Open, On Hold, Waiting on Customer, Escalated`. `--status resolved` expands to `Resolved, Closed`. You can also pass any comma-separated combination of: `New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed`.
+`--category`, `--status`, and `--priority` are repeatable: pass the flag once per value (the standard convention used by docker, kubectl, and aws). The legacy comma-separated form (`--status Open,Closed`) is still accepted for backward compatibility, and the two forms can be mixed.
 
-`--priority urgent` expands to `High, Medium`. Or pass a comma-separated list of `High, Medium, Low`.
+`--status open` expands to `Open, On Hold, Waiting on Customer, Escalated`. `--status resolved` expands to `Resolved, Closed`. You can also pass any combination of: `New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed`.
+
+`--priority urgent` expands to `High, Medium`. Or pass any of `High, Medium, Low`.
 
 `--category` accepts any combination of `Cloud, Network, Billing, Sales, SOC, Abuse`. `SOC` and `Abuse` are sent as boolean filters; the others are joined into a single category filter.
 

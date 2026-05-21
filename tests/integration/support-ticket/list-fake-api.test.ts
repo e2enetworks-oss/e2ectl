@@ -118,6 +118,64 @@ describe('support-ticket list against a fake MyAccount API', () => {
     }
   });
 
+  it('accepts repeated --category/--status/--priority flags and forwards a single query string', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/ticket_management/tickets/filter/': () => ({
+        body: {
+          account_manager: null,
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'Success'
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'support-ticket',
+          'list',
+          '--category',
+          'Cloud',
+          '--category',
+          'SOC',
+          '--category',
+          'Abuse',
+          '--status',
+          'New',
+          '--status',
+          'Closed',
+          '--priority',
+          'High',
+          '--priority',
+          'Low'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(server.requests[0]?.query).toMatchObject({
+        abuse_ticket: 'true',
+        priority: 'High,Low',
+        soc_ticket: 'true',
+        status: 'New,Closed',
+        ticket_category: 'Cloud'
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('translates SOC/Abuse categories into boolean filters on the query string', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/ticket_management/tickets/filter/': () => ({

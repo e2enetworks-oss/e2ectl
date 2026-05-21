@@ -163,7 +163,7 @@ describe('SupportTicketService', () => {
 
     await service.listTickets({
       alias: 'prod',
-      category: 'cloud,SOC,Abuse,billing'
+      category: ['cloud,SOC,Abuse,billing']
     });
 
     expect(listTickets).toHaveBeenCalledWith({
@@ -190,8 +190,8 @@ describe('SupportTicketService', () => {
 
     await service.listTickets({
       alias: 'prod',
-      priority: 'urgent',
-      status: 'open',
+      priority: ['urgent'],
+      status: ['open'],
       year: '2026'
     });
 
@@ -201,7 +201,7 @@ describe('SupportTicketService', () => {
       year: 2026
     });
 
-    await service.listTickets({ alias: 'prod', status: 'resolved' });
+    await service.listTickets({ alias: 'prod', status: ['resolved'] });
     expect(listTickets).toHaveBeenLastCalledWith({
       status: 'Resolved,Closed'
     });
@@ -224,21 +224,21 @@ describe('SupportTicketService', () => {
 
     await service.listTickets({
       alias: 'prod',
-      priority: 'High,Low',
-      status: 'Open,Closed'
+      priority: ['High', 'Low'],
+      status: ['New', 'Closed']
     });
 
     expect(listTickets).toHaveBeenLastCalledWith({
       priority: 'High,Low',
-      status: 'Open,Closed'
+      status: 'New,Closed'
     });
 
     await expect(
-      service.listTickets({ alias: 'prod', status: 'bogus' })
+      service.listTickets({ alias: 'prod', status: ['bogus'] })
     ).rejects.toMatchObject({ code: 'INVALID_ENUM_INPUT' });
 
     await expect(
-      service.listTickets({ alias: 'prod', category: 'NotACategory' })
+      service.listTickets({ alias: 'prod', category: ['NotACategory'] })
     ).rejects.toMatchObject({ code: 'INVALID_ENUM_INPUT' });
   });
 

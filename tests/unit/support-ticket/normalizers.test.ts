@@ -4,12 +4,12 @@ import {
   assertNonEmptyTrimmed,
   assertPositiveInteger,
   detectMimeType,
+  expandRepeatableList,
   normalizeCcEmails,
   normalizeOptionalInteger,
   normalizeOptionalString,
   parseCategoryFilter,
   parseContactContext,
-  parseCsvList,
   parsePriorityFilter,
   parseResourceSpec,
   parseResources,
@@ -141,13 +141,35 @@ describe('normalizeOptionalInteger', () => {
   });
 });
 
-describe('parseCsvList', () => {
-  it('splits, trims, and drops empty entries', () => {
-    expect(parseCsvList('  a, ,b  ,c', '--category')).toEqual(['a', 'b', 'c']);
+describe('expandRepeatableList', () => {
+  it('returns undefined for missing/empty input', () => {
+    expect(expandRepeatableList(undefined, '--category')).toBeUndefined();
+    expect(expandRepeatableList([], '--category')).toBeUndefined();
   });
 
-  it('throws when no non-empty items remain', () => {
-    expect(() => parseCsvList(' , , ', '--category')).toThrowError(
+  it('flattens repeated flags into a list', () => {
+    expect(expandRepeatableList(['Open', 'Closed'], '--status')).toEqual([
+      'Open',
+      'Closed'
+    ]);
+  });
+
+  it('splits legacy comma-separated entries and trims whitespace', () => {
+    expect(expandRepeatableList(['  a, ,b  ,c'], '--category')).toEqual([
+      'a',
+      'b',
+      'c'
+    ]);
+  });
+
+  it('supports mixed repeat + comma-separated usage', () => {
+    expect(
+      expandRepeatableList(['Cloud,Billing', 'Sales'], '--category')
+    ).toEqual(['Cloud', 'Billing', 'Sales']);
+  });
+
+  it('throws when every entry is blank after trimming', () => {
+    expect(() => expandRepeatableList([' , , '], '--category')).toThrowError(
       /must not be empty/
     );
   });
@@ -160,18 +182,41 @@ describe('parseCategoryFilter', () => {
       category: undefined,
       socTicket: false
     });
+    expect(parseCategoryFilter([])).toEqual({
+      abuseTicket: false,
+      category: undefined,
+      socTicket: false
+    });
   });
 
-  it('splits SOC/Abuse into boolean flags and dedupes standard categories', () => {
-    expect(parseCategoryFilter('Cloud,SOC,Abuse,billing,cloud')).toEqual({
+  it('splits SOC/Abuse into boolean flags and dedupes standard categories from repeated flags', () => {
+    expect(
+      parseCategoryFilter(['Cloud', 'SOC', 'Abuse', 'billing', 'cloud'])
+    ).toEqual({
       abuseTicket: true,
       category: 'Cloud,Billing',
       socTicket: true
     });
   });
 
+  it('accepts the legacy comma-separated form', () => {
+    expect(parseCategoryFilter(['Cloud,SOC,Abuse,billing,cloud'])).toEqual({
+      abuseTicket: true,
+      category: 'Cloud,Billing',
+      socTicket: true
+    });
+  });
+
+  it('accepts mixed repeat + comma-separated usage', () => {
+    expect(parseCategoryFilter(['Cloud,Billing', 'SOC'])).toEqual({
+      abuseTicket: false,
+      category: 'Cloud,Billing',
+      socTicket: true
+    });
+  });
+
   it('returns category undefined when only SOC/Abuse are passed', () => {
-    expect(parseCategoryFilter('SOC,Abuse')).toEqual({
+    expect(parseCategoryFilter(['SOC', 'Abuse'])).toEqual({
       abuseTicket: true,
       category: undefined,
       socTicket: true
@@ -179,7 +224,7 @@ describe('parseCategoryFilter', () => {
   });
 
   it('rejects unknown category values', () => {
-    expect(() => parseCategoryFilter('NotACategory')).toThrowError(
+    expect(() => parseCategoryFilter(['NotACategory'])).toThrowError(
       /Unsupported value for --category/
     );
   });
@@ -187,26 +232,48 @@ describe('parseCategoryFilter', () => {
 
 describe('parseStatusFilter and parsePriorityFilter', () => {
   it('expands the open/resolved/urgent presets', () => {
-    expect(parseStatusFilter('  Open ')).toBe(
+    expect(parseStatusFilter([' Open '])).toBe(
       'Open,On Hold,Waiting on Customer,Escalated'
     );
-    expect(parseStatusFilter('resolved')).toBe('Resolved,Closed');
-    expect(parsePriorityFilter('URGENT')).toBe('High,Medium');
+    expect(parseStatusFilter(['resolved'])).toBe('Resolved,Closed');
+    expect(parsePriorityFilter(['URGENT'])).toBe('High,Medium');
   });
 
-  it('accepts raw CSV lists and validates each entry', () => {
-    expect(parseStatusFilter('Open,Closed')).toBe('Open,Closed');
-    expect(parsePriorityFilter('High,Low')).toBe('High,Low');
+  it('accepts repeated flags and dedupes literal enum values', () => {
+    expect(parseStatusFilter(['New', 'Closed'])).toBe('New,Closed');
+    expect(parsePriorityFilter(['High', 'Low'])).toBe('High,Low');
+    expect(parseStatusFilter(['New', 'new', 'Closed'])).toBe('New,Closed');
+  });
+
+  it('expands presets even when they appear alongside literal values', () => {
+    expect(parseStatusFilter(['open', 'Closed'])).toBe(
+      'Open,On Hold,Waiting on Customer,Escalated,Closed'
+    );
+    expect(parsePriorityFilter(['urgent', 'Low'])).toBe('High,Medium,Low');
+  });
+
+  it('accepts the legacy comma-separated form', () => {
+    expect(parseStatusFilter(['New,Closed'])).toBe('New,Closed');
+    expect(parsePriorityFilter(['High,Low'])).toBe('High,Low');
+  });
+
+  it('accepts mixed repeat + comma-separated usage', () => {
+    expect(parseStatusFilter(['New,Closed', 'Escalated'])).toBe(
+      'New,Closed,Escalated'
+    );
+    expect(parsePriorityFilter(['High,Medium', 'Low'])).toBe('High,Medium,Low');
   });
 
   it('returns undefined when no value is passed', () => {
     expect(parseStatusFilter(undefined)).toBeUndefined();
     expect(parsePriorityFilter(undefined)).toBeUndefined();
+    expect(parseStatusFilter([])).toBeUndefined();
+    expect(parsePriorityFilter([])).toBeUndefined();
   });
 
   it('rejects values not in the enum', () => {
-    expect(() => parseStatusFilter('bogus')).toThrowError(/Unsupported value/);
-    expect(() => parsePriorityFilter('Critical')).toThrowError(
+    expect(() => parseStatusFilter(['bogus'])).toThrowError(/Unsupported value/);
+    expect(() => parsePriorityFilter(['Critical'])).toThrowError(
       /Unsupported value/
     );
   });

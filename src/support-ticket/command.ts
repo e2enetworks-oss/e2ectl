@@ -41,16 +41,22 @@ export function buildSupportTicketCommand(runtime: CliRuntime): Command {
       .option('--page-no <pageNo>', 'Page number (1-based).')
       .option('--per-page <perPage>', 'Page size.')
       .option(
-        '--category <categories>',
-        'Comma-separated. One or more of: Cloud, Network, Billing, Sales, SOC, Abuse. SOC and Abuse are sent as boolean filters.'
+        '--category <category>',
+        'Filter by category. Repeat for multiple values (e.g. --category Cloud --category Billing). One or more of: Cloud, Network, Billing, Sales, SOC, Abuse. SOC and Abuse are sent as boolean filters. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
       )
       .option(
-        '--status <statuses>',
-        'Status filter. Presets: open (Open,On Hold,Waiting on Customer,Escalated), resolved (Resolved,Closed). Or pass a comma-separated list of: New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed.'
+        '--status <status>',
+        'Filter by status. Repeat for multiple values (e.g. --status Open --status Escalated). Presets: open (Open, On Hold, Waiting on Customer, Escalated), resolved (Resolved, Closed). Or pass any of: New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
       )
       .option(
-        '--priority <priorities>',
-        'Priority filter. Preset: urgent (High,Medium). Or pass a comma-separated list of: High, Medium, Low.'
+        '--priority <priority>',
+        'Filter by priority. Repeat for multiple values (e.g. --priority High --priority Medium). Preset: urgent (High, Medium). Or pass any of: High, Medium, Low. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
       )
       .option(
         '--year <year>',

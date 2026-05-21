@@ -5,13 +5,13 @@ export interface SupportTicketContextOptions {
 }
 
 export interface SupportTicketListOptions extends SupportTicketContextOptions {
-  category?: string;
+  category?: string[];
   contactEmail?: string;
   contactType?: string;
   pageNo?: string;
   perPage?: string;
-  priority?: string;
-  status?: string;
+  priority?: string[];
+  status?: string[];
   year?: string;
 }
 

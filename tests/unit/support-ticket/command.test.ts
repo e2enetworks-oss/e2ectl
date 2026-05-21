@@ -200,7 +200,47 @@ describe('support-ticket commands', () => {
     expect(parsed.items.map((item) => item.id)).toEqual([42]);
   });
 
-  it('translates list filter flags (category presets, status/priority shortcuts, year)', async () => {
+  it('translates list filter flags using repeated --category/--status/--priority', async () => {
+    const { runtime, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'support-ticket',
+      'list',
+      '--alias',
+      'prod',
+      '--category',
+      'Cloud',
+      '--category',
+      'SOC',
+      '--category',
+      'Abuse',
+      '--status',
+      'New',
+      '--status',
+      'Closed',
+      '--priority',
+      'High',
+      '--priority',
+      'Low',
+      '--year',
+      '2026'
+    ]);
+
+    expect(supportTicketStub.listTickets).toHaveBeenCalledWith({
+      abuseTicket: true,
+      category: 'Cloud',
+      priority: 'High,Low',
+      socTicket: true,
+      status: 'New,Closed',
+      year: 2026
+    });
+  });
+
+  it('still accepts the legacy comma-separated form for filter flags', async () => {
     const { runtime, supportTicketStub } = createRuntimeFixture();
     await seedProfile(runtime);
     const program = createProgram(runtime);
@@ -230,6 +270,55 @@ describe('support-ticket commands', () => {
       status: 'Open,On Hold,Waiting on Customer,Escalated',
       year: 2026
     });
+  });
+
+  it('supports mixed repeat + comma-separated filter input', async () => {
+    const { runtime, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'support-ticket',
+      'list',
+      '--alias',
+      'prod',
+      '--category',
+      'Cloud,Billing',
+      '--category',
+      'SOC',
+      '--status',
+      'open',
+      '--status',
+      'Closed'
+    ]);
+
+    expect(supportTicketStub.listTickets).toHaveBeenCalledWith({
+      category: 'Cloud,Billing',
+      socTicket: true,
+      status: 'Open,On Hold,Waiting on Customer,Escalated,Closed'
+    });
+  });
+
+  it('rejects an unsupported --status value with a helpful error', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    program.exitOverride();
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'support-ticket',
+        'list',
+        '--alias',
+        'prod',
+        '--status',
+        'bogus'
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_ENUM_INPUT' });
   });
 
   it('forwards pagination flags to the client', async () => {

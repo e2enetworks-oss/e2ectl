@@ -172,33 +172,45 @@ export function normalizeOptionalInteger(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) ? value : null;
 }
 
-export function parseCsvList(value: string, flagName: string): string[] {
-  const items = value
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+export function expandRepeatableList(
+  values: string[] | undefined,
+  flagName: string
+): string[] | undefined {
+  if (values === undefined || values.length === 0) {
+    return undefined;
+  }
+
+  const items: string[] = [];
+  for (const value of values) {
+    for (const piece of value.split(',')) {
+      const trimmed = piece.trim();
+      if (trimmed.length > 0) {
+        items.push(trimmed);
+      }
+    }
+  }
 
   if (items.length === 0) {
     throw new CliError(`${flagName} must not be empty.`, {
       code: 'EMPTY_STRING_INPUT',
       exitCode: EXIT_CODES.usage,
-      suggestion: `Pass a non-empty comma-separated value with ${flagName}.`
+      suggestion: `Pass a non-empty value with ${flagName}. Repeat the flag (preferred) or pass a comma-separated list.`
     });
   }
 
   return items;
 }
 
-export function parseCategoryFilter(value: string | undefined): {
+export function parseCategoryFilter(values: string[] | undefined): {
   abuseTicket: boolean;
   category: string | undefined;
   socTicket: boolean;
 } {
-  if (value === undefined) {
+  const raw = expandRepeatableList(values, '--category');
+  if (raw === undefined) {
     return { abuseTicket: false, category: undefined, socTicket: false };
   }
 
-  const raw = parseCsvList(value, '--category');
   const standard: SupportTicketCategory[] = [];
   let abuse = false;
   let soc = false;
@@ -234,39 +246,61 @@ export function parseCategoryFilter(value: string | undefined): {
 }
 
 export function parseStatusFilter(
-  value: string | undefined
+  values: string[] | undefined
 ): string | undefined {
-  if (value === undefined) {
+  const raw = expandRepeatableList(values, '--status');
+  if (raw === undefined) {
     return undefined;
   }
 
-  const preset = STATUS_PRESETS[value.trim().toLowerCase()];
-  if (preset !== undefined) {
-    return preset.join(',');
+  const collected: string[] = [];
+  for (const item of raw) {
+    const preset = STATUS_PRESETS[item.toLowerCase()];
+    if (preset !== undefined) {
+      for (const status of preset) {
+        if (!collected.includes(status)) {
+          collected.push(status);
+        }
+      }
+      continue;
+    }
+
+    const canonical = assertEnum(item, VALID_STATUSES, '--status');
+    if (!collected.includes(canonical)) {
+      collected.push(canonical);
+    }
   }
 
-  const items = parseCsvList(value, '--status');
-  return items
-    .map((item) => assertEnum(item, VALID_STATUSES, '--status'))
-    .join(',');
+  return collected.join(',');
 }
 
 export function parsePriorityFilter(
-  value: string | undefined
+  values: string[] | undefined
 ): string | undefined {
-  if (value === undefined) {
+  const raw = expandRepeatableList(values, '--priority');
+  if (raw === undefined) {
     return undefined;
   }
 
-  const preset = PRIORITY_PRESETS[value.trim().toLowerCase()];
-  if (preset !== undefined) {
-    return preset.join(',');
+  const collected: string[] = [];
+  for (const item of raw) {
+    const preset = PRIORITY_PRESETS[item.toLowerCase()];
+    if (preset !== undefined) {
+      for (const priority of preset) {
+        if (!collected.includes(priority)) {
+          collected.push(priority);
+        }
+      }
+      continue;
+    }
+
+    const canonical = assertEnum(item, VALID_PRIORITIES, '--priority');
+    if (!collected.includes(canonical)) {
+      collected.push(canonical);
+    }
   }
 
-  const items = parseCsvList(value, '--priority');
-  return items
-    .map((item) => assertEnum(item, VALID_PRIORITIES, '--priority'))
-    .join(',');
+  return collected.join(',');
 }
 
 export function parseResources(
