@@ -272,7 +272,9 @@ describe('parseStatusFilter and parsePriorityFilter', () => {
   });
 
   it('rejects values not in the enum', () => {
-    expect(() => parseStatusFilter(['bogus'])).toThrowError(/Unsupported value/);
+    expect(() => parseStatusFilter(['bogus'])).toThrowError(
+      /Unsupported value/
+    );
     expect(() => parsePriorityFilter(['Critical'])).toThrowError(
       /Unsupported value/
     );
