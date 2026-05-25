@@ -479,7 +479,7 @@ describe('support-ticket commands', () => {
     });
   });
 
-  it('lists replies via the replies subcommand', async () => {
+  it('lists replies via the list-replies subcommand', async () => {
     const { runtime, stdout, supportTicketStub } = createRuntimeFixture();
     await seedProfile(runtime);
     supportTicketStub.listReplies.mockResolvedValueOnce([
@@ -501,7 +501,7 @@ describe('support-ticket commands', () => {
       CLI_COMMAND_NAME,
       '--json',
       'support-ticket',
-      'replies',
+      'list-replies',
       '466',
       '--alias',
       'prod'
@@ -512,7 +512,7 @@ describe('support-ticket commands', () => {
       action: string;
       threads: Array<{ id: string }>;
     };
-    expect(parsed.action).toBe('replies');
+    expect(parsed.action).toBe('list-replies');
     expect(parsed.threads.map((thread) => thread.id)).toEqual(['thread-1']);
   });
 });

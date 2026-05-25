@@ -95,7 +95,7 @@ export interface SupportTicketCloseCommandResult {
 }
 
 export interface SupportTicketRepliesCommandResult {
-  action: 'replies';
+  action: 'list-replies';
   threads: SupportTicketThreadItem[];
   ticket_id: number;
 }

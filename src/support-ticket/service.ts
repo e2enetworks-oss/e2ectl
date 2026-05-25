@@ -329,7 +329,7 @@ export class SupportTicketService {
     );
 
     return {
-      action: 'replies',
+      action: 'list-replies',
       ticket_id: normalizedTicketId,
       threads: expandedThreads.map((thread) =>
         normalizeSupportTicketThread(thread)

@@ -850,7 +850,7 @@ describe('SupportTicketService', () => {
 
     expect(listReplies).toHaveBeenCalledWith(466, {});
     expect(result).toMatchObject({
-      action: 'replies',
+      action: 'list-replies',
       ticket_id: 466
     });
     expect(result.threads).toHaveLength(1);

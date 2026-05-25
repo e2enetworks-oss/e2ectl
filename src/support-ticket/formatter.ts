@@ -51,7 +51,7 @@ function renderSupportTicketHuman(result: SupportTicketCommandResult): string {
         `Closed support ticket ${result.ticket_id}.\n` +
         `Message: ${result.message || '--'}\n`
       );
-    case 'replies':
+    case 'list-replies':
       return result.threads.length === 0
         ? `No replies on support ticket ${result.ticket_id}.\n`
         : `Replies on support ticket ${result.ticket_id}:\n${formatSupportTicketRepliesTable(result.threads)}\n`;
@@ -106,9 +106,9 @@ function normalizeSupportTicketJson(
         message: result.message,
         ticket_id: result.ticket_id
       };
-    case 'replies':
+    case 'list-replies':
       return {
-        action: 'replies',
+        action: 'list-replies',
         threads: result.threads.map((thread) =>
           normalizeSupportTicketThreadJson(thread)
         ),
