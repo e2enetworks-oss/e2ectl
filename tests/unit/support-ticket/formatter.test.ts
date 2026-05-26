@@ -245,7 +245,7 @@ describe('support-ticket formatter', () => {
   it('renders a human-readable replies table with attachment names', () => {
     const output = renderSupportTicketResult(
       {
-        action: 'list-replies',
+        action: 'get-replies',
         threads: [
           sampleThread({
             attachments: [
@@ -269,7 +269,7 @@ describe('support-ticket formatter', () => {
   it('renders empty-replies message in human mode', () => {
     expect(
       renderSupportTicketResult(
-        { action: 'list-replies', threads: [], ticket_id: 466 },
+        { action: 'get-replies', threads: [], ticket_id: 466 },
         false
       )
     ).toBe('No replies on support ticket 466.\n');
@@ -278,7 +278,7 @@ describe('support-ticket formatter', () => {
   it('falls back to author_name only when email is missing, and to -- when author_name is missing', () => {
     const output = renderSupportTicketResult(
       {
-        action: 'list-replies',
+        action: 'get-replies',
         threads: [
           sampleThread({ author_email: null, id: 't1' }),
           sampleThread({ author_email: null, author_name: null, id: 't2' })
@@ -295,7 +295,7 @@ describe('support-ticket formatter', () => {
   it('emits deterministic JSON for replies output', () => {
     const json = renderSupportTicketResult(
       {
-        action: 'list-replies',
+        action: 'get-replies',
         threads: [
           sampleThread({
             attachments: [{ download_url: 'https://x/y', file_name: 'log.txt' }]
@@ -314,7 +314,7 @@ describe('support-ticket formatter', () => {
       }>;
       ticket_id: number;
     };
-    expect(parsed.action).toBe('list-replies');
+    expect(parsed.action).toBe('get-replies');
     expect(parsed.ticket_id).toBe(466);
     expect(parsed.threads[0]?.id).toBe('thread-1');
     expect(parsed.threads[0]?.attachments[0]?.file_name).toBe('log.txt');

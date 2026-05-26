@@ -4,7 +4,7 @@ import { startTestHttpServer } from '../../helpers/http-server.js';
 import { runBuiltCli } from '../../helpers/process.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
-describe('support-ticket get/list-replies against a fake MyAccount API', () => {
+describe('support-ticket get/get-replies against a fake MyAccount API', () => {
   it('fetches a ticket detail, normalizes HTML description, and forwards contact filters', async () => {
     const server = await startTestHttpServer({
       'GET /myaccount/api/v1/ticket_management/ticket/42/': () => ({
@@ -226,7 +226,7 @@ describe('support-ticket get/list-replies against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['--json', 'support-ticket', 'list-replies', '466'],
+        ['--json', 'support-ticket', 'get-replies', '466'],
         {
           env: {
             HOME: tempHome.path,
@@ -248,7 +248,7 @@ describe('support-ticket get/list-replies against a fake MyAccount API', () => {
         ticket_id: number;
       };
 
-      expect(parsed.action).toBe('list-replies');
+      expect(parsed.action).toBe('get-replies');
       expect(parsed.ticket_id).toBe(466);
       expect(parsed.threads).toHaveLength(2);
       expect(parsed.threads[0]?.id).toBe('thread-1');
@@ -287,7 +287,7 @@ describe('support-ticket get/list-replies against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['support-ticket', 'list-replies', '466'],
+        ['support-ticket', 'get-replies', '466'],
         {
           env: {
             HOME: tempHome.path,
@@ -337,7 +337,7 @@ describe('support-ticket get/list-replies against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['support-ticket', 'list-replies', '466'],
+        ['support-ticket', 'get-replies', '466'],
         {
           env: {
             HOME: tempHome.path,

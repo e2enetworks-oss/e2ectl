@@ -39,7 +39,7 @@ e2ectl support-ticket list --page-no 2 --per-page 25
 ### Read The Conversation Thread
 
 ```bash
-e2ectl support-ticket list-replies <ticket-id>
+e2ectl support-ticket get-replies <ticket-id>
 ```
 
 This returns every comment and reply on the ticket (description thread plus follow-ups), including author, direction, channel, visibility, and any attachments. Truncated summaries are automatically expanded to the full thread text where the API exposes it.

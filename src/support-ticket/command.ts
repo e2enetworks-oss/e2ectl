@@ -112,7 +112,7 @@ export function buildSupportTicketCommand(runtime: CliRuntime): Command {
 
   addContextOptions(
     command
-      .command('list-replies <ticketId>')
+      .command('get-replies <ticketId>')
       .description(
         'List the conversation threads (comments + replies) on a ticket.'
       )
