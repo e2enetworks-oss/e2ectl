@@ -9,7 +9,7 @@
 - Save a default alias (and default project / location context), or pass `--alias`, `--project-id`, and `--location` explicitly.
 - Know the numeric department id you want to file against. Run `e2ectl support-ticket departments` to list the valid ids — departments are configured per-account in MyAccount.
 - Attachments must be `.jpg`, `.jpeg`, `.png`, or `.pdf`, no larger than 5 MB each, with at most 5 files per request.
-- Subject can be up to 60 printable ASCII characters; descriptions and reply comments accept up to 60 characters.
+- Subject can be up to 60 printable ASCII characters; descriptions and reply comments accept up to 250 characters.
 
 ## Common Tasks
 
