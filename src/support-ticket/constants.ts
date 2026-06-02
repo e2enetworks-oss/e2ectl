@@ -63,7 +63,7 @@ export const CATEGORIES_REQUIRING_PRIORITY: ReadonlySet<SupportTicketCategory> =
 
 export const SUBJECT_MAX_LENGTH = 60;
 export const DESCRIPTION_MAX_LENGTH = 6000;
-export const COMMENT_MAX_LENGTH = 6000;
+export const COMMENT_MAX_LENGTH = 250;
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

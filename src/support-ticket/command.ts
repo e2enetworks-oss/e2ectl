@@ -315,7 +315,7 @@ function buildSupportTicketReplyCommand(
         .description('Post a reply on an existing support ticket.')
         .argument('<ticketId>', 'Support ticket id.')
     )
-      .requiredOption('--comment <comment>', 'Reply body (<= 6000 chars).')
+      .requiredOption('--comment <comment>', 'Reply body (<= 250 chars).')
       .option('--channel <channel>', 'Reply channel (e.g. Email, Web).')
       .option(
         '--attachment <path>',
@@ -360,7 +360,7 @@ function buildSupportTicketCloseCommand(
       .description('Post a closing comment on a ticket and resolve it.')
       .argument('<ticketId>', 'Support ticket id.')
   )
-    .requiredOption('--comment <comment>', 'Closing comment (<= 6000 chars).')
+    .requiredOption('--comment <comment>', 'Closing comment (<= 250 chars).')
     .option(
       '--contact-email <email>',
       'Contact person email scope for the closing comment.'
@@ -399,7 +399,7 @@ function buildSupportTicketReopenCommand(
   )
     .requiredOption(
       '--comment <comment>',
-      'Reason for reopening (<= 6000 chars).'
+      'Reason for reopening (<= 250 chars).'
     )
     .option(
       '--contact-email <email>',
