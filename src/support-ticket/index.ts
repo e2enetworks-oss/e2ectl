@@ -11,6 +11,8 @@ export type {
   SupportTicketCloseRequest,
   SupportTicketContactPersonType,
   SupportTicketCreateRequest,
+  SupportTicketCreateResult,
+  SupportTicketDepartment,
   SupportTicketDetail,
   SupportTicketFilterCategory,
   SupportTicketGetQuery,

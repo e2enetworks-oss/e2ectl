@@ -32,8 +32,10 @@ export interface SupportTicketCreateOptions extends SupportTicketContextOptions 
 }
 
 export interface SupportTicketGetOptions extends SupportTicketContextOptions {
+  abuseTicket?: boolean;
   contactEmail?: string;
   contactType?: string;
+  socTicket?: boolean;
 }
 
 export interface SupportTicketReplyOptions extends SupportTicketContextOptions {
@@ -43,6 +45,7 @@ export interface SupportTicketReplyOptions extends SupportTicketContextOptions {
   comment: string;
   contactEmail?: string;
   contactType?: string;
+  socTicket?: boolean;
 }
 
 export interface SupportTicketCloseOptions extends SupportTicketContextOptions {

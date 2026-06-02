@@ -48,12 +48,27 @@ export interface SupportTicketThreadItem {
   cc: string | null;
   content_type: string | null;
   created_time: string | null;
-  direction: 'in' | 'out' | null;
+  // Kept as a raw string (rather than a closed 'in' | 'out' union) so that any
+  // new value the API introduces surfaces to the user instead of being silently
+  // dropped to null.
+  direction: string | null;
   id: string;
   is_description_thread: boolean;
+  // Whether the summary below holds the full thread body. False means the API
+  // returned a truncated preview and the full-content fetch did not succeed.
+  is_summary_complete: boolean;
   summary: string | null;
   to: string | null;
-  visibility: 'private' | 'public' | null;
+  // Raw string for the same forward-compatibility reason as `direction`.
+  visibility: string | null;
+}
+
+export interface SupportTicketDepartmentItem {
+  description: string | null;
+  id: number;
+  is_default: boolean;
+  is_enabled: boolean;
+  name: string | null;
 }
 
 export interface SupportTicketListCommandResult {
@@ -77,9 +92,19 @@ export interface SupportTicketGetCommandResult {
   ticket: SupportTicketDetailItem;
 }
 
+export interface SupportTicketDepartmentsCommandResult {
+  action: 'departments';
+  departments: SupportTicketDepartmentItem[];
+}
+
 export interface SupportTicketCreateCommandResult {
+  account_manager: string | null;
   action: 'create';
+  // True when the full ticket detail was fetched after creation; false when the
+  // create succeeded but the follow-up detail fetch failed (see `warnings`).
+  detail_loaded: boolean;
   ticket: SupportTicketDetailItem;
+  warnings: readonly string[];
 }
 
 export interface SupportTicketReplyCommandResult {
@@ -98,11 +123,13 @@ export interface SupportTicketRepliesCommandResult {
   action: 'get-replies';
   threads: SupportTicketThreadItem[];
   ticket_id: number;
+  warnings: readonly string[];
 }
 
 export type SupportTicketCommandResult =
   | SupportTicketCloseCommandResult
   | SupportTicketCreateCommandResult
+  | SupportTicketDepartmentsCommandResult
   | SupportTicketGetCommandResult
   | SupportTicketListCommandResult
   | SupportTicketRepliesCommandResult

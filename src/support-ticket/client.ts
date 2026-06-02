@@ -3,6 +3,8 @@ import type { ApiEnvelope, MyAccountTransport } from '../myaccount/index.js';
 import type {
   SupportTicketCloseRequest,
   SupportTicketCreateRequest,
+  SupportTicketCreateResult,
+  SupportTicketDepartment,
   SupportTicketDetail,
   SupportTicketGetQuery,
   SupportTicketReplyRequest,
@@ -19,6 +21,7 @@ const TICKET_REPLY_PATH = '/ticket_management/ticket-reply/';
 const TICKET_CLOSE_PATH = '/ticket_management/ticket-comment-close/';
 const TICKET_CONVERSATION_PATH = '/ticket_management/ticket-conservation/';
 const TICKET_THREAD_PATH = '/ticket_management/ticket-thread-conservation/';
+const DEPARTMENTS_PATH = '/ticket_management/departments/';
 
 export interface SupportTicketListPage {
   account_manager: string | null;
@@ -72,7 +75,10 @@ export interface SupportTicketClient {
     ticketRowId: number,
     body: SupportTicketCloseRequest
   ): Promise<SupportTicketReplyResult>;
-  createTicket(body: SupportTicketCreateRequest): Promise<SupportTicketDetail>;
+  createTicket(
+    body: SupportTicketCreateRequest
+  ): Promise<SupportTicketCreateResult>;
+  listDepartments(): Promise<SupportTicketDepartment[]>;
   getThread(
     ticketId: number,
     threadId: string
@@ -97,14 +103,26 @@ export class SupportTicketApiClient implements SupportTicketClient {
 
   async createTicket(
     body: SupportTicketCreateRequest
-  ): Promise<SupportTicketDetail> {
+  ): Promise<SupportTicketCreateResult> {
     const response = await this.transport.post<
-      ApiEnvelope<SupportTicketDetail>
+      ApiEnvelope<SupportTicketCreateResult>
     >(TICKETS_PATH, {
       body
     });
 
     return response.data;
+  }
+
+  async listDepartments(): Promise<SupportTicketDepartment[]> {
+    const response = await this.transport.get<
+      ApiEnvelope<SupportTicketDepartment[]>
+    >(DEPARTMENTS_PATH, {
+      // The departments catalogue is account-global; it is not scoped to a
+      // project, so do not require/append project context for this call.
+      includeProjectContext: false
+    });
+
+    return Array.isArray(response.data) ? response.data : [];
   }
 
   async getTicket(
@@ -114,10 +132,7 @@ export class SupportTicketApiClient implements SupportTicketClient {
     const response = await this.transport.get<SupportTicketDetailEnvelope>(
       `${TICKET_DETAIL_PATH}${ticketId}/`,
       {
-        query: {
-          contact_person_email: query.contact_person_email,
-          contact_person_type: query.contact_person_type
-        }
+        query: buildGetQuery(query)
       }
     );
 
@@ -134,10 +149,7 @@ export class SupportTicketApiClient implements SupportTicketClient {
     const response = await this.transport.get<
       ApiEnvelope<SupportTicketThread[]>
     >(`${TICKET_CONVERSATION_PATH}${ticketId}/`, {
-      query: {
-        contact_person_email: query.contact_person_email,
-        contact_person_type: query.contact_person_type
-      }
+      query: buildGetQuery(query)
     });
 
     return Array.isArray(response.data) ? response.data : [];
@@ -203,13 +215,16 @@ export class SupportTicketApiClient implements SupportTicketClient {
     ticketRowId: number,
     body: SupportTicketReplyRequest
   ): Promise<SupportTicketReplyResult> {
-    const { abuse_ticket, ...rest } = body;
+    // The reply endpoint routes SOC/Abuse tickets to their own tables based on
+    // the `soc_ticket` / `abuse_ticket` flags read from the request BODY (not
+    // the query string), so they must travel in the body.
     const response = await this.transport.post<
       ApiEnvelope<{ message?: string } | null>
     >(`${TICKET_REPLY_PATH}${ticketRowId}/`, {
-      body: { abuse_ticket: false, ...rest },
-      query: {
-        abuse_ticket: abuse_ticket === true ? 'true' : undefined
+      body: {
+        ...body,
+        abuse_ticket: body.abuse_ticket === true,
+        soc_ticket: body.soc_ticket === true
       }
     });
 
@@ -224,6 +239,17 @@ export class SupportTicketApiClient implements SupportTicketClient {
       message: dataMessage ?? response.message
     };
   }
+}
+
+function buildGetQuery(
+  query: SupportTicketGetQuery
+): Record<string, string | undefined> {
+  return {
+    abuse_ticket: query.abuse_ticket === true ? 'true' : undefined,
+    contact_person_email: query.contact_person_email,
+    contact_person_type: query.contact_person_type,
+    soc_ticket: query.soc_ticket === true ? 'true' : undefined
+  };
 }
 
 function buildListQuery(

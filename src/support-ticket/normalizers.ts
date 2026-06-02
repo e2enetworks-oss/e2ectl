@@ -43,6 +43,38 @@ export function parseContactContext(options: {
   };
 }
 
+export interface SupportTicketTypeFlags {
+  abuseTicket: boolean;
+  socTicket: boolean;
+}
+
+/**
+ * Resolve the mutually-exclusive `--soc-ticket` / `--abuse-ticket` flags. A
+ * ticket is at most one of SOC, Abuse, or a regular ticket, so passing both is a
+ * usage error.
+ */
+export function parseTicketTypeFlags(options: {
+  abuseTicket?: boolean;
+  socTicket?: boolean;
+}): SupportTicketTypeFlags {
+  const socTicket = options.socTicket === true;
+  const abuseTicket = options.abuseTicket === true;
+
+  if (socTicket && abuseTicket) {
+    throw new CliError(
+      'Pass only one of --soc-ticket or --abuse-ticket, not both.',
+      {
+        code: 'INVALID_INPUT_COMBINATION',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'A ticket is either a SOC ticket or an Abuse ticket — choose one.'
+      }
+    );
+  }
+
+  return { abuseTicket, socTicket };
+}
+
 export function assertPositiveInteger(value: string, flagName: string): number {
   const trimmed = value.trim();
 

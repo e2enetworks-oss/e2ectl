@@ -13,9 +13,11 @@ import {
   VALID_TICKET_CATEGORIES
 } from './constants.js';
 import {
+  buildDetailFromCreateResult,
   buildListResult,
   extractThreadText,
   isSummaryTruncated,
+  normalizeSupportTicketDepartment,
   normalizeSupportTicketDetail,
   normalizeSupportTicketThread
 } from './mappers.js';
@@ -30,6 +32,7 @@ import {
   parsePriorityFilter,
   parseResources,
   parseStatusFilter,
+  parseTicketTypeFlags,
   readAndEncodeAttachments
 } from './normalizers.js';
 import type {
@@ -38,8 +41,10 @@ import type {
   SupportTicketContextOptions,
   SupportTicketCreateCommandResult,
   SupportTicketCreateOptions,
+  SupportTicketDepartmentsCommandResult,
   SupportTicketGetCommandResult,
   SupportTicketGetOptions,
+  SupportTicketGetQuery,
   SupportTicketListCommandResult,
   SupportTicketListOptions,
   SupportTicketPriority,
@@ -47,7 +52,8 @@ import type {
   SupportTicketReplyCommandResult,
   SupportTicketReplyOptions,
   SupportTicketResource,
-  SupportTicketServiceDependencies
+  SupportTicketServiceDependencies,
+  SupportTicketThreadItem
 } from './types/index.js';
 
 export class SupportTicketService {
@@ -138,7 +144,7 @@ export class SupportTicketService {
     );
 
     const client = await this.createClient(options);
-    const ticket = await client.createTicket({
+    const created = await client.createTicket({
       cc_email_list: ccEmails ?? [],
       channel,
       ...(componentField === undefined ? {} : { component: componentField }),
@@ -157,9 +163,51 @@ export class SupportTicketService {
       ticket_category: ticketCategory
     });
 
+    // The create endpoint returns only the identifiers, so fetch the full detail
+    // in a follow-up request. If that fetch fails the ticket was still created,
+    // so fall back to the identifiers we have and surface a warning rather than
+    // failing the whole command.
+    try {
+      const { account_manager, ticket } = await client.getTicket(created.id, {
+        ...(contactEmail === undefined
+          ? {}
+          : { contact_person_email: contactEmail }),
+        ...(contactType === undefined
+          ? {}
+          : { contact_person_type: contactType })
+      });
+
+      return {
+        account_manager,
+        action: 'create',
+        detail_loaded: true,
+        ticket: normalizeSupportTicketDetail(ticket),
+        warnings: []
+      };
+    } catch (cause) {
+      return {
+        account_manager: null,
+        action: 'create',
+        detail_loaded: false,
+        ticket: buildDetailFromCreateResult(created),
+        warnings: [
+          `Ticket ${created.ticket_number ?? created.id} was created, but its full detail could not be loaded${formatCause(cause)}. Run \`support-ticket get ${created.id}\` to view it.`
+        ]
+      };
+    }
+  }
+
+  async listDepartments(
+    options: SupportTicketContextOptions
+  ): Promise<SupportTicketDepartmentsCommandResult> {
+    const client = await this.createClient(options);
+    const departments = await client.listDepartments();
+
     return {
-      action: 'create',
-      ticket: normalizeSupportTicketDetail(ticket)
+      action: 'departments',
+      departments: departments.map((department) =>
+        normalizeSupportTicketDepartment(department)
+      )
     };
   }
 
@@ -169,17 +217,11 @@ export class SupportTicketService {
   ): Promise<SupportTicketGetCommandResult> {
     const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
     const { contactEmail, contactType } = parseContactContext(options);
+    const typeFlags = parseTicketTypeFlags(options);
     const client = await this.createClient(options);
     const { account_manager, ticket } = await client.getTicket(
       normalizedTicketId,
-      {
-        ...(contactEmail === undefined
-          ? {}
-          : { contact_person_email: contactEmail }),
-        ...(contactType === undefined
-          ? {}
-          : { contact_person_type: contactType })
-      }
+      buildGetQuery(contactEmail, contactType, typeFlags)
     );
 
     return {
@@ -240,6 +282,7 @@ export class SupportTicketService {
     );
     const channel = normalizeOptionalString(options.channel);
     const { contactEmail, contactType } = parseContactContext(options);
+    const { abuseTicket, socTicket } = parseTicketTypeFlags(options);
     const attachments = await readAndEncodeAttachments(
       options.attachment,
       (path) => this.dependencies.readAttachmentFile(path)
@@ -247,7 +290,8 @@ export class SupportTicketService {
 
     const client = await this.createClient(options);
     const result = await client.replyTicket(normalizedTicketId, {
-      abuse_ticket: options.abuseTicket ?? false,
+      abuse_ticket: abuseTicket,
+      soc_ticket: socTicket,
       ...(channel === undefined ? {} : { channel }),
       comment,
       contact_person_email: contactEmail ?? '',
@@ -300,40 +344,53 @@ export class SupportTicketService {
   ): Promise<SupportTicketRepliesCommandResult> {
     const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
     const { contactEmail, contactType } = parseContactContext(options);
+    const typeFlags = parseTicketTypeFlags(options);
     const client = await this.createClient(options);
-    const threads = await client.listReplies(normalizedTicketId, {
-      ...(contactEmail === undefined
-        ? {}
-        : { contact_person_email: contactEmail }),
-      ...(contactType === undefined ? {} : { contact_person_type: contactType })
-    });
+    const threads = await client.listReplies(
+      normalizedTicketId,
+      buildGetQuery(contactEmail, contactType, typeFlags)
+    );
 
     const expandedThreads = await mapWithConcurrency(
       threads,
       THREAD_EXPANSION_CONCURRENCY,
-      async (thread) => {
+      async (thread): Promise<SupportTicketThreadItem> => {
         if (!isSummaryTruncated(thread.summary)) {
-          return thread;
+          return normalizeSupportTicketThread(thread, true);
         }
 
+        // The list endpoint returned a truncated preview; try to load the full
+        // thread body. If that fails (or yields no text) we keep the truncated
+        // summary but flag it as incomplete so the gap is never silent.
         try {
           const detail = await client.getThread(normalizedTicketId, thread.id);
           const fullText = extractThreadText(detail);
           return fullText === undefined
-            ? thread
-            : { ...thread, summary: fullText };
+            ? normalizeSupportTicketThread(thread, false)
+            : normalizeSupportTicketThread(
+                { ...thread, summary: fullText },
+                true
+              );
         } catch {
-          return thread;
+          return normalizeSupportTicketThread(thread, false);
         }
       }
     );
 
+    const incompleteCount = expandedThreads.filter(
+      (thread) => !thread.is_summary_complete
+    ).length;
+
     return {
       action: 'get-replies',
       ticket_id: normalizedTicketId,
-      threads: expandedThreads.map((thread) =>
-        normalizeSupportTicketThread(thread)
-      )
+      threads: expandedThreads,
+      warnings:
+        incompleteCount === 0
+          ? []
+          : [
+              `Showing truncated text for ${incompleteCount} of ${expandedThreads.length} replies: the full content could not be loaded.`
+            ]
     };
   }
 
@@ -344,6 +401,29 @@ export class SupportTicketService {
       await resolveStoredCredentials(this.dependencies.store, options)
     );
   }
+}
+
+function buildGetQuery(
+  contactEmail: string | undefined,
+  contactType: string | undefined,
+  typeFlags: { abuseTicket: boolean; socTicket: boolean }
+): SupportTicketGetQuery {
+  return {
+    ...(typeFlags.abuseTicket ? { abuse_ticket: true } : {}),
+    ...(contactEmail === undefined
+      ? {}
+      : { contact_person_email: contactEmail }),
+    ...(contactType === undefined ? {} : { contact_person_type: contactType }),
+    ...(typeFlags.socTicket ? { soc_ticket: true } : {})
+  };
+}
+
+function formatCause(cause: unknown): string {
+  if (cause instanceof Error && cause.message.length > 0) {
+    return ` (${cause.message})`;
+  }
+
+  return '';
 }
 
 async function mapWithConcurrency<TIn, TOut>(

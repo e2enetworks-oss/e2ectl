@@ -4,6 +4,14 @@ import { startTestHttpServer } from '../../helpers/http-server.js';
 import { runBuiltCli } from '../../helpers/process.js';
 import { createTempHome } from '../../helpers/temp-home.js';
 
+// The real create endpoint returns only the identifiers; the CLI then fetches
+// the full detail via GET ticket/<id>/.
+const CREATE_RESPONSE = {
+  id: 42,
+  ticket_id: 'ZD-123',
+  ticket_number: 'T-100042'
+};
+
 const SUCCESS_TICKET = {
   channel: 'Web',
   created_at: '2026-05-19 09:00:00',
@@ -16,22 +24,34 @@ const SUCCESS_TICKET = {
   status: 'Open',
   subject: 'Cannot reach my VM',
   ticket_category: 'Cloud',
+  ticket_id: 'ZD-123',
   ticket_number: 'T-100042',
   updated_at: '2026-05-19 09:00:00'
 };
 
+const CREATE_HANDLERS = {
+  'POST /myaccount/api/v1/ticket_management/tickets/': () => ({
+    body: {
+      code: 200,
+      data: CREATE_RESPONSE,
+      errors: {},
+      message: 'OK'
+    }
+  }),
+  'GET /myaccount/api/v1/ticket_management/ticket/42/': () => ({
+    body: {
+      account_manager: 'Asha Iyer',
+      code: 200,
+      data: SUCCESS_TICKET,
+      errors: {},
+      message: 'OK'
+    }
+  })
+};
+
 describe('support-ticket create against a fake MyAccount API', () => {
   it('posts a normalized Cloud ticket payload and renders the create result as JSON', async () => {
-    const server = await startTestHttpServer({
-      'POST /myaccount/api/v1/ticket_management/tickets/': () => ({
-        body: {
-          code: 200,
-          data: SUCCESS_TICKET,
-          errors: {},
-          message: 'OK'
-        }
-      })
-    });
+    const server = await startTestHttpServer(CREATE_HANDLERS);
     const tempHome = await createTempHome();
 
     try {
@@ -79,8 +99,10 @@ describe('support-ticket create against a fake MyAccount API', () => {
       expect(parsed.action).toBe('create');
       expect(parsed.ticket.id).toBe(42);
 
-      expect(server.requests).toHaveLength(1);
+      // POST to create, then GET to load the full detail (Option A).
+      expect(server.requests).toHaveLength(2);
       expect(server.requests[0]?.method).toBe('POST');
+      expect(server.requests[1]?.method).toBe('GET');
       const body = JSON.parse(server.requests[0]?.body ?? '{}') as Record<
         string,
         unknown
@@ -107,16 +129,7 @@ describe('support-ticket create against a fake MyAccount API', () => {
   });
 
   it('reads --attachment files from disk and base64-encodes them', async () => {
-    const server = await startTestHttpServer({
-      'POST /myaccount/api/v1/ticket_management/tickets/': () => ({
-        body: {
-          code: 200,
-          data: SUCCESS_TICKET,
-          errors: {},
-          message: 'OK'
-        }
-      })
-    });
+    const server = await startTestHttpServer(CREATE_HANDLERS);
     const tempHome = await createTempHome();
 
     try {
@@ -171,16 +184,7 @@ describe('support-ticket create against a fake MyAccount API', () => {
   });
 
   it('renders a human-readable create result with a next-step hint', async () => {
-    const server = await startTestHttpServer({
-      'POST /myaccount/api/v1/ticket_management/tickets/': () => ({
-        body: {
-          code: 200,
-          data: SUCCESS_TICKET,
-          errors: {},
-          message: 'OK'
-        }
-      })
-    });
+    const server = await startTestHttpServer(CREATE_HANDLERS);
     const tempHome = await createTempHome();
 
     try {
@@ -215,6 +219,64 @@ describe('support-ticket create against a fake MyAccount API', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('Created support ticket T-100042');
       expect(result.stdout).toContain('support-ticket get 42');
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
+  it('still succeeds with a stderr warning when the post-create detail fetch fails', async () => {
+    const server = await startTestHttpServer({
+      'POST /myaccount/api/v1/ticket_management/tickets/': () => ({
+        body: {
+          code: 200,
+          data: CREATE_RESPONSE,
+          errors: {},
+          message: 'OK'
+        }
+      }),
+      'GET /myaccount/api/v1/ticket_management/ticket/42/': () => ({
+        body: { code: 500, data: null, errors: {}, message: 'boom' },
+        status: 500
+      })
+    });
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'support-ticket',
+          'create',
+          '--department',
+          '101',
+          '--subject',
+          'Cannot reach my VM',
+          '--description',
+          'VM is unreachable.',
+          '--ticket-category',
+          'Cloud',
+          '--component',
+          'Auto Scaling',
+          '--priority',
+          'High'
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      // The ticket was created, so the command succeeds — but the truncated
+      // detail is flagged on stderr, never silently presented as the ticket.
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Created support ticket T-100042');
+      expect(result.stdout).toContain('ID: 42');
+      expect(result.stderr).toContain('Warning:');
+      expect(result.stderr).toContain('support-ticket get 42');
     } finally {
       await server.close();
       await tempHome.cleanup();

@@ -7,11 +7,19 @@
 ## Before You Start
 
 - Save a default alias (and default project / location context), or pass `--alias`, `--project-id`, and `--location` explicitly.
-- Know the numeric department id you want to file against. Departments are configured per-account in MyAccount.
+- Know the numeric department id you want to file against. Run `e2ectl support-ticket departments` to list the valid ids — departments are configured per-account in MyAccount.
 - Attachments must be `.jpg`, `.jpeg`, or `.pdf`, no larger than 5 MB each, with at most 5 files per request.
 - Subjects accept up to 256 characters; descriptions and reply comments accept up to 6000 characters.
 
 ## Common Tasks
+
+### Discover Department Ids
+
+```bash
+e2ectl support-ticket departments
+```
+
+Lists every active ticket department with its numeric id, so you can pick the right value for `create --department` without leaving the terminal.
 
 ### List And Inspect Tickets
 
@@ -19,6 +27,18 @@
 e2ectl support-ticket list
 e2ectl support-ticket get <ticket-id>
 ```
+
+#### SOC and Abuse tickets
+
+SOC and Abuse tickets live in separate tables. To `get`, `get-replies`, or `reply` on one, add the matching flag so the request is routed correctly:
+
+```bash
+e2ectl support-ticket get <ticket-id> --soc-ticket
+e2ectl support-ticket get-replies <ticket-id> --abuse-ticket
+e2ectl support-ticket reply <ticket-id> --abuse-ticket --comment "..."
+```
+
+`--soc-ticket` and `--abuse-ticket` are mutually exclusive.
 
 Common filters on `list`:
 
@@ -42,7 +62,7 @@ e2ectl support-ticket list --page-no 2 --per-page 25
 e2ectl support-ticket get-replies <ticket-id>
 ```
 
-This returns every comment and reply on the ticket (description thread plus follow-ups), including author, direction, channel, visibility, and any attachments. Truncated summaries are automatically expanded to the full thread text where the API exposes it.
+This returns every comment and reply on the ticket (description thread plus follow-ups), including author, direction, channel, visibility, and any attachments. Truncated summaries are automatically expanded to the full thread text where the API exposes it. If a reply's full content cannot be loaded, the row is marked `[truncated — full content unavailable]` (and `is_summary_complete: false` in `--json`), and a warning is printed to stderr — the gap is never silent.
 
 ### Open A New Ticket
 
@@ -64,6 +84,8 @@ Category-specific rules:
 | Billing  | Required                | Required               | Not allowed  |
 | Network  | Optional                | Optional               | Not allowed  |
 | Sales    | Optional (sent as `""`) | Ignored (sent as null) | Not allowed  |
+
+After the ticket is created, the CLI fetches and prints its full detail (the same view as `support-ticket get`). If that follow-up fetch fails, the ticket is still created — the command prints the new ticket id and number, warns on stderr, and points you to `support-ticket get <id>`.
 
 ### Reply To A Ticket
 
@@ -136,11 +158,11 @@ e2ectl --json support-ticket list --status open
 
 ## Automation Notes
 
-- Resolve `--department` once for your account and treat it as a constant in scripts; the value is account-specific.
+- Resolve `--department` once for your account (via `support-ticket departments`) and treat it as a constant in scripts; the value is account-specific.
 - Use `--json` on `list`, `get`, and `replies` when piping into other tools — the JSON shape is stable and includes the page summary (`open_count`, `resolved_count`, `urgent_count`, `total_records`).
 - `--contact-email` and `--contact-type` are optional. When you omit them on `create`, MyAccount uses the account owner as the contact person.
 - `--channel` defaults to `Web` on `create`; override it only if your workflow needs a specific origin tag.
-- `--priority-ticket` marks a ticket as a priority (chat) ticket. `--abuse-ticket` on `reply` flags the reply as belonging to an abuse ticket.
+- `--priority-ticket` marks a ticket as a priority (chat) ticket. `--soc-ticket` / `--abuse-ticket` on `get`, `get-replies`, and `reply` route the request to the SOC or Abuse ticket table; pass at most one.
 
 ## Related Guides
 

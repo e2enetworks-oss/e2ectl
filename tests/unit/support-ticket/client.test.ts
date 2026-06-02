@@ -201,8 +201,10 @@ describe('SupportTicketApiClient', () => {
       '/ticket_management/ticket/42/',
       {
         query: {
+          abuse_ticket: undefined,
           contact_person_email: undefined,
-          contact_person_type: undefined
+          contact_person_type: undefined,
+          soc_ticket: undefined
         }
       }
     );
@@ -210,6 +212,53 @@ describe('SupportTicketApiClient', () => {
       account_manager: 'Asha Iyer',
       ticket: sampleTicket()
     });
+  });
+
+  it('forwards SOC/Abuse flags as query params on getTicket', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      account_manager: null,
+      code: 200,
+      data: sampleTicket(),
+      errors: {},
+      message: 'Success'
+    });
+
+    await client.getTicket(42, { soc_ticket: true });
+
+    expect(transport.getMock).toHaveBeenCalledWith(
+      '/ticket_management/ticket/42/',
+      {
+        query: {
+          abuse_ticket: undefined,
+          contact_person_email: undefined,
+          contact_person_type: undefined,
+          soc_ticket: 'true'
+        }
+      }
+    );
+  });
+
+  it('lists departments without project context', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [{ id: 101, name: 'Cloud Support' }],
+      errors: {},
+      message: 'Success'
+    });
+
+    const result = await client.listDepartments();
+
+    expect(transport.getMock).toHaveBeenCalledWith(
+      '/ticket_management/departments/',
+      { includeProjectContext: false }
+    );
+    expect(result).toEqual([{ id: 101, name: 'Cloud Support' }]);
   });
 
   it('creates tickets through the tickets collection path', async () => {
@@ -279,15 +328,15 @@ describe('SupportTicketApiClient', () => {
           abuse_ticket: false,
           comment: 'Any update?',
           contact_person_email: '',
-          contact_person_type: ''
-        },
-        query: { abuse_ticket: undefined }
+          contact_person_type: '',
+          soc_ticket: false
+        }
       }
     );
     expect(result).toEqual({ message: 'Reply posted.' });
   });
 
-  it('routes abuse_ticket=true through the query string and keeps body abuse_ticket=false', async () => {
+  it('sends abuse_ticket/soc_ticket in the request body (where the backend reads them)', async () => {
     const transport = new StubTransport();
     const client = new SupportTicketApiClient(transport);
 
@@ -309,12 +358,12 @@ describe('SupportTicketApiClient', () => {
       '/ticket_management/ticket-reply/42/',
       {
         body: {
-          abuse_ticket: false,
+          abuse_ticket: true,
           comment: 'flag this',
           contact_person_email: '',
-          contact_person_type: ''
-        },
-        query: { abuse_ticket: 'true' }
+          contact_person_type: '',
+          soc_ticket: false
+        }
       }
     );
   });
@@ -387,8 +436,10 @@ describe('SupportTicketApiClient', () => {
       '/ticket_management/ticket-conservation/466/',
       {
         query: {
+          abuse_ticket: undefined,
           contact_person_email: undefined,
-          contact_person_type: undefined
+          contact_person_type: undefined,
+          soc_ticket: undefined
         }
       }
     );

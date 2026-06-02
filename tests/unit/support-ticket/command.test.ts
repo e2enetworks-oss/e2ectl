@@ -34,17 +34,31 @@ function createSupportTicketStub(): {
   createTicket: ReturnType<typeof vi.fn>;
   getThread: ReturnType<typeof vi.fn>;
   getTicket: ReturnType<typeof vi.fn>;
+  listDepartments: ReturnType<typeof vi.fn>;
   listReplies: ReturnType<typeof vi.fn>;
   listTickets: ReturnType<typeof vi.fn>;
   replyTicket: ReturnType<typeof vi.fn>;
   stub: SupportTicketClient;
 } {
-  const createTicket = vi.fn(() => Promise.resolve(sampleTicket()));
+  const createTicket = vi.fn(() =>
+    Promise.resolve({ id: 42, ticket_id: 'ZD-123', ticket_number: 'T-100042' })
+  );
   const getTicket = vi.fn(() =>
     Promise.resolve({
       account_manager: 'Asha Iyer',
       ticket: sampleTicket()
     })
+  );
+  const listDepartments = vi.fn(() =>
+    Promise.resolve([
+      {
+        description: 'Infra and platform issues',
+        id: 101,
+        is_default: true,
+        is_enabled: true,
+        name: 'Cloud Support'
+      }
+    ])
   );
   const listTickets = vi.fn(() =>
     Promise.resolve({
@@ -73,6 +87,7 @@ function createSupportTicketStub(): {
     createTicket,
     getThread,
     getTicket,
+    listDepartments,
     listReplies,
     listTickets,
     replyTicket,
@@ -81,6 +96,7 @@ function createSupportTicketStub(): {
       createTicket,
       getThread,
       getTicket,
+      listDepartments,
       listReplies,
       listTickets,
       replyTicket
@@ -365,6 +381,80 @@ describe('support-ticket commands', () => {
     expect(stdout.buffer).toContain('Asha Iyer');
   });
 
+  it('passes the SOC ticket flag through to getTicket', async () => {
+    const { runtime, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'support-ticket',
+      'get',
+      '42',
+      '--alias',
+      'prod',
+      '--soc-ticket'
+    ]);
+
+    expect(supportTicketStub.getTicket).toHaveBeenCalledWith(42, {
+      soc_ticket: true
+    });
+  });
+
+  it('rejects passing both --soc-ticket and --abuse-ticket', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+    program.exitOverride();
+
+    await expect(
+      program.parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        'support-ticket',
+        'get',
+        '42',
+        '--alias',
+        'prod',
+        '--soc-ticket',
+        '--abuse-ticket'
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT_COMBINATION' });
+  });
+
+  it('lists ticket departments with their ids', async () => {
+    const { runtime, stdout, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'support-ticket',
+      'departments',
+      '--alias',
+      'prod'
+    ]);
+
+    expect(supportTicketStub.listDepartments).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(stdout.buffer) as {
+      action: string;
+      departments: Array<{ id: number; name: string }>;
+    };
+    expect(parsed.action).toBe('departments');
+    expect(parsed.departments).toEqual([
+      {
+        description: 'Infra and platform issues',
+        id: 101,
+        is_default: true,
+        is_enabled: true,
+        name: 'Cloud Support'
+      }
+    ]);
+  });
+
   it('creates a ticket from required + optional flags and posts a normalized payload', async () => {
     const { runtime, stdout, supportTicketStub } = createRuntimeFixture();
     await seedProfile(runtime);
@@ -441,7 +531,8 @@ describe('support-ticket commands', () => {
       abuse_ticket: false,
       comment: 'Any update?',
       contact_person_email: '',
-      contact_person_type: ''
+      contact_person_type: '',
+      soc_ticket: false
     });
     expect(stdout.buffer).toBe(
       `${stableStringify({

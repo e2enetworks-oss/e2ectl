@@ -6,6 +6,9 @@ import {
   normalizeOptionalString
 } from './normalizers.js';
 import type {
+  SupportTicketCreateResult,
+  SupportTicketDepartment,
+  SupportTicketDepartmentItem,
   SupportTicketDetail,
   SupportTicketDetailItem,
   SupportTicketItem,
@@ -85,17 +88,39 @@ export function normalizeSupportTicketDetail(
   };
 }
 
+/**
+ * Build a (mostly empty) detail item from the minimal create response. Used as a
+ * fallback for display when the post-create detail fetch fails — the ticket was
+ * still created, so we surface the identifiers we do have rather than nulls only.
+ */
+export function buildDetailFromCreateResult(
+  result: SupportTicketCreateResult
+): SupportTicketDetailItem {
+  return {
+    ...normalizeSupportTicketItem({ id: result.id }),
+    crn: null,
+    customer_type: null,
+    ticket_id: normalizeOptionalString(result.ticket_id) ?? null,
+    ticket_number: normalizeOptionalString(result.ticket_number) ?? null
+  };
+}
+
+export function normalizeSupportTicketDepartment(
+  department: SupportTicketDepartment
+): SupportTicketDepartmentItem {
+  return {
+    description: normalizeOptionalString(department.description) ?? null,
+    id: department.id,
+    is_default: department.is_default === true,
+    is_enabled: department.is_enabled === true,
+    name: normalizeOptionalString(department.name) ?? null
+  };
+}
+
 export function normalizeSupportTicketThread(
-  thread: SupportTicketThread
+  thread: SupportTicketThread,
+  isSummaryComplete = true
 ): SupportTicketThreadItem {
-  const direction =
-    thread.direction === 'in' || thread.direction === 'out'
-      ? thread.direction
-      : null;
-  const visibility =
-    thread.visibility === 'public' || thread.visibility === 'private'
-      ? thread.visibility
-      : null;
   const attachments = (thread.attachment_list?.data ?? []).map((att) => ({
     download_url: normalizeOptionalString(att.download_url) ?? null,
     file_name: normalizeOptionalString(att.file_name) ?? ''
@@ -111,12 +136,15 @@ export function normalizeSupportTicketThread(
     channel: normalizeOptionalString(thread.channel) ?? null,
     content_type: normalizeOptionalString(thread.contentType) ?? null,
     created_time: normalizeOptionalString(thread.createdTime) ?? null,
-    direction,
+    // Preserve the raw value so unrecognized directions/visibilities surface to
+    // the caller instead of being silently coerced to null.
+    direction: normalizeOptionalString(thread.direction) ?? null,
     id: thread.id,
     is_description_thread: thread.isDescriptionThread === true,
+    is_summary_complete: isSummaryComplete,
     summary: normalizeOptionalString(thread.summary) ?? null,
     to: normalizeOptionalString(thread.to) ?? null,
-    visibility
+    visibility: normalizeOptionalString(thread.visibility) ?? null
   };
 }
 

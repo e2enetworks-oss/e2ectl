@@ -4,6 +4,7 @@ import { formatCliCommand } from '../app/metadata.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type {
   SupportTicketCommandResult,
+  SupportTicketDepartmentItem,
   SupportTicketDetailItem,
   SupportTicketItem,
   SupportTicketThreadItem
@@ -22,21 +23,29 @@ function renderSupportTicketHuman(result: SupportTicketCommandResult): string {
   switch (result.action) {
     case 'create': {
       const reference = result.ticket.ticket_number ?? String(result.ticket.id);
+      const heading = `Created support ticket ${reference}.\n`;
+      const next = `\nNext: run ${formatCliCommand('support-ticket get ' + String(result.ticket.id))} to inspect the ticket.\n`;
+
+      // When the full detail loaded, show it (real values, no nulls). When it
+      // didn't, show only what the create response actually returned so we never
+      // present fabricated "--" fields as if they were the ticket's real state.
+      if (result.detail_loaded) {
+        return `${heading}\n${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n${next}`;
+      }
 
       return (
-        `Created support ticket ${reference}.\n` +
+        heading +
         `ID: ${result.ticket.id}\n` +
         `Ticket Number: ${result.ticket.ticket_number ?? '--'}\n` +
-        `Subject: ${result.ticket.subject ?? '--'}\n` +
-        `Status: ${result.ticket.status ?? '--'}\n` +
-        `Priority: ${result.ticket.priority ?? '--'}\n` +
-        `Category: ${result.ticket.ticket_category ?? '--'}\n` +
-        '\n' +
-        `Next: run ${formatCliCommand('support-ticket get ' + String(result.ticket.id))} to inspect the ticket.\n`
+        next
       );
     }
     case 'get':
       return `${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n`;
+    case 'departments':
+      return result.departments.length === 0
+        ? 'No support ticket departments found.\n'
+        : `${formatSupportTicketDepartmentsTable(result.departments)}\n`;
     case 'list':
       return result.items.length === 0
         ? 'No support tickets found.\n'
@@ -68,8 +77,21 @@ function normalizeSupportTicketJson(
   switch (result.action) {
     case 'create':
       return {
+        account_manager: result.account_manager,
         action: 'create',
+        detail_loaded: result.detail_loaded,
         ticket: normalizeSupportTicketDetailJson(result.ticket)
+      };
+    case 'departments':
+      return {
+        action: 'departments',
+        departments: result.departments.map((department) => ({
+          description: department.description,
+          id: department.id,
+          is_default: department.is_default,
+          is_enabled: department.is_enabled,
+          name: department.name
+        }))
       };
     case 'get':
       return {
@@ -172,14 +194,35 @@ function formatSupportTicketRepliesTable(
       thread.attachments.length === 0
         ? '--'
         : thread.attachments.map((att) => att.file_name || '--').join(', ');
+    // Make truncation visible in the table itself, not just on stderr.
+    const summary =
+      thread.summary === null
+        ? '--'
+        : thread.is_summary_complete
+          ? thread.summary
+          : `${thread.summary} [truncated — full content unavailable]`;
 
-    table.push([
-      thread.created_time ?? '--',
-      author,
-      thread.summary ?? '--',
-      attachments
-    ]);
+    table.push([thread.created_time ?? '--', author, summary, attachments]);
   });
+
+  return table.toString();
+}
+
+function formatSupportTicketDepartmentsTable(
+  departments: SupportTicketDepartmentItem[]
+): string {
+  const table = new Table({ head: ['ID', 'Name', 'Description', 'Default'] });
+
+  [...departments]
+    .sort((left, right) => left.id - right.id)
+    .forEach((department) => {
+      table.push([
+        String(department.id),
+        department.name ?? '--',
+        department.description ?? '--',
+        department.is_default ? 'yes' : 'no'
+      ]);
+    });
 
   return table.toString();
 }
@@ -203,6 +246,7 @@ function normalizeSupportTicketThreadJson(
     direction: thread.direction,
     id: thread.id,
     is_description_thread: thread.is_description_thread,
+    is_summary_complete: thread.is_summary_complete,
     summary: thread.summary,
     to: thread.to,
     visibility: thread.visibility

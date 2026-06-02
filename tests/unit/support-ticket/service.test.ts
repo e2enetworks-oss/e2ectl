@@ -2,7 +2,10 @@ import type {
   ConfigFile,
   ResolvedCredentials
 } from '../../../src/config/index.js';
-import type { SupportTicketClient } from '../../../src/support-ticket/index.js';
+import type {
+  SupportTicketClient,
+  SupportTicketDetail
+} from '../../../src/support-ticket/index.js';
 import { SupportTicketService } from '../../../src/support-ticket/service.js';
 
 function createConfig(): ConfigFile {
@@ -19,7 +22,7 @@ function createConfig(): ConfigFile {
   };
 }
 
-function sampleTicketDetail() {
+function sampleTicketDetail(): SupportTicketDetail {
   return {
     created_at: '2026-05-18 14:32:15',
     department: 'Cloud Support',
@@ -43,6 +46,7 @@ function createServiceFixture(): {
   createSupportTicketClient: ReturnType<typeof vi.fn>;
   getThread: ReturnType<typeof vi.fn>;
   getTicket: ReturnType<typeof vi.fn>;
+  listDepartments: ReturnType<typeof vi.fn>;
   listReplies: ReturnType<typeof vi.fn>;
   listTickets: ReturnType<typeof vi.fn>;
   readAttachmentFile: ReturnType<typeof vi.fn>;
@@ -51,9 +55,19 @@ function createServiceFixture(): {
   service: SupportTicketService;
 } {
   const closeTicket = vi.fn();
-  const createTicket = vi.fn();
+  // Default create flow: the create endpoint returns identifiers only and the
+  // service fetches the full detail in a follow-up getTicket call.
+  const createTicket = vi.fn(() =>
+    Promise.resolve({ id: 42, ticket_id: 'ZD-123', ticket_number: 'T-100042' })
+  );
   const getThread = vi.fn();
-  const getTicket = vi.fn();
+  const getTicket = vi.fn(() =>
+    Promise.resolve({
+      account_manager: 'Asha Iyer',
+      ticket: sampleTicketDetail()
+    })
+  );
+  const listDepartments = vi.fn(() => Promise.resolve([]));
   const listReplies = vi.fn();
   const listTickets = vi.fn();
   const replyTicket = vi.fn();
@@ -67,6 +81,7 @@ function createServiceFixture(): {
     createTicket,
     getThread,
     getTicket,
+    listDepartments,
     listReplies,
     listTickets,
     replyTicket
@@ -92,6 +107,7 @@ function createServiceFixture(): {
     createSupportTicketClient,
     getThread,
     getTicket,
+    listDepartments,
     listReplies,
     listTickets,
     readAttachmentFile,
@@ -332,6 +348,100 @@ describe('SupportTicketService', () => {
     });
     expect(result.action).toBe('create');
     expect(result.ticket.id).toBe(42);
+  });
+
+  it('fetches the full detail after create and reports it as loaded', async () => {
+    const { createTicket, getTicket, service } = createServiceFixture();
+
+    createTicket.mockResolvedValue({
+      id: 42,
+      ticket_id: 'ZD-123',
+      ticket_number: 'T-100042'
+    });
+    getTicket.mockResolvedValue({
+      account_manager: 'Asha Iyer',
+      ticket: sampleTicketDetail()
+    });
+
+    const result = await service.createTicket({
+      alias: 'prod',
+      component: 'Auto Scaling',
+      department: '101',
+      description: 'VM is unreachable.',
+      priority: 'High',
+      subject: 'Cannot reach my VM',
+      ticketCategory: 'Cloud'
+    });
+
+    // The follow-up detail fetch keys off the local id returned by create.
+    expect(getTicket).toHaveBeenCalledWith(42, {});
+    expect(result.detail_loaded).toBe(true);
+    expect(result.account_manager).toBe('Asha Iyer');
+    expect(result.warnings).toHaveLength(0);
+    expect(result.ticket).toMatchObject({
+      id: 42,
+      status: 'Open',
+      subject: 'Cannot reach my VM',
+      ticket_number: 'T-100042'
+    });
+  });
+
+  it('still succeeds (with a warning) when the post-create detail fetch fails', async () => {
+    const { createTicket, getTicket, service } = createServiceFixture();
+
+    createTicket.mockResolvedValue({
+      id: 42,
+      ticket_id: 'ZD-123',
+      ticket_number: 'T-100042'
+    });
+    getTicket.mockRejectedValue(new Error('temporary outage'));
+
+    const result = await service.createTicket({
+      alias: 'prod',
+      component: 'Auto Scaling',
+      department: '101',
+      description: 'VM is unreachable.',
+      priority: 'High',
+      subject: 'Cannot reach my VM',
+      ticketCategory: 'Cloud'
+    });
+
+    expect(result.detail_loaded).toBe(false);
+    // We still surface the identifiers we do have rather than failing the create.
+    expect(result.ticket).toMatchObject({
+      id: 42,
+      ticket_id: 'ZD-123',
+      ticket_number: 'T-100042'
+    });
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('support-ticket get 42');
+  });
+
+  it('lists ticket departments', async () => {
+    const { listDepartments, service } = createServiceFixture();
+
+    listDepartments.mockResolvedValue([
+      {
+        description: null,
+        id: 101,
+        is_default: true,
+        is_enabled: true,
+        name: 'Cloud Support'
+      }
+    ]);
+
+    const result = await service.listDepartments({ alias: 'prod' });
+
+    expect(result.action).toBe('departments');
+    expect(result.departments).toEqual([
+      {
+        description: null,
+        id: 101,
+        is_default: true,
+        is_enabled: true,
+        name: 'Cloud Support'
+      }
+    ]);
   });
 
   it('allows Cloud tickets without --resource (defaults to resource: null)', async () => {
@@ -747,7 +857,8 @@ describe('SupportTicketService', () => {
       abuse_ticket: false,
       comment: 'Any update?',
       contact_person_email: '',
-      contact_person_type: ''
+      contact_person_type: '',
+      soc_ticket: false
     });
     expect(result).toEqual({
       action: 'reply',
@@ -787,8 +898,44 @@ describe('SupportTicketService', () => {
       contact_person_email: 'me@example.com',
       contact_person_type: 'Admin',
       file_name: ['photo.jpg'],
-      imagedata: ['data:image/jpeg;base64,/9j/']
+      imagedata: ['data:image/jpeg;base64,/9j/'],
+      soc_ticket: false
     });
+  });
+
+  it('routes a reply to the SOC ticket table when --soc-ticket is set', async () => {
+    const { replyTicket, service } = createServiceFixture();
+
+    replyTicket.mockResolvedValue({ message: 'Reply posted.' });
+
+    await service.replyTicket('466', {
+      alias: 'prod',
+      comment: 'hi',
+      socTicket: true
+    });
+
+    expect(replyTicket).toHaveBeenCalledWith(466, {
+      abuse_ticket: false,
+      comment: 'hi',
+      contact_person_email: '',
+      contact_person_type: '',
+      soc_ticket: true
+    });
+  });
+
+  it('rejects a reply that sets both --soc-ticket and --abuse-ticket', async () => {
+    const { replyTicket, service } = createServiceFixture();
+
+    await expect(
+      service.replyTicket('466', {
+        abuseTicket: true,
+        alias: 'prod',
+        comment: 'hi',
+        socTicket: true
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT_COMBINATION' });
+
+    expect(replyTicket).not.toHaveBeenCalled();
   });
 
   it('closes a ticket with a trimmed comment and optional contact filters', async () => {
@@ -922,6 +1069,21 @@ describe('SupportTicketService', () => {
     const result = await service.getReplies('466', { alias: 'prod' });
 
     expect(result.threads[0]?.summary).toBe('truncated...');
+    // The gap must not be silent: the thread is flagged incomplete and a
+    // warning is surfaced to the caller.
+    expect(result.threads[0]?.is_summary_complete).toBe(false);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('truncated');
+  });
+
+  it('forwards the SOC/abuse flags to listReplies as query params', async () => {
+    const { listReplies, service } = createServiceFixture();
+
+    listReplies.mockResolvedValue([]);
+
+    await service.getReplies('466', { abuseTicket: true, alias: 'prod' });
+
+    expect(listReplies).toHaveBeenCalledWith(466, { abuse_ticket: true });
   });
 
   it('caps concurrent getThread calls at THREAD_EXPANSION_CONCURRENCY when many summaries are truncated', async () => {

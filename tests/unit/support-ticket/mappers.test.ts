@@ -1,7 +1,9 @@
 import {
+  buildDetailFromCreateResult,
   buildListResult,
   extractThreadText,
   isSummaryTruncated,
+  normalizeSupportTicketDepartment,
   normalizeSupportTicketDetail,
   normalizeSupportTicketItem,
   normalizeSupportTicketThread
@@ -127,6 +129,42 @@ describe('normalizeSupportTicketDetail', () => {
   });
 });
 
+describe('buildDetailFromCreateResult', () => {
+  it('surfaces the identifiers from the create response and nulls the rest', () => {
+    const detail = buildDetailFromCreateResult({
+      id: 42,
+      ticket_id: 'ZD-123',
+      ticket_number: 'T-100042'
+    });
+
+    expect(detail).toMatchObject({
+      id: 42,
+      subject: null,
+      ticket_id: 'ZD-123',
+      ticket_number: 'T-100042'
+    });
+  });
+});
+
+describe('normalizeSupportTicketDepartment', () => {
+  it('coerces optional fields and defaults booleans', () => {
+    expect(
+      normalizeSupportTicketDepartment({
+        description: '  Infra  ',
+        id: 101,
+        is_default: true,
+        name: 'Cloud Support'
+      })
+    ).toEqual({
+      description: 'Infra',
+      id: 101,
+      is_default: true,
+      is_enabled: false,
+      name: 'Cloud Support'
+    });
+  });
+});
+
 describe('buildListResult', () => {
   it('maps a list page into a list command result', () => {
     expect(
@@ -158,7 +196,7 @@ describe('buildListResult', () => {
 });
 
 describe('normalizeSupportTicketThread', () => {
-  it('returns canonical direction/visibility and null author fields when missing', () => {
+  it('preserves unrecognized direction/visibility verbatim (forward-compatible)', () => {
     expect(
       normalizeSupportTicketThread({
         author: null,
@@ -172,11 +210,20 @@ describe('normalizeSupportTicketThread', () => {
       author_name: null,
       author_type: null,
       can_reply: false,
-      direction: null,
+      // No longer coerced to null: a new API value surfaces instead of vanishing.
+      direction: 'sideways',
       id: 't1',
       is_description_thread: false,
-      visibility: null
+      is_summary_complete: true,
+      visibility: 'maybe'
     });
+  });
+
+  it('flags the summary as incomplete when told it is truncated', () => {
+    expect(
+      normalizeSupportTicketThread({ id: 't1', summary: 'partial...' }, false)
+        .is_summary_complete
+    ).toBe(false);
   });
 
   it('keeps known direction/visibility and propagates the author + cc + to fields', () => {
@@ -221,6 +268,7 @@ describe('normalizeSupportTicketThread', () => {
       direction: 'out',
       id: 't2',
       is_description_thread: true,
+      is_summary_complete: true,
       summary: 'hi',
       to: 'customer@example.com',
       visibility: 'private'

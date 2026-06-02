@@ -1,8 +1,10 @@
 import { stableStringify } from '../../../src/core/json.js';
 import { renderSupportTicketResult } from '../../../src/support-ticket/formatter.js';
 import type {
+  SupportTicketCreateCommandResult,
   SupportTicketDetailItem,
   SupportTicketItem,
+  SupportTicketRepliesCommandResult,
   SupportTicketThreadItem
 } from '../../../src/support-ticket/types/index.js';
 
@@ -68,9 +70,35 @@ function sampleThread(
     direction: 'out',
     id: 'thread-1',
     is_description_thread: false,
+    is_summary_complete: true,
     summary: 'Hello',
     to: 'customer@example.com',
     visibility: 'public',
+    ...overrides
+  };
+}
+
+function sampleCreate(
+  overrides: Partial<SupportTicketCreateCommandResult> = {}
+): SupportTicketCreateCommandResult {
+  return {
+    account_manager: null,
+    action: 'create',
+    detail_loaded: true,
+    ticket: sampleDetail(),
+    warnings: [],
+    ...overrides
+  };
+}
+
+function sampleReplies(
+  overrides: Partial<SupportTicketRepliesCommandResult> = {}
+): SupportTicketRepliesCommandResult {
+  return {
+    action: 'get-replies',
+    threads: [],
+    ticket_id: 466,
+    warnings: [],
     ...overrides
   };
 }
@@ -129,18 +157,67 @@ describe('support-ticket formatter', () => {
     expect(output).toContain('Account Manager: Asha Iyer');
   });
 
-  it('renders a create result with a next-step hint', () => {
+  it('renders a create result with the full detail table and a next-step hint', () => {
     const output = renderSupportTicketResult(
-      {
-        action: 'create',
-        ticket: sampleDetail()
-      },
+      sampleCreate({ account_manager: 'Asha Iyer' }),
       false
     );
 
     expect(output).toContain('Created support ticket T-100042.');
-    expect(output).toContain('ID: 42');
+    // With the detail loaded, the create result shows the real ticket table
+    // (no fabricated placeholders).
+    expect(output).toContain('Subject');
+    expect(output).toContain('Cannot reach my VM');
+    expect(output).toContain('Status');
     expect(output).toContain('support-ticket get 42');
+  });
+
+  it('renders a departments table and deterministic JSON', () => {
+    const result = {
+      action: 'departments' as const,
+      departments: [
+        {
+          description: 'Infra issues',
+          id: 101,
+          is_default: true,
+          is_enabled: true,
+          name: 'Cloud Support'
+        }
+      ]
+    };
+
+    const human = renderSupportTicketResult(result, false);
+    expect(human).toContain('Cloud Support');
+    expect(human).toContain('101');
+
+    const json = JSON.parse(renderSupportTicketResult(result, true)) as {
+      action: string;
+      departments: Array<{ id: number; name: string }>;
+    };
+    expect(json.action).toBe('departments');
+    expect(json.departments[0]?.id).toBe(101);
+  });
+
+  it('renders an empty departments message', () => {
+    expect(
+      renderSupportTicketResult(
+        { action: 'departments', departments: [] },
+        false
+      )
+    ).toBe('No support ticket departments found.\n');
+  });
+
+  it('marks truncated reply summaries in the human table', () => {
+    const output = renderSupportTicketResult(
+      sampleReplies({
+        threads: [
+          sampleThread({ is_summary_complete: false, summary: 'partial' })
+        ]
+      }),
+      false
+    );
+
+    expect(output).toContain('truncated — full content unavailable');
   });
 
   it('renders a get result including account manager and reply allowed flag', () => {
@@ -244,8 +321,7 @@ describe('support-ticket formatter', () => {
 
   it('renders a human-readable replies table with attachment names', () => {
     const output = renderSupportTicketResult(
-      {
-        action: 'get-replies',
+      sampleReplies({
         threads: [
           sampleThread({
             attachments: [
@@ -253,9 +329,8 @@ describe('support-ticket formatter', () => {
               { download_url: null, file_name: '' }
             ]
           })
-        ],
-        ticket_id: 466
-      },
+        ]
+      }),
       false
     );
 
@@ -267,24 +342,20 @@ describe('support-ticket formatter', () => {
   });
 
   it('renders empty-replies message in human mode', () => {
-    expect(
-      renderSupportTicketResult(
-        { action: 'get-replies', threads: [], ticket_id: 466 },
-        false
-      )
-    ).toBe('No replies on support ticket 466.\n');
+    expect(renderSupportTicketResult(sampleReplies(), false)).toBe(
+      'No replies on support ticket 466.\n'
+    );
   });
 
   it('falls back to author_name only when email is missing, and to -- when author_name is missing', () => {
     const output = renderSupportTicketResult(
-      {
-        action: 'get-replies',
+      sampleReplies({
         threads: [
           sampleThread({ author_email: null, id: 't1' }),
           sampleThread({ author_email: null, author_name: null, id: 't2' })
         ],
         ticket_id: 1
-      },
+      }),
       false
     );
 
@@ -294,15 +365,13 @@ describe('support-ticket formatter', () => {
 
   it('emits deterministic JSON for replies output', () => {
     const json = renderSupportTicketResult(
-      {
-        action: 'get-replies',
+      sampleReplies({
         threads: [
           sampleThread({
             attachments: [{ download_url: 'https://x/y', file_name: 'log.txt' }]
           })
-        ],
-        ticket_id: 466
-      },
+        ]
+      }),
       true
     );
 
@@ -311,6 +380,7 @@ describe('support-ticket formatter', () => {
       threads: Array<{
         attachments: Array<{ file_name: string }>;
         id: string;
+        is_summary_complete: boolean;
       }>;
       ticket_id: number;
     };
@@ -318,6 +388,7 @@ describe('support-ticket formatter', () => {
     expect(parsed.ticket_id).toBe(466);
     expect(parsed.threads[0]?.id).toBe('thread-1');
     expect(parsed.threads[0]?.attachments[0]?.file_name).toBe('log.txt');
+    expect(parsed.threads[0]?.is_summary_complete).toBe(true);
   });
 
   it('renders a get result without an account manager row when none is provided', () => {
@@ -358,27 +429,31 @@ describe('support-ticket formatter', () => {
     expect(output).toMatch(/Customer Type.*--/);
   });
 
-  it('renders -- placeholders for missing create result fields', () => {
+  it('shows only the known identifiers (no fabricated fields) when the detail fetch failed', () => {
     const output = renderSupportTicketResult(
-      {
-        action: 'create',
+      sampleCreate({
+        detail_loaded: false,
         ticket: sampleDetail({
           priority: null,
           status: null,
           subject: null,
           ticket_category: null,
           ticket_number: null
-        })
-      },
+        }),
+        warnings: [
+          'Ticket 42 was created, but its full detail could not be loaded.'
+        ]
+      }),
       false
     );
 
     expect(output).toContain('Created support ticket 42.');
+    expect(output).toContain('ID: 42');
     expect(output).toContain('Ticket Number: --');
-    expect(output).toContain('Subject: --');
-    expect(output).toContain('Status: --');
-    expect(output).toContain('Priority: --');
-    expect(output).toContain('Category: --');
+    expect(output).toContain('support-ticket get 42');
+    // The fallback must NOT invent Subject/Status/Priority/Category lines.
+    expect(output).not.toContain('Subject:');
+    expect(output).not.toContain('Status:');
   });
 
   it('joins CC emails with a comma in the get table', () => {
@@ -533,12 +608,10 @@ describe('support-ticket formatter', () => {
   });
 
   it('emits deterministic JSON for create and get outputs (includes crn/customer_type)', () => {
-    const createJson = renderSupportTicketResult(
-      { action: 'create', ticket: sampleDetail() },
-      true
-    );
+    const createJson = renderSupportTicketResult(sampleCreate(), true);
     expect(JSON.parse(createJson)).toMatchObject({
       action: 'create',
+      detail_loaded: true,
       ticket: { crn: 'CRN-1', customer_type: 'Standard', id: 42 }
     });
 

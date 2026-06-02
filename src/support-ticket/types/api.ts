@@ -63,6 +63,25 @@ export interface SupportTicketDetail extends SupportTicketSummary {
   customer_type?: 'Priority' | 'Standard';
 }
 
+/**
+ * Shape returned by the create endpoint. The backend only echoes the local DB
+ * id plus the Zoho identifiers — it does NOT return the full ticket detail.
+ * The CLI fetches the populated detail in a follow-up request keyed off `id`.
+ */
+export interface SupportTicketCreateResult {
+  id: number;
+  ticket_id?: string | null;
+  ticket_number?: string | null;
+}
+
+export interface SupportTicketDepartment {
+  description?: string | null;
+  id: number;
+  is_default?: boolean;
+  is_enabled?: boolean;
+  name?: string | null;
+}
+
 export interface SupportTicketCreateRequest {
   cc_email_list: string[];
   channel?: string;
@@ -88,6 +107,7 @@ export interface SupportTicketReplyRequest {
   contact_person_type: SupportTicketContactPersonType | '';
   file_name?: string[];
   imagedata?: string[];
+  soc_ticket?: boolean;
 }
 
 export interface SupportTicketCloseRequest {
@@ -97,8 +117,10 @@ export interface SupportTicketCloseRequest {
 }
 
 export interface SupportTicketGetQuery {
+  abuse_ticket?: boolean;
   contact_person_email?: string;
   contact_person_type?: string;
+  soc_ticket?: boolean;
 }
 
 export interface SupportTicketThreadAuthor {

@@ -65,7 +65,7 @@ describe('support-ticket reply/close against a fake MyAccount API', () => {
     }
   });
 
-  it('reply forwards --abuse-ticket as a query param and includes the file attachment payload', async () => {
+  it('reply forwards --abuse-ticket in the request body and includes the file attachment payload', async () => {
     const server = await startTestHttpServer({
       'POST /myaccount/api/v1/ticket_management/ticket-reply/466/': () => ({
         body: {
@@ -109,14 +109,17 @@ describe('support-ticket reply/close against a fake MyAccount API', () => {
       expect(result.stdout).toContain('Replied to support ticket 466');
       expect(result.stdout).toContain('Reply posted.');
 
-      expect(server.requests[0]?.query).toMatchObject({ abuse_ticket: 'true' });
       const body = JSON.parse(server.requests[0]?.body ?? '{}') as {
         abuse_ticket: boolean;
         file?: string;
         file_name: string[];
         imagedata: string[];
+        soc_ticket: boolean;
       };
-      expect(body.abuse_ticket).toBe(false);
+      // The backend reads abuse_ticket/soc_ticket from the request body, so the
+      // flag must travel there (not in the query string).
+      expect(body.abuse_ticket).toBe(true);
+      expect(body.soc_ticket).toBe(false);
       expect(body.file).toBeUndefined();
       expect(body.file_name).toEqual(['photo.jpg']);
       expect(body.imagedata[0]).toMatch(/^data:image\/jpeg;base64,/);
