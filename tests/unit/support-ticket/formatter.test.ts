@@ -291,19 +291,21 @@ describe('support-ticket formatter', () => {
   });
 
   it('renders human-readable reply and close confirmations with -- when message is empty', () => {
-    expect(
-      renderSupportTicketResult(
-        { action: 'reply', message: '', ticket_id: 42 },
-        false
-      )
-    ).toBe('Replied to support ticket 42.\nMessage: --\n');
+    const reply = renderSupportTicketResult(
+      { action: 'reply', message: '', ticket_id: 42 },
+      false
+    );
+    expect(reply).toContain('Replied to support ticket 42.\nMessage: --\n');
+    expect(reply).toContain('Tip: ');
+    expect(reply).toContain('support-ticket get-replies 42');
 
-    expect(
-      renderSupportTicketResult(
-        { action: 'close', message: 'Ticket closed.', ticket_id: 99 },
-        false
-      )
-    ).toBe('Closed support ticket 99.\nMessage: Ticket closed.\n');
+    const close = renderSupportTicketResult(
+      { action: 'close', message: 'Ticket closed.', ticket_id: 99 },
+      false
+    );
+    expect(close).toContain('Closed support ticket 99.\nMessage: Ticket closed.\n');
+    expect(close).toContain('Tip: ');
+    expect(close).toContain('support-ticket reopen 99');
   });
 
   it('emits deterministic JSON for close output', () => {
@@ -320,19 +322,23 @@ describe('support-ticket formatter', () => {
   });
 
   it('renders human-readable reopen confirmation (and -- for empty messages)', () => {
-    expect(
-      renderSupportTicketResult(
-        { action: 'reopen', message: 'Ticket reopened.', ticket_id: 99 },
-        false
-      )
-    ).toBe('Reopened support ticket 99.\nMessage: Ticket reopened.\n');
+    const reopen = renderSupportTicketResult(
+      { action: 'reopen', message: 'Ticket reopened.', ticket_id: 99 },
+      false
+    );
+    expect(reopen).toContain(
+      'Reopened support ticket 99.\nMessage: Ticket reopened.\n'
+    );
+    expect(reopen).toContain('Tip: ');
+    expect(reopen).toContain('support-ticket reply 99');
+    expect(reopen).toContain('support-ticket close 99');
 
     expect(
       renderSupportTicketResult(
         { action: 'reopen', message: '', ticket_id: 99 },
         false
       )
-    ).toBe('Reopened support ticket 99.\nMessage: --\n');
+    ).toContain('Reopened support ticket 99.\nMessage: --\n');
   });
 
   it('emits deterministic JSON for reopen output', () => {

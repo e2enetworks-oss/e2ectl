@@ -41,40 +41,79 @@ function renderSupportTicketHuman(result: SupportTicketCommandResult): string {
         next
       );
     }
-    case 'get':
-      return `${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n`;
+    case 'get': {
+      const id = String(result.ticket.id);
+      return (
+        `${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n` +
+        formatHint(
+          `read the conversation with ${formatCliCommand('support-ticket get-replies ' + id)}, ` +
+            `or respond with ${formatCliCommand('support-ticket reply ' + id)}.`
+        )
+      );
+    }
     case 'departments':
       return result.departments.length === 0
         ? 'No support ticket departments found.\n'
-        : `${formatSupportTicketDepartmentsTable(result.departments)}\n`;
+        : `${formatSupportTicketDepartmentsTable(result.departments)}\n` +
+            formatHint(
+              `pass an id from the ID column as ${formatCliCommand('support-ticket create --department <department-id>')} to route a new ticket.`
+            );
     case 'list':
       return result.items.length === 0
         ? 'No support tickets found.\n'
-        : `${formatSupportTicketListTable(result.items)}\n${formatListFooter(result)}`;
+        : `${formatSupportTicketListTable(result.items)}\n${formatListFooter(result)}` +
+            formatHint(
+              `use a ticket id from the ID column with ${formatCliCommand('support-ticket get <ticket-id>')} to view full details.`
+            );
     case 'reply':
       return (
         `Replied to support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n`
+        `Message: ${result.message || '--'}\n` +
+        formatHint(
+          `view the full conversation with ${formatCliCommand('support-ticket get-replies ' + String(result.ticket_id))}.`
+        )
       );
     case 'close':
       return (
         `Closed support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n`
+        `Message: ${result.message || '--'}\n` +
+        formatHint(
+          `reopen this ticket if needed with ${formatCliCommand('support-ticket reopen ' + String(result.ticket_id))}.`
+        )
       );
     case 'reopen':
       return (
         `Reopened support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n`
+        `Message: ${result.message || '--'}\n` +
+        formatHint(
+          `add a reply with ${formatCliCommand('support-ticket reply ' + String(result.ticket_id))}, ` +
+            `or close it again with ${formatCliCommand('support-ticket close ' + String(result.ticket_id))}.`
+        )
       );
     case 'timeline':
       return result.events.length === 0
         ? `No timeline events on support ticket ${result.ticket_id}.\n`
-        : `Timeline for support ticket ${result.ticket_id}:\n${formatSupportTicketTimelineTable(result.events)}\n`;
+        : `Timeline for support ticket ${result.ticket_id}:\n${formatSupportTicketTimelineTable(result.events)}\n` +
+            formatHint(
+              `view the ticket's current details with ${formatCliCommand('support-ticket get ' + String(result.ticket_id))}.`
+            );
     case 'get-replies':
       return result.threads.length === 0
         ? `No replies on support ticket ${result.ticket_id}.\n`
-        : `Replies on support ticket ${result.ticket_id}:\n${formatSupportTicketRepliesTable(result.threads)}\n`;
+        : `Replies on support ticket ${result.ticket_id}:\n${formatSupportTicketRepliesTable(result.threads)}\n` +
+            formatHint(
+              `respond to this ticket with ${formatCliCommand('support-ticket reply ' + String(result.ticket_id))}.`
+            );
   }
+}
+
+/**
+ * Render a one-line usage hint shown beneath human-readable output. Hints only
+ * appear in the human renderer — never in JSON — so scripted output stays a
+ * clean, parseable payload.
+ */
+function formatHint(text: string): string {
+  return `\nTip: ${text}\n`;
 }
 
 function renderSupportTicketJson(result: SupportTicketCommandResult): string {
