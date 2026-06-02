@@ -31,6 +31,8 @@ Sample output:
 ├─────┼───────────────┼────────────────────────────┼─────────┤
 │ 102 │ Billing       │ Invoices and payments      │ no      │
 └─────┴───────────────┴────────────────────────────┴─────────┘
+
+Tip: pass an id from the ID column as e2ectl support-ticket create --department <department-id> to route a new ticket.
 ```
 
 Pass `--json` to capture the same data (`id`, `name`, `description`, `is_default`, `is_enabled`) for downstream automation.
@@ -134,6 +136,8 @@ Sample output:
 ```text
 Reopened support ticket 466.
 Message: Ticket reopened.
+
+Tip: add a reply with e2ectl support-ticket reply 466, or close it again with e2ectl support-ticket close 466.
 ```
 
 ### Review A Ticket's Timeline
@@ -158,6 +162,8 @@ Timeline for support ticket 466:
 ├─────────────────────┼────────────────┼───────────┼────────┼────────────────────────┤
 │ 2026-05-19 10:00:00 │ comment_added  │ Customer  │ --     │ Added a comment        │
 └─────────────────────┴────────────────┴───────────┴────────┴────────────────────────┘
+
+Tip: view the ticket's current details with e2ectl support-ticket get 466.
 ```
 
 Pass `--json` to get the normalized events plus the applied `filters`

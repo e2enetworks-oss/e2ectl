@@ -303,7 +303,9 @@ describe('support-ticket formatter', () => {
       { action: 'close', message: 'Ticket closed.', ticket_id: 99 },
       false
     );
-    expect(close).toContain('Closed support ticket 99.\nMessage: Ticket closed.\n');
+    expect(close).toContain(
+      'Closed support ticket 99.\nMessage: Ticket closed.\n'
+    );
     expect(close).toContain('Tip: ');
     expect(close).toContain('support-ticket reopen 99');
   });
