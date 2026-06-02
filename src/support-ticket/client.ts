@@ -7,11 +7,14 @@ import type {
   SupportTicketDepartment,
   SupportTicketDetail,
   SupportTicketGetQuery,
+  SupportTicketReopenRequest,
   SupportTicketReplyRequest,
   SupportTicketReplyResult,
   SupportTicketSummary,
   SupportTicketThread,
-  SupportTicketThreadDetail
+  SupportTicketThreadDetail,
+  SupportTicketTimelineEvent,
+  SupportTicketTimelineQuery
 } from './types/index.js';
 
 const TICKETS_PATH = '/ticket_management/tickets/';
@@ -19,8 +22,10 @@ const TICKETS_FILTER_PATH = '/ticket_management/tickets/filter/';
 const TICKET_DETAIL_PATH = '/ticket_management/ticket/';
 const TICKET_REPLY_PATH = '/ticket_management/ticket-reply/';
 const TICKET_CLOSE_PATH = '/ticket_management/ticket-comment-close/';
+const TICKET_REOPEN_PATH = '/ticket_management/ticket-comment-reopen/';
 const TICKET_CONVERSATION_PATH = '/ticket_management/ticket-conservation/';
 const TICKET_THREAD_PATH = '/ticket_management/ticket-thread-conservation/';
+const TICKET_TIMELINE_PATH = '/ticket_management/ticket-timeline/';
 const DEPARTMENTS_PATH = '/ticket_management/departments/';
 
 export interface SupportTicketListPage {
@@ -91,7 +96,15 @@ export interface SupportTicketClient {
     ticketId: number,
     query?: SupportTicketGetQuery
   ): Promise<SupportTicketThread[]>;
+  getTimeline(
+    ticketId: number,
+    query?: SupportTicketTimelineQuery
+  ): Promise<SupportTicketTimelineEvent[]>;
   listTickets(query?: SupportTicketListQuery): Promise<SupportTicketListPage>;
+  reopenTicket(
+    ticketRowId: number,
+    body: SupportTicketReopenRequest
+  ): Promise<SupportTicketReplyResult>;
   replyTicket(
     ticketRowId: number,
     body: SupportTicketReplyRequest
@@ -188,6 +201,41 @@ export class SupportTicketApiClient implements SupportTicketClient {
     };
   }
 
+  async reopenTicket(
+    ticketRowId: number,
+    body: SupportTicketReopenRequest
+  ): Promise<SupportTicketReplyResult> {
+    const response = await this.transport.post<
+      ApiEnvelope<{ message?: string } | null>
+    >(`${TICKET_REOPEN_PATH}${ticketRowId}/`, {
+      body
+    });
+
+    const dataMessage =
+      typeof response.data === 'object' &&
+      response.data !== null &&
+      typeof response.data.message === 'string'
+        ? response.data.message
+        : undefined;
+
+    return {
+      message: dataMessage ?? response.message
+    };
+  }
+
+  async getTimeline(
+    ticketId: number,
+    query: SupportTicketTimelineQuery = {}
+  ): Promise<SupportTicketTimelineEvent[]> {
+    const response = await this.transport.get<
+      ApiEnvelope<SupportTicketTimelineEvent[]>
+    >(`${TICKET_TIMELINE_PATH}${ticketId}/`, {
+      query: buildTimelineQuery(query)
+    });
+
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
   async listTickets(
     query: SupportTicketListQuery = {}
   ): Promise<SupportTicketListPage> {
@@ -239,6 +287,15 @@ export class SupportTicketApiClient implements SupportTicketClient {
       message: dataMessage ?? response.message
     };
   }
+}
+
+function buildTimelineQuery(
+  query: SupportTicketTimelineQuery
+): Record<string, string | undefined> {
+  return {
+    month: query.month === undefined ? undefined : String(query.month),
+    year: query.year === undefined ? undefined : String(query.year)
+  };
 }
 
 function buildGetQuery(

@@ -419,6 +419,129 @@ describe('SupportTicketApiClient', () => {
     expect(result).toEqual({ message: 'Ticket closed.' });
   });
 
+  it('reopens a ticket through the ticket-comment-reopen path', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.postMock.mockResolvedValue({
+      code: 200,
+      data: { message: 'Ticket reopened.' },
+      errors: {},
+      message: 'OK'
+    });
+
+    const result = await client.reopenTicket(466, {
+      comment: 'Issue recurred',
+      contact_person_email: '',
+      contact_person_type: 'Admin'
+    });
+
+    expect(transport.postMock).toHaveBeenCalledWith(
+      '/ticket_management/ticket-comment-reopen/466/',
+      {
+        body: {
+          comment: 'Issue recurred',
+          contact_person_email: '',
+          contact_person_type: 'Admin'
+        }
+      }
+    );
+    expect(result).toEqual({ message: 'Ticket reopened.' });
+  });
+
+  it('falls back to the envelope message on reopen when data has none', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.postMock.mockResolvedValue({
+      code: 200,
+      data: null,
+      errors: {},
+      message: 'Reopened.'
+    });
+
+    const result = await client.reopenTicket(466, {
+      comment: 'Issue recurred'
+    });
+
+    expect(result).toEqual({ message: 'Reopened.' });
+  });
+
+  it('surfaces a transport error from reopenTicket to the caller', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.postMock.mockRejectedValue(new Error('boom'));
+
+    await expect(
+      client.reopenTicket(466, { comment: 'retry' })
+    ).rejects.toThrowError('boom');
+  });
+
+  it('fetches the timeline through the ticket-timeline path with month/year query params', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [{ event: 'created', time: '2026-05-18 14:32:15' }],
+      errors: {},
+      message: 'Success'
+    });
+
+    const result = await client.getTimeline(466, { month: 5, year: 2026 });
+
+    expect(transport.getMock).toHaveBeenCalledWith(
+      '/ticket_management/ticket-timeline/466/',
+      {
+        query: {
+          month: '5',
+          year: '2026'
+        }
+      }
+    );
+    expect(result).toEqual([{ event: 'created', time: '2026-05-18 14:32:15' }]);
+  });
+
+  it('omits timeline query params when no filters are provided', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: [],
+      errors: {},
+      message: 'Success'
+    });
+
+    await client.getTimeline(466);
+
+    expect(transport.getMock).toHaveBeenCalledWith(
+      '/ticket_management/ticket-timeline/466/',
+      {
+        query: {
+          month: undefined,
+          year: undefined
+        }
+      }
+    );
+  });
+
+  it('returns an empty array when the timeline data field is not an array', async () => {
+    const transport = new StubTransport();
+    const client = new SupportTicketApiClient(transport);
+
+    transport.getMock.mockResolvedValue({
+      code: 200,
+      data: null,
+      errors: {},
+      message: 'Success'
+    });
+
+    const result = await client.getTimeline(466);
+    expect(result).toEqual([]);
+  });
+
   it('lists replies through the ticket-conservation path and returns the data array', async () => {
     const transport = new StubTransport();
     const client = new SupportTicketApiClient(transport);

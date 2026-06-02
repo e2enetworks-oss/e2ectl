@@ -17,6 +17,7 @@ export type {
   SupportTicketFilterCategory,
   SupportTicketGetQuery,
   SupportTicketPriority,
+  SupportTicketReopenRequest,
   SupportTicketReplyRequest,
   SupportTicketReplyResult,
   SupportTicketResource,
@@ -24,5 +25,7 @@ export type {
   SupportTicketSummary,
   SupportTicketThread,
   SupportTicketThreadAttachment,
-  SupportTicketThreadAuthor
+  SupportTicketThreadAuthor,
+  SupportTicketTimelineEvent,
+  SupportTicketTimelineQuery
 } from './types/index.js';

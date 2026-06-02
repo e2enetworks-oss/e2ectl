@@ -53,3 +53,14 @@ export interface SupportTicketCloseOptions extends SupportTicketContextOptions {
   contactEmail?: string;
   contactType?: string;
 }
+
+export interface SupportTicketReopenOptions extends SupportTicketContextOptions {
+  comment: string;
+  contactEmail?: string;
+  contactType?: string;
+}
+
+export interface SupportTicketTimelineOptions extends SupportTicketContextOptions {
+  month?: string;
+  year?: string;
+}

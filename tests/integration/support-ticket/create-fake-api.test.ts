@@ -183,6 +183,60 @@ describe('support-ticket create against a fake MyAccount API', () => {
     }
   });
 
+  it('reads a .png --attachment from disk and maps it to image/png', async () => {
+    const server = await startTestHttpServer(CREATE_HANDLERS);
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+      const attachmentPath = await tempHome.writeImportFile(
+        'attachments/dashboard.png',
+        'pngbytes'
+      );
+
+      const result = await runBuiltCli(
+        [
+          '--json',
+          'support-ticket',
+          'create',
+          '--department',
+          '101',
+          '--subject',
+          'Dashboard screenshot',
+          '--description',
+          'See attached',
+          '--ticket-category',
+          'Cloud',
+          '--component',
+          'Auto Scaling',
+          '--priority',
+          'High',
+          '--attachment',
+          attachmentPath
+        ],
+        {
+          env: {
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe('');
+
+      const body = JSON.parse(server.requests[0]?.body ?? '{}') as {
+        file_name: string[];
+        imagedata: string[];
+      };
+      expect(body.file_name).toEqual(['dashboard.png']);
+      expect(body.imagedata[0]).toMatch(/^data:image\/png;base64,/);
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('renders a human-readable create result with a next-step hint', async () => {
     const server = await startTestHttpServer(CREATE_HANDLERS);
     const tempHome = await createTempHome();

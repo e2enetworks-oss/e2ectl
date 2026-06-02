@@ -7,7 +7,8 @@ import type {
   SupportTicketDepartmentItem,
   SupportTicketDetailItem,
   SupportTicketItem,
-  SupportTicketThreadItem
+  SupportTicketThreadItem,
+  SupportTicketTimelineEventItem
 } from './types/index.js';
 
 export function renderSupportTicketResult(
@@ -60,6 +61,15 @@ function renderSupportTicketHuman(result: SupportTicketCommandResult): string {
         `Closed support ticket ${result.ticket_id}.\n` +
         `Message: ${result.message || '--'}\n`
       );
+    case 'reopen':
+      return (
+        `Reopened support ticket ${result.ticket_id}.\n` +
+        `Message: ${result.message || '--'}\n`
+      );
+    case 'timeline':
+      return result.events.length === 0
+        ? `No timeline events on support ticket ${result.ticket_id}.\n`
+        : `Timeline for support ticket ${result.ticket_id}:\n${formatSupportTicketTimelineTable(result.events)}\n`;
     case 'get-replies':
       return result.threads.length === 0
         ? `No replies on support ticket ${result.ticket_id}.\n`
@@ -126,6 +136,28 @@ function normalizeSupportTicketJson(
       return {
         action: 'close',
         message: result.message,
+        ticket_id: result.ticket_id
+      };
+    case 'reopen':
+      return {
+        action: 'reopen',
+        message: result.message,
+        ticket_id: result.ticket_id
+      };
+    case 'timeline':
+      return {
+        action: 'timeline',
+        events: result.events.map((event) => ({
+          actor: event.actor,
+          description: event.description,
+          event_type: event.event_type,
+          status: event.status,
+          time: event.time
+        })),
+        filters: {
+          month: result.filters.month,
+          year: result.filters.year
+        },
         ticket_id: result.ticket_id
       };
     case 'get-replies':
@@ -203,6 +235,26 @@ function formatSupportTicketRepliesTable(
           : `${thread.summary} [truncated — full content unavailable]`;
 
     table.push([thread.created_time ?? '--', author, summary, attachments]);
+  });
+
+  return table.toString();
+}
+
+function formatSupportTicketTimelineTable(
+  events: SupportTicketTimelineEventItem[]
+): string {
+  const table = new Table({
+    head: ['Time', 'Event', 'Actor', 'Status', 'Description']
+  });
+
+  events.forEach((event) => {
+    table.push([
+      event.time ?? '--',
+      event.event_type ?? '--',
+      event.actor ?? '--',
+      event.status ?? '--',
+      event.description ?? '--'
+    ]);
   });
 
   return table.toString();

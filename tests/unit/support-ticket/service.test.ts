@@ -46,11 +46,13 @@ function createServiceFixture(): {
   createSupportTicketClient: ReturnType<typeof vi.fn>;
   getThread: ReturnType<typeof vi.fn>;
   getTicket: ReturnType<typeof vi.fn>;
+  getTimeline: ReturnType<typeof vi.fn>;
   listDepartments: ReturnType<typeof vi.fn>;
   listReplies: ReturnType<typeof vi.fn>;
   listTickets: ReturnType<typeof vi.fn>;
   readAttachmentFile: ReturnType<typeof vi.fn>;
   receivedCredentials: () => ResolvedCredentials | undefined;
+  reopenTicket: ReturnType<typeof vi.fn>;
   replyTicket: ReturnType<typeof vi.fn>;
   service: SupportTicketService;
 } {
@@ -67,9 +69,11 @@ function createServiceFixture(): {
       ticket: sampleTicketDetail()
     })
   );
+  const getTimeline = vi.fn(() => Promise.resolve([]));
   const listDepartments = vi.fn(() => Promise.resolve([]));
   const listReplies = vi.fn();
   const listTickets = vi.fn();
+  const reopenTicket = vi.fn();
   const replyTicket = vi.fn();
   const readAttachmentFile = vi.fn(() =>
     Promise.resolve(Buffer.from('stub', 'utf8'))
@@ -81,9 +85,11 @@ function createServiceFixture(): {
     createTicket,
     getThread,
     getTicket,
+    getTimeline,
     listDepartments,
     listReplies,
     listTickets,
+    reopenTicket,
     replyTicket
   };
   const createSupportTicketClient = vi.fn(
@@ -107,11 +113,13 @@ function createServiceFixture(): {
     createSupportTicketClient,
     getThread,
     getTicket,
+    getTimeline,
     listDepartments,
     listReplies,
     listTickets,
     readAttachmentFile,
     receivedCredentials: () => credentials,
+    reopenTicket,
     replyTicket,
     service
   };
@@ -960,6 +968,149 @@ describe('SupportTicketService', () => {
       message: 'Ticket closed.',
       ticket_id: 466
     });
+  });
+
+  it('reopens a ticket with a trimmed comment and optional contact filters', async () => {
+    const { reopenTicket, service } = createServiceFixture();
+
+    reopenTicket.mockResolvedValue({ message: 'Ticket reopened.' });
+
+    const result = await service.reopenTicket('466', {
+      alias: 'prod',
+      comment: '  issue recurred  ',
+      contactEmail: 'me@example.com',
+      contactType: 'Admin'
+    });
+
+    expect(reopenTicket).toHaveBeenCalledWith(466, {
+      comment: 'issue recurred',
+      contact_person_email: 'me@example.com',
+      contact_person_type: 'Admin'
+    });
+    expect(result).toEqual({
+      action: 'reopen',
+      message: 'Ticket reopened.',
+      ticket_id: 466
+    });
+  });
+
+  it('reopen omits contact fields when not provided', async () => {
+    const { reopenTicket, service } = createServiceFixture();
+
+    reopenTicket.mockResolvedValue({ message: 'Ticket reopened.' });
+
+    await service.reopenTicket('466', { alias: 'prod', comment: 'again' });
+
+    expect(reopenTicket).toHaveBeenCalledWith(466, { comment: 'again' });
+  });
+
+  it('rejects an empty reopen comment locally and never calls the client', async () => {
+    const { reopenTicket, service } = createServiceFixture();
+
+    await expect(
+      service.reopenTicket('466', { alias: 'prod', comment: '   ' })
+    ).rejects.toMatchObject({ code: 'EMPTY_STRING_INPUT' });
+
+    expect(reopenTicket).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-numeric ticket id on reopen', async () => {
+    const { reopenTicket, service } = createServiceFixture();
+
+    await expect(
+      service.reopenTicket('abc', { alias: 'prod', comment: 'again' })
+    ).rejects.toMatchObject({ code: 'INVALID_INTEGER_INPUT' });
+
+    expect(reopenTicket).not.toHaveBeenCalled();
+  });
+
+  it('fetches a ticket timeline and normalizes the events', async () => {
+    const { getTimeline, service } = createServiceFixture();
+
+    getTimeline.mockResolvedValue([
+      {
+        actor: 'Asha Iyer',
+        description: 'Ticket created',
+        status: 'Open',
+        time: '2026-05-18 14:32:15',
+        type: 'created'
+      }
+    ]);
+
+    const result = await service.getTimeline('466', { alias: 'prod' });
+
+    expect(getTimeline).toHaveBeenCalledWith(466, {});
+    expect(result).toMatchObject({
+      action: 'timeline',
+      filters: { month: null, year: null },
+      ticket_id: 466
+    });
+    expect(result.events).toEqual([
+      {
+        actor: 'Asha Iyer',
+        description: 'Ticket created',
+        event_type: 'created',
+        status: 'Open',
+        time: '2026-05-18 14:32:15'
+      }
+    ]);
+  });
+
+  it('forwards validated month/year filters to the timeline client', async () => {
+    const { getTimeline, service } = createServiceFixture();
+
+    getTimeline.mockResolvedValue([]);
+
+    const result = await service.getTimeline('466', {
+      alias: 'prod',
+      month: '05',
+      year: '2026'
+    });
+
+    expect(getTimeline).toHaveBeenCalledWith(466, { month: 5, year: 2026 });
+    expect(result.filters).toEqual({ month: 5, year: 2026 });
+  });
+
+  it('rejects an out-of-range timeline month before calling the client', async () => {
+    const { getTimeline, service } = createServiceFixture();
+
+    await expect(
+      service.getTimeline('466', { alias: 'prod', month: '13' })
+    ).rejects.toMatchObject({ code: 'INVALID_INTEGER_INPUT' });
+
+    expect(getTimeline).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-positive timeline year and a non-numeric ticket id locally', async () => {
+    const { getTimeline, service } = createServiceFixture();
+
+    await expect(
+      service.getTimeline('466', { alias: 'prod', year: '0' })
+    ).rejects.toMatchObject({ code: 'INVALID_INTEGER_INPUT' });
+
+    await expect(
+      service.getTimeline('abc', { alias: 'prod' })
+    ).rejects.toMatchObject({ code: 'INVALID_INTEGER_INPUT' });
+
+    expect(getTimeline).not.toHaveBeenCalled();
+  });
+
+  it('rejects a subject containing non-ASCII characters on create', async () => {
+    const { createTicket, service } = createServiceFixture();
+
+    await expect(
+      service.createTicket({
+        alias: 'prod',
+        component: 'Auto Scaling',
+        department: '101',
+        description: 'desc',
+        priority: 'High',
+        subject: 'Café outage 🚨',
+        ticketCategory: 'Cloud'
+      })
+    ).rejects.toMatchObject({ code: 'NON_ASCII_INPUT' });
+
+    expect(createTicket).not.toHaveBeenCalled();
   });
 
   it('lists replies and normalizes the Zoho-style thread envelope', async () => {

@@ -1,10 +1,13 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import {
   ALLOWED_ATTACHMENT_EXTENSIONS,
+  ASCII_PRINTABLE_PATTERN,
   EMAIL_PATTERN,
   MAX_ATTACHMENT_COUNT,
   MAX_ATTACHMENT_SIZE_BYTES,
+  MAX_MONTH,
   MIME_TYPES,
+  MIN_MONTH,
   PRIORITY_PRESETS,
   STATUS_PRESETS,
   VALID_CONTACT_PERSON_TYPES,
@@ -91,10 +94,18 @@ export function assertPositiveInteger(value: string, flagName: string): number {
   return Number(trimmed);
 }
 
+export interface AssertNonEmptyTrimmedOptions {
+  // When true, the trimmed value must contain only printable ASCII characters
+  // (`^[\x20-\x7E]+$`). Used for the subject, which the frontend/API reject when
+  // they contain Unicode-only or non-printable characters.
+  asciiPrintableOnly?: boolean;
+}
+
 export function assertNonEmptyTrimmed(
   value: string,
   flagName: string,
-  maxLength: number
+  maxLength: number,
+  options: AssertNonEmptyTrimmedOptions = {}
 ): string {
   const trimmed = value.trim();
 
@@ -118,7 +129,39 @@ export function assertNonEmptyTrimmed(
     );
   }
 
+  if (
+    options.asciiPrintableOnly === true &&
+    !ASCII_PRINTABLE_PATTERN.test(trimmed)
+  ) {
+    throw new CliError(
+      `${flagName} must contain only printable ASCII characters.`,
+      {
+        code: 'NON_ASCII_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Remove emoji, accented, or other non-ASCII characters from ${flagName}.`
+      }
+    );
+  }
+
   return trimmed;
+}
+
+export function assertMonth(value: string, flagName: string): number {
+  const month = assertPositiveInteger(value, flagName);
+
+  if (month < MIN_MONTH || month > MAX_MONTH) {
+    throw new CliError(
+      `${flagName} must be a month between ${MIN_MONTH} and ${MAX_MONTH}.`,
+      {
+        code: 'INVALID_INTEGER_INPUT',
+        details: [`Received: ${month}`],
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass a month from ${MIN_MONTH} to ${MAX_MONTH} with ${flagName}.`
+      }
+    );
+  }
+
+  return month;
 }
 
 export function assertEnum<TValue extends string>(
@@ -428,7 +471,7 @@ export async function readAndEncodeAttachments(
     const extension = baseName.split('.').pop()?.toLowerCase() ?? '';
     if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
       throw new CliError(
-        `--attachment "${trimmed}" must be a .jpg, .jpeg, or .pdf file.`,
+        `--attachment "${trimmed}" must be a .jpg, .jpeg, .png, or .pdf file.`,
         {
           code: 'UNSUPPORTED_ATTACHMENT_TYPE',
           exitCode: EXIT_CODES.usage,

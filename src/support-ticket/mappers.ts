@@ -16,7 +16,9 @@ import type {
   SupportTicketSummary,
   SupportTicketThread,
   SupportTicketThreadDetail,
-  SupportTicketThreadItem
+  SupportTicketThreadItem,
+  SupportTicketTimelineEvent,
+  SupportTicketTimelineEventItem
 } from './types/index.js';
 
 export function buildListResult(
@@ -145,6 +147,31 @@ export function normalizeSupportTicketThread(
     summary: normalizeOptionalString(thread.summary) ?? null,
     to: normalizeOptionalString(thread.to) ?? null,
     visibility: normalizeOptionalString(thread.visibility) ?? null
+  };
+}
+
+export function normalizeSupportTicketTimelineEvent(
+  event: SupportTicketTimelineEvent
+): SupportTicketTimelineEventItem {
+  return {
+    actor:
+      normalizeOptionalString(event.actor) ??
+      normalizeOptionalString(event.performed_by) ??
+      null,
+    description:
+      normalizeOptionalString(event.description) ??
+      normalizeOptionalString(event.summary) ??
+      null,
+    event_type:
+      normalizeOptionalString(event.type) ??
+      normalizeOptionalString(event.event) ??
+      null,
+    status: normalizeOptionalString(event.status) ?? null,
+    time:
+      normalizeOptionalString(event.time) ??
+      normalizeOptionalString(event.event_time) ??
+      normalizeOptionalString(event.created_at) ??
+      null
   };
 }
 

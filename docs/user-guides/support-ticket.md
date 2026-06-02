@@ -2,14 +2,14 @@
 
 ## What This Command Group Does
 
-`e2ectl support-ticket` opens, lists, inspects, replies to, and closes MyAccount support tickets without leaving the terminal. Use it to drive the same ticketing flows you would otherwise run from the MyAccount portal — including attaching files, scoping requests to a specific contact person, and pulling the full reply thread.
+`e2ectl support-ticket` opens, lists, inspects, replies to, closes, and reopens MyAccount support tickets without leaving the terminal. Use it to drive the same ticketing flows you would otherwise run from the MyAccount portal — including attaching files, scoping requests to a specific contact person, pulling the full reply thread, and reviewing a ticket's activity timeline.
 
 ## Before You Start
 
 - Save a default alias (and default project / location context), or pass `--alias`, `--project-id`, and `--location` explicitly.
 - Know the numeric department id you want to file against. Run `e2ectl support-ticket departments` to list the valid ids — departments are configured per-account in MyAccount.
-- Attachments must be `.jpg`, `.jpeg`, or `.pdf`, no larger than 5 MB each, with at most 5 files per request.
-- Subjects accept up to 256 characters; descriptions and reply comments accept up to 6000 characters.
+- Attachments must be `.jpg`, `.jpeg`, `.png`, or `.pdf`, no larger than 5 MB each, with at most 5 files per request.
+- Subject can be up to 60 printable ASCII characters; descriptions and reply comments accept up to 6000 characters.
 
 ## Common Tasks
 
@@ -19,7 +19,21 @@
 e2ectl support-ticket departments
 ```
 
-Lists every active ticket department with its numeric id, so you can pick the right value for `create --department` without leaving the terminal.
+Lists every active ticket department with its numeric id, so you can pick the right value for `create --department` without leaving the terminal. Run it once when you first script against an account (the ids are account-specific) and whenever a ticket fails because the department id is wrong.
+
+Sample output:
+
+```text
+┌─────┬───────────────┬────────────────────────────┬─────────┐
+│ ID  │ Name          │ Description                │ Default │
+├─────┼───────────────┼────────────────────────────┼─────────┤
+│ 101 │ Cloud Support │ Infra and platform issues  │ yes     │
+├─────┼───────────────┼────────────────────────────┼─────────┤
+│ 102 │ Billing       │ Invoices and payments      │ no      │
+└─────┴───────────────┴────────────────────────────┴─────────┘
+```
+
+Pass `--json` to capture the same data (`id`, `name`, `description`, `is_default`, `is_enabled`) for downstream automation.
 
 ### List And Inspect Tickets
 
@@ -48,7 +62,7 @@ e2ectl support-ticket list --category Cloud --category Billing --year 2026
 e2ectl support-ticket list --page-no 2 --per-page 25
 ```
 
-`--category`, `--status`, and `--priority` are repeatable: pass the flag once per value (the standard convention used by docker, kubectl, and aws). The legacy comma-separated form (`--status Open,Closed`) is still accepted for backward compatibility, and the two forms can be mixed.
+`--category`, `--status`, and `--priority` are repeatable: pass the flag once per value (e.g. `--status Open --status Escalated`).
 
 `--status open` expands to `Open, On Hold, Waiting on Customer, Escalated`. `--status resolved` expands to `Resolved, Closed`. You can also pass any combination of: `New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed`.
 
@@ -102,6 +116,52 @@ e2ectl support-ticket close <ticket-id> \
 ```
 
 Closing posts the comment and resolves the ticket in a single call.
+
+### Reopen A Ticket
+
+```bash
+e2ectl support-ticket reopen <ticket-id> \
+  --comment "<reason-for-reopening>"
+```
+
+Reopening posts a comment explaining why and moves a closed ticket back into an
+active state — the inverse of `close`, so a ticket's full lifecycle stays in the
+terminal without needing the web UI. Scope it to a contact person with the
+optional `--contact-email` / `--contact-type` flags.
+
+Sample output:
+
+```text
+Reopened support ticket 466.
+Message: Ticket reopened.
+```
+
+### Review A Ticket's Timeline
+
+```bash
+e2ectl support-ticket timeline <ticket-id>
+e2ectl support-ticket timeline <ticket-id> --month 05 --year 2026
+```
+
+`timeline` lists the ticket's activity events (creation, status changes,
+comments, and so on) in chronological order. Narrow the view with the optional
+`--month` (1-12) and `--year` filters.
+
+Sample output:
+
+```text
+Timeline for support ticket 466:
+┌─────────────────────┬────────────────┬───────────┬────────┬────────────────────────┐
+│ Time                │ Event          │ Actor     │ Status │ Description            │
+├─────────────────────┼────────────────┼───────────┼────────┼────────────────────────┤
+│ 2026-05-18 14:32:15 │ created        │ Asha Iyer │ Open   │ Ticket created         │
+├─────────────────────┼────────────────┼───────────┼────────┼────────────────────────┤
+│ 2026-05-19 10:00:00 │ comment_added  │ Customer  │ --     │ Added a comment        │
+└─────────────────────┴────────────────┴───────────┴────────┴────────────────────────┘
+```
+
+Pass `--json` to get the normalized events plus the applied `filters`
+(`month`, `year`) for downstream automation.
 
 ## Examples
 

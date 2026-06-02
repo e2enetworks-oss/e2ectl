@@ -116,6 +116,35 @@ export interface SupportTicketCloseRequest {
   contact_person_type?: SupportTicketContactPersonType;
 }
 
+export interface SupportTicketReopenRequest {
+  comment: string;
+  contact_person_email?: string;
+  contact_person_type?: SupportTicketContactPersonType;
+}
+
+export interface SupportTicketTimelineQuery {
+  month?: number;
+  year?: number;
+}
+
+/**
+ * One entry returned by the ticket-timeline endpoint. The backend mixes a few
+ * field names across event types, so the optional aliases below are normalized
+ * down to a single shape by `normalizeSupportTicketTimelineEvent`.
+ */
+export interface SupportTicketTimelineEvent {
+  actor?: string | null;
+  created_at?: string | null;
+  description?: string | null;
+  event?: string | null;
+  event_time?: string | null;
+  performed_by?: string | null;
+  status?: string | null;
+  summary?: string | null;
+  time?: string | null;
+  type?: string | null;
+}
+
 export interface SupportTicketGetQuery {
   abuse_ticket?: boolean;
   contact_person_email?: string;

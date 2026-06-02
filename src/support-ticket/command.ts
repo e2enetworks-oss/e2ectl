@@ -12,7 +12,9 @@ import type {
   SupportTicketCreateOptions,
   SupportTicketGetOptions,
   SupportTicketListOptions,
-  SupportTicketReplyOptions
+  SupportTicketReopenOptions,
+  SupportTicketReplyOptions,
+  SupportTicketTimelineOptions
 } from './types/index.js';
 
 interface GlobalOptions {
@@ -190,9 +192,34 @@ export function buildSupportTicketCommand(runtime: CliRuntime): Command {
     }
   );
 
+  addContextOptions(
+    command
+      .command('timeline <ticketId>')
+      .description('Show the activity timeline for a support ticket.')
+      .option(
+        '--month <month>',
+        'Restrict the timeline to a calendar month (1-12).'
+      )
+      .option('--year <year>', 'Restrict the timeline to a calendar year.')
+  ).action(
+    async (
+      ticketId: string,
+      options: SupportTicketTimelineOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getTimeline(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
   command.addCommand(buildSupportTicketCreateCommand(service, runtime));
   command.addCommand(buildSupportTicketReplyCommand(service, runtime));
   command.addCommand(buildSupportTicketCloseCommand(service, runtime));
+  command.addCommand(buildSupportTicketReopenCommand(service, runtime));
 
   command.action(() => {
     command.outputHelp();
@@ -212,7 +239,10 @@ function buildSupportTicketCreateCommand(
       '--department <departmentId>',
       'Numeric department id. Run `support-ticket departments` to discover valid ids.'
     )
-    .requiredOption('--subject <subject>', 'Ticket subject (<= 256 chars).')
+    .requiredOption(
+      '--subject <subject>',
+      'Ticket subject (<= 60 printable ASCII chars).'
+    )
     .requiredOption(
       '--description <description>',
       'Ticket description (<= 6000 chars).'
@@ -347,6 +377,46 @@ function buildSupportTicketCloseCommand(
       commandInstance: Command
     ) => {
       const result = await service.closeTicket(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  return command;
+}
+
+function buildSupportTicketReopenCommand(
+  service: SupportTicketService,
+  runtime: CliRuntime
+): Command {
+  const command = addContextOptions(
+    new Command('reopen')
+      .description('Reopen a closed ticket with a comment explaining why.')
+      .argument('<ticketId>', 'Support ticket id.')
+  )
+    .requiredOption(
+      '--comment <comment>',
+      'Reason for reopening (<= 6000 chars).'
+    )
+    .option(
+      '--contact-email <email>',
+      'Contact person email scope for the reopen comment.'
+    )
+    .option(
+      '--contact-type <type>',
+      'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+    );
+
+  command.action(
+    async (
+      ticketId: string,
+      options: SupportTicketReopenOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.reopenTicket(ticketId, options);
       writeSupportTicketResult(
         runtime,
         result,

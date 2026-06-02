@@ -61,15 +61,21 @@ export const CATEGORIES_REQUIRING_COMPONENT: ReadonlySet<SupportTicketCategory> 
 export const CATEGORIES_REQUIRING_PRIORITY: ReadonlySet<SupportTicketCategory> =
   new Set(['Billing', 'Cloud']);
 
-export const SUBJECT_MAX_LENGTH = 256;
+export const SUBJECT_MAX_LENGTH = 60;
 export const DESCRIPTION_MAX_LENGTH = 6000;
 export const COMMENT_MAX_LENGTH = 6000;
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Subjects must be printable ASCII only (matches the frontend's
+// `^[\x20-\x7E]+$` rule). Unicode-only or non-printable characters that the
+// CLI would otherwise accept are rejected server-side, so we reject them here.
+export const ASCII_PRINTABLE_PATTERN = /^[\x20-\x7E]+$/;
+
 export const ALLOWED_ATTACHMENT_EXTENSIONS: ReadonlySet<string> = new Set([
   'jpeg',
   'jpg',
+  'png',
   'pdf'
 ]);
 
@@ -81,5 +87,10 @@ export const THREAD_EXPANSION_CONCURRENCY = 5;
 export const MIME_TYPES: Record<string, string> = {
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
-  pdf: 'application/pdf'
+  pdf: 'application/pdf',
+  png: 'image/png'
 };
+
+// Calendar month bounds for the timeline `--month` filter.
+export const MIN_MONTH = 1;
+export const MAX_MONTH = 12;

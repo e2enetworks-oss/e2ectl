@@ -319,6 +319,107 @@ describe('support-ticket formatter', () => {
     });
   });
 
+  it('renders human-readable reopen confirmation (and -- for empty messages)', () => {
+    expect(
+      renderSupportTicketResult(
+        { action: 'reopen', message: 'Ticket reopened.', ticket_id: 99 },
+        false
+      )
+    ).toBe('Reopened support ticket 99.\nMessage: Ticket reopened.\n');
+
+    expect(
+      renderSupportTicketResult(
+        { action: 'reopen', message: '', ticket_id: 99 },
+        false
+      )
+    ).toBe('Reopened support ticket 99.\nMessage: --\n');
+  });
+
+  it('emits deterministic JSON for reopen output', () => {
+    const json = renderSupportTicketResult(
+      { action: 'reopen', message: 'Ticket reopened.', ticket_id: 99 },
+      true
+    );
+
+    expect(JSON.parse(json)).toEqual({
+      action: 'reopen',
+      message: 'Ticket reopened.',
+      ticket_id: 99
+    });
+  });
+
+  it('renders a human-readable timeline table and an empty-state message', () => {
+    const output = renderSupportTicketResult(
+      {
+        action: 'timeline',
+        events: [
+          {
+            actor: 'Asha Iyer',
+            description: 'Ticket created',
+            event_type: 'created',
+            status: 'Open',
+            time: '2026-05-18 14:32:15'
+          }
+        ],
+        filters: { month: null, year: null },
+        ticket_id: 466
+      },
+      false
+    );
+
+    expect(output).toContain('Timeline for support ticket 466');
+    expect(output).toContain('created');
+    expect(output).toContain('Asha Iyer');
+    expect(output).toContain('Ticket created');
+
+    expect(
+      renderSupportTicketResult(
+        {
+          action: 'timeline',
+          events: [],
+          filters: { month: 5, year: 2026 },
+          ticket_id: 466
+        },
+        false
+      )
+    ).toBe('No timeline events on support ticket 466.\n');
+  });
+
+  it('emits deterministic JSON for timeline output including the applied filters', () => {
+    const json = renderSupportTicketResult(
+      {
+        action: 'timeline',
+        events: [
+          {
+            actor: null,
+            description: 'Added a comment',
+            event_type: 'comment_added',
+            status: null,
+            time: '2026-05-19 10:00:00'
+          }
+        ],
+        filters: { month: 5, year: 2026 },
+        ticket_id: 466
+      },
+      true
+    );
+
+    expect(JSON.parse(json)).toEqual({
+      action: 'timeline',
+      events: [
+        {
+          actor: null,
+          description: 'Added a comment',
+          event_type: 'comment_added',
+          status: null,
+          time: '2026-05-19 10:00:00'
+        }
+      ],
+      filters: { month: 5, year: 2026 },
+      ticket_id: 466
+    });
+  });
+
   it('renders a human-readable replies table with attachment names', () => {
     const output = renderSupportTicketResult(
       sampleReplies({

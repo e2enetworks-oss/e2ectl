@@ -119,6 +119,30 @@ export interface SupportTicketCloseCommandResult {
   ticket_id: number;
 }
 
+export interface SupportTicketReopenCommandResult {
+  action: 'reopen';
+  message: string;
+  ticket_id: number;
+}
+
+export interface SupportTicketTimelineEventItem {
+  actor: string | null;
+  description: string | null;
+  event_type: string | null;
+  status: string | null;
+  time: string | null;
+}
+
+export interface SupportTicketTimelineCommandResult {
+  action: 'timeline';
+  events: SupportTicketTimelineEventItem[];
+  filters: {
+    month: number | null;
+    year: number | null;
+  };
+  ticket_id: number;
+}
+
 export interface SupportTicketRepliesCommandResult {
   action: 'get-replies';
   threads: SupportTicketThreadItem[];
@@ -133,4 +157,6 @@ export type SupportTicketCommandResult =
   | SupportTicketGetCommandResult
   | SupportTicketListCommandResult
   | SupportTicketRepliesCommandResult
-  | SupportTicketReplyCommandResult;
+  | SupportTicketReopenCommandResult
+  | SupportTicketReplyCommandResult
+  | SupportTicketTimelineCommandResult;

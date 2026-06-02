@@ -1,6 +1,7 @@
 import {
   assertEmail,
   assertEnum,
+  assertMonth,
   assertNonEmptyTrimmed,
   assertPositiveInteger,
   detectMimeType,
@@ -58,6 +59,51 @@ describe('assertNonEmptyTrimmed', () => {
   it('rejects strings longer than the configured maxLength', () => {
     expect(() => assertNonEmptyTrimmed('abcdef', '--subject', 3)).toThrowError(
       /3 characters or fewer/
+    );
+  });
+
+  it('accepts printable ASCII when asciiPrintableOnly is set', () => {
+    expect(
+      assertNonEmptyTrimmed('Cannot reach my VM (node #42)!', '--subject', 60, {
+        asciiPrintableOnly: true
+      })
+    ).toBe('Cannot reach my VM (node #42)!');
+  });
+
+  it('rejects non-printable / Unicode-only input when asciiPrintableOnly is set', () => {
+    for (const value of ['Café outage', 'alert 🚨', 'line\tbreak']) {
+      expect(() =>
+        assertNonEmptyTrimmed(value, '--subject', 60, {
+          asciiPrintableOnly: true
+        })
+      ).toThrowError(/printable ASCII/);
+    }
+  });
+
+  it('does not enforce ASCII when the option is omitted', () => {
+    expect(assertNonEmptyTrimmed('Café ☕', '--description', 60)).toBe(
+      'Café ☕'
+    );
+  });
+});
+
+describe('assertMonth', () => {
+  it('accepts months 1-12, including zero-padded input', () => {
+    expect(assertMonth('1', '--month')).toBe(1);
+    expect(assertMonth('05', '--month')).toBe(5);
+    expect(assertMonth('12', '--month')).toBe(12);
+  });
+
+  it('rejects months outside the 1-12 range', () => {
+    expect(() => assertMonth('0', '--month')).toThrowError(
+      /positive integer|month between/
+    );
+    expect(() => assertMonth('13', '--month')).toThrowError(/month between/);
+  });
+
+  it('rejects non-numeric month input', () => {
+    expect(() => assertMonth('May', '--month')).toThrowError(
+      /positive integer/
     );
   });
 });
@@ -365,7 +411,9 @@ describe('detectMimeType', () => {
     expect(detectMimeType('foo.PDF')).toBe('application/pdf');
     expect(detectMimeType('bar.jpg')).toBe('image/jpeg');
     expect(detectMimeType('baz.JPEG')).toBe('image/jpeg');
-    expect(detectMimeType('quux.png')).toBe('application/octet-stream');
+    expect(detectMimeType('quux.png')).toBe('image/png');
+    expect(detectMimeType('shot.PNG')).toBe('image/png');
+    expect(detectMimeType('weird.gif')).toBe('application/octet-stream');
     expect(detectMimeType('noext')).toBe('application/octet-stream');
   });
 });
@@ -443,5 +491,16 @@ describe('readAndEncodeAttachments', () => {
 
     expect(result?.fileNames).toEqual(['photo.jpg']);
     expect(result?.imagedata[0]).toBe('data:image/jpeg;base64,/9j/');
+  });
+
+  it('accepts PNG attachments and maps them to the image/png MIME type', async () => {
+    // PNG magic number bytes.
+    const result = await readAndEncodeAttachments(
+      ['/screenshots/dashboard.png'],
+      () => Promise.resolve(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    );
+
+    expect(result?.fileNames).toEqual(['dashboard.png']);
+    expect(result?.imagedata[0]).toBe('data:image/png;base64,iVBORw==');
   });
 });

@@ -19,10 +19,12 @@ import {
   isSummaryTruncated,
   normalizeSupportTicketDepartment,
   normalizeSupportTicketDetail,
-  normalizeSupportTicketThread
+  normalizeSupportTicketThread,
+  normalizeSupportTicketTimelineEvent
 } from './mappers.js';
 import {
   assertEnum,
+  assertMonth,
   assertNonEmptyTrimmed,
   assertPositiveInteger,
   normalizeCcEmails,
@@ -49,11 +51,15 @@ import type {
   SupportTicketListOptions,
   SupportTicketPriority,
   SupportTicketRepliesCommandResult,
+  SupportTicketReopenCommandResult,
+  SupportTicketReopenOptions,
   SupportTicketReplyCommandResult,
   SupportTicketReplyOptions,
   SupportTicketResource,
   SupportTicketServiceDependencies,
-  SupportTicketThreadItem
+  SupportTicketThreadItem,
+  SupportTicketTimelineCommandResult,
+  SupportTicketTimelineOptions
 } from './types/index.js';
 
 export class SupportTicketService {
@@ -67,7 +73,8 @@ export class SupportTicketService {
     const subject = assertNonEmptyTrimmed(
       options.subject,
       '--subject',
-      SUBJECT_MAX_LENGTH
+      SUBJECT_MAX_LENGTH,
+      { asciiPrintableOnly: true }
     );
     const description = assertNonEmptyTrimmed(
       options.description,
@@ -334,6 +341,64 @@ export class SupportTicketService {
     return {
       action: 'close',
       message: result.message,
+      ticket_id: normalizedTicketId
+    };
+  }
+
+  async reopenTicket(
+    ticketId: string,
+    options: SupportTicketReopenOptions
+  ): Promise<SupportTicketReopenCommandResult> {
+    const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
+    const comment = assertNonEmptyTrimmed(
+      options.comment,
+      '--comment',
+      COMMENT_MAX_LENGTH
+    );
+    const { contactEmail, contactType } = parseContactContext(options);
+    const client = await this.createClient(options);
+    const result = await client.reopenTicket(normalizedTicketId, {
+      comment,
+      ...(contactEmail === undefined
+        ? {}
+        : { contact_person_email: contactEmail }),
+      ...(contactType === undefined ? {} : { contact_person_type: contactType })
+    });
+
+    return {
+      action: 'reopen',
+      message: result.message,
+      ticket_id: normalizedTicketId
+    };
+  }
+
+  async getTimeline(
+    ticketId: string,
+    options: SupportTicketTimelineOptions
+  ): Promise<SupportTicketTimelineCommandResult> {
+    const normalizedTicketId = assertPositiveInteger(ticketId, '<ticketId>');
+    const month =
+      options.month === undefined
+        ? undefined
+        : assertMonth(options.month, '--month');
+    const year =
+      options.year === undefined
+        ? undefined
+        : assertPositiveInteger(options.year, '--year');
+
+    const client = await this.createClient(options);
+    const events = await client.getTimeline(normalizedTicketId, {
+      ...(month === undefined ? {} : { month }),
+      ...(year === undefined ? {} : { year })
+    });
+
+    return {
+      action: 'timeline',
+      events: events.map((event) => normalizeSupportTicketTimelineEvent(event)),
+      filters: {
+        month: month ?? null,
+        year: year ?? null
+      },
       ticket_id: normalizedTicketId
     };
   }

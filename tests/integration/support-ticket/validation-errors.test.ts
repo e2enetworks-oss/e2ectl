@@ -234,13 +234,13 @@ describe('support-ticket input validation errors', () => {
     }
   });
 
-  it('rejects a --subject longer than 256 characters', async () => {
+  it('rejects a --subject longer than 60 characters', async () => {
     const tempHome = await createTempHome();
 
     try {
       await seedDefaultProfile(tempHome);
 
-      const longSubject = 'a'.repeat(300);
+      const longSubject = 'a'.repeat(61);
       const result = await runBuiltCli(
         [
           'support-ticket',
@@ -263,7 +263,41 @@ describe('support-ticket input validation errors', () => {
 
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('--subject');
-      expect(result.stderr).toContain('256');
+      expect(result.stderr).toContain('60');
+    } finally {
+      await tempHome.cleanup();
+    }
+  });
+
+  it('rejects a --subject containing non-ASCII characters', async () => {
+    const tempHome = await createTempHome();
+
+    try {
+      await seedDefaultProfile(tempHome);
+
+      const result = await runBuiltCli(
+        [
+          'support-ticket',
+          'create',
+          '--department',
+          '101',
+          '--subject',
+          'Café outage 🚨',
+          '--description',
+          'desc',
+          '--ticket-category',
+          'Cloud',
+          '--component',
+          'Auto Scaling',
+          '--priority',
+          'High'
+        ],
+        { env: { HOME: tempHome.path } }
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('--subject');
+      expect(result.stderr).toContain('ASCII');
     } finally {
       await tempHome.cleanup();
     }

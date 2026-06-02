@@ -34,9 +34,11 @@ function createSupportTicketStub(): {
   createTicket: ReturnType<typeof vi.fn>;
   getThread: ReturnType<typeof vi.fn>;
   getTicket: ReturnType<typeof vi.fn>;
+  getTimeline: ReturnType<typeof vi.fn>;
   listDepartments: ReturnType<typeof vi.fn>;
   listReplies: ReturnType<typeof vi.fn>;
   listTickets: ReturnType<typeof vi.fn>;
+  reopenTicket: ReturnType<typeof vi.fn>;
   replyTicket: ReturnType<typeof vi.fn>;
   stub: SupportTicketClient;
 } {
@@ -79,6 +81,10 @@ function createSupportTicketStub(): {
   const closeTicket = vi.fn(() =>
     Promise.resolve({ message: 'Ticket closed.' })
   );
+  const reopenTicket = vi.fn(() =>
+    Promise.resolve({ message: 'Ticket reopened.' })
+  );
+  const getTimeline = vi.fn(() => Promise.resolve([]));
   const listReplies = vi.fn(() => Promise.resolve([]));
   const getThread = vi.fn();
 
@@ -87,18 +93,22 @@ function createSupportTicketStub(): {
     createTicket,
     getThread,
     getTicket,
+    getTimeline,
     listDepartments,
     listReplies,
     listTickets,
+    reopenTicket,
     replyTicket,
     stub: {
       closeTicket,
       createTicket,
       getThread,
       getTicket,
+      getTimeline,
       listDepartments,
       listReplies,
       listTickets,
+      reopenTicket,
       replyTicket
     }
   };
@@ -568,6 +578,76 @@ describe('support-ticket commands', () => {
       action: 'close',
       ticket_id: 466
     });
+  });
+
+  it('reopens a ticket via the reopen subcommand', async () => {
+    const { runtime, stdout, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'support-ticket',
+      'reopen',
+      '466',
+      '--alias',
+      'prod',
+      '--comment',
+      'issue recurred'
+    ]);
+
+    expect(supportTicketStub.reopenTicket).toHaveBeenCalledWith(466, {
+      comment: 'issue recurred'
+    });
+    expect(JSON.parse(stdout.buffer)).toMatchObject({
+      action: 'reopen',
+      ticket_id: 466
+    });
+  });
+
+  it('fetches a ticket timeline via the timeline subcommand with filters', async () => {
+    const { runtime, stdout, supportTicketStub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    supportTicketStub.getTimeline.mockResolvedValueOnce([
+      {
+        actor: 'Asha Iyer',
+        description: 'Ticket created',
+        status: 'Open',
+        time: '2026-05-18 14:32:15',
+        type: 'created'
+      }
+    ]);
+    const program = createProgram(runtime);
+
+    await program.parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      '--json',
+      'support-ticket',
+      'timeline',
+      '466',
+      '--alias',
+      'prod',
+      '--month',
+      '05',
+      '--year',
+      '2026'
+    ]);
+
+    expect(supportTicketStub.getTimeline).toHaveBeenCalledWith(466, {
+      month: 5,
+      year: 2026
+    });
+    const parsed = JSON.parse(stdout.buffer) as {
+      action: string;
+      events: Array<{ event_type: string }>;
+      filters: { month: number; year: number };
+    };
+    expect(parsed.action).toBe('timeline');
+    expect(parsed.filters).toEqual({ month: 5, year: 2026 });
+    expect(parsed.events.map((event) => event.event_type)).toEqual(['created']);
   });
 
   it('lists replies via the get-replies subcommand', async () => {

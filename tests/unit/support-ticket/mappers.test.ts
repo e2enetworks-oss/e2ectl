@@ -6,7 +6,8 @@ import {
   normalizeSupportTicketDepartment,
   normalizeSupportTicketDetail,
   normalizeSupportTicketItem,
-  normalizeSupportTicketThread
+  normalizeSupportTicketThread,
+  normalizeSupportTicketTimelineEvent
 } from '../../../src/support-ticket/mappers.js';
 
 describe('normalizeSupportTicketItem', () => {
@@ -285,6 +286,62 @@ describe('normalizeSupportTicketThread', () => {
       normalizeSupportTicketThread({ attachment_list: { data: [] }, id: 't1' })
         .attachments
     ).toEqual([]);
+  });
+});
+
+describe('normalizeSupportTicketTimelineEvent', () => {
+  it('maps the primary field names to the normalized shape', () => {
+    expect(
+      normalizeSupportTicketTimelineEvent({
+        actor: 'Asha Iyer',
+        description: 'Status changed to Open',
+        status: 'Open',
+        time: '2026-05-18 14:32:15',
+        type: 'status_change'
+      })
+    ).toEqual({
+      actor: 'Asha Iyer',
+      description: 'Status changed to Open',
+      event_type: 'status_change',
+      status: 'Open',
+      time: '2026-05-18 14:32:15'
+    });
+  });
+
+  it('falls back across alias field names (performed_by/summary/event/event_time)', () => {
+    expect(
+      normalizeSupportTicketTimelineEvent({
+        event: 'comment_added',
+        event_time: '2026-05-19 10:00:00',
+        performed_by: 'Customer',
+        summary: 'Added a comment'
+      })
+    ).toEqual({
+      actor: 'Customer',
+      description: 'Added a comment',
+      event_type: 'comment_added',
+      status: null,
+      time: '2026-05-19 10:00:00'
+    });
+  });
+
+  it('falls back to created_at for time and nulls every missing field', () => {
+    expect(
+      normalizeSupportTicketTimelineEvent({ created_at: '2026-05-20 09:00:00' })
+    ).toEqual({
+      actor: null,
+      description: null,
+      event_type: null,
+      status: null,
+      time: '2026-05-20 09:00:00'
+    });
+    expect(normalizeSupportTicketTimelineEvent({})).toEqual({
+      actor: null,
+      description: null,
+      event_type: null,
+      status: null,
+      time: null
+    });
   });
 });
 
