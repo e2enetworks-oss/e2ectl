@@ -8,7 +8,7 @@
 
 - Save a default alias and default project/location context, or pass `--alias`, `--project-id`, and `--location` explicitly.
 - Run `support-ticket departments` once to find your department ids — they are account-specific and required by `create`.
-- Subject: up to 60 characters. Description and reply comments: up to 250 characters.
+- Subject: up to 60 characters, description 6000 and reply comments: up to 250 characters.
 - Attachments: `.jpg`, `.jpeg`, `.png`, or `.pdf`, up to 5 MB each, max 5 files per request.
 
 ## Common Tasks
