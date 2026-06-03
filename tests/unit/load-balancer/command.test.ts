@@ -13,6 +13,7 @@ import type { ReservedIpClient } from '../../../src/reserved-ip/index.js';
 import type { SecurityGroupClient } from '../../../src/security-group/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { SslClient } from '../../../src/ssl/index.js';
+import type { SupportTicketClient } from '../../../src/support-ticket/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
@@ -229,6 +230,9 @@ describe('lb commands', () => {
       createSslClient: vi.fn() as unknown as (
         c: ResolvedCredentials
       ) => SslClient,
+      createSupportTicketClient: vi.fn() as unknown as (
+        c: ResolvedCredentials
+      ) => SupportTicketClient,
       createVolumeClient: vi.fn() as unknown as (
         c: ResolvedCredentials
       ) => VolumeClient,

@@ -11,6 +11,7 @@ import { ConfigStore } from '../../../src/config/store.js';
 import type { NodeClient } from '../../../src/node/index.js';
 import type { SshKeyClient } from '../../../src/ssh-key/index.js';
 import type { SslClient } from '../../../src/ssl/index.js';
+import type { SupportTicketClient } from '../../../src/support-ticket/index.js';
 import type { VolumeClient } from '../../../src/volume/index.js';
 import type { VpcClient } from '../../../src/vpc/index.js';
 import type { LoadBalancerClient } from '../../../src/load-balancer/index.js';
@@ -103,6 +104,13 @@ describe('ssh-key commands', () => {
       createSslClient: vi.fn(() => {
         throw new Error('SSL client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => SslClient,
+      createSupportTicketClient: vi.fn(() => {
+        throw new Error(
+          'Support ticket client should not be created for this test.'
+        );
+      }) as unknown as (
+        credentials: ResolvedCredentials
+      ) => SupportTicketClient,
       createVolumeClient: vi.fn(() => {
         throw new Error('Volume client should not be created for this test.');
       }) as unknown as (credentials: ResolvedCredentials) => VolumeClient,
