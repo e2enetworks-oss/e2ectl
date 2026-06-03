@@ -20,7 +20,8 @@ describe('createProgram', () => {
       'vpc',
       'security-group',
       'ssh-key',
-      'ssl'
+      'ssl',
+      'support-ticket'
     ]);
   });
 });

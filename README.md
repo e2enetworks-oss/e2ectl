@@ -78,6 +78,7 @@ Command guides:
 - [Project](./docs/user-guides/project.md)
 - [DBaaS](./docs/user-guides/dbaas.md)
 - [Load Balancer](./docs/user-guides/load-balancer.md)
+- [SSL](./docs/user-guides/ssl.md)
 - [Node](./docs/user-guides/node.md)
 - [Image](./docs/user-guides/image.md)
 - [Reserved IP](./docs/user-guides/reserved-ip.md)
@@ -85,6 +86,7 @@ Command guides:
 - [VPC](./docs/user-guides/vpc.md)
 - [Security group](./docs/user-guides/security-group.md)
 - [SSH key](./docs/user-guides/ssh-key.md)
+- [Support ticket](./docs/user-guides/support-ticket.md)
 
 ## Contributors And Maintainers
 

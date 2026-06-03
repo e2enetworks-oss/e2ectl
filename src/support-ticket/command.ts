@@ -1,0 +1,433 @@
+import { readFile } from 'node:fs/promises';
+
+import { Command } from 'commander';
+
+import { addContextOptions } from '../app/context-options.js';
+import type { CliRuntime } from '../app/index.js';
+import { renderSupportTicketResult } from './formatter.js';
+import { SupportTicketService } from './service.js';
+import type {
+  SupportTicketCloseOptions,
+  SupportTicketCommandResult,
+  SupportTicketCreateOptions,
+  SupportTicketGetOptions,
+  SupportTicketListOptions,
+  SupportTicketReopenOptions,
+  SupportTicketReplyOptions,
+  SupportTicketTimelineOptions
+} from './types/index.js';
+
+interface GlobalOptions {
+  json?: boolean;
+}
+
+function addTicketTypeOptions<TCommand extends Command>(
+  command: TCommand
+): TCommand {
+  return command
+    .option(
+      '--soc-ticket',
+      'Treat the target as a SOC ticket (routes to the SOC ticket table).'
+    )
+    .option(
+      '--abuse-ticket',
+      'Treat the target as an abuse ticket (routes to the abuse ticket table).'
+    );
+}
+
+/**
+ * Write a command result: any warnings go to stderr (so stdout stays a clean,
+ * parseable payload — especially under --json), the result itself to stdout.
+ */
+function writeSupportTicketResult(
+  runtime: CliRuntime,
+  result: SupportTicketCommandResult,
+  json: boolean
+): void {
+  const warnings = 'warnings' in result ? result.warnings : [];
+  for (const warning of warnings) {
+    runtime.stderr.write(`Warning: ${warning}\n`);
+  }
+
+  runtime.stdout.write(renderSupportTicketResult(result, json));
+}
+
+export function buildSupportTicketCommand(runtime: CliRuntime): Command {
+  const service = new SupportTicketService({
+    createSupportTicketClient: (credentials) =>
+      runtime.createSupportTicketClient(credentials),
+    readAttachmentFile: async (path) => await readFile(path),
+    store: runtime.store
+  });
+  const command = new Command('support-ticket').description(
+    'Manage MyAccount support tickets.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a support-ticket command'
+  );
+
+  addContextOptions(
+    command
+      .command('list')
+      .description('List support tickets for the authenticated customer.')
+      .option('--page-no <pageNo>', 'Page number (1-based).')
+      .option('--per-page <perPage>', 'Page size.')
+      .option(
+        '--category <category>',
+        'Filter by category. Repeat for multiple values (e.g. --category Cloud --category Billing). One or more of: Cloud, Network, Billing, Sales, SOC, Abuse. SOC and Abuse are sent as boolean filters. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
+      )
+      .option(
+        '--status <status>',
+        'Filter by status. Repeat for multiple values (e.g. --status Open --status Escalated). Presets: open (Open, On Hold, Waiting on Customer, Escalated), resolved (Resolved, Closed). Or pass any of: New, Open, On Hold, Waiting on Customer, Escalated, Resolved, Closed. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
+      )
+      .option(
+        '--priority <priority>',
+        'Filter by priority. Repeat for multiple values (e.g. --priority High --priority Medium). Preset: urgent (High, Medium). Or pass any of: High, Medium, Low. Comma-separated values are also accepted for backward compatibility.',
+        collectValues,
+        []
+      )
+      .option(
+        '--year <year>',
+        'Restrict results to tickets opened in this year.'
+      )
+      .option(
+        '--contact-email <email>',
+        'Restrict results to tickets with this contact person email.'
+      )
+      .option(
+        '--contact-type <type>',
+        'Restrict results to a contact person type: Technical Lead, Billing, Manager, or Admin.'
+      )
+  ).action(
+    async (options: SupportTicketListOptions, commandInstance: Command) => {
+      const result = await service.listTickets(options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  addTicketTypeOptions(
+    addContextOptions(
+      command
+        .command('get <ticketId>')
+        .description('Get details for one support ticket by its local id.')
+        .option(
+          '--contact-email <email>',
+          'Contact person email to scope the request.'
+        )
+        .option(
+          '--contact-type <type>',
+          'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+        )
+    )
+  ).action(
+    async (
+      ticketId: string,
+      options: SupportTicketGetOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getTicket(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  addTicketTypeOptions(
+    addContextOptions(
+      command
+        .command('get-replies <ticketId>')
+        .description(
+          'List the conversation threads (comments + replies) on a ticket.'
+        )
+        .option(
+          '--contact-email <email>',
+          'Contact person email to scope the request.'
+        )
+        .option(
+          '--contact-type <type>',
+          'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+        )
+    )
+  ).action(
+    async (
+      ticketId: string,
+      options: SupportTicketGetOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getReplies(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('departments')
+      .description(
+        'List the support ticket departments and their ids (use the id with create --department).'
+      )
+  ).action(
+    async (options: SupportTicketListOptions, commandInstance: Command) => {
+      const result = await service.listDepartments(options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('timeline <ticketId>')
+      .description('Show the activity timeline for a support ticket.')
+      .option(
+        '--month <month>',
+        'Restrict the timeline to a calendar month (1-12).'
+      )
+      .option('--year <year>', 'Restrict the timeline to a calendar year.')
+  ).action(
+    async (
+      ticketId: string,
+      options: SupportTicketTimelineOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.getTimeline(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  command.addCommand(buildSupportTicketCreateCommand(service, runtime));
+  command.addCommand(buildSupportTicketReplyCommand(service, runtime));
+  command.addCommand(buildSupportTicketCloseCommand(service, runtime));
+  command.addCommand(buildSupportTicketReopenCommand(service, runtime));
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildSupportTicketCreateCommand(
+  service: SupportTicketService,
+  runtime: CliRuntime
+): Command {
+  const command = addContextOptions(
+    new Command('create').description('Open a new support ticket.')
+  )
+    .requiredOption(
+      '--department <departmentId>',
+      'Numeric department id. Run `support-ticket departments` to discover valid ids.'
+    )
+    .requiredOption(
+      '--subject <subject>',
+      'Ticket subject (<= 60 printable ASCII chars).'
+    )
+    .requiredOption(
+      '--description <description>',
+      'Ticket description (<= 6000 chars).'
+    )
+    .requiredOption(
+      '--ticket-category <category>',
+      'One of: Cloud, Network, Billing, Sales.'
+    )
+    .option(
+      '--component <component>',
+      'Affected service / component. Required for Cloud and Billing categories.'
+    )
+    .option(
+      '--resource <spec>',
+      'Resource affected, in id:name[:ip] form. Repeat for multiple resources. Cloud only.',
+      collectValues,
+      []
+    )
+    .option(
+      '--priority <priority>',
+      'Severity. One of: High, Medium, Low. Required for Cloud and Billing categories. Ignored for Sales.'
+    )
+    .option(
+      '--cc <email>',
+      'CC email address. Repeat the flag for multiple addresses.',
+      collectValues,
+      []
+    )
+    .option(
+      '--attachment <path>',
+      'Attach a file (read from disk and base64-encoded). Repeat for multiple attachments.',
+      collectValues,
+      []
+    )
+    .option(
+      '--contact-email <email>',
+      'Contact person email (defaults to account owner if omitted).'
+    )
+    .option(
+      '--contact-type <type>',
+      'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+    )
+    .option(
+      '--priority-ticket',
+      'Mark this ticket as a priority (chat) ticket.'
+    )
+    .option('--channel <channel>', 'Origin channel (defaults to Web).');
+
+  command.action(
+    async (options: SupportTicketCreateOptions, commandInstance: Command) => {
+      const result = await service.createTicket(options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  return command;
+}
+
+function buildSupportTicketReplyCommand(
+  service: SupportTicketService,
+  runtime: CliRuntime
+): Command {
+  const command = addTicketTypeOptions(
+    addContextOptions(
+      new Command('reply')
+        .description('Post a reply on an existing support ticket.')
+        .argument('<ticketId>', 'Support ticket id.')
+    )
+      .requiredOption('--comment <comment>', 'Reply body (<= 250 chars).')
+      .option('--channel <channel>', 'Reply channel (e.g. Email, Web).')
+      .option(
+        '--attachment <path>',
+        'Attach a file (read from disk and base64-encoded). Repeat for multiple attachments.',
+        collectValues,
+        []
+      )
+      .option(
+        '--contact-email <email>',
+        'Contact person email scope for the reply.'
+      )
+      .option(
+        '--contact-type <type>',
+        'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+      )
+  );
+
+  command.action(
+    async (
+      ticketId: string,
+      options: SupportTicketReplyOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.replyTicket(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  return command;
+}
+
+function buildSupportTicketCloseCommand(
+  service: SupportTicketService,
+  runtime: CliRuntime
+): Command {
+  const command = addContextOptions(
+    new Command('close')
+      .description('Post a closing comment on a ticket and resolve it.')
+      .argument('<ticketId>', 'Support ticket id.')
+  )
+    .requiredOption('--comment <comment>', 'Closing comment (<= 250 chars).')
+    .option(
+      '--contact-email <email>',
+      'Contact person email scope for the closing comment.'
+    )
+    .option(
+      '--contact-type <type>',
+      'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+    );
+
+  command.action(
+    async (
+      ticketId: string,
+      options: SupportTicketCloseOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.closeTicket(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  return command;
+}
+
+function buildSupportTicketReopenCommand(
+  service: SupportTicketService,
+  runtime: CliRuntime
+): Command {
+  const command = addContextOptions(
+    new Command('reopen')
+      .description('Reopen a closed ticket with a comment explaining why.')
+      .argument('<ticketId>', 'Support ticket id.')
+  )
+    .requiredOption(
+      '--comment <comment>',
+      'Reason for reopening (<= 250 chars).'
+    )
+    .option(
+      '--contact-email <email>',
+      'Contact person email scope for the reopen comment.'
+    )
+    .option(
+      '--contact-type <type>',
+      'Contact person type: Technical Lead, Billing, Manager, or Admin.'
+    );
+
+  command.action(
+    async (
+      ticketId: string,
+      options: SupportTicketReopenOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.reopenTicket(ticketId, options);
+      writeSupportTicketResult(
+        runtime,
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      );
+    }
+  );
+
+  return command;
+}
+
+function collectValues(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}

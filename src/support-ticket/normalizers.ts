@@ -1,0 +1,518 @@
+import { CliError, EXIT_CODES } from '../core/errors.js';
+import {
+  ALLOWED_ATTACHMENT_EXTENSIONS,
+  ASCII_PRINTABLE_PATTERN,
+  EMAIL_PATTERN,
+  MAX_ATTACHMENT_COUNT,
+  MAX_ATTACHMENT_SIZE_BYTES,
+  MAX_MONTH,
+  MIME_TYPES,
+  MIN_MONTH,
+  PRIORITY_PRESETS,
+  STATUS_PRESETS,
+  VALID_CONTACT_PERSON_TYPES,
+  VALID_FILTER_CATEGORIES,
+  VALID_PRIORITIES,
+  VALID_STATUSES
+} from './constants.js';
+import type {
+  SupportTicketCategory,
+  SupportTicketContactPersonType,
+  SupportTicketResource
+} from './types/index.js';
+
+export interface SupportTicketContactContext {
+  contactEmail: string | undefined;
+  contactType: SupportTicketContactPersonType | undefined;
+}
+
+export function parseContactContext(options: {
+  contactEmail?: string;
+  contactType?: string;
+}): SupportTicketContactContext {
+  return {
+    contactEmail:
+      options.contactEmail === undefined
+        ? undefined
+        : assertEmail(options.contactEmail, '--contact-email'),
+    contactType:
+      options.contactType === undefined
+        ? undefined
+        : assertEnum(
+            options.contactType,
+            VALID_CONTACT_PERSON_TYPES,
+            '--contact-type'
+          )
+  };
+}
+
+export interface SupportTicketTypeFlags {
+  abuseTicket: boolean;
+  socTicket: boolean;
+}
+
+/**
+ * Resolve the mutually-exclusive `--soc-ticket` / `--abuse-ticket` flags. A
+ * ticket is at most one of SOC, Abuse, or a regular ticket, so passing both is a
+ * usage error.
+ */
+export function parseTicketTypeFlags(options: {
+  abuseTicket?: boolean;
+  socTicket?: boolean;
+}): SupportTicketTypeFlags {
+  const socTicket = options.socTicket === true;
+  const abuseTicket = options.abuseTicket === true;
+
+  if (socTicket && abuseTicket) {
+    throw new CliError(
+      'Pass only one of --soc-ticket or --abuse-ticket, not both.',
+      {
+        code: 'INVALID_INPUT_COMBINATION',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'A ticket is either a SOC ticket or an Abuse ticket — choose one.'
+      }
+    );
+  }
+
+  return { abuseTicket, socTicket };
+}
+
+export function assertPositiveInteger(value: string, flagName: string): number {
+  const trimmed = value.trim();
+
+  if (!/^\d+$/.test(trimmed) || trimmed === '0') {
+    throw new CliError(`${flagName} must be a positive integer.`, {
+      code: 'INVALID_INTEGER_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: flagName.startsWith('--')
+        ? `Pass a positive integer with ${flagName}.`
+        : `Pass a positive integer as ${flagName}.`
+    });
+  }
+
+  return Number(trimmed);
+}
+
+export interface AssertNonEmptyTrimmedOptions {
+  // When true, the trimmed value must contain only printable ASCII characters
+  // (`^[\x20-\x7E]+$`). Used for the subject, which the frontend/API reject when
+  // they contain Unicode-only or non-printable characters.
+  asciiPrintableOnly?: boolean;
+}
+
+export function assertNonEmptyTrimmed(
+  value: string,
+  flagName: string,
+  maxLength: number,
+  options: AssertNonEmptyTrimmedOptions = {}
+): string {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    throw new CliError(`${flagName} must not be empty.`, {
+      code: 'EMPTY_STRING_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a non-empty value with ${flagName}.`
+    });
+  }
+
+  if (trimmed.length > maxLength) {
+    throw new CliError(
+      `${flagName} must be ${maxLength} characters or fewer.`,
+      {
+        code: 'STRING_INPUT_TOO_LONG',
+        details: [`Received length: ${trimmed.length}`],
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Shorten the value passed with ${flagName}.`
+      }
+    );
+  }
+
+  if (
+    options.asciiPrintableOnly === true &&
+    !ASCII_PRINTABLE_PATTERN.test(trimmed)
+  ) {
+    throw new CliError(
+      `${flagName} must contain only printable ASCII characters.`,
+      {
+        code: 'NON_ASCII_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Remove emoji, accented, or other non-ASCII characters from ${flagName}.`
+      }
+    );
+  }
+
+  return trimmed;
+}
+
+export function assertMonth(value: string, flagName: string): number {
+  const month = assertPositiveInteger(value, flagName);
+
+  if (month < MIN_MONTH || month > MAX_MONTH) {
+    throw new CliError(
+      `${flagName} must be a month between ${MIN_MONTH} and ${MAX_MONTH}.`,
+      {
+        code: 'INVALID_INTEGER_INPUT',
+        details: [`Received: ${month}`],
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass a month from ${MIN_MONTH} to ${MAX_MONTH} with ${flagName}.`
+      }
+    );
+  }
+
+  return month;
+}
+
+export function assertEnum<TValue extends string>(
+  value: string,
+  allowed: readonly TValue[],
+  flagName: string
+): TValue {
+  const trimmed = value.trim();
+  const match = allowed.find(
+    (candidate) => candidate.toLowerCase() === trimmed.toLowerCase()
+  );
+
+  if (match === undefined) {
+    throw new CliError(`Unsupported value for ${flagName}: "${value}".`, {
+      code: 'INVALID_ENUM_INPUT',
+      details: [`Expected one of: ${allowed.join(', ')}`],
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a supported value with ${flagName}.`
+    });
+  }
+
+  return match;
+}
+
+export function assertEmail(value: string, flagName: string): string {
+  const trimmed = value.trim();
+
+  if (!EMAIL_PATTERN.test(trimmed)) {
+    throw new CliError(`${flagName} must be a valid email address.`, {
+      code: 'INVALID_EMAIL_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a valid email address with ${flagName}.`
+    });
+  }
+
+  return trimmed;
+}
+
+export function normalizeCcEmails(
+  values: string[] | undefined
+): string[] | undefined {
+  if (values === undefined) {
+    return undefined;
+  }
+
+  const trimmed = values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  for (const email of trimmed) {
+    if (!EMAIL_PATTERN.test(email)) {
+      throw new CliError(`--cc must be a valid email address: "${email}".`, {
+        code: 'INVALID_EMAIL_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Pass valid email addresses with --cc.'
+      });
+    }
+  }
+
+  return trimmed;
+}
+
+export function normalizeOptionalString(
+  value: string | number | null | undefined
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
+export function normalizeOptionalInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+export function expandRepeatableList(
+  values: string[] | undefined,
+  flagName: string
+): string[] | undefined {
+  if (values === undefined || values.length === 0) {
+    return undefined;
+  }
+
+  const items: string[] = [];
+  for (const value of values) {
+    for (const piece of value.split(',')) {
+      const trimmed = piece.trim();
+      if (trimmed.length > 0) {
+        items.push(trimmed);
+      }
+    }
+  }
+
+  if (items.length === 0) {
+    throw new CliError(`${flagName} must not be empty.`, {
+      code: 'EMPTY_STRING_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a non-empty value with ${flagName}. Repeat the flag (preferred) or pass a comma-separated list.`
+    });
+  }
+
+  return items;
+}
+
+export function parseCategoryFilter(values: string[] | undefined): {
+  abuseTicket: boolean;
+  category: string | undefined;
+  socTicket: boolean;
+} {
+  const raw = expandRepeatableList(values, '--category');
+  if (raw === undefined) {
+    return { abuseTicket: false, category: undefined, socTicket: false };
+  }
+
+  const standard: SupportTicketCategory[] = [];
+  let abuse = false;
+  let soc = false;
+
+  for (const item of raw) {
+    const match = VALID_FILTER_CATEGORIES.find(
+      (candidate) => candidate.toLowerCase() === item.toLowerCase()
+    );
+
+    if (match === undefined) {
+      throw new CliError(`Unsupported value for --category: "${item}".`, {
+        code: 'INVALID_ENUM_INPUT',
+        details: [`Expected one of: ${VALID_FILTER_CATEGORIES.join(', ')}`],
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Pass a supported value with --category.'
+      });
+    }
+
+    if (match === 'Abuse') {
+      abuse = true;
+    } else if (match === 'SOC') {
+      soc = true;
+    } else if (!standard.includes(match)) {
+      standard.push(match);
+    }
+  }
+
+  return {
+    abuseTicket: abuse,
+    category: standard.length === 0 ? undefined : standard.join(','),
+    socTicket: soc
+  };
+}
+
+export function parseStatusFilter(
+  values: string[] | undefined
+): string | undefined {
+  const raw = expandRepeatableList(values, '--status');
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const collected: string[] = [];
+  for (const item of raw) {
+    const preset = STATUS_PRESETS[item.toLowerCase()];
+    if (preset !== undefined) {
+      for (const status of preset) {
+        if (!collected.includes(status)) {
+          collected.push(status);
+        }
+      }
+      continue;
+    }
+
+    const canonical = assertEnum(item, VALID_STATUSES, '--status');
+    if (!collected.includes(canonical)) {
+      collected.push(canonical);
+    }
+  }
+
+  return collected.join(',');
+}
+
+export function parsePriorityFilter(
+  values: string[] | undefined
+): string | undefined {
+  const raw = expandRepeatableList(values, '--priority');
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const collected: string[] = [];
+  for (const item of raw) {
+    const preset = PRIORITY_PRESETS[item.toLowerCase()];
+    if (preset !== undefined) {
+      for (const priority of preset) {
+        if (!collected.includes(priority)) {
+          collected.push(priority);
+        }
+      }
+      continue;
+    }
+
+    const canonical = assertEnum(item, VALID_PRIORITIES, '--priority');
+    if (!collected.includes(canonical)) {
+      collected.push(canonical);
+    }
+  }
+
+  return collected.join(',');
+}
+
+export function parseResources(
+  values: string[] | undefined
+): SupportTicketResource[] {
+  if (values === undefined) {
+    return [];
+  }
+
+  return values.map((raw) => parseResourceSpec(raw));
+}
+
+export function parseResourceSpec(value: string): SupportTicketResource {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    throw new CliError('--resource must not be empty.', {
+      code: 'EMPTY_STRING_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass --resource <id:name[:ip]>.'
+    });
+  }
+
+  const parts = trimmed.split(':').map((part) => part.trim());
+  if (parts.length < 2 || parts.length > 3) {
+    throw new CliError(`Invalid --resource value: "${value}".`, {
+      code: 'INVALID_RESOURCE_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Format is id:name or id:name:ip_address.'
+    });
+  }
+
+  const [id, name, ip] = parts;
+  if (
+    id === undefined ||
+    id.length === 0 ||
+    name === undefined ||
+    name.length === 0
+  ) {
+    throw new CliError(`Invalid --resource value: "${value}".`, {
+      code: 'INVALID_RESOURCE_INPUT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Both id and name segments must be non-empty.'
+    });
+  }
+
+  return {
+    id,
+    ...(ip === undefined || ip.length === 0 ? {} : { ip_address: ip }),
+    name
+  };
+}
+
+export interface AttachmentPayload {
+  fileNames: string[];
+  imagedata: string[];
+}
+
+export async function readAndEncodeAttachments(
+  paths: string[] | undefined,
+  readFile: (path: string) => Promise<Buffer>
+): Promise<AttachmentPayload | undefined> {
+  if (paths === undefined || paths.length === 0) {
+    return undefined;
+  }
+
+  if (paths.length > MAX_ATTACHMENT_COUNT) {
+    throw new CliError(
+      `--attachment accepts at most ${MAX_ATTACHMENT_COUNT} files.`,
+      {
+        code: 'TOO_MANY_ATTACHMENTS',
+        details: [`Received: ${paths.length}`],
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass no more than ${MAX_ATTACHMENT_COUNT} --attachment flags.`
+      }
+    );
+  }
+
+  const fileNames: string[] = [];
+  const imagedata: string[] = [];
+
+  for (const rawPath of paths) {
+    const trimmed = rawPath.trim();
+    if (trimmed.length === 0) {
+      throw new CliError('--attachment path must not be empty.', {
+        code: 'EMPTY_STRING_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Pass --attachment <path-to-file>.'
+      });
+    }
+
+    const baseName = trimmed.split(/[\\/]/).pop() ?? trimmed;
+    const extension = baseName.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
+      throw new CliError(
+        `--attachment "${trimmed}" must be a .jpg, .jpeg, .png, or .pdf file.`,
+        {
+          code: 'UNSUPPORTED_ATTACHMENT_TYPE',
+          exitCode: EXIT_CODES.usage,
+          suggestion: 'Convert the file or pick a supported format.'
+        }
+      );
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await readFile(trimmed);
+    } catch (cause) {
+      throw new CliError(`Unable to read attachment: "${trimmed}".`, {
+        cause,
+        code: 'ATTACHMENT_READ_FAILED',
+        exitCode: EXIT_CODES.usage,
+        suggestion: 'Check the path and read permissions.'
+      });
+    }
+
+    if (buffer.byteLength > MAX_ATTACHMENT_SIZE_BYTES) {
+      throw new CliError(
+        `--attachment "${trimmed}" exceeds the 5 MB per-file limit.`,
+        {
+          code: 'ATTACHMENT_TOO_LARGE',
+          details: [`File size: ${buffer.byteLength} bytes`],
+          exitCode: EXIT_CODES.usage,
+          suggestion: 'Compress the file or attach a smaller one.'
+        }
+      );
+    }
+
+    const mimeType = detectMimeType(baseName);
+    fileNames.push(baseName);
+    imagedata.push(`data:${mimeType};base64,${buffer.toString('base64')}`);
+  }
+
+  return { fileNames, imagedata };
+}
+
+export function detectMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  return MIME_TYPES[ext] ?? 'application/octet-stream';
+}
