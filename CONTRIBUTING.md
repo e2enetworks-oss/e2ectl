@@ -152,17 +152,17 @@ Format:
 
 Supported types and how they map to releases and the changelog:
 
-| Type | Version bump | Changelog section |
-| --- | --- | --- |
-| `feat` | minor (`0.x` → `0.(x+1)`) | Features |
-| `fix` | patch (`0.0.x` → `0.0.(x+1)`) | Fixes |
-| `perf` | patch | Performance |
-| `refactor` | patch | Internal |
-| `docs` | none | hidden |
-| `test` | none | hidden |
-| `chore` | none | hidden |
-| `ci` | none | hidden |
-| `build` | none | hidden |
+| Type       | Version bump                  | Changelog section |
+| ---------- | ----------------------------- | ----------------- |
+| `feat`     | minor (`0.x` → `0.(x+1)`)     | Features          |
+| `fix`      | patch (`0.0.x` → `0.0.(x+1)`) | Fixes             |
+| `perf`     | patch                         | Performance       |
+| `refactor` | patch                         | Internal          |
+| `docs`     | none                          | hidden            |
+| `test`     | none                          | hidden            |
+| `chore`    | none                          | hidden            |
+| `ci`       | none                          | hidden            |
+| `build`    | none                          | hidden            |
 
 Guidance:
 
