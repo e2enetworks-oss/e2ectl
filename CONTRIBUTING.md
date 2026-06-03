@@ -136,13 +136,60 @@ Keep one canonical home for each recurring fact. Prefer linking to the source-of
 - Troubleshooting guidance must explain what to redact before sharing command output.
 - Automation examples should avoid patterns that leak secrets into shell history, CI logs, or screenshots.
 
+## Commit Messages
+
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/). Release Please parses commit messages on `main` to decide the next version and to generate [CHANGELOG.md](./CHANGELOG.md), so the prefix you choose has real release consequences.
+
+Format:
+
+```text
+<type>(<optional scope>): <short summary>
+
+<optional body explaining what and why>
+
+<optional footers>
+```
+
+Supported types and how they map to releases and the changelog:
+
+| Type | Version bump | Changelog section |
+| --- | --- | --- |
+| `feat` | minor (`0.x` → `0.(x+1)`) | Features |
+| `fix` | patch (`0.0.x` → `0.0.(x+1)`) | Fixes |
+| `perf` | patch | Performance |
+| `refactor` | patch | Internal |
+| `docs` | none | hidden |
+| `test` | none | hidden |
+| `chore` | none | hidden |
+| `ci` | none | hidden |
+| `build` | none | hidden |
+
+Guidance:
+
+- Write the summary in the imperative mood and keep it under ~72 characters.
+- Use a scope to point at the affected domain, such as `feat(node):` or `fix(load-balancer):`.
+- Mark breaking changes with a `!` after the type/scope (`feat!:`) or a `BREAKING CHANGE:` footer. While the package is `0.x`, a breaking change bumps the minor version.
+- Hidden types (`docs`, `chore`, `ci`, etc.) do not appear in the changelog and do not trigger a release on their own.
+
+### Forcing a specific release version
+
+To make Release Please cut an exact version regardless of the inferred bump, add a `Release-As:` footer to a commit on `main`:
+
+```text
+chore: release e2ectl 0.6.2
+
+Release-As: 0.6.2
+```
+
+Use this sparingly — for example, to align with a coordinated release or to recover after a versioning mistake. Normal feature work should let the conventional-commit types drive the version automatically.
+
 ## Pull Requests
 
 - Keep changes small and reviewable.
 - Avoid unrelated cleanup in the same PR.
 - Include the verification commands you actually ran.
 - Call out any user-visible docs updates.
-- Use Conventional Commits such as `feat:`, `fix:`, `refactor:`, or `chore:`.
+- Use Conventional Commits such as `feat:`, `fix:`, `refactor:`, or `chore:`. See [Commit Messages](#commit-messages) for the full convention.
 
 ## Release Automation
 
