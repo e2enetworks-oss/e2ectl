@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/e2enetworks-oss/e2ectl/compare/v0.6.1...v0.6.2) (2026-06-04)
+
+
+### Documentation
+
+* add commit message guidance for release-please workflow ([ffeb626](https://github.com/e2enetworks-oss/e2ectl/commit/ffeb626cb770f710cb7bfc65a6b24331ed8432f1))
+* align commit-message guidance table formatting ([6716e09](https://github.com/e2enetworks-oss/e2ectl/commit/6716e09838bfe4ad8388ac6e607f3f10d03a3edd))
+
+
+### Chores
+
+* release e2ectl 0.6.2 ([6ef5bcc](https://github.com/e2enetworks-oss/e2ectl/commit/6ef5bcc5b00fe0bb45b9e8504541169a79fd1a0e))
+
 ## [0.6.1](https://github.com/e2enetworks-oss/e2ectl/compare/v0.6.0...v0.6.1) (2026-05-06)
 
 ### Improvements
