@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/e2enetworks-oss/e2ectl/compare/v0.6.1...v0.6.2) (2026-06-04)
+
+
+### Features
+
+* Raise, track, and resolve MyAccount support tickets without leaving the terminal.
+
 ## [0.6.1](https://github.com/e2enetworks-oss/e2ectl/compare/v0.6.0...v0.6.1) (2026-05-06)
 
 ### Improvements
