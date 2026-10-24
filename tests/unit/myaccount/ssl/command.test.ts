@@ -4,6 +4,7 @@ import { ConfigStore } from '../../../../src/config/store.js';
 import type { SslClient } from '../../../../src/myaccount/ssl/index.js';
 import {
   createTestConfigPath,
+  createTestRuntime,
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
@@ -22,34 +23,18 @@ async function createRuntimeWithSslClient(
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
 
-  const runtime: CliRuntime = {
+  const runtime: CliRuntime = createTestRuntime({
     confirm: vi.fn(),
-    createImageClient: vi.fn() as unknown as CliRuntime['createImageClient'],
-    createDbaasClient: vi.fn() as unknown as CliRuntime['createDbaasClient'],
-    createLoadBalancerClient:
-      vi.fn() as unknown as CliRuntime['createLoadBalancerClient'],
-    createNodeClient: vi.fn() as unknown as CliRuntime['createNodeClient'],
-    createProjectClient:
-      vi.fn() as unknown as CliRuntime['createProjectClient'],
-    createReservedIpClient:
-      vi.fn() as unknown as CliRuntime['createReservedIpClient'],
-    createSecurityGroupClient:
-      vi.fn() as unknown as CliRuntime['createSecurityGroupClient'],
-    createSshKeyClient: vi.fn() as unknown as CliRuntime['createSshKeyClient'],
     createSslClient: vi
       .fn()
       .mockReturnValue(sslClient) as unknown as CliRuntime['createSslClient'],
-    createSupportTicketClient:
-      vi.fn() as unknown as CliRuntime['createSupportTicketClient'],
-    createVolumeClient: vi.fn() as unknown as CliRuntime['createVolumeClient'],
-    createVpcClient: vi.fn() as unknown as CliRuntime['createVpcClient'],
     credentialValidator: { validate: vi.fn() },
     isInteractive: false,
     prompt: vi.fn(),
     stderr,
     stdout,
     store
-  };
+  });
 
   return { runtime, stdout };
 }

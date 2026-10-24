@@ -19,7 +19,11 @@ import { VolumeApiClient } from '../../../src/myaccount/volume/index.js';
 import { VpcApiClient } from '../../../src/myaccount/vpc/index.js';
 import { LoadBalancerApiClient } from '../../../src/myaccount/load-balancer/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
-import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
+import {
+  createTestConfigPath,
+  createTestRuntime,
+  MemoryWriter
+} from '../../helpers/runtime.js';
 
 class StubCredentialValidator extends ApiCredentialValidator {
   readonly calls: ApiAuthCredentials[] = [];
@@ -61,35 +65,16 @@ describe('config commands', () => {
     return {
       confirm,
       prompt,
-      runtime: {
+      runtime: createTestRuntime({
         confirm,
-        createImageClient: vi.fn(() => {
-          throw new Error('Image client should not be created for this test.');
-        }) as unknown as CliRuntime['createImageClient'],
-        createDbaasClient: vi.fn(() => {
-          throw new Error('DBaaS client should not be created for this test.');
-        }) as unknown as CliRuntime['createDbaasClient'],
         createNodeClient: (credentials: ResolvedCredentials) =>
           new NodeApiClient(createMyAccountTransport(credentials)),
-        createProjectClient: vi.fn(() => {
-          throw new Error(
-            'Project client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createProjectClient'],
         createReservedIpClient: (credentials: ResolvedCredentials) =>
           new ReservedIpApiClient(createMyAccountTransport(credentials)),
         createSecurityGroupClient: (credentials: ResolvedCredentials) =>
           new SecurityGroupApiClient(createMyAccountTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
           new SshKeyApiClient(createMyAccountTransport(credentials)),
-        createSslClient: vi.fn(() => {
-          throw new Error('SSL client should not be created for this test.');
-        }) as unknown as CliRuntime['createSslClient'],
-        createSupportTicketClient: vi.fn(() => {
-          throw new Error(
-            'Support ticket client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createSupportTicketClient'],
         createVolumeClient: (credentials: ResolvedCredentials) =>
           new VolumeApiClient(createMyAccountTransport(credentials)),
         createLoadBalancerClient: (credentials: ResolvedCredentials) =>
@@ -102,7 +87,7 @@ describe('config commands', () => {
         stderr: new MemoryWriter(),
         stdout,
         store
-      },
+      }),
       stdout,
       validator,
       store

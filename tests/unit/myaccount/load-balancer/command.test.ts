@@ -7,17 +7,11 @@ import type {
   LoadBalancerClient,
   LoadBalancerDetails
 } from '../../../../src/myaccount/load-balancer/index.js';
-import type { DbaasClient } from '../../../../src/myaccount/dbaas/index.js';
-import type { ImageClient } from '../../../../src/myaccount/image/index.js';
 import type { ReservedIpClient } from '../../../../src/myaccount/reserved-ip/index.js';
-import type { SecurityGroupClient } from '../../../../src/myaccount/security-group/index.js';
-import type { SshKeyClient } from '../../../../src/myaccount/ssh-key/index.js';
-import type { SslClient } from '../../../../src/myaccount/ssl/index.js';
-import type { SupportTicketClient } from '../../../../src/myaccount/support-ticket/index.js';
-import type { VolumeClient } from '../../../../src/myaccount/volume/index.js';
 import type { VpcClient } from '../../../../src/myaccount/vpc/index.js';
 import {
   createTestConfigPath,
+  createTestRuntime,
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
@@ -203,14 +197,8 @@ describe('lb commands', () => {
       throw new Error(`${name} should not be called in this test`);
     };
 
-    const runtime: CliRuntime = {
+    const runtime: CliRuntime = createTestRuntime({
       confirm,
-      createImageClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => ImageClient,
-      createDbaasClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => DbaasClient,
       createLoadBalancerClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return lbStub.stub;
@@ -224,21 +212,6 @@ describe('lb commands', () => {
       createReservedIpClient: vi.fn(() => reservedIpStub.stub) as unknown as (
         c: ResolvedCredentials
       ) => ReservedIpClient,
-      createSecurityGroupClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => SecurityGroupClient,
-      createSshKeyClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => SshKeyClient,
-      createSslClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => SslClient,
-      createSupportTicketClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => SupportTicketClient,
-      createVolumeClient: vi.fn() as unknown as (
-        c: ResolvedCredentials
-      ) => VolumeClient,
       createVpcClient: vi.fn(() => vpcClient) as unknown as (
         c: ResolvedCredentials
       ) => VpcClient,
@@ -248,7 +221,7 @@ describe('lb commands', () => {
       stderr,
       stdout,
       store
-    };
+    });
 
     return {
       lbStub,

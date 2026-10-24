@@ -10,7 +10,11 @@ import {
   runCli,
   type CliRuntime
 } from '../../../src/app/index.js';
-import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
+import {
+  createTestConfigPath,
+  createTestRuntime,
+  MemoryWriter
+} from '../../helpers/runtime.js';
 
 describe('runCli', () => {
   function createRuntimeFixture(options?: { isInteractive?: boolean }): {
@@ -22,56 +26,8 @@ describe('runCli', () => {
     const stderr = new MemoryWriter();
 
     return {
-      runtime: {
+      runtime: createTestRuntime({
         confirm: vi.fn(() => Promise.resolve(false)),
-        createImageClient: vi.fn(() => {
-          throw new Error('Image client should not be created for this test.');
-        }),
-        createDbaasClient: vi.fn(() => {
-          throw new Error('DBaaS client should not be created for this test.');
-        }) as unknown as CliRuntime['createDbaasClient'],
-        createNodeClient: vi.fn(() => {
-          throw new Error('Node client should not be created for this test.');
-        }),
-        createProjectClient: vi.fn(() => {
-          throw new Error(
-            'Project client should not be created for this test.'
-          );
-        }),
-        createReservedIpClient: vi.fn(() => {
-          throw new Error(
-            'Reserved IP client should not be created for this test.'
-          );
-        }),
-        createSecurityGroupClient: vi.fn(() => {
-          throw new Error(
-            'Security group client should not be created for this test.'
-          );
-        }),
-        createSshKeyClient: vi.fn(() => {
-          throw new Error(
-            'SSH key client should not be created for this test.'
-          );
-        }),
-        createSslClient: vi.fn(() => {
-          throw new Error('SSL client should not be created for this test.');
-        }) as unknown as CliRuntime['createSslClient'],
-        createSupportTicketClient: vi.fn(() => {
-          throw new Error(
-            'Support ticket client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createSupportTicketClient'],
-        createLoadBalancerClient: vi.fn(() => {
-          throw new Error(
-            'Load balancer client should not be created for this test.'
-          );
-        }),
-        createVolumeClient: vi.fn(() => {
-          throw new Error('Volume client should not be created for this test.');
-        }),
-        createVpcClient: vi.fn(() => {
-          throw new Error('VPC client should not be created for this test.');
-        }),
         credentialValidator: {
           validate: vi.fn()
         },
@@ -82,7 +38,7 @@ describe('runCli', () => {
         store: new ConfigStore({
           configPath: createTestConfigPath('app-cli')
         })
-      },
+      }),
       stderr,
       stdout
     };

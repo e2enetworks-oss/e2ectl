@@ -15,6 +15,7 @@ import type { VolumeClient } from '../../../../src/myaccount/volume/index.js';
 import type { VpcClient } from '../../../../src/myaccount/vpc/index.js';
 import {
   createTestConfigPath,
+  createTestRuntime,
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
@@ -411,34 +412,16 @@ describe('node commands', () => {
     const prompt = vi.fn(() => Promise.resolve(''));
     let credentials: ResolvedCredentials | undefined;
 
-    const runtime: CliRuntime = {
+    const runtime: CliRuntime = createTestRuntime({
       confirm,
-      createImageClient: vi.fn(() => {
-        throw new Error('Image client should not be created for this test.');
-      }) as unknown as CliRuntime['createImageClient'],
-      createDbaasClient: vi.fn(() => {
-        throw new Error('DBaaS client should not be created for this test.');
-      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeStub.stub;
       },
-      createProjectClient: vi.fn(() => {
-        throw new Error('Project client should not be created for this test.');
-      }) as unknown as CliRuntime['createProjectClient'],
       createReservedIpClient: vi.fn(() => reservedIpStub.stub),
       createSecurityGroupClient: vi.fn(() => securityGroupStub.stub),
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
-      createSslClient: vi.fn(() => {
-        throw new Error('SSL client should not be created for this test.');
-      }) as unknown as CliRuntime['createSslClient'],
-      createSupportTicketClient: vi.fn(() => {
-        throw new Error(
-          'Support ticket client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createSupportTicketClient'],
       createVolumeClient: vi.fn(() => volumeStub.stub),
-      createLoadBalancerClient: vi.fn(),
       createVpcClient: vi.fn(() => vpcStub.stub),
       credentialValidator: {
         validate: vi.fn()
@@ -448,7 +431,7 @@ describe('node commands', () => {
       stderr: new MemoryWriter(),
       stdout,
       store
-    };
+    });
 
     return {
       confirm,

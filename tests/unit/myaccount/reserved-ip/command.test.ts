@@ -9,9 +9,9 @@ import type { ResolvedCredentials } from '../../../../src/config/index.js';
 import { ConfigStore } from '../../../../src/config/store.js';
 import type { NodeClient } from '../../../../src/myaccount/node/index.js';
 import type { ReservedIpClient } from '../../../../src/myaccount/reserved-ip/index.js';
-import type { LoadBalancerClient } from '../../../../src/myaccount/load-balancer/index.js';
 import {
   createTestConfigPath,
+  createTestRuntime,
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
@@ -148,52 +148,16 @@ describe('reserved-ip commands', () => {
       upgradeNode: vi.fn()
     };
 
-    const runtime: CliRuntime = {
+    const runtime: CliRuntime = createTestRuntime({
       confirm: vi.fn(() => Promise.resolve(true)),
-      createImageClient: vi.fn(() => {
-        throw new Error('Image client should not be created for this test.');
-      }) as unknown as CliRuntime['createImageClient'],
-      createDbaasClient: vi.fn(() => {
-        throw new Error('DBaaS client should not be created for this test.');
-      }) as unknown as CliRuntime['createDbaasClient'],
       createNodeClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return nodeClient;
       },
-      createProjectClient: vi.fn(() => {
-        throw new Error('Project client should not be created for this test.');
-      }) as unknown as CliRuntime['createProjectClient'],
       createReservedIpClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return reservedIpStub.stub;
       },
-      createSecurityGroupClient: vi.fn(() => {
-        throw new Error(
-          'Security group client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createSecurityGroupClient'],
-      createSshKeyClient: vi.fn(() => {
-        throw new Error('SSH key client should not be created for this test.');
-      }) as unknown as CliRuntime['createSshKeyClient'],
-      createSslClient: vi.fn(() => {
-        throw new Error('SSL client should not be created for this test.');
-      }) as unknown as CliRuntime['createSslClient'],
-      createSupportTicketClient: vi.fn(() => {
-        throw new Error(
-          'Support ticket client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createSupportTicketClient'],
-      createLoadBalancerClient: vi.fn(() => {
-        throw new Error(
-          'Load balancer client should not be created for this test.'
-        );
-      }) as unknown as (credentials: ResolvedCredentials) => LoadBalancerClient,
-      createVolumeClient: vi.fn(() => {
-        throw new Error('Volume client should not be created for this test.');
-      }) as unknown as CliRuntime['createVolumeClient'],
-      createVpcClient: vi.fn(() => {
-        throw new Error('VPC client should not be created for this test.');
-      }) as unknown as CliRuntime['createVpcClient'],
       credentialValidator: {
         validate: vi.fn()
       },
@@ -202,7 +166,7 @@ describe('reserved-ip commands', () => {
       stderr,
       stdout,
       store
-    };
+    });
 
     return {
       stderr,

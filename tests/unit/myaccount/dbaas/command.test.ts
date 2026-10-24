@@ -11,9 +11,9 @@ import { stableStringify } from '../../../../src/core/json.js';
 import type { ResolvedCredentials } from '../../../../src/config/index.js';
 import { ConfigStore } from '../../../../src/config/store.js';
 import type { DbaasClient } from '../../../../src/myaccount/dbaas/index.js';
-import type { ImageClient } from '../../../../src/myaccount/image/index.js';
 import {
   createTestConfigPath,
+  createTestRuntime,
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
@@ -213,53 +213,12 @@ describe('dbaas commands', () => {
     const stub = createDbaasClientStub();
     let credentials: ResolvedCredentials | undefined;
 
-    const runtime: CliRuntime = {
+    const runtime: CliRuntime = createTestRuntime({
       confirm: vi.fn(() => Promise.resolve(true)),
-      createImageClient: vi.fn(() => {
-        throw new Error('Image client should not be created for this test.');
-      }) as unknown as (_: ResolvedCredentials) => ImageClient,
       createDbaasClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return stub.stub;
       },
-      createNodeClient: vi.fn(() => {
-        throw new Error('Node client should not be created for this test.');
-      }) as unknown as CliRuntime['createNodeClient'],
-      createProjectClient: vi.fn(() => {
-        throw new Error('Project client should not be created for this test.');
-      }) as unknown as CliRuntime['createProjectClient'],
-      createReservedIpClient: vi.fn(() => {
-        throw new Error(
-          'Reserved IP client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createReservedIpClient'],
-      createSecurityGroupClient: vi.fn(() => {
-        throw new Error(
-          'Security group client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createSecurityGroupClient'],
-      createSshKeyClient: vi.fn(() => {
-        throw new Error('SSH key client should not be created for this test.');
-      }) as unknown as CliRuntime['createSshKeyClient'],
-      createSslClient: vi.fn(() => {
-        throw new Error('SSL client should not be created for this test.');
-      }) as unknown as CliRuntime['createSslClient'],
-      createSupportTicketClient: vi.fn(() => {
-        throw new Error(
-          'Support ticket client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createSupportTicketClient'],
-      createLoadBalancerClient: vi.fn(() => {
-        throw new Error(
-          'Load balancer client should not be created for this test.'
-        );
-      }) as unknown as CliRuntime['createLoadBalancerClient'],
-      createVolumeClient: vi.fn(() => {
-        throw new Error('Volume client should not be created for this test.');
-      }) as unknown as CliRuntime['createVolumeClient'],
-      createVpcClient: vi.fn(() => {
-        throw new Error('VPC client should not be created for this test.');
-      }) as unknown as CliRuntime['createVpcClient'],
       credentialValidator: {
         validate: vi.fn()
       },
@@ -268,7 +227,7 @@ describe('dbaas commands', () => {
       stderr: new MemoryWriter(),
       stdout,
       store
-    };
+    });
 
     return {
       receivedCredentials: () => credentials,
