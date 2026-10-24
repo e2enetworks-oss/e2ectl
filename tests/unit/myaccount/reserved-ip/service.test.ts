@@ -90,6 +90,8 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode: vi.fn(),
     powerOnNode: vi.fn(),
+    rebootNode: vi.fn(),
+    setDeletionProtection: vi.fn(),
     saveNodeImage: vi.fn(),
     upgradeNode: vi.fn()
   };

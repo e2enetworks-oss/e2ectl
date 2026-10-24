@@ -7,9 +7,9 @@ import {
   renderNodeResult,
   formatNodeCreateResult,
   formatNodeDetails,
-  formatNodesTable,
-  summarizeNodeCatalogOs
+  formatNodesTable
 } from '../../../../src/myaccount/node/formatter.js';
+import { summarizeNodeCatalogOs } from '../../../../src/myaccount/node/catalog.js';
 
 describe('node formatter', () => {
   it('renders stable node list and detail output', () => {
@@ -251,22 +251,18 @@ describe('node formatter', () => {
   });
 
   it('flattens OS catalog rows into command-ready entries', () => {
+    const ubuntu2404 = {
+      number_of_domains: null,
+      os: 'Ubuntu',
+      software_version: '',
+      sub_category: 'Ubuntu',
+      version: '24.04'
+    };
     const entries = summarizeNodeCatalogOs({
-      category_list: [
-        {
-          OS: 'Ubuntu',
-          category: ['Linux Virtual Node', 'Linux Smart Dedicated Compute'],
-          version: [
-            {
-              number_of_domains: null,
-              os: 'Ubuntu',
-              software_version: '',
-              sub_category: 'Ubuntu',
-              version: '24.04'
-            }
-          ]
-        }
-      ]
+      category_list: {
+        'Linux Smart Dedicated Compute': { Ubuntu: [ubuntu2404] },
+        'Linux Virtual Node': { Ubuntu: [ubuntu2404] }
+      }
     });
 
     expect(entries).toHaveLength(2);
@@ -290,22 +286,16 @@ describe('node formatter', () => {
     const output = renderNodeResult(
       {
         action: 'catalog-os',
-        catalog: {
-          category_list: [
-            {
-              OS: 'Ubuntu',
-              category: ['GPU Optimized'],
-              version: [
-                {
-                  number_of_domains: null,
-                  os: 'Ubuntu',
-                  sub_category: 'Ubuntu',
-                  version: '24.04'
-                }
-              ]
-            }
-          ]
-        }
+        entries: [
+          {
+            category: 'Ubuntu',
+            display_category: 'GPU Optimized',
+            number_of_domains: null,
+            os: 'Ubuntu',
+            os_version: '24.04',
+            software_version: ''
+          }
+        ]
       },
       false
     );
@@ -344,6 +334,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: null,
           family: 'General Purpose',
+          gpu: null,
           ram: null,
           series: null,
           vcpu: null
@@ -365,6 +356,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: 50,
           family: 'Burst',
+          gpu: null,
           ram: 'Burst',
           series: 'C3',
           vcpu: 2
@@ -402,6 +394,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: null,
           family: 'General Purpose',
+          gpu: null,
           ram: '8.00',
           series: 'C3',
           vcpu: null
@@ -463,6 +456,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: 100,
           family: 'CPU Intensive 3rd Generation',
+          gpu: null,
           ram: '8.00',
           series: 'C3',
           vcpu: 4
@@ -493,6 +487,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: 100,
           family: 'CPU Intensive 3rd Generation',
+          gpu: null,
           ram: '8.00',
           series: 'C3',
           vcpu: 4
@@ -537,6 +532,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 100,
               family: 'CPU Intensive 3rd Generation',
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -598,6 +594,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 50,
               family: 'CPU Intensive 3rd Generation',
+              gpu: null,
               ram: '4.00',
               series: 'C3',
               vcpu: 2
@@ -626,6 +623,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 100,
               family: 'CPU Intensive 3rd Generation',
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -669,6 +667,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 100,
               family: 'CPU Intensive 3rd Generation',
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -721,6 +720,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: 0,
           family: 'General Purpose',
+          gpu: null,
           ram: '6.00',
           series: 'E1',
           vcpu: 2
@@ -742,6 +742,7 @@ describe('node formatter', () => {
         config: {
           disk_gb: 0,
           family: 'General Purpose',
+          gpu: null,
           ram: '8.00',
           series: 'E1WC',
           vcpu: 4
@@ -785,6 +786,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 0,
               family: 'General Purpose',
+              gpu: null,
               ram: '6.00',
               series: 'E1',
               vcpu: 2
@@ -895,6 +897,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 100,
               family: 'Zeta',
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -916,6 +919,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 50,
               family: null,
+              gpu: null,
               ram: '4.00',
               series: 'C3',
               vcpu: 2
@@ -937,6 +941,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 75,
               family: 'Alpha',
+              gpu: null,
               ram: '6.00',
               series: 'C3',
               vcpu: 3
@@ -1182,6 +1187,7 @@ describe('node formatter', () => {
       {
         action: 'upgrade',
         cancelled: true,
+        image_kept: false,
         node_id: 105,
         requested: {
           image: 'Ubuntu-24.04-Distro',
@@ -1193,6 +1199,7 @@ describe('node formatter', () => {
     const minimalUpgradeOutput = renderNodeResult(
       {
         action: 'upgrade',
+        image_kept: false,
         details: {
           location: null,
           new_node_image_id: null,
@@ -1258,6 +1265,7 @@ describe('node formatter', () => {
     const output = renderNodeResult(
       {
         action: 'upgrade',
+        image_kept: false,
         details: {
           location: 'Delhi',
           new_node_image_id: 8802,
@@ -1329,6 +1337,7 @@ describe('node formatter', () => {
     const output = renderNodeResult(
       {
         action: 'upgrade',
+        image_kept: false,
         details: {
           location: 'Delhi',
           new_node_image_id: 8802,
@@ -1348,6 +1357,7 @@ describe('node formatter', () => {
     expect(output).toBe(
       `${stableStringify({
         action: 'upgrade',
+        image_kept: false,
         details: {
           location: 'Delhi',
           new_node_image_id: 8802,
@@ -1382,6 +1392,7 @@ describe('node formatter', () => {
             config: {
               disk_gb: 100,
               family: 'CPU Intensive 3rd Generation',
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -1427,6 +1438,7 @@ describe('node formatter', () => {
               config: {
                 disk_gb: 100,
                 family: 'CPU Intensive 3rd Generation',
+                gpu: null,
                 ram: '8.00',
                 series: 'C3',
                 vcpu: 4
@@ -1461,9 +1473,7 @@ describe('node formatter', () => {
     const output = renderNodeResult(
       {
         action: 'catalog-os',
-        catalog: {
-          category_list: []
-        }
+        entries: []
       },
       false
     );
@@ -1636,6 +1646,7 @@ describe('node formatter', () => {
       {
         action: 'upgrade',
         cancelled: true,
+        image_kept: false,
         node_id: 101,
         requested: {
           image: 'Ubuntu-24.04-Distro',
@@ -1697,6 +1708,7 @@ describe('node formatter', () => {
       `${stableStringify({
         action: 'upgrade',
         cancelled: true,
+        image_kept: false,
         node_id: 101,
         requested: {
           image: 'Ubuntu-24.04-Distro',

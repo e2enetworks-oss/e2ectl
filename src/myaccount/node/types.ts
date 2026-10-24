@@ -17,6 +17,7 @@ export interface NodeOsInfo {
 
 export interface NodeDetails extends NodeSummary {
   created_at?: string;
+  is_accidental_protection?: boolean;
   disk?: string;
   label?: string;
   location?: string;
@@ -42,14 +43,11 @@ export interface NodeCatalogOsVersion {
   version: string;
 }
 
-export interface NodeCatalogOsGroup {
-  OS: string;
-  category: string[];
-  version: NodeCatalogOsVersion[];
-}
-
+// The catalog grouped by display category (Linux Virtual Node, GPU, ...),
+// then by OS or GPU card, then the OS rows. Some display categories (the
+// GPU wizard) hold other shapes; only rows with an OS and version count.
 export interface NodeCatalogOsData {
-  category_list: NodeCatalogOsGroup[];
+  category_list: Record<string, unknown>;
 }
 
 export interface NodeCatalogOsEntry {
@@ -73,6 +71,23 @@ export type NodeCatalogQuery = Record<
 export interface NodeCatalogPlansQuery extends NodeCatalogQuery {
   billing_type: NodeCatalogBillingType;
   family?: string;
+  gpu_type?: string;
+  min_ram_gb?: number;
+  min_vcpu?: number;
+}
+
+// Optional filters on the catalog rows, applied by the CLI.
+export interface NodeCatalogPlanFilters {
+  family?: string;
+  gpuType?: string;
+  minRamGb?: number;
+  minVcpu?: number;
+}
+
+export interface NodeCatalogGpuCard {
+  CARD_TYPE?: string;
+  MEMORY?: string;
+  UNIT_COUNT?: number;
 }
 
 export interface NodeCatalogPlanOsInfo {
@@ -110,6 +125,7 @@ export interface NodeCatalogPlan {
   bitninja_discount_percentage?: number;
   cpu_type?: string;
   currency?: string;
+  gpu_card_details?: NodeCatalogGpuCard | Record<string, never>;
   image: string;
   is_blockstorage_attachable?: boolean;
   location?: string;
@@ -120,9 +136,16 @@ export interface NodeCatalogPlan {
   specs?: NodeCatalogPlanSpecs;
 }
 
+export interface NodeCatalogGpuSummary {
+  count: number | null;
+  memory_gb: number | null;
+  type: string;
+}
+
 export interface NodeCatalogConfigSummary {
   disk_gb: number | null;
   family: string | null;
+  gpu: NodeCatalogGpuSummary | null;
   ram: string | null;
   series: string | null;
   vcpu: number | null;
@@ -197,7 +220,13 @@ export interface NodeUpgradeResult {
 }
 
 export type NodeActionType =
-  'add_ssh_keys' | 'power_off' | 'power_on' | 'save_images';
+  | 'add_ssh_keys'
+  | 'disable_accidental_protection'
+  | 'enable_accidental_protection'
+  | 'power_off'
+  | 'power_on'
+  | 'reboot'
+  | 'save_images';
 
 export interface NodeActionSshKey {
   label: string;
@@ -206,10 +235,12 @@ export interface NodeActionSshKey {
 
 export type NodeActionRequest =
   | {
-      type: 'power_on';
-    }
-  | {
-      type: 'power_off';
+      type:
+        | 'disable_accidental_protection'
+        | 'enable_accidental_protection'
+        | 'power_off'
+        | 'power_on'
+        | 'reboot';
     }
   | {
       name: string;

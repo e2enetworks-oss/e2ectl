@@ -300,17 +300,17 @@ describe('NodeApiClient', () => {
 
     transport.getMock.mockResolvedValue(
       envelope({
-        category_list: []
+        category_list: {}
       })
     );
 
     const result = await client.listNodeCatalogOs();
 
     expect(transport.getMock).toHaveBeenCalledWith(
-      '/images/os-category/',
+      '/images/category-list/',
       undefined
     );
-    expect(result.category_list).toEqual([]);
+    expect(result.category_list).toEqual({});
   });
 
   it('requests plan and image pairs with the required query filters', async () => {

@@ -30,7 +30,8 @@ type NodeListApiResponse = ApiResponse<
 >;
 
 const NODES_PATH = '/nodes/';
-const NODE_CATALOG_OS_PATH = '/images/os-category/';
+// category-list, not os-category: os-category leaves out the GPU rows.
+const NODE_CATALOG_OS_PATH = '/images/category-list/';
 const NODE_CATALOG_PLANS_PATH = '/images/';
 
 export type NodeDeleteQuery = Record<'reserve_ip_required', 'true'>;
@@ -51,6 +52,11 @@ export interface NodeClient {
   listNodes(): Promise<NodeListResult>;
   powerOffNode(nodeId: string): Promise<NodeActionResult>;
   powerOnNode(nodeId: string): Promise<NodeActionResult>;
+  rebootNode(nodeId: string): Promise<NodeActionResult>;
+  setDeletionProtection(
+    nodeId: string,
+    enabled: boolean
+  ): Promise<NodeActionResult>;
   saveNodeImage(nodeId: string, name: string): Promise<NodeActionResult>;
   upgradeNode(
     nodeId: string,
@@ -138,6 +144,25 @@ export class NodeApiClient implements NodeClient {
   async powerOnNode(nodeId: string): Promise<NodeActionResult> {
     return await this.runNodeAction(nodeId, {
       type: 'power_on'
+    });
+  }
+
+  async rebootNode(nodeId: string): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      type: 'reboot'
+    });
+  }
+
+  // E2E calls this accidental protection: a protected node cannot be
+  // deleted until it is turned off again.
+  async setDeletionProtection(
+    nodeId: string,
+    enabled: boolean
+  ): Promise<NodeActionResult> {
+    return await this.runNodeAction(nodeId, {
+      type: enabled
+        ? 'enable_accidental_protection'
+        : 'disable_accidental_protection'
     });
   }
 

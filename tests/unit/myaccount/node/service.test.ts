@@ -141,7 +141,9 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode,
     powerOnNode,
+    rebootNode: vi.fn(),
     saveNodeImage,
+    setDeletionProtection: vi.fn(),
     upgradeNode
   };
   const listSshKeys = vi.fn(() =>
@@ -497,6 +499,7 @@ describe('NodeService', () => {
     expect(upgradeNode.mock.calls[0]?.[1]).not.toHaveProperty('committed_id');
     expect(result).toEqual({
       action: 'upgrade',
+      image_kept: false,
       details: {
         location: 'Delhi',
         new_node_image_id: 8802,
@@ -528,6 +531,7 @@ describe('NodeService', () => {
     expect(upgradeNode).not.toHaveBeenCalled();
     expect(result).toEqual({
       action: 'upgrade',
+      image_kept: false,
       cancelled: true,
       node_id: 101,
       requested: {
@@ -1256,6 +1260,7 @@ describe('NodeService', () => {
           config: {
             disk_gb: 50,
             family: 'CPU Intensive 3rd Generation',
+            gpu: null,
             ram: '4.00',
             series: 'C3',
             vcpu: 2
@@ -1284,6 +1289,7 @@ describe('NodeService', () => {
           config: {
             disk_gb: 100,
             family: 'CPU Intensive 3rd Generation',
+            gpu: null,
             ram: '8.00',
             series: 'C3',
             vcpu: 4

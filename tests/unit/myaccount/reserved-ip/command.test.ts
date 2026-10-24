@@ -144,6 +144,8 @@ describe('reserved-ip commands', () => {
       listNodes: vi.fn(),
       powerOffNode: vi.fn(),
       powerOnNode: vi.fn(),
+      rebootNode: vi.fn(),
+      setDeletionProtection: vi.fn(),
       saveNodeImage: vi.fn(),
       upgradeNode: vi.fn()
     };

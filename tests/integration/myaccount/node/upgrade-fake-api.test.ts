@@ -56,6 +56,7 @@ describe('node upgrade against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'upgrade',
+          image_kept: false,
           details: {
             location: 'Delhi',
             new_node_image_id: 8802,
@@ -181,6 +182,7 @@ describe('node upgrade against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'upgrade',
+          image_kept: false,
           details: {
             location: 'Delhi',
             new_node_image_id: 8802,

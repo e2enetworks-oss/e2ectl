@@ -49,6 +49,9 @@ const EXPECTED_COMMANDS = [
   'myaccount node action power-on',
   'myaccount node action power-off',
   'myaccount node action save-image',
+  'myaccount node action reboot',
+  'myaccount node action protect',
+  'myaccount node action unprotect',
   'myaccount node action public-ip detach',
   'myaccount node action vpc attach',
   'myaccount node action vpc detach',
@@ -136,7 +139,7 @@ describe('createProgram', () => {
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(100);
+    expect(EXPECTED_COMMANDS).toHaveLength(103);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });

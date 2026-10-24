@@ -4,7 +4,8 @@ import {
   type ResolvedCredentials
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
-import { CliError, EXIT_CODES } from '../../core/errors.js';
+import { AppError, CliError, EXIT_CODES } from '../../core/errors.js';
+import { pollUntilFound, type PollOptions } from '../../core/waiter.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
 import type { SecurityGroupClient } from '../security-group/index.js';
 import type { SshKeyClient, SshKeySummary } from '../ssh-key/index.js';
@@ -13,8 +14,9 @@ import type { VpcClient } from '../vpc/index.js';
 import {
   buildNodeCatalogQuery,
   normalizeNodeCatalogBillingType,
+  normalizeNodeCatalogPlanFilters,
   normalizeNodeCatalogPlanItems,
-  normalizeOptionalNodeCatalogFamily,
+  summarizeNodeCatalogOs,
   summarizeNodeCatalogPlans
 } from './catalog.js';
 import type { NodeClient } from './client.js';
@@ -39,7 +41,7 @@ import {
 import type {
   NodeActionSshKey,
   NodeActionResult,
-  NodeCatalogOsData,
+  NodeCatalogOsEntry,
   NodeCatalogPlanItem,
   NodeCatalogPlansQuery,
   NodeCreateBillingType,
@@ -59,6 +61,7 @@ export interface NodeContextOptions {
 
 export interface NodeCreateOptions extends NodeContextOptions {
   billingType?: string;
+  wait?: boolean;
   committedPlanId?: string;
   disk?: string;
   image?: string;
@@ -75,7 +78,8 @@ export interface NodeDeleteOptions extends NodeContextOptions {
 
 export interface NodeUpgradeOptions extends NodeContextOptions {
   force?: boolean;
-  image: string;
+  // Leave out to keep the image the node runs now.
+  image?: string;
   plan: string;
 }
 
@@ -88,6 +92,9 @@ export interface NodeCatalogPlansOptions extends NodeContextOptions {
   category: string;
   displayCategory: string;
   family?: string;
+  gpuType?: string;
+  minRam?: string;
+  minVcpu?: string;
   os: string;
   osVersion: string;
 }
@@ -142,6 +149,8 @@ export interface NodeCreateBillingSummary {
 export interface NodeCreateCommandResult {
   action: 'create';
   billing: NodeCreateBillingSummary;
+  // With --wait: the node once it is running.
+  node?: NodeDetails;
   result: NodeCreateResult;
 }
 
@@ -173,6 +182,7 @@ export interface NodeUpgradeDetailsSummary {
 export interface NodeUpgradeCancelledCommandResult {
   action: 'upgrade';
   cancelled: true;
+  image_kept: boolean;
   node_id: number;
   requested: NodeUpgradeRequestSummary;
 }
@@ -180,6 +190,8 @@ export interface NodeUpgradeCancelledCommandResult {
 export interface NodeUpgradeCompletedCommandResult {
   action: 'upgrade';
   details: NodeUpgradeDetailsSummary;
+  // True when --image was left out and the node's own image was kept.
+  image_kept: boolean;
   message: string;
   node_id: number;
   requested: NodeUpgradeRequestSummary;
@@ -190,7 +202,7 @@ export type NodeUpgradeCommandResult =
 
 export interface NodeCatalogOsCommandResult {
   action: 'catalog-os';
-  catalog: NodeCatalogOsData;
+  entries: NodeCatalogOsEntry[];
 }
 
 export interface NodeCatalogPlansCommandResult {
@@ -201,7 +213,11 @@ export interface NodeCatalogPlansCommandResult {
 }
 
 export type NodeCatalogPlansEmptyReason =
-  'no_committed' | 'no_committed_for_family' | 'no_family_match' | 'no_plans';
+  | 'no_committed'
+  | 'no_committed_for_family'
+  | 'no_family_match'
+  | 'no_filter_match'
+  | 'no_plans';
 
 export interface NodeCatalogPlansSummary {
   available_families: string[];
@@ -216,6 +232,18 @@ export interface NodePowerOnCommandResult {
 
 export interface NodePowerOffCommandResult {
   action: 'power-off';
+  node_id: number;
+  result: NodeActionStatusSummary;
+}
+
+export interface NodeRebootCommandResult {
+  action: 'reboot';
+  node_id: number;
+  result: NodeActionStatusSummary;
+}
+
+export interface NodeProtectionCommandResult {
+  action: 'protect' | 'unprotect';
   node_id: number;
   result: NodeActionStatusSummary;
 }
@@ -333,7 +361,9 @@ export type NodeCommandResult =
   | NodeListCommandResult
   | NodePowerOffCommandResult
   | NodePowerOnCommandResult
+  | NodeProtectionCommandResult
   | NodePublicIpDetachCommandResult
+  | NodeRebootCommandResult
   | NodeSaveImageCommandResult
   | NodeSecurityGroupAttachCommandResult
   | NodeSecurityGroupDetachCommandResult
@@ -360,6 +390,8 @@ export interface NodeServiceDependencies {
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   isInteractive: boolean;
+  // How long create --wait keeps checking; tests shorten it.
+  nodeReadyPoll?: PollOptions;
   store: NodeStore;
 }
 
@@ -384,6 +416,9 @@ interface NodeCreatePayloadInput {
 }
 
 const DEFAULT_NODE_CREATE_BILLING_TYPE: NodeCreateBillingType = 'hourly';
+// create --wait checks every 10 seconds for up to 20 minutes.
+const NODE_READY_POLL: PollOptions = { attempts: 120, intervalMs: 10_000 };
+const NODE_READY_STATUS = 'Running';
 const COMMITTED_NODE_CREATE_STATUS: NodeCommittedCreateStatus = 'auto_renew';
 
 export class NodeService {
@@ -552,6 +587,9 @@ export class NodeService {
     return {
       action: 'create',
       billing: summarizeNodeCreateBilling(billing),
+      ...(options.wait === true
+        ? { node: await this.waitForNodeReady(client, result) }
+        : {}),
       result
     };
   }
@@ -580,10 +618,14 @@ export class NodeService {
     }
 
     const client = await this.createNodeClient(options);
-    const result = await client.deleteNode(
-      String(normalizedNodeId),
-      reservePublicIp ? { reserve_ip_required: 'true' } : undefined
-    );
+    const result = await client
+      .deleteNode(
+        String(normalizedNodeId),
+        reservePublicIp ? { reserve_ip_required: 'true' } : undefined
+      )
+      .catch((error: unknown) => {
+        throw explainProtectedDelete(error, normalizedNodeId);
+      });
 
     return {
       action: 'delete',
@@ -727,7 +769,7 @@ export class NodeService {
 
     return {
       action: 'catalog-os',
-      catalog: await client.listNodeCatalogOs()
+      entries: summarizeNodeCatalogOs(await client.listNodeCatalogOs())
     };
   }
 
@@ -736,10 +778,10 @@ export class NodeService {
   ): Promise<NodeCatalogPlansCommandResult> {
     const client = await this.createNodeClient(options);
     const billingType = normalizeNodeCatalogBillingType(options.billingType);
-    const family = normalizeOptionalNodeCatalogFamily(options.family);
+    const filters = normalizeNodeCatalogPlanFilters(options);
     const query = buildNodeCatalogQuery(options);
     const plans = await client.listNodeCatalogPlans(query);
-    const items = normalizeNodeCatalogPlanItems(plans, billingType, family);
+    const items = normalizeNodeCatalogPlanItems(plans, billingType, filters);
 
     return {
       action: 'catalog-plans',
@@ -747,9 +789,14 @@ export class NodeService {
       query: {
         billing_type: billingType,
         ...query,
-        ...(family === undefined ? {} : { family })
+        ...(filters.family === undefined ? {} : { family: filters.family }),
+        ...(filters.gpuType === undefined ? {} : { gpu_type: filters.gpuType }),
+        ...(filters.minRamGb === undefined
+          ? {}
+          : { min_ram_gb: filters.minRamGb }),
+        ...(filters.minVcpu === undefined ? {} : { min_vcpu: filters.minVcpu })
       },
-      summary: summarizeNodeCatalogPlans(plans, items, billingType, family)
+      summary: summarizeNodeCatalogPlans(plans, items, billingType, filters)
     };
   }
 
@@ -788,6 +835,40 @@ export class NodeService {
 
     return {
       action: 'power-on',
+      node_id: normalizedNodeId,
+      result: summarizeNodeAction(result)
+    };
+  }
+
+  async rebootNode(
+    nodeId: string,
+    options: NodeContextOptions
+  ): Promise<NodeRebootCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const client = await this.createNodeClient(options);
+    const result = await client.rebootNode(String(normalizedNodeId));
+
+    return {
+      action: 'reboot',
+      node_id: normalizedNodeId,
+      result: summarizeNodeAction(result)
+    };
+  }
+
+  async setDeletionProtection(
+    nodeId: string,
+    enabled: boolean,
+    options: NodeContextOptions
+  ): Promise<NodeProtectionCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const client = await this.createNodeClient(options);
+    const result = await client.setDeletionProtection(
+      String(normalizedNodeId),
+      enabled
+    );
+
+    return {
+      action: enabled ? 'protect' : 'unprotect',
       node_id: normalizedNodeId,
       result: summarizeNodeAction(result)
     };
@@ -864,13 +945,22 @@ export class NodeService {
     options: NodeUpgradeOptions
   ): Promise<NodeUpgradeCommandResult> {
     const normalizedNodeId = assertNodeId(nodeId);
+    const plan = normalizeRequiredString(options.plan, 'Plan', '--plan');
+    if (!(options.force ?? false)) {
+      assertCanUpgrade(this.dependencies.isInteractive);
+    }
+
+    const client = await this.createNodeClient(options);
+    const imageKept = options.image === undefined;
     const requested = {
-      image: normalizeRequiredString(options.image, 'Image', '--image'),
-      plan: normalizeRequiredString(options.plan, 'Plan', '--plan')
+      image:
+        options.image === undefined
+          ? await findCurrentImage(client, normalizedNodeId, plan)
+          : normalizeRequiredString(options.image, 'Image', '--image'),
+      plan
     };
 
     if (!(options.force ?? false)) {
-      assertCanUpgrade(this.dependencies.isInteractive);
       const confirmed = await this.dependencies.confirm(
         `Upgrade node ${normalizedNodeId} to plan ${requested.plan} with image ${requested.image}? This is disruptive.`
       );
@@ -879,13 +969,13 @@ export class NodeService {
         return {
           action: 'upgrade',
           cancelled: true,
+          image_kept: imageKept,
           node_id: normalizedNodeId,
           requested
         };
       }
     }
 
-    const client = await this.createNodeClient(options);
     const result = await client.upgradeNode(
       String(normalizedNodeId),
       requested
@@ -894,10 +984,52 @@ export class NodeService {
     return {
       action: 'upgrade',
       details: summarizeNodeUpgradeDetails(result),
+      image_kept: imageKept,
       message: result.message,
       node_id: normalizedNodeId,
       requested
     };
+  }
+
+  // Polls until the new node is running. Every failure names the node,
+  // because it exists and is billed even when the wait gives up.
+  private async waitForNodeReady(
+    client: NodeClient,
+    result: NodeCreateResult
+  ): Promise<NodeDetails> {
+    const nodeId = result.node_create_response[0]?.id;
+    if (nodeId === undefined) {
+      throw new CliError(
+        'E2E did not return the new node, so the CLI cannot wait for it.',
+        {
+          code: 'NODE_WAIT_FAILED',
+          exitCode: EXIT_CODES.network,
+          suggestion: `Run ${formatMyAccountCommand('node list')} to find the node and check its status.`
+        }
+      );
+    }
+
+    const poll = this.dependencies.nodeReadyPoll ?? NODE_READY_POLL;
+    const ready = await pollUntilFound(
+      () => checkNodeReady(client, nodeId),
+      poll
+    ).catch((error: unknown) => {
+      throw toNodeWaitError(error, nodeId);
+    });
+
+    if (ready === undefined) {
+      const minutes = Math.round((poll.attempts * poll.intervalMs) / 60_000);
+      throw new CliError(
+        `Node ${nodeId} is not running after ${minutes} minutes.`,
+        {
+          code: 'NODE_WAIT_TIMEOUT',
+          exitCode: EXIT_CODES.general,
+          suggestion: `The node exists and is billed. Check it with ${formatMyAccountCommand(`node get ${nodeId}`)}, or delete it with ${formatMyAccountCommand(`node delete ${nodeId}`)}.`
+        }
+      );
+    }
+
+    return ready;
   }
 
   private async createNodeClient(
@@ -942,6 +1074,126 @@ export class NodeService {
   ): Promise<NodeDetails> {
     return await nodeClient.getNode(String(nodeId));
   }
+}
+
+// E2E refuses to delete a node with deletion protection on; say how to
+// turn it off instead of the generic API hint.
+function explainProtectedDelete(error: unknown, nodeId: number): unknown {
+  if (
+    !(error instanceof AppError) ||
+    !error.details.some((detail) => /accidental protection/i.test(detail))
+  ) {
+    return error;
+  }
+
+  return new CliError(`Node ${nodeId} has deletion protection on.`, {
+    cause: error,
+    code: 'NODE_DELETE_PROTECTED',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Run ${formatMyAccountCommand(`node action unprotect ${nodeId}`)}, then delete it again.`
+  });
+}
+
+async function checkNodeReady(
+  client: NodeClient,
+  nodeId: number
+): Promise<NodeDetails | undefined> {
+  const node = await client.getNode(String(nodeId));
+
+  if (/fail|error/i.test(node.status)) {
+    throw new CliError(
+      `Node ${nodeId} failed to start (status: ${node.status}).`,
+      {
+        code: 'NODE_CREATE_FAILED',
+        exitCode: EXIT_CODES.general,
+        suggestion: `Delete it with ${formatMyAccountCommand(`node delete ${nodeId}`)} and create it again, or contact support if it keeps failing.`
+      }
+    );
+  }
+
+  return node.status === NODE_READY_STATUS ? node : undefined;
+}
+
+function toNodeWaitError(error: unknown, nodeId: number): CliError {
+  if (error instanceof CliError && error.code === 'NODE_CREATE_FAILED') {
+    return error;
+  }
+
+  return new CliError(
+    `Node ${nodeId} was created, but checking whether it is running failed.`,
+    {
+      cause: error,
+      code: 'NODE_WAIT_FAILED',
+      details: error instanceof Error ? [`Reason: ${error.message}`] : [],
+      exitCode: EXIT_CODES.network,
+      suggestion: `The node exists and is billed. Check it with ${formatMyAccountCommand(`node get ${nodeId}`)}.`
+    }
+  );
+}
+
+// Upgrading needs an image. To keep the node's own image, find the one
+// catalog row that matches its OS exactly and that row's image for the new
+// plan. Anything less than an exact match fails rather than guessing.
+async function findCurrentImage(
+  client: NodeClient,
+  nodeId: number,
+  plan: string
+): Promise<string> {
+  const os = (await client.getNode(String(nodeId))).os_info;
+  const rows = summarizeNodeCatalogOs(await client.listNodeCatalogOs()).filter(
+    (row) =>
+      row.display_category === os?.category &&
+      row.os === os.name &&
+      row.os_version === os.version
+  );
+  const row = rows.length === 1 ? rows[0] : undefined;
+  if (row === undefined) {
+    throw currentImageError(
+      `Could not tell which image node ${nodeId} runs, so it cannot be kept.`,
+      nodeId
+    );
+  }
+
+  const images = new Set(
+    (
+      await client.listNodeCatalogPlans({
+        category: row.category,
+        display_category: row.display_category,
+        os: row.os,
+        osversion: row.os_version
+      })
+    )
+      .filter((candidate) => candidate.plan === plan)
+      .map((candidate) => candidate.image)
+  );
+  const [image] = images;
+  if (images.size !== 1 || image === undefined) {
+    throw currentImageError(
+      `Plan ${plan} is not offered for the image node ${nodeId} runs (${row.os} ${row.os_version}).`,
+      nodeId,
+      row
+    );
+  }
+
+  return image;
+}
+
+function currentImageError(
+  message: string,
+  nodeId: number,
+  row?: NodeCatalogOsEntry
+): CliError {
+  const catalogCommand =
+    row === undefined
+      ? 'node catalog os'
+      : `node catalog plans --display-category "${row.display_category}" --category "${row.category}" --os "${row.os}" --os-version "${row.os_version}"`;
+
+  return new CliError(message, {
+    code: 'NODE_IMAGE_UNKNOWN',
+    details: [`Node ID: ${nodeId}`],
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Pass --image with a plan and image pair from ${formatMyAccountCommand(catalogCommand)}.`
+  });
 }
 
 function assertCanDelete(isInteractive: boolean): void {

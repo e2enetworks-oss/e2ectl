@@ -17,6 +17,9 @@
 e2ectl myaccount node catalog os
 ```
 
+The rows include GPU nodes where the location offers them: display category `GPU`, category `Gpu`.
+On the test account those are in Delhi only.
+
 ### Discover Exact Plans And Images
 
 ```bash
@@ -27,6 +30,26 @@ e2ectl myaccount node catalog plans \
   --os-version "<os-version>" \
   --billing-type all
 ```
+
+Narrow the list with these filters:
+
+| Flag                 | Keeps plans with                                         |
+| -------------------- | -------------------------------------------------------- |
+| `--gpu-type <card>`  | that GPU card, for example `T4`, `A100` or `Nvidia-L40S` |
+| `--min-vcpu <count>` | at least that many vCPUs                                 |
+| `--min-ram <gb>`     | at least that much RAM, in GB                            |
+
+For example, every GPU plan with an A100 and at least 32 vCPUs:
+
+```bash
+e2ectl myaccount node catalog plans --location Delhi \
+  --display-category GPU --category Gpu --os Ubuntu --os-version 24.04 \
+  --gpu-type A100 --min-vcpu 32
+```
+
+Each `--json` item has `config.gpu`: `{ "count": 1, "memory_gb": 16, "type": "Nvidia-T4" }`, or
+`null` for plans without a GPU. A GPU node is created with `node create` like any other node, using
+the plan and image from this list.
 
 ### List And Inspect Nodes
 
@@ -43,6 +66,11 @@ e2ectl myaccount node create \
   --plan <plan> \
   --image <image>
 ```
+
+Add `--wait` to return only when the node is running. It checks every 10 seconds for up to 20
+minutes, and the `--json` output then includes the running node under `node`. If the node fails
+to start or is still not running after 20 minutes, the error names the node so you can check or
+delete it: it exists and is billed either way.
 
 For committed billing, add `--billing-type committed --committed-plan-id <committed-plan-id>`.
 
@@ -63,9 +91,17 @@ e2ectl myaccount node create \
 ### Upgrade A Node
 
 ```bash
-e2ectl myaccount node upgrade <node-id> \
-  --plan <plan> \
-  --image <image>
+e2ectl myaccount node upgrade <node-id> --plan <plan>
+```
+
+The node keeps the image it runs now. The CLI finds that image from the node's OS and the catalog;
+if it cannot match exactly one catalog row, or the plan is not offered for that image, it stops and
+asks for `--image`. `--json` reports `"image_kept": true` when the image was kept.
+
+To switch the image at the same time, pass it:
+
+```bash
+e2ectl myaccount node upgrade <node-id> --plan <plan> --image <image>
 ```
 
 ### Power A Node Off Or On
@@ -74,6 +110,22 @@ e2ectl myaccount node upgrade <node-id> \
 e2ectl myaccount node action power-off <node-id>
 e2ectl myaccount node action power-on <node-id>
 ```
+
+### Reboot A Node
+
+```bash
+e2ectl myaccount node action reboot <node-id>
+```
+
+### Protect A Node From Deletion
+
+```bash
+e2ectl myaccount node action protect <node-id>
+e2ectl myaccount node action unprotect <node-id>
+```
+
+A protected node cannot be deleted until protection is turned off. `node get` shows
+`Deletion Protection: on` or `off`.
 
 ### Save A Node As An Image
 

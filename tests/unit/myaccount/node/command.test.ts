@@ -74,11 +74,9 @@ function createNodeClientStub() {
   );
   const listNodeCatalogOs = vi.fn(() =>
     Promise.resolve({
-      category_list: [
-        {
-          OS: 'Ubuntu',
-          category: ['Linux Virtual Node'],
-          version: [
+      category_list: {
+        'Linux Virtual Node': {
+          Ubuntu: [
             {
               number_of_domains: null,
               os: 'Ubuntu',
@@ -88,7 +86,7 @@ function createNodeClientStub() {
             }
           ]
         }
-      ]
+      }
     })
   );
   const listNodeCatalogPlans = vi.fn(() =>
@@ -162,6 +160,24 @@ function createNodeClientStub() {
       status: 'In Progress'
     })
   );
+  const rebootNode = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'Reboot',
+      created_at: '2026-03-14T08:15:00Z',
+      id: 704,
+      resource_id: '101',
+      status: 'In Progress'
+    })
+  );
+  const setDeletionProtection = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'enable_accidental_protection',
+      created_at: '2026-03-14T08:16:00Z',
+      id: 705,
+      resource_id: '101',
+      status: 'Done'
+    })
+  );
   const saveNodeImage = vi.fn(() =>
     Promise.resolve({
       action_type: 'Save Image',
@@ -192,7 +208,9 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
+    rebootNode,
     saveNodeImage,
+    setDeletionProtection,
     upgradeNode
   };
 
@@ -206,7 +224,9 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
+    rebootNode,
     saveNodeImage,
+    setDeletionProtection,
     upgradeNode,
     stub
   };
@@ -1178,6 +1198,7 @@ describe('node commands', () => {
             config: {
               disk_gb: 100,
               family: null,
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -1402,6 +1423,7 @@ describe('node commands', () => {
           old_node_image_id: 8801,
           vm_id: 100157
         },
+        image_kept: false,
         message: 'Node upgrade initiated',
         node_id: 101,
         requested: {
