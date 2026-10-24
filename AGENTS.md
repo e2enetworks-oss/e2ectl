@@ -83,7 +83,7 @@ Rules:
 - Clients own endpoint paths and response parsing.
 - Formatters own human-readable output and deterministic `--json` output.
 - Keep generic API execution and failure handling centralized in `src/http/transport.ts`.
-- Cross-product imports go through each product's `index.ts`; ESLint enforces this.
+- Cross-product imports go through each product's `index.ts`; oxlint enforces this (`.oxlintrc.json`).
 - Start a new product with `make new-domain <platform>/<product>`.
 
 ## Documentation Contract

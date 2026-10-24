@@ -14,7 +14,7 @@ help:
 	@printf "  make dev      Run the CLI in development mode\n"
 	@printf "  make up       No-op for this repository\n"
 	@printf "  make down     No-op for this repository\n"
-	@printf "  make lint     Run format check, ESLint, and typecheck\n"
+	@printf "  make lint     Run format check, oxlint, and typecheck\n"
 	@printf "  make test     Run unit tests\n"
 	@printf "  make coverage Run unit and integration coverage reports\n"
 	@printf "  make build    Build the CLI\n"
