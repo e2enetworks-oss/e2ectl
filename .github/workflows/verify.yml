@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - develop
+      - platform-split
   pull_request:
     branches:
       - develop
       - main
+      - platform-split
   merge_group:
     branches:
       - main
@@ -71,6 +73,14 @@ jobs:
 
       - name: Package dry run
         run: npm pack --dry-run
+
+      # Runs last because it changes the checkout: generates a throwaway
+      # product and checks that it builds, lints and passes its own test.
+      - name: New product generator
+        run: |
+          make new-domain tir/foo
+          make lint
+          npx vitest run tests/unit/tir/foo tests/unit/app
 
   verify-macos:
     name: verify (macos build test package)
