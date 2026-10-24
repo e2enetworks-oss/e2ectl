@@ -365,7 +365,7 @@ describe('dbaas validation through the built CLI', () => {
       expect(result.exitCode).toBe(2);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe(
-        'Error: No DBaaS plan matches "Unknown Plan".\n\nNext step: Run dbaas plans with the same --type and --db-version values, then retry with one of the listed plan names.\n'
+        'Error: No DBaaS plan matches "Unknown Plan".\n\nNext step: Run e2ectl myaccount dbaas plans with the same --type and --db-version values, then retry with one of the listed plan names.\n'
       );
     } finally {
       await server.close();
