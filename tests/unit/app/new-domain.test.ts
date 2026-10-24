@@ -67,7 +67,11 @@ describe('parseDomainName', () => {
 });
 
 describe('reserved names', () => {
-  it.each(['app/foo', 'config/foo', 'core/foo', 'http/foo'])(
+  it('refuses "help" as a product name', () => {
+    expect(() => parseDomainName('tir/help')).toThrow('is the help command');
+  });
+
+  it.each(['app/foo', 'config/foo', 'core/foo', 'help/foo', 'http/foo'])(
     'refuses %s because that folder is shared code',
     (input) => {
       expect(() => parseDomainName(input)).toThrow(

@@ -262,6 +262,11 @@ function buildReserveIpCommand(
     "Reserve a load balancer's current public IP."
   );
 
+  command.helpCommand(
+    'help [command]',
+    'Show help for lb network reserve-ip commands'
+  );
+
   addContextOptions(
     command
       .command('reserve <lbId>')
@@ -289,6 +294,11 @@ function buildVpcCommand(
 ): Command {
   const command = new Command('vpc').description(
     'Manage load balancer VPC attachment.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for lb network vpc commands'
   );
 
   addContextOptions(
@@ -352,6 +362,11 @@ function buildBackendGroupCommand(
 ): Command {
   const command = new Command('group').description(
     'Manage backend groups on a load balancer.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for lb backend group commands'
   );
 
   addContextOptions(
@@ -464,6 +479,11 @@ function buildBackendServerCommand(
 ): Command {
   const command = new Command('server').description(
     'Manage backend servers on a load balancer.'
+  );
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for lb backend server commands'
   );
 
   addContextOptions(

@@ -54,6 +54,17 @@ describe('isBusyRefusal', () => {
   });
 });
 
+describe('classifyCleanupError with API details', () => {
+  it('does not treat a 404 status line in the details as already gone', () => {
+    const error = Object.assign(
+      new Error('MyAccount API request failed: Bad Request'),
+      { details: ['HTTP status: 404 Not Found', 'Path: /nodes/1/'] }
+    );
+
+    expect(classifyCleanupError(error)).toBe('retryable');
+  });
+});
+
 describe('formatError', () => {
   it('adds the error details after the message', () => {
     const error = Object.assign(

@@ -2,7 +2,13 @@
 // `node scripts/new-domain.mjs tir/foo`. Works out every change before
 // writing, so a bad name or a missing place to edit writes nothing; then
 // writes the files and formats them.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -63,6 +69,13 @@ function planChanges(names) {
     throw new Error(`${productDirectory} already exists.`);
   }
 
+  const existingCommand = findCommandFile(names.platform, names.product);
+  if (existingCommand !== undefined) {
+    throw new Error(
+      `${existingCommand} already defines a "${names.product}" command on ${names.platform}.`
+    );
+  }
+
   const runtimeSource = read('src/app/runtime.ts');
   if (runtimeSource.includes(`create${names.baseName}Client`)) {
     throw new Error(
@@ -96,6 +109,24 @@ function planChanges(names) {
   }
 
   return changes;
+}
+
+// A product folder's name can differ from its command (load-balancer is
+// `lb`), so look for the command itself in the platform's command files.
+function findCommandFile(platform, product) {
+  const platformDirectory = path.join(repoRoot, 'src', platform);
+  if (!existsSync(platformDirectory)) {
+    return undefined;
+  }
+
+  const marker = `new Command('${product}')`;
+  return readdirSync(platformDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join('src', platform, entry.name, 'command.ts'))
+    .find(
+      (file) =>
+        existsSync(path.join(repoRoot, file)) && read(file).includes(marker)
+    );
 }
 
 function read(relativePath) {

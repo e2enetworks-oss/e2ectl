@@ -9,7 +9,7 @@ const NAME_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const MYACCOUNT_NAME = 'MyAccount';
 
 // Shared folders under src that must never become a platform.
-const RESERVED_PLATFORMS = new Set(['app', 'config', 'core', 'http']);
+const RESERVED_PLATFORMS = new Set(['app', 'config', 'core', 'help', 'http']);
 
 export function parseDomainName(input) {
   const parts = (input ?? '').trim().split('/');
@@ -25,6 +25,10 @@ export function parseDomainName(input) {
   }
 
   const [platform, product] = parts;
+  if (product === 'help') {
+    throw new Error('"help" is the help command, not a product name.');
+  }
+
   if (RESERVED_PLATFORMS.has(platform)) {
     throw new Error(
       `"${platform}" is shared code under src, not a platform. Use a platform such as myaccount or tir.`

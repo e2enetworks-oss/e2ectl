@@ -45,7 +45,11 @@ export function classifyCleanupMessage(message) {
 }
 
 export function classifyCleanupError(error) {
-  return classifyCleanupMessage(formatError(error));
+  // Only the message: details hold the HTTP status line, and a 404 from a
+  // wrong address must not be mistaken for "already deleted".
+  return classifyCleanupMessage(
+    error instanceof Error ? error.message : String(error)
+  );
 }
 
 // The fallback clients throw errors whose message can be as short as
