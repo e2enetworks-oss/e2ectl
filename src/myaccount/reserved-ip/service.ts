@@ -7,6 +7,7 @@ import {
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
+import { pollUntilFound } from '../../core/waiter.js';
 import type { NodeClient, NodeDetails } from '../node/index.js';
 import type { ReservedIpClient } from './client.js';
 import type {
@@ -420,19 +421,13 @@ async function findReservedIpInInventoryWithRetry(
   client: ReservedIpClient,
   ipAddress: string
 ): Promise<ReservedIpItem | undefined> {
-  for (let attempt = 1; attempt <= RESERVED_IP_POLL_ATTEMPTS; attempt += 1) {
-    const item = await findReservedIpInInventory(client, ipAddress);
-
-    if (item !== undefined) {
-      return item;
+  return await pollUntilFound(
+    () => findReservedIpInInventory(client, ipAddress),
+    {
+      attempts: RESERVED_IP_POLL_ATTEMPTS,
+      intervalMs: RESERVED_IP_POLL_INTERVAL_MS
     }
-
-    if (attempt < RESERVED_IP_POLL_ATTEMPTS) {
-      await wait(RESERVED_IP_POLL_INTERVAL_MS);
-    }
-  }
-
-  return undefined;
+  );
 }
 
 async function findReservedIpInInventory(
@@ -512,12 +507,6 @@ function normalizeOptionalString(
   }
 
   return value;
-}
-
-async function wait(durationMs: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
 }
 
 function readPositiveIntegerEnv(name: string, fallback: number): number {
