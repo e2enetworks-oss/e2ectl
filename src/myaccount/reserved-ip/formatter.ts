@@ -5,7 +5,10 @@ import { stableStringify, type JsonValue } from '../../core/json.js';
 import type {
   ReservedIpAttachmentNodeItem,
   ReservedIpCommandResult,
-  ReservedIpItem
+  ReservedIpCreateCommandResult,
+  ReservedIpGetCommandResult,
+  ReservedIpItem,
+  ReservedIpNodeActionCommandResult
 } from './service.js';
 
 export function renderReservedIpResult(
@@ -57,51 +60,17 @@ function formatReservedIpAttachmentTable(
 function renderReservedIpHuman(result: ReservedIpCommandResult): string {
   switch (result.action) {
     case 'attach-node':
-      return (
-        `Attached reserved IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
-        `Status: ${result.reserved_ip.status ?? '--'}\n` +
-        `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
-        `Message: ${result.message}\n`
-      );
+      return renderReservedIpAttachNodeHuman(result);
     case 'create':
-      return (
-        `Created reserved IP: ${result.reserved_ip.ip_address}\n` +
-        'Source: default-network\n' +
-        `Status: ${result.reserved_ip.status ?? '--'}\n` +
-        `Type: ${formatReservedIpType(result.reserved_ip)}\n` +
-        `Project: ${result.reserved_ip.project_name ?? '--'}\n` +
-        `Reserve ID: ${result.reserved_ip.reserve_id ?? '--'}\n` +
-        '\n' +
-        `Next: run ${formatMyAccountCommand('reserved-ip list')} to inspect the current state.\n`
-      );
+      return renderReservedIpCreateHuman(result);
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
         : `Deleted reserved IP ${result.ip_address}.\nMessage: ${result.message ?? ''}\n`;
     case 'detach-node':
-      return (
-        `Detached reserved IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
-        `Status: ${result.reserved_ip.status ?? '--'}\n` +
-        `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
-        `Message: ${result.message}\n`
-      );
-    case 'get': {
-      const attachmentSection =
-        result.reserved_ip.floating_ip_attached_nodes.length === 0
-          ? 'Floating Attached Nodes: none\n'
-          : `Floating Attached Nodes (${result.reserved_ip.floating_ip_attached_nodes.length})\n${formatReservedIpAttachmentTable(result.reserved_ip.floating_ip_attached_nodes)}\n`;
-
-      return (
-        `Reserved IP: ${result.reserved_ip.ip_address}\n` +
-        `Status: ${result.reserved_ip.status ?? '--'}\n` +
-        `Attached VM: ${formatAttachedVm(result.reserved_ip)}\n` +
-        `Type: ${formatReservedIpType(result.reserved_ip)}\n` +
-        `Project: ${result.reserved_ip.project_name ?? '--'}\n` +
-        `Bought At: ${result.reserved_ip.bought_at ?? '--'}\n` +
-        `Reserve ID: ${result.reserved_ip.reserve_id ?? '--'}\n` +
-        `${attachmentSection}`
-      );
-    }
+      return renderReservedIpDetachNodeHuman(result);
+    case 'get':
+      return renderReservedIpGetHuman(result);
     case 'list':
       return result.items.length === 0
         ? 'No reserved IPs found.\n'
@@ -113,6 +82,61 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
         `Message: ${result.message}\n`
       );
   }
+}
+
+function renderReservedIpAttachNodeHuman(
+  result: ReservedIpNodeActionCommandResult
+): string {
+  return (
+    `Attached reserved IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
+    `Status: ${result.reserved_ip.status ?? '--'}\n` +
+    `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
+    `Message: ${result.message}\n`
+  );
+}
+
+function renderReservedIpDetachNodeHuman(
+  result: ReservedIpNodeActionCommandResult
+): string {
+  return (
+    `Detached reserved IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
+    `Status: ${result.reserved_ip.status ?? '--'}\n` +
+    `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
+    `Message: ${result.message}\n`
+  );
+}
+
+function renderReservedIpCreateHuman(
+  result: ReservedIpCreateCommandResult
+): string {
+  return (
+    `Created reserved IP: ${result.reserved_ip.ip_address}\n` +
+    'Source: default-network\n' +
+    `Status: ${result.reserved_ip.status ?? '--'}\n` +
+    `Type: ${formatReservedIpType(result.reserved_ip)}\n` +
+    `Project: ${result.reserved_ip.project_name ?? '--'}\n` +
+    `Reserve ID: ${result.reserved_ip.reserve_id ?? '--'}\n` +
+    '\n' +
+    `Next: run ${formatMyAccountCommand('reserved-ip list')} to inspect the current state.\n`
+  );
+}
+
+function renderReservedIpGetHuman(result: ReservedIpGetCommandResult): string {
+  const attachmentSection =
+    result.reserved_ip.floating_ip_attached_nodes.length === 0
+      ? 'Floating Attached Nodes: none\n'
+      : `Floating Attached Nodes (${result.reserved_ip.floating_ip_attached_nodes.length})\n${formatReservedIpAttachmentTable(result.reserved_ip.floating_ip_attached_nodes)}\n`;
+
+  return (
+    `Reserved IP: ${result.reserved_ip.ip_address}\n` +
+    `Status: ${result.reserved_ip.status ?? '--'}\n` +
+    `Attached VM: ${formatAttachedVm(result.reserved_ip)}\n` +
+    `Type: ${formatReservedIpType(result.reserved_ip)}\n` +
+    `Project: ${result.reserved_ip.project_name ?? '--'}\n` +
+    `Bought At: ${result.reserved_ip.bought_at ?? '--'}\n` +
+    `Reserve ID: ${result.reserved_ip.reserve_id ?? '--'}\n` +
+    `${attachmentSection}`
+  );
 }
 
 function renderReservedIpJson(result: ReservedIpCommandResult): string {

@@ -297,53 +297,28 @@ function hasVisibleValue(value: string): boolean {
   return value.trim().length > 0;
 }
 
+// Attach and detach results share a similar shape, so they are rendered in a
+// separate switch to keep each switch short.
+type NodeAttachmentCommandResult = Extract<
+  NodeCommandResult,
+  {
+    action:
+      | 'security-group-attach'
+      | 'security-group-detach'
+      | 'ssh-key-attach'
+      | 'volume-attach'
+      | 'volume-detach'
+      | 'vpc-attach'
+      | 'vpc-detach';
+  }
+>;
+
 function renderNodeHuman(result: NodeCommandResult): string {
   switch (result.action) {
-    case 'catalog-os': {
-      const entries = summarizeNodeCatalogOs(result.catalog);
-      if (entries.length === 0) {
-        return 'No OS catalog rows found.\n';
-      }
-
-      return (
-        `${formatNodeCatalogOsTable(entries)}\n\nUse one row with:\n` +
-        `${formatMyAccountCommand('node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>')}\n`
-      );
-    }
-    case 'catalog-plans': {
-      const filterSummary = formatNodeCatalogFilterSummary(result.query);
-      const familySummary = formatNodeCatalogFamiliesSummary(
-        result.summary,
-        result.items
-      );
-      if (result.items.length === 0) {
-        return [
-          filterSummary,
-          familySummary,
-          formatNodeCatalogEmptyMessage(result)
-        ]
-          .filter((section) => section.length > 0)
-          .join('\n\n')
-          .concat('\n');
-      }
-
-      const sections = [
-        filterSummary,
-        ...(familySummary.length === 0 ? [] : [familySummary]),
-        'Candidate Configs',
-        formatNodeCatalogPlansTable(result.items)
-      ];
-
-      if (result.query.billing_type !== 'hourly') {
-        sections.push(formatCommittedOptionsSection(result.items));
-      }
-
-      sections.push(
-        formatNodeCatalogCreateExamples(result.items, result.query.billing_type)
-      );
-
-      return `${sections.join('\n\n')}\n`;
-    }
+    case 'catalog-os':
+      return formatNodeCatalogOsResult(result);
+    case 'catalog-plans':
+      return formatNodeCatalogPlansResult(result);
     case 'create':
       return (
         formatNodeCreateBilling(result.billing)
@@ -382,6 +357,15 @@ function renderNodeHuman(result: NodeCommandResult): string {
       );
     case 'upgrade':
       return formatNodeUpgradeResult(result);
+    default:
+      return renderNodeAttachmentHuman(result);
+  }
+}
+
+function renderNodeAttachmentHuman(
+  result: NodeAttachmentCommandResult
+): string {
+  switch (result.action) {
     case 'security-group-attach':
       return (
         [
@@ -423,45 +407,81 @@ function renderNodeHuman(result: NodeCommandResult): string {
           `Message: ${result.result.message}`
         ].join('\n') + '\n'
       );
-    case 'vpc-attach': {
-      const lines = [
-        `Requested VPC attach for node ${result.node_id}.`,
-        `VPC ID: ${result.vpc.id}`,
-        `VPC Name: ${result.vpc.name}`
-      ];
-
-      if (result.vpc.subnet_id !== null) {
-        lines.push(`Subnet ID: ${result.vpc.subnet_id}`);
-      }
-
-      if (result.vpc.private_ip !== null) {
-        lines.push(`Private IP: ${result.vpc.private_ip}`);
-      }
-
-      lines.push(`Message: ${result.result.message}`);
-
-      return `${lines.join('\n')}\n`;
-    }
-    case 'vpc-detach': {
-      const lines = [
-        `Requested VPC detach for node ${result.node_id}.`,
-        `VPC ID: ${result.vpc.id}`,
-        `VPC Name: ${result.vpc.name}`
-      ];
-
-      if (result.vpc.subnet_id !== null) {
-        lines.push(`Subnet ID: ${result.vpc.subnet_id}`);
-      }
-
-      if (result.vpc.private_ip !== null) {
-        lines.push(`Private IP: ${result.vpc.private_ip}`);
-      }
-
-      lines.push(`Message: ${result.result.message}`);
-
-      return `${lines.join('\n')}\n`;
-    }
+    case 'vpc-attach':
+      return formatNodeVpcResult('attach', result);
+    case 'vpc-detach':
+      return formatNodeVpcResult('detach', result);
   }
+}
+
+function formatNodeCatalogOsResult(
+  result: Extract<NodeCommandResult, { action: 'catalog-os' }>
+): string {
+  const entries = summarizeNodeCatalogOs(result.catalog);
+  if (entries.length === 0) {
+    return 'No OS catalog rows found.\n';
+  }
+
+  return (
+    `${formatNodeCatalogOsTable(entries)}\n\nUse one row with:\n` +
+    `${formatMyAccountCommand('node catalog plans --display-category <value> --category <value> --os <value> --os-version <value>')}\n`
+  );
+}
+
+function formatNodeCatalogPlansResult(
+  result: Extract<NodeCommandResult, { action: 'catalog-plans' }>
+): string {
+  const filterSummary = formatNodeCatalogFilterSummary(result.query);
+  const familySummary = formatNodeCatalogFamiliesSummary(
+    result.summary,
+    result.items
+  );
+  if (result.items.length === 0) {
+    return [filterSummary, familySummary, formatNodeCatalogEmptyMessage(result)]
+      .filter((section) => section.length > 0)
+      .join('\n\n')
+      .concat('\n');
+  }
+
+  const sections = [
+    filterSummary,
+    ...(familySummary.length === 0 ? [] : [familySummary]),
+    'Candidate Configs',
+    formatNodeCatalogPlansTable(result.items)
+  ];
+
+  if (result.query.billing_type !== 'hourly') {
+    sections.push(formatCommittedOptionsSection(result.items));
+  }
+
+  sections.push(
+    formatNodeCatalogCreateExamples(result.items, result.query.billing_type)
+  );
+
+  return `${sections.join('\n\n')}\n`;
+}
+
+function formatNodeVpcResult(
+  verb: 'attach' | 'detach',
+  result: Extract<NodeCommandResult, { action: 'vpc-attach' | 'vpc-detach' }>
+): string {
+  const lines = [
+    `Requested VPC ${verb} for node ${result.node_id}.`,
+    `VPC ID: ${result.vpc.id}`,
+    `VPC Name: ${result.vpc.name}`
+  ];
+
+  if (result.vpc.subnet_id !== null) {
+    lines.push(`Subnet ID: ${result.vpc.subnet_id}`);
+  }
+
+  if (result.vpc.private_ip !== null) {
+    lines.push(`Private IP: ${result.vpc.private_ip}`);
+  }
+
+  lines.push(`Message: ${result.result.message}`);
+
+  return `${lines.join('\n')}\n`;
 }
 
 function renderNodeJson(result: NodeCommandResult): string {
@@ -472,73 +492,11 @@ function renderNodeJson(result: NodeCommandResult): string {
         entries: summarizeNodeCatalogOs(result.catalog)
       });
     case 'catalog-plans':
-      return renderJson({
-        action: 'catalog-plans',
-        items: result.items.map((item) => ({
-          available_inventory: item.available_inventory,
-          committed_options: item.committed_options.map((option) => ({
-            days: option.days,
-            id: option.id,
-            name: option.name,
-            total_price: option.total_price
-          })),
-          config: {
-            disk_gb: item.config.disk_gb,
-            family: item.config.family,
-            ram: item.config.ram,
-            series: item.config.series,
-            vcpu: item.config.vcpu
-          },
-          currency: item.currency,
-          hourly: {
-            minimum_billing_amount: item.hourly.minimum_billing_amount,
-            price_per_hour: item.hourly.price_per_hour,
-            price_per_month: item.hourly.price_per_month
-          },
-          image: item.image,
-          plan: item.plan,
-          row: item.row,
-          sku: item.sku
-        })),
-        query: result.query
-      });
+      return renderNodeCatalogPlansJson(result);
     case 'create':
-      return renderJson({
-        action: 'create',
-        billing: {
-          billing_type: result.billing.billing_type,
-          ...(result.billing.committed_plan_id === undefined
-            ? {}
-            : {
-                committed_plan_id: result.billing.committed_plan_id
-              }),
-          ...(result.billing.post_commit_behavior === undefined
-            ? {}
-            : {
-                post_commit_behavior: result.billing.post_commit_behavior
-              })
-        },
-        created: result.result.total_number_of_node_created,
-        nodes: result.result.node_create_response,
-        requested: result.result.total_number_of_node_requested
-      });
+      return renderNodeCreateJson(result);
     case 'delete':
-      return renderJson(
-        result.cancelled
-          ? {
-              action: 'delete',
-              cancelled: true,
-              node_id: result.node_id,
-              reserve_public_ip_requested: result.reserve_public_ip_requested
-            }
-          : {
-              action: 'delete',
-              cancelled: false,
-              message: result.message ?? '',
-              node_id: result.node_id,
-              reserve_public_ip_requested: result.reserve_public_ip_requested
-            }
-      );
+      return renderNodeDeleteJson(result);
     case 'get':
       return renderJson({
         action: 'get',
@@ -564,21 +522,7 @@ function renderNodeJson(result: NodeCommandResult): string {
         result: normalizeNodeActionJson(result.result)
       });
     case 'public-ip-detach':
-      return renderJson(
-        'cancelled' in result
-          ? {
-              action: 'public-ip-detach',
-              cancelled: true,
-              node_id: result.node_id,
-              public_ip: result.public_ip
-            }
-          : {
-              action: 'public-ip-detach',
-              message: result.message,
-              node_id: result.node_id,
-              public_ip: result.public_ip
-            }
-      );
+      return renderNodePublicIpDetachJson(result);
     case 'save-image':
       return renderJson({
         action: 'save-image',
@@ -587,33 +531,14 @@ function renderNodeJson(result: NodeCommandResult): string {
         result: normalizeNodeActionJson(result.result)
       });
     case 'upgrade':
-      return renderJson(
-        'cancelled' in result
-          ? {
-              action: 'upgrade',
-              cancelled: true,
-              node_id: result.node_id,
-              requested: {
-                image: result.requested.image,
-                plan: result.requested.plan
-              }
-            }
-          : {
-              action: 'upgrade',
-              details: {
-                location: result.details.location,
-                new_node_image_id: result.details.new_node_image_id,
-                old_node_image_id: result.details.old_node_image_id,
-                vm_id: result.details.vm_id
-              },
-              message: result.message,
-              node_id: result.node_id,
-              requested: {
-                image: result.requested.image,
-                plan: result.requested.plan
-              }
-            }
-      );
+      return renderNodeUpgradeJson(result);
+    default:
+      return renderNodeAttachmentJson(result);
+  }
+}
+
+function renderNodeAttachmentJson(result: NodeAttachmentCommandResult): string {
+  switch (result.action) {
     case 'security-group-attach':
       return renderJson({
         action: 'security-group-attach',
@@ -697,6 +622,138 @@ function renderNodeJson(result: NodeCommandResult): string {
         }
       });
   }
+}
+
+function renderNodeCatalogPlansJson(
+  result: Extract<NodeCommandResult, { action: 'catalog-plans' }>
+): string {
+  return renderJson({
+    action: 'catalog-plans',
+    items: result.items.map((item) => ({
+      available_inventory: item.available_inventory,
+      committed_options: item.committed_options.map((option) => ({
+        days: option.days,
+        id: option.id,
+        name: option.name,
+        total_price: option.total_price
+      })),
+      config: {
+        disk_gb: item.config.disk_gb,
+        family: item.config.family,
+        ram: item.config.ram,
+        series: item.config.series,
+        vcpu: item.config.vcpu
+      },
+      currency: item.currency,
+      hourly: {
+        minimum_billing_amount: item.hourly.minimum_billing_amount,
+        price_per_hour: item.hourly.price_per_hour,
+        price_per_month: item.hourly.price_per_month
+      },
+      image: item.image,
+      plan: item.plan,
+      row: item.row,
+      sku: item.sku
+    })),
+    query: result.query
+  });
+}
+
+function renderNodeCreateJson(
+  result: Extract<NodeCommandResult, { action: 'create' }>
+): string {
+  return renderJson({
+    action: 'create',
+    billing: {
+      billing_type: result.billing.billing_type,
+      ...(result.billing.committed_plan_id === undefined
+        ? {}
+        : {
+            committed_plan_id: result.billing.committed_plan_id
+          }),
+      ...(result.billing.post_commit_behavior === undefined
+        ? {}
+        : {
+            post_commit_behavior: result.billing.post_commit_behavior
+          })
+    },
+    created: result.result.total_number_of_node_created,
+    nodes: result.result.node_create_response,
+    requested: result.result.total_number_of_node_requested
+  });
+}
+
+function renderNodeDeleteJson(
+  result: Extract<NodeCommandResult, { action: 'delete' }>
+): string {
+  return renderJson(
+    result.cancelled
+      ? {
+          action: 'delete',
+          cancelled: true,
+          node_id: result.node_id,
+          reserve_public_ip_requested: result.reserve_public_ip_requested
+        }
+      : {
+          action: 'delete',
+          cancelled: false,
+          message: result.message ?? '',
+          node_id: result.node_id,
+          reserve_public_ip_requested: result.reserve_public_ip_requested
+        }
+  );
+}
+
+function renderNodePublicIpDetachJson(
+  result: Extract<NodeCommandResult, { action: 'public-ip-detach' }>
+): string {
+  return renderJson(
+    'cancelled' in result
+      ? {
+          action: 'public-ip-detach',
+          cancelled: true,
+          node_id: result.node_id,
+          public_ip: result.public_ip
+        }
+      : {
+          action: 'public-ip-detach',
+          message: result.message,
+          node_id: result.node_id,
+          public_ip: result.public_ip
+        }
+  );
+}
+
+function renderNodeUpgradeJson(
+  result: Extract<NodeCommandResult, { action: 'upgrade' }>
+): string {
+  return renderJson(
+    'cancelled' in result
+      ? {
+          action: 'upgrade',
+          cancelled: true,
+          node_id: result.node_id,
+          requested: {
+            image: result.requested.image,
+            plan: result.requested.plan
+          }
+        }
+      : {
+          action: 'upgrade',
+          details: {
+            location: result.details.location,
+            new_node_image_id: result.details.new_node_image_id,
+            old_node_image_id: result.details.old_node_image_id,
+            vm_id: result.details.vm_id
+          },
+          message: result.message,
+          node_id: result.node_id,
+          requested: {
+            image: result.requested.image,
+            plan: result.requested.plan
+          }
+        }
+  );
 }
 
 function renderJson(value: unknown): string {

@@ -5,15 +5,21 @@ import { stableStringify, type JsonValue } from '../../core/json.js';
 import type {
   DbaasCommandResult,
   DbaasCommittedSkuItem,
+  DbaasCreateCommandResult,
   DbaasCreatedSummary,
   DbaasDetailItem,
   DbaasListItem,
   DbaasListTypeItem,
   DbaasPlansTemplateItem,
+  DbaasPublicIpAttachCommandResult,
+  DbaasPublicIpDetachCommandResult,
+  DbaasResetPasswordCommandResult,
   DbaasSummaryItem,
   DbaasVpcAttachCommandResult,
   DbaasVpcDetachCommandResult,
-  DbaasWhitelistedIpItem
+  DbaasWhitelistedIpItem,
+  DbaasWhitelistListCommandResult,
+  DbaasWhitelistUpdateCommandResult
 } from './types/index.js';
 
 export function renderDbaasResult(
@@ -117,31 +123,20 @@ export function formatDbaasCommittedSkusTable(
   return table.toString();
 }
 
+// VPC, public IP and whitelist results are rendered in a separate switch to
+// keep each switch short.
+type DbaasNetworkCommandResult =
+  | DbaasPublicIpAttachCommandResult
+  | DbaasPublicIpDetachCommandResult
+  | DbaasVpcAttachCommandResult
+  | DbaasVpcDetachCommandResult
+  | DbaasWhitelistListCommandResult
+  | DbaasWhitelistUpdateCommandResult;
+
 function renderDbaasHuman(result: DbaasCommandResult): string {
   switch (result.action) {
-    case 'create': {
-      const createTable = new Table({ head: ['Created DBaaS', ''] });
-      createTable.push(
-        ['Name', result.dbaas.name || '--'],
-        ['ID', String(result.dbaas.id)],
-        [
-          'DB Version',
-          formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
-        ],
-        ['Database Name', result.dbaas.database_name || '--'],
-        ['Billing Type', result.requested.billing_type || '--']
-      );
-      if (result.requested.committed_plan_id !== undefined) {
-        createTable.push([
-          'Committed Plan ID',
-          String(result.requested.committed_plan_id)
-        ]);
-      }
-      if (result.requested.vpc_id !== undefined) {
-        createTable.push(['VPC ID', String(result.requested.vpc_id)]);
-      }
-      return `${createTable.toString()}\n`;
-    }
+    case 'create':
+      return renderCreateHuman(result);
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -156,20 +151,15 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
       return renderListTypesHuman(result);
     case 'plans':
       return renderTemplatePlansHuman(result);
-    case 'reset-password': {
-      const resetTable = new Table({ head: ['Password Reset', ''] });
-      resetTable.push(
-        ['Name', result.dbaas.name || '--'],
-        ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
-        [
-          'DB Version',
-          formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
-        ],
-        ['Username', result.dbaas.username ?? '--'],
-        ['Message', result.message || '--']
-      );
-      return `${resetTable.toString()}\n`;
-    }
+    case 'reset-password':
+      return renderResetPasswordHuman(result);
+    default:
+      return renderDbaasNetworkHuman(result);
+  }
+}
+
+function renderDbaasNetworkHuman(result: DbaasNetworkCommandResult): string {
+  switch (result.action) {
     case 'vpc-attach':
       return renderVpcAttachHuman(result);
     case 'vpc-detach':
@@ -199,6 +189,47 @@ function renderDbaasHuman(result: DbaasCommandResult): string {
         (result.message == null ? '' : `Message: ${result.message}\n`)
       );
   }
+}
+
+function renderCreateHuman(result: DbaasCreateCommandResult): string {
+  const createTable = new Table({ head: ['Created DBaaS', ''] });
+  createTable.push(
+    ['Name', result.dbaas.name || '--'],
+    ['ID', String(result.dbaas.id)],
+    [
+      'DB Version',
+      formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
+    ],
+    ['Database Name', result.dbaas.database_name || '--'],
+    ['Billing Type', result.requested.billing_type || '--']
+  );
+  if (result.requested.committed_plan_id !== undefined) {
+    createTable.push([
+      'Committed Plan ID',
+      String(result.requested.committed_plan_id)
+    ]);
+  }
+  if (result.requested.vpc_id !== undefined) {
+    createTable.push(['VPC ID', String(result.requested.vpc_id)]);
+  }
+  return `${createTable.toString()}\n`;
+}
+
+function renderResetPasswordHuman(
+  result: DbaasResetPasswordCommandResult
+): string {
+  const resetTable = new Table({ head: ['Password Reset', ''] });
+  resetTable.push(
+    ['Name', result.dbaas.name || '--'],
+    ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
+    [
+      'DB Version',
+      formatDbaasVersion(result.dbaas.type, result.dbaas.version) || '--'
+    ],
+    ['Username', result.dbaas.username ?? '--'],
+    ['Message', result.message || '--']
+  );
+  return `${resetTable.toString()}\n`;
 }
 
 function renderGetHuman(item: DbaasDetailItem): string {
@@ -439,6 +470,15 @@ function normalizeDbaasJson(result: DbaasCommandResult): JsonValue {
         dbaas: normalizeSummaryJson(result.dbaas),
         message: result.message
       };
+    default:
+      return normalizeDbaasNetworkJson(result);
+  }
+}
+
+function normalizeDbaasNetworkJson(
+  result: DbaasNetworkCommandResult
+): JsonValue {
+  switch (result.action) {
     case 'vpc-attach':
       return {
         action: 'vpc-attach',
