@@ -11,7 +11,6 @@ export interface DomainNames {
 }
 
 export function parseDomainName(input: string | undefined): DomainNames;
-export function toPascalCase(name: string): string;
 export function insertAfterLastImport(source: string, text: string): string;
 export function insertBeforeLine(
   source: string,

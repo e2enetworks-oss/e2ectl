@@ -127,7 +127,9 @@ export function createRuntime(): CliRuntime {
       ),
     createVpcClient: (credentials) =>
       new VpcApiClient(createMyAccountTransport(credentials, apiClientOptions)),
-    credentialValidator: new ApiCredentialValidator(apiClientOptions),
+    credentialValidator: new ApiCredentialValidator((credentials) =>
+      createMyAccountTransport(credentials, apiClientOptions)
+    ),
     isInteractive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     prompt: promptForInput,
     stderr: process.stderr,

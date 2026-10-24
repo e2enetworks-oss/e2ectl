@@ -13,7 +13,6 @@ import type {
   FetchLike
 } from './types.js';
 
-const DEFAULT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const GET_RETRY_BACKOFF_MS = 250;
 const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
@@ -29,6 +28,9 @@ export interface ProjectContextOptions {
 export interface HttpTransportOptions extends ApiClientOptions {
   // Names the API in error messages, for example "MyAccount".
   apiName: string;
+  // Each platform passes its own address; there is no shared default, so a
+  // platform can never send requests to another platform's API by mistake.
+  baseUrl: string;
   // When set, every request sends the credentials' project_id and location
   // unless the call passes includeProjectContext: false.
   projectContext?: ProjectContextOptions;
@@ -66,7 +68,7 @@ export class HttpTransport implements ApiTransport {
   ) {
     this.apiName = options.apiName;
     this.credentials = credentials;
-    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.fetchFn = options.fetchFn ?? (fetch as FetchLike);
     this.projectContext = options.projectContext;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;

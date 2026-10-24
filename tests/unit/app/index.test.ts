@@ -87,11 +87,23 @@ describe('runCli', () => {
     ],
     [
       ['confg', 'list'],
-      'Error: Unknown command "confg".\n\nNext step: Run e2ectl --help to see the commands.\n'
+      'Error: Unknown command "confg".\n\nNext step: Did you mean "e2ectl config"? Run e2ectl --help to see the commands.\n'
     ],
     [
       ['myaccount', 'node', 'lst'],
-      'Error: Unknown command "lst".\n\nNext step: Run e2ectl myaccount node --help to see the commands.\n'
+      'Error: Unknown command "lst".\n\nNext step: Did you mean "e2ectl myaccount node list"? Run e2ectl myaccount node --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', 'nod', 'list', '--alias', 'prod'],
+      'Error: Unknown command "nod".\n\nNext step: Did you mean "e2ectl myaccount node"? Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
+      ['help', 'node'],
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
+    ],
+    [
+      ['xyz', '--alias', 'prod'],
+      'Error: Unknown command "xyz".\n\nNext step: Run e2ectl --help to see the commands.\n'
     ]
   ])('names an unknown command in %j', async (args, expected) => {
     const { runtime, stderr, stdout } = createRuntimeFixture();

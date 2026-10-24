@@ -79,7 +79,8 @@ jobs:
       - name: New product generator
         run: |
           make new-domain tir/foo
-          make lint
+          npm run typecheck
+          npx eslint src/tir src/app tests/unit/tir tests/helpers
           npx vitest run tests/unit/tir/foo tests/unit/app
 
   verify-macos:

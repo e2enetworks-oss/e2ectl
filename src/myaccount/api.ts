@@ -9,6 +9,9 @@ import {
 
 const MYACCOUNT_COMMAND = 'myaccount';
 
+export const MYACCOUNT_API_BASE_URL =
+  'https://api.e2enetworks.com/myaccount/api/v1';
+
 // Every MyAccount request carries a project and location unless the call
 // turns it off.
 export const MYACCOUNT_PROJECT_CONTEXT: ProjectContextOptions = {
@@ -23,6 +26,7 @@ export function createMyAccountTransport(
   return new HttpTransport(credentials, {
     ...options,
     apiName: 'MyAccount',
+    baseUrl: options.baseUrl ?? MYACCOUNT_API_BASE_URL,
     projectContext: MYACCOUNT_PROJECT_CONTEXT
   });
 }

@@ -60,7 +60,7 @@ export function parseDomainName(input) {
   };
 }
 
-export function toPascalCase(name) {
+function toPascalCase(name) {
   return name
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -189,9 +189,11 @@ export function registerInTestRuntime(source, names) {
 // A new platform's index registers its first product straight away.
 export function renderPlatformFiles(names) {
   const { displayName, platform, platformName } = names;
+  const addressConstant = `${platform.toUpperCase().replaceAll('-', '_')}_API_BASE_URL`;
 
   return {
     [`src/${platform}/api.ts`]: `import { formatCliCommand } from '../app/metadata.js';
+import { CliError, EXIT_CODES } from '../core/errors.js';
 import {
   HttpTransport,
   type ApiClientCredentials,
@@ -199,16 +201,28 @@ import {
   type ApiTransport
 } from '../http/index.js';
 
-// Until this platform has its own address, requests go to HttpTransport's
-// default address, which is the MyAccount API. Pass this platform's
-// baseUrl here once it is known.
+// Set this to the ${displayName} API address before adding real commands.
+// Until then every ${platform} command stops with a clear error instead of
+// sending requests somewhere else.
+const ${addressConstant}: string | undefined = undefined;
+
 export function create${platformName}Transport(
   credentials: ApiClientCredentials,
   options: ApiClientOptions = {}
 ): ApiTransport {
+  const baseUrl = options.baseUrl ?? ${addressConstant};
+  if (baseUrl === undefined) {
+    throw new CliError('The ${displayName} API address is not set yet.', {
+      code: 'PLATFORM_ADDRESS_MISSING',
+      exitCode: EXIT_CODES.config,
+      suggestion: 'Set ${addressConstant} in src/${platform}/api.ts.'
+    });
+  }
+
   return new HttpTransport(credentials, {
     ...options,
-    apiName: '${displayName}'
+    apiName: '${displayName}',
+    baseUrl
   });
 }
 
@@ -245,14 +259,8 @@ export function renderProductFiles(names) {
   const { baseName, isMyAccount, platform, product } = names;
   const directory = `src/${platform}/${product}`;
   const pathConstant = `${product.toUpperCase().replaceAll('-', '_')}_PATH`;
-  const contextOptions = isMyAccount
-    ? `export interface ${baseName}ContextOptions {
-  alias?: string;
-  location?: string;
-  projectId?: string;
-}`
-    : `export interface ${baseName}ContextOptions {
-  alias?: string;
+  const contextOptions = `export interface ${baseName}ContextOptions {
+  alias?: string;${isMyAccount ? '\n  location?: string;\n  projectId?: string;' : ''}
 }`;
 
   return {

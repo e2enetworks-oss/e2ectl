@@ -34,7 +34,7 @@ export async function runCli(
   prepareProgramForCli(program);
 
   try {
-    rejectMovedCommand(program, argv.slice(2));
+    rejectUnknownCommand(program, argv.slice(2));
     await program.parseAsync(argv);
     return EXIT_CODES.success;
   } catch (error: unknown) {
@@ -70,76 +70,86 @@ export function pathsReferToSameFile(
 }
 
 function prepareProgramForCli(program: Command): void {
-  program.hook('preAction', rejectUnknownSubcommand);
-  prepareCommandForCli(program);
-}
-
-function prepareCommandForCli(command: Command): void {
-  // A command group (one with subcommands) lets an unknown word through so
-  // rejectUnknownSubcommand can name it, instead of Commander's "too many
-  // arguments".
-  command.allowExcessArguments(command.commands.length > 0);
-  command.configureOutput({
+  program.allowExcessArguments(false);
+  program.configureOutput({
     outputError: () => {},
     writeErr: () => {}
   });
-  command.exitOverride();
+  program.exitOverride();
 
-  for (const subcommand of command.commands) {
-    prepareCommandForCli(subcommand);
+  for (const command of program.commands) {
+    prepareProgramForCli(command);
   }
 }
 
-function rejectUnknownSubcommand(
-  _program: Command,
-  actionCommand: Command
-): void {
-  const [unknownName] = actionCommand.args;
+// Checks the command words typed (before any option) against the command
+// tree before Commander parses, so an unknown word is named the same way at
+// every level and whether or not options follow it. Every command group
+// shows its help when run on its own, which stops Commander from reporting
+// unknown words itself. Hints repeat only command words, never option
+// values, so a password typed on the line is not echoed back.
+function rejectUnknownCommand(program: Command, args: string[]): void {
+  const words = readCommandWords(program, args);
+  let group = program;
 
-  if (actionCommand.commands.length === 0 || unknownName === undefined) {
-    return;
-  }
-
-  throw new CliError(`Unknown command "${unknownName}".`, {
-    code: 'UNKNOWN_COMMAND',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Run ${formatCommandPath(actionCommand)} --help to see the commands.`
-  });
-}
-
-// Catches commands typed in their old place, such as `e2ectl node list`,
-// before Commander parses options, so a command with options of its own
-// (`--alias prod`) still gets the hint. The hint repeats only the command
-// words, never option values, so a password typed on the line is not
-// echoed back.
-function rejectMovedCommand(program: Command, args: string[]): void {
-  // Root options such as --json take no value, so they can be skipped.
-  const firstWordIndex = args.findIndex((arg) => !arg.startsWith('-'));
-  const commandWords: string[] = [];
-  for (const arg of firstWordIndex === -1 ? [] : args.slice(firstWordIndex)) {
-    if (arg.startsWith('-')) {
-      break;
+  for (const [index, word] of words.entries()) {
+    if (group.commands.length === 0) {
+      return;
     }
-    commandWords.push(arg);
-  }
 
-  const [firstWord] = commandWords;
-  if (
-    firstWord === undefined ||
-    program.commands.some((command) => command.name() === firstWord)
+    if (word === 'help') {
+      continue;
+    }
+
+    const next = group.commands.find((command) => command.name() === word);
+    if (next === undefined) {
+      throw unknownCommandError(group, word, words.slice(index + 1));
+    }
+
+    group = next;
+  }
+}
+
+// Top-level options such as --json take no value, so they can be skipped.
+// Anything else before the first word is left for Commander to report.
+function readCommandWords(program: Command, args: string[]): string[] {
+  let start = 0;
+  while (
+    start < args.length &&
+    program.options.some(
+      (option) => option.long === args[start] || option.short === args[start]
+    )
   ) {
-    return;
+    start += 1;
   }
 
-  const platform = findPlatformWithProduct(program, firstWord);
-  if (platform === undefined) {
-    return;
+  const rest = args.slice(start);
+  const end = rest.findIndex((arg) => arg.startsWith('-'));
+
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+function unknownCommandError(
+  group: Command,
+  word: string,
+  laterWords: string[]
+): CliError {
+  const groupPath = formatCommandPath(group);
+  const platform =
+    group.parent === null ? findPlatformWithProduct(group, word) : undefined;
+  const closest = findClosestCommandName(group, word);
+
+  let suggestion = `Run ${groupPath} --help to see the commands.`;
+  if (platform !== undefined) {
+    suggestion = `Commands now start with the platform name. Did you mean "${[formatCommandPath(platform), word, ...laterWords].join(' ')}"?`;
+  } else if (closest !== undefined) {
+    suggestion = `Did you mean "${groupPath} ${closest}"? Run ${groupPath} --help to see the commands.`;
   }
 
-  throw new CliError(`Unknown command "${firstWord}".`, {
+  return new CliError(`Unknown command "${word}".`, {
     code: 'UNKNOWN_COMMAND',
     exitCode: EXIT_CODES.usage,
-    suggestion: `Commands now start with the platform name. Did you mean "${program.name()} ${platform.name()} ${commandWords.join(' ')}"?`
+    suggestion
   });
 }
 
@@ -154,6 +164,47 @@ function findPlatformWithProduct(
       (product) => product.name() === productName && product.commands.length > 0
     )
   );
+}
+
+// The nearest command name within two edits (nod -> node, lst -> list).
+function findClosestCommandName(
+  group: Command,
+  word: string
+): string | undefined {
+  let closest: { distance: number; name: string } | undefined;
+
+  for (const command of group.commands) {
+    const distance = editDistance(word, command.name());
+    if (
+      distance <= 2 &&
+      (closest === undefined || distance < closest.distance)
+    ) {
+      closest = { distance, name: command.name() };
+    }
+  }
+
+  return closest?.name;
+}
+
+// Number of single-letter inserts, deletes or changes that turn one word
+// into the other.
+function editDistance(left: string, right: string): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+
+  for (let row = 1; row <= left.length; row += 1) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column += 1) {
+      const changeCost = left[row - 1] === right[column - 1] ? 0 : 1;
+      current[column] = Math.min(
+        (previous[column] ?? 0) + 1,
+        (current[column - 1] ?? 0) + 1,
+        (previous[column - 1] ?? 0) + changeCost
+      );
+    }
+    previous = current;
+  }
+
+  return previous[right.length] ?? 0;
 }
 
 function formatCommandPath(command: Command): string {

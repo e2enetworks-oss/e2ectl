@@ -1,6 +1,6 @@
 export {
   ApiCredentialValidator,
-  type ApiCredentialValidatorOptions,
+  type CreateValidationTransport,
   type CredentialValidationResult,
   type CredentialValidator
 } from './credential-validator.js';

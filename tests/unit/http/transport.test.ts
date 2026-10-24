@@ -2,6 +2,8 @@ import { AppError } from '../../../src/core/errors.js';
 import { HttpTransport } from '../../../src/http/transport.js';
 import type { ApiEnvelope, FetchLike } from '../../../src/http/types.js';
 
+const MYACCOUNT_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
+
 const projectContext = {
   missingContextSuggestion: 'Pass --project-id and --location.'
 };
@@ -116,7 +118,12 @@ describe('HttpTransport', () => {
         auth_token: 'auth-token',
         source: 'profile'
       },
-      { apiName: 'MyAccount', projectContext, fetchFn: vi.fn() }
+      {
+        apiName: 'MyAccount',
+        baseUrl: MYACCOUNT_BASE_URL,
+        projectContext,
+        fetchFn: vi.fn()
+      }
     );
 
     await expect(
@@ -170,6 +177,7 @@ describe('HttpTransport', () => {
   it('raises a CLI error when the API envelope indicates failure', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -203,6 +211,7 @@ describe('HttpTransport', () => {
   it('raises a CLI error when the response is malformed', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -245,6 +254,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -282,6 +292,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -306,6 +317,7 @@ describe('HttpTransport', () => {
   it('extracts a DRF-style detail message from failed API responses', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -347,6 +359,7 @@ describe('HttpTransport', () => {
 
       const transport = new HttpTransport(credentials, {
         apiName: 'MyAccount',
+        baseUrl: MYACCOUNT_BASE_URL,
         projectContext,
         fetchFn
       });
@@ -363,6 +376,7 @@ describe('HttpTransport', () => {
   it('extracts message and status_code from non-envelope API failures', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -389,6 +403,7 @@ describe('HttpTransport', () => {
   it('treats a 200 response with errors=true as an API failure', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -426,6 +441,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -445,6 +461,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () => Promise.reject(new Error('socket hang up'))
     });
@@ -468,6 +485,7 @@ describe('HttpTransport', () => {
   it('uses a short response preview for non-json failed responses', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -502,6 +520,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () => Promise.reject(new Error('network failure'))
     });
@@ -524,6 +543,7 @@ describe('HttpTransport', () => {
   it('supports endpoint-specific success parsing for future non-envelope domains', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -571,6 +591,7 @@ describe('HttpTransport', () => {
     );
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -609,6 +630,7 @@ describe('HttpTransport', () => {
     const fetchFn = vi.fn<FetchLike>(() => Promise.reject(abortError));
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -636,6 +658,7 @@ describe('HttpTransport', () => {
     );
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn
     });
@@ -658,6 +681,7 @@ describe('HttpTransport', () => {
   it('turns empty text bodies into invalid-response errors', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -680,6 +704,7 @@ describe('HttpTransport', () => {
     const preview = `${'X'.repeat(170)} end`;
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -707,6 +732,7 @@ describe('HttpTransport', () => {
   it('uses parser errors to explain invalid custom success parsing', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -742,6 +768,7 @@ describe('HttpTransport', () => {
   it('treats status_code failures with string errors as actionable API failures', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(
@@ -772,6 +799,7 @@ describe('HttpTransport', () => {
   it('surfaces json parser failures when text() is unavailable', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
       projectContext,
       fetchFn: () =>
         Promise.resolve(

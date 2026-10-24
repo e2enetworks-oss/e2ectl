@@ -1,9 +1,9 @@
 import { AppError, EXIT_CODES } from '../core/errors.js';
-import {
-  HttpTransport,
-  type ApiAuthCredentials,
-  type ApiEnvelope,
-  type FetchLike
+import type {
+  ApiAuthCredentials,
+  ApiClientCredentials,
+  ApiEnvelope,
+  ApiTransport
 } from '../http/index.js';
 
 export interface CredentialValidationResult {
@@ -17,31 +17,25 @@ export interface CredentialValidator {
   ): Promise<CredentialValidationResult>;
 }
 
-export interface ApiCredentialValidatorOptions {
-  baseUrl?: string;
-  fetchFn?: FetchLike;
-  timeoutMs?: number;
-}
+// Builds the transport the token is checked with. The runtime passes the
+// MyAccount one, so the check always uses the same address and settings as
+// the MyAccount commands.
+export type CreateValidationTransport = (
+  credentials: ApiClientCredentials
+) => ApiTransport;
 
 export class ApiCredentialValidator implements CredentialValidator {
-  private readonly options: ApiCredentialValidatorOptions;
-
-  constructor(options: ApiCredentialValidatorOptions = {}) {
-    this.options = options;
-  }
+  constructor(private readonly createTransport: CreateValidationTransport) {}
 
   async validate(
     credentials: ApiAuthCredentials
   ): Promise<CredentialValidationResult> {
     // One token works on MyAccount and TIR, so checking it against MyAccount
     // is enough for every platform.
-    const transport = new HttpTransport(
-      {
-        ...credentials,
-        source: 'profile'
-      },
-      { ...this.options, apiName: 'MyAccount' }
-    );
+    const transport = this.createTransport({
+      ...credentials,
+      source: 'profile'
+    });
 
     try {
       await transport.get<ApiEnvelope<unknown>>('/iam/multi-crn/', {

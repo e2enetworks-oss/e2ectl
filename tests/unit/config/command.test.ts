@@ -30,7 +30,7 @@ class StubCredentialValidator extends ApiCredentialValidator {
   private readonly result: CredentialValidationResult;
 
   constructor(result: CredentialValidationResult = { valid: true }) {
-    super();
+    super((credentials) => createMyAccountTransport(credentials));
     this.result = result;
   }
 
