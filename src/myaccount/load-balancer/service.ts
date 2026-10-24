@@ -48,6 +48,8 @@ import {
   summarizeTcpBackendGroup
 } from './mappers.js';
 import type {
+  LoadBalancerAlgorithm,
+  LoadBalancerBackend,
   LoadBalancerBackendGroupCreateCommandResult,
   LoadBalancerBackendGroupCreateOptions,
   LoadBalancerBackendGroupDeleteCommandResult,
@@ -60,6 +62,7 @@ import type {
   LoadBalancerBackendServerDeleteOptions,
   LoadBalancerClient,
   LoadBalancerContextOptions,
+  LoadBalancerContextPayload,
   LoadBalancerCreatedBackendSummary,
   LoadBalancerCreateCommandResult,
   LoadBalancerCreateBillingSelectionOptions,
@@ -69,10 +72,12 @@ import type {
   LoadBalancerDetails,
   LoadBalancerGetCommandResult,
   LoadBalancerListCommandResult,
+  LoadBalancerMode,
   LoadBalancerMutationResponse,
   LoadBalancerMutationState,
   LoadBalancerNetworkCommandResult,
   LoadBalancerPlansCommandResult,
+  LoadBalancerServer,
   LoadBalancerServiceDependencies,
   LoadBalancerUpdateRequestOverrides,
   ResolvedLoadBalancerMutationContext,
@@ -82,6 +87,8 @@ import type {
   LoadBalancerVpcAttachment,
   LoadBalancerVpcDetachOptions,
   LoadBalancerSummary,
+  LoadBalancerTcpBackend,
+  LoadBalancerVpc,
   ResolvedLoadBalancerCreateBilling
 } from './types/index.js';
 import type { VpcClient } from '../vpc/index.js';
@@ -124,25 +131,11 @@ export class LoadBalancerService {
     const requestedVpcId = options.networkId ?? options.vpcId;
     const mode = assertFrontendProtocol(options.frontendProtocol);
     const lbType = assertLbType(options.lbType);
-    if (lbType === 'internal' && requestedVpcId === undefined) {
-      throw new CliError('--vpc-id is required when --lb-type is internal.', {
-        code: 'INTERNAL_LB_REQUIRES_VPC',
-        exitCode: EXIT_CODES.usage,
-        suggestion:
-          'Provide --vpc-id <vpcId> with --lb-type internal, or omit --lb-type (defaults to external).'
-      });
-    }
-    if (lbType === 'internal' && options.reserveIp !== undefined) {
-      throw new CliError(
-        '--reserve-ip cannot be used with --lb-type internal.',
-        {
-          code: 'INTERNAL_LB_NO_RESERVE_IP',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Internal load balancers cannot have a public reserved IP.'
-        }
-      );
-    }
+    assertInternalLoadBalancerOptions(
+      lbType,
+      requestedVpcId,
+      options.reserveIp
+    );
     const networkId = requestedVpcId
       ? normalizeRequiredNumericId(requestedVpcId, 'Network ID', '--vpc-id')
       : null;
@@ -150,15 +143,7 @@ export class LoadBalancerService {
       options.subnet === undefined
         ? null
         : normalizeRequiredNumericId(options.subnet, 'Subnet ID', '--subnet');
-    const resolvedPort = options.port ?? defaultPortForProtocol(mode);
-    if (resolvedPort === undefined) {
-      throw new CliError('--port is required for TCP load balancers.', {
-        code: 'MISSING_PORT',
-        exitCode: EXIT_CODES.usage,
-        suggestion: 'Pass --port <port> to specify the frontend listener port.'
-      });
-    }
-    const port = assertPort(resolvedPort, '--port');
+    const port = resolveCreateFrontendPort(options.port, mode);
     const algorithm = assertAlgorithm(options.algorithm ?? 'roundrobin');
     assertCreateBillingOptionShape(options);
     const credentials = await this.resolveContext(options);
@@ -172,90 +157,35 @@ export class LoadBalancerService {
             '--reserve-ip'
           );
 
-    const requiresSslCert = LOAD_BALANCER_SSL_MODES.includes(mode);
-    if (requiresSslCert && !options.sslCertificateId) {
-      throw new CliError(
-        `--ssl-certificate-id is required when --frontend-protocol is ${mode}.`,
-        {
-          code: 'MISSING_SSL_CERTIFICATE_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatMyAccountCommand('ssl list')} to discover certificate IDs, then pass one with --ssl-certificate-id.`
-        }
-      );
-    }
-    const sslCertificateId = requiresSslCert
-      ? normalizeRequiredNumericId(
-          options.sslCertificateId!,
-          'SSL certificate ID',
-          '--ssl-certificate-id'
-        )
-      : null;
+    const sslCertificateId = resolveCreateSslCertificateId(
+      mode,
+      options.sslCertificateId
+    );
 
     const isAlb = LOAD_BALANCER_ALB_MODES.includes(mode);
-    if (!isAlb && options.backendGroupProtocol !== undefined) {
-      throw new CliError(
-        '--backend-group-protocol is only valid for ALB protocols.',
-        {
-          code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
-          exitCode: EXIT_CODES.usage,
-          suggestion:
-            'Remove --backend-group-protocol when --frontend-protocol is TCP.'
-        }
-      );
-    }
-    const albBackendProtocol = isAlb
-      ? assertAlbBackendProtocol(options.backendGroupProtocol)
-      : null;
+    const albBackendProtocol = resolveCreateAlbBackendProtocol(
+      isAlb,
+      options.backendGroupProtocol
+    );
     const backendGroup = assertNonEmpty(
       options.backendGroupName,
       '--backend-group-name'
     );
     const servers = parseBackendServerSpecs(options.backendGroupServer);
-
-    const backends = isAlb
-      ? [
-          buildAlbBackendGroup({
-            algorithm,
-            backendProtocol: albBackendProtocol!,
-            includeScalerDefaults: true,
-            name: backendGroup,
-            servers
-          })
-        ]
-      : [];
-    const tcpBackend = isAlb
-      ? []
-      : [
-          buildTcpBackendGroup({ algorithm, name: backendGroup, port, servers })
-        ];
-    const backendSummary: LoadBalancerCreatedBackendSummary = isAlb
-      ? summarizeAlbBackendGroup({
-          algorithm,
-          backendProtocol: albBackendProtocol!,
-          name: backendGroup,
-          servers
-        })
-      : summarizeTcpBackendGroup({
-          algorithm,
-          name: backendGroup,
-          port,
-          servers
-        });
-
-    const billing = await resolveCreateBillingSelection(client, options.plan, {
-      ...(options.billingType === undefined
-        ? {}
-        : { billingType: options.billingType }),
-      ...(options.committedPlan === undefined
-        ? {}
-        : { committedPlan: options.committedPlan }),
-      ...(options.committedPlanId === undefined
-        ? {}
-        : { committedPlanId: options.committedPlanId }),
-      ...(options.postCommitBehavior === undefined
-        ? {}
-        : { postCommitBehavior: options.postCommitBehavior })
+    const { backends, backendSummary, tcpBackend } = buildCreateBackendGroups({
+      albBackendProtocol,
+      algorithm,
+      isAlb,
+      name: backendGroup,
+      port,
+      servers
     });
+
+    const billing = await resolveCreateBillingSelection(
+      client,
+      options.plan,
+      pickCreateBillingSelectionOptions(options)
+    );
     const vpcList =
       networkId === null
         ? undefined
@@ -267,15 +197,9 @@ export class LoadBalancerService {
             )
           ];
 
-    const securityGroupId =
-      options.securityGroupId !== undefined &&
-      options.securityGroupId.trim().length > 0
-        ? normalizeRequiredNumericId(
-            options.securityGroupId,
-            'Security group ID',
-            '--security-group'
-          )
-        : null;
+    const securityGroupId = normalizeOptionalSecurityGroupId(
+      options.securityGroupId
+    );
 
     const name = assertNonEmpty(options.name, '--name');
     const result = await client.createLoadBalancer(
@@ -355,57 +279,11 @@ export class LoadBalancerService {
     const currentMode = mutation.isNlb
       ? 'TCP'
       : normalizeExistingMode(lb.lb_mode, 'HTTP');
-
-    let nextMode = currentMode;
-    if (options.frontendProtocol !== undefined) {
-      nextMode = assertFrontendProtocol(options.frontendProtocol);
-      if (currentMode === 'TCP' && nextMode !== 'TCP') {
-        throw new CliError(
-          'Cannot change an NLB from TCP to an ALB protocol.',
-          {
-            code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
-            exitCode: EXIT_CODES.usage
-          }
-        );
-      }
-      if (currentMode !== 'TCP' && nextMode === 'TCP') {
-        throw new CliError('Cannot change an ALB to TCP.', {
-          code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
-          exitCode: EXIT_CODES.usage
-        });
-      }
-    }
-
-    if (options.sslCertificateId !== undefined && currentMode === 'TCP') {
-      throw new CliError('--ssl-certificate-id is only valid for ALB.', {
-        code: 'SSL_UPDATE_REQUIRES_ALB',
-        exitCode: EXIT_CODES.usage
-      });
-    }
-
-    if (
-      (nextMode === 'HTTPS' || nextMode === 'BOTH') &&
-      !hasSslCertificate(options, mutation.context)
-    ) {
-      throw new CliError(
-        `--ssl-certificate-id is required when --frontend-protocol is ${nextMode}.`,
-        {
-          code: 'MISSING_SSL_CERTIFICATE_ID',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Run ${formatMyAccountCommand('ssl list')} to discover certificate IDs.`
-        }
-      );
-    }
-
-    if ((options.redirectHttpToHttps ?? false) && nextMode !== 'BOTH') {
-      throw new CliError(
-        '--redirect-http-to-https is only valid with --frontend-protocol BOTH.',
-        {
-          code: 'REDIRECT_REQUIRES_BOTH_PROTOCOL',
-          exitCode: EXIT_CODES.usage
-        }
-      );
-    }
+    const nextMode = resolveUpdateFrontendMode(
+      currentMode,
+      options.frontendProtocol
+    );
+    assertUpdateSslOptions(options, currentMode, nextMode, mutation.context);
 
     const sslCertificateId =
       options.sslCertificateId === undefined
@@ -415,15 +293,11 @@ export class LoadBalancerService {
             'SSL certificate ID',
             '--ssl-certificate-id'
           );
-    const sslContext = {
-      ...(mutation.context.ssl_context ?? {}),
-      ...(sslCertificateId === null
-        ? {}
-        : { ssl_certificate_id: sslCertificateId }),
-      redirect_to_https:
-        options.redirectHttpToHttps ??
-        Boolean(mutation.context.ssl_context?.['redirect_to_https'])
-    };
+    const sslContext = buildUpdateSslContext(
+      mutation.context,
+      sslCertificateId,
+      options.redirectHttpToHttps
+    );
 
     const result = await this.applyMutation(lbId, client, lb, mutation, {
       lb_mode: nextMode,
@@ -437,18 +311,7 @@ export class LoadBalancerService {
       lb_id: lbId,
       lb_name: options.name ?? lb.appliance_name,
       message: result.message,
-      changes: {
-        ...(options.name === undefined ? {} : { name: options.name }),
-        ...(options.frontendProtocol === undefined
-          ? {}
-          : { protocol: options.frontendProtocol }),
-        ...(sslCertificateId === null
-          ? {}
-          : { ssl_certificate_id: sslCertificateId }),
-        ...(options.redirectHttpToHttps === undefined
-          ? {}
-          : { redirect_http_to_https: options.redirectHttpToHttps })
-      }
+      changes: buildUpdateChanges(options, sslCertificateId)
     };
   }
 
@@ -597,55 +460,13 @@ export class LoadBalancerService {
       options.algorithm === undefined
         ? undefined
         : assertAlgorithm(options.algorithm);
-    let backendProtocol: 'HTTP' | 'HTTPS' | undefined;
+    const backendProtocol = resolveUpdateBackendGroupProtocol(
+      mutation.isNlb,
+      options.backendGroupProtocol
+    );
 
-    if (mutation.isNlb) {
-      if (options.backendGroupProtocol !== undefined) {
-        throw new CliError(
-          '--backend-group-protocol is only valid for ALB backend groups.',
-          {
-            code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
-            exitCode: EXIT_CODES.usage
-          }
-        );
-      }
-    } else {
-      backendProtocol =
-        options.backendGroupProtocol === undefined
-          ? undefined
-          : assertAlbBackendProtocol(options.backendGroupProtocol);
-    }
-
-    const nextName = options.backendGroupName?.trim();
-    if (nextName !== undefined && nextName.length === 0) {
-      throw new CliError('--backend-group-name cannot be empty.', {
-        code: 'INVALID_BACKEND_GROUP_NAME',
-        exitCode: EXIT_CODES.usage
-      });
-    }
-    if (nextName !== undefined && nextName !== groupName) {
-      if (mutation.isNlb) {
-        if (mutation.tcpBackends.some((g) => g.backend_name === nextName)) {
-          throw new CliError(
-            `Backend group "${nextName}" already exists on load balancer ${lbId}.`,
-            {
-              code: 'BACKEND_GROUP_EXISTS',
-              exitCode: EXIT_CODES.usage
-            }
-          );
-        }
-      } else {
-        if (mutation.backends.some((g) => g.name === nextName)) {
-          throw new CliError(
-            `Backend group "${nextName}" already exists on load balancer ${lbId}.`,
-            {
-              code: 'BACKEND_GROUP_EXISTS',
-              exitCode: EXIT_CODES.usage
-            }
-          );
-        }
-      }
-    }
+    const nextName = normalizeNextBackendGroupName(options.backendGroupName);
+    assertBackendGroupNameAvailable(lbId, groupName, nextName, mutation);
 
     const mutationResult = buildBackendGroupUpdateMutation(
       mutation,
@@ -1077,6 +898,340 @@ async function resolveAvailableReservedIp(
   }
 
   return match.ip_address;
+}
+
+function assertInternalLoadBalancerOptions(
+  lbType: LoadBalancerVpc,
+  requestedVpcId: string | undefined,
+  reserveIp: string | undefined
+): void {
+  if (lbType !== 'internal') {
+    return;
+  }
+
+  if (requestedVpcId === undefined) {
+    throw new CliError('--vpc-id is required when --lb-type is internal.', {
+      code: 'INTERNAL_LB_REQUIRES_VPC',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Provide --vpc-id <vpcId> with --lb-type internal, or omit --lb-type (defaults to external).'
+    });
+  }
+
+  if (reserveIp !== undefined) {
+    throw new CliError('--reserve-ip cannot be used with --lb-type internal.', {
+      code: 'INTERNAL_LB_NO_RESERVE_IP',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Internal load balancers cannot have a public reserved IP.'
+    });
+  }
+}
+
+function resolveCreateFrontendPort(
+  port: string | undefined,
+  mode: LoadBalancerMode
+): number {
+  const resolvedPort = port ?? defaultPortForProtocol(mode);
+  if (resolvedPort === undefined) {
+    throw new CliError('--port is required for TCP load balancers.', {
+      code: 'MISSING_PORT',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass --port <port> to specify the frontend listener port.'
+    });
+  }
+
+  return assertPort(resolvedPort, '--port');
+}
+
+function resolveCreateSslCertificateId(
+  mode: LoadBalancerMode,
+  sslCertificateId: string | undefined
+): number | null {
+  if (!LOAD_BALANCER_SSL_MODES.includes(mode)) {
+    return null;
+  }
+
+  if (!sslCertificateId) {
+    throw new CliError(
+      `--ssl-certificate-id is required when --frontend-protocol is ${mode}.`,
+      {
+        code: 'MISSING_SSL_CERTIFICATE_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatMyAccountCommand('ssl list')} to discover certificate IDs, then pass one with --ssl-certificate-id.`
+      }
+    );
+  }
+
+  return normalizeRequiredNumericId(
+    sslCertificateId,
+    'SSL certificate ID',
+    '--ssl-certificate-id'
+  );
+}
+
+function resolveCreateAlbBackendProtocol(
+  isAlb: boolean,
+  backendGroupProtocol: string | undefined
+): 'HTTP' | 'HTTPS' | null {
+  if (isAlb) {
+    return assertAlbBackendProtocol(backendGroupProtocol);
+  }
+
+  if (backendGroupProtocol !== undefined) {
+    throw new CliError(
+      '--backend-group-protocol is only valid for ALB protocols.',
+      {
+        code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
+        exitCode: EXIT_CODES.usage,
+        suggestion:
+          'Remove --backend-group-protocol when --frontend-protocol is TCP.'
+      }
+    );
+  }
+
+  return null;
+}
+
+// A create request carries either one ALB backend group or one TCP backend
+// group. The other list is sent empty.
+function buildCreateBackendGroups(input: {
+  albBackendProtocol: 'HTTP' | 'HTTPS' | null;
+  algorithm: LoadBalancerAlgorithm;
+  isAlb: boolean;
+  name: string;
+  port: number;
+  servers: LoadBalancerServer[];
+}): {
+  backends: LoadBalancerBackend[];
+  backendSummary: LoadBalancerCreatedBackendSummary;
+  tcpBackend: LoadBalancerTcpBackend[];
+} {
+  const { algorithm, name, port, servers } = input;
+
+  if (!input.isAlb) {
+    return {
+      backends: [],
+      backendSummary: summarizeTcpBackendGroup({
+        algorithm,
+        name,
+        port,
+        servers
+      }),
+      tcpBackend: [buildTcpBackendGroup({ algorithm, name, port, servers })]
+    };
+  }
+
+  const backendProtocol = input.albBackendProtocol!;
+  return {
+    backends: [
+      buildAlbBackendGroup({
+        algorithm,
+        backendProtocol,
+        includeScalerDefaults: true,
+        name,
+        servers
+      })
+    ],
+    backendSummary: summarizeAlbBackendGroup({
+      algorithm,
+      backendProtocol,
+      name,
+      servers
+    }),
+    tcpBackend: []
+  };
+}
+
+function pickCreateBillingSelectionOptions(
+  options: LoadBalancerCreateOptions
+): LoadBalancerCreateBillingSelectionOptions {
+  return {
+    ...(options.billingType === undefined
+      ? {}
+      : { billingType: options.billingType }),
+    ...(options.committedPlan === undefined
+      ? {}
+      : { committedPlan: options.committedPlan }),
+    ...(options.committedPlanId === undefined
+      ? {}
+      : { committedPlanId: options.committedPlanId }),
+    ...(options.postCommitBehavior === undefined
+      ? {}
+      : { postCommitBehavior: options.postCommitBehavior })
+  };
+}
+
+function normalizeOptionalSecurityGroupId(
+  securityGroupId: string | undefined
+): number | null {
+  if (securityGroupId === undefined || securityGroupId.trim().length === 0) {
+    return null;
+  }
+
+  return normalizeRequiredNumericId(
+    securityGroupId,
+    'Security group ID',
+    '--security-group'
+  );
+}
+
+// An update may change the protocol within its family (ALB to ALB), but never
+// between an NLB (TCP) and an ALB.
+function resolveUpdateFrontendMode(
+  currentMode: LoadBalancerMode,
+  frontendProtocol: string | undefined
+): LoadBalancerMode {
+  if (frontendProtocol === undefined) {
+    return currentMode;
+  }
+
+  const nextMode = assertFrontendProtocol(frontendProtocol);
+  if (currentMode === 'TCP' && nextMode !== 'TCP') {
+    throw new CliError('Cannot change an NLB from TCP to an ALB protocol.', {
+      code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
+      exitCode: EXIT_CODES.usage
+    });
+  }
+  if (currentMode !== 'TCP' && nextMode === 'TCP') {
+    throw new CliError('Cannot change an ALB to TCP.', {
+      code: 'LOAD_BALANCER_PROTOCOL_FAMILY_CHANGE',
+      exitCode: EXIT_CODES.usage
+    });
+  }
+
+  return nextMode;
+}
+
+function assertUpdateSslOptions(
+  options: LoadBalancerUpdateOptions,
+  currentMode: LoadBalancerMode,
+  nextMode: LoadBalancerMode,
+  context: LoadBalancerContextPayload
+): void {
+  if (options.sslCertificateId !== undefined && currentMode === 'TCP') {
+    throw new CliError('--ssl-certificate-id is only valid for ALB.', {
+      code: 'SSL_UPDATE_REQUIRES_ALB',
+      exitCode: EXIT_CODES.usage
+    });
+  }
+
+  if (
+    (nextMode === 'HTTPS' || nextMode === 'BOTH') &&
+    !hasSslCertificate(options, context)
+  ) {
+    throw new CliError(
+      `--ssl-certificate-id is required when --frontend-protocol is ${nextMode}.`,
+      {
+        code: 'MISSING_SSL_CERTIFICATE_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run ${formatMyAccountCommand('ssl list')} to discover certificate IDs.`
+      }
+    );
+  }
+
+  if ((options.redirectHttpToHttps ?? false) && nextMode !== 'BOTH') {
+    throw new CliError(
+      '--redirect-http-to-https is only valid with --frontend-protocol BOTH.',
+      {
+        code: 'REDIRECT_REQUIRES_BOTH_PROTOCOL',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+}
+
+function buildUpdateSslContext(
+  context: LoadBalancerContextPayload,
+  sslCertificateId: number | null,
+  redirectHttpToHttps: boolean | undefined
+): Record<string, unknown> {
+  return {
+    ...(context.ssl_context ?? {}),
+    ...(sslCertificateId === null
+      ? {}
+      : { ssl_certificate_id: sslCertificateId }),
+    redirect_to_https:
+      redirectHttpToHttps ?? Boolean(context.ssl_context?.['redirect_to_https'])
+  };
+}
+
+function buildUpdateChanges(
+  options: LoadBalancerUpdateOptions,
+  sslCertificateId: number | null
+): LoadBalancerUpdateCommandResult['changes'] {
+  return {
+    ...(options.name === undefined ? {} : { name: options.name }),
+    ...(options.frontendProtocol === undefined
+      ? {}
+      : { protocol: options.frontendProtocol }),
+    ...(sslCertificateId === null
+      ? {}
+      : { ssl_certificate_id: sslCertificateId }),
+    ...(options.redirectHttpToHttps === undefined
+      ? {}
+      : { redirect_http_to_https: options.redirectHttpToHttps })
+  };
+}
+
+function resolveUpdateBackendGroupProtocol(
+  isNlb: boolean,
+  backendGroupProtocol: string | undefined
+): 'HTTP' | 'HTTPS' | undefined {
+  if (backendGroupProtocol === undefined) {
+    return undefined;
+  }
+
+  if (isNlb) {
+    throw new CliError(
+      '--backend-group-protocol is only valid for ALB backend groups.',
+      {
+        code: 'NLB_BACKEND_PROTOCOL_NOT_SUPPORTED',
+        exitCode: EXIT_CODES.usage
+      }
+    );
+  }
+
+  return assertAlbBackendProtocol(backendGroupProtocol);
+}
+
+function normalizeNextBackendGroupName(
+  backendGroupName: string | undefined
+): string | undefined {
+  const nextName = backendGroupName?.trim();
+  if (nextName !== undefined && nextName.length === 0) {
+    throw new CliError('--backend-group-name cannot be empty.', {
+      code: 'INVALID_BACKEND_GROUP_NAME',
+      exitCode: EXIT_CODES.usage
+    });
+  }
+
+  return nextName;
+}
+
+function assertBackendGroupNameAvailable(
+  lbId: string,
+  groupName: string,
+  nextName: string | undefined,
+  mutation: ResolvedLoadBalancerMutationContext
+): void {
+  if (nextName === undefined || nextName === groupName) {
+    return;
+  }
+
+  const nameTaken = mutation.isNlb
+    ? mutation.tcpBackends.some((group) => group.backend_name === nextName)
+    : mutation.backends.some((group) => group.name === nextName);
+  if (!nameTaken) {
+    return;
+  }
+
+  throw new CliError(
+    `Backend group "${nextName}" already exists on load balancer ${lbId}.`,
+    {
+      code: 'BACKEND_GROUP_EXISTS',
+      exitCode: EXIT_CODES.usage
+    }
+  );
 }
 
 function throwBackendGroupNotFound(lbId: string, groupName: string): never {
