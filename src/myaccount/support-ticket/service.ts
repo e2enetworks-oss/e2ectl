@@ -523,12 +523,13 @@ async function loadCreatedTicket(
 ): Promise<SupportTicketCreateCommandResult> {
   const { contactEmail, contactType } = contact;
   try {
-    const { account_manager, ticket } = await client.getTicket(created.id, {
-      ...(contactEmail === undefined
-        ? {}
-        : { contact_person_email: contactEmail }),
-      ...(contactType === undefined ? {} : { contact_person_type: contactType })
-    });
+    const { account_manager, ticket } = await client.getTicket(
+      created.id,
+      buildGetQuery(contactEmail, contactType, {
+        abuseTicket: false,
+        socTicket: false
+      })
+    );
 
     return {
       account_manager,

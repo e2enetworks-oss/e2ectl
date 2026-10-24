@@ -60,7 +60,7 @@ function formatReservedIpAttachmentTable(
 function renderReservedIpHuman(result: ReservedIpCommandResult): string {
   switch (result.action) {
     case 'attach-node':
-      return renderReservedIpAttachNodeHuman(result);
+      return renderReservedIpNodeActionHuman('Attached', result);
     case 'create':
       return renderReservedIpCreateHuman(result);
     case 'delete':
@@ -68,7 +68,7 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
         ? 'Deletion cancelled.\n'
         : `Deleted reserved IP ${result.ip_address}.\nMessage: ${result.message ?? ''}\n`;
     case 'detach-node':
-      return renderReservedIpDetachNodeHuman(result);
+      return renderReservedIpNodeActionHuman('Detached', result);
     case 'get':
       return renderReservedIpGetHuman(result);
     case 'list':
@@ -84,22 +84,15 @@ function renderReservedIpHuman(result: ReservedIpCommandResult): string {
   }
 }
 
-function renderReservedIpAttachNodeHuman(
+// verb is "Attached reserved IP ... to" or "Detached reserved IP ... from".
+function renderReservedIpNodeActionHuman(
+  verb: 'Attached' | 'Detached',
   result: ReservedIpNodeActionCommandResult
 ): string {
-  return (
-    `Attached reserved IP ${result.reserved_ip.ip_address} to node ${result.node_id}.\n` +
-    `Status: ${result.reserved_ip.status ?? '--'}\n` +
-    `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
-    `Message: ${result.message}\n`
-  );
-}
+  const preposition = verb === 'Attached' ? 'to' : 'from';
 
-function renderReservedIpDetachNodeHuman(
-  result: ReservedIpNodeActionCommandResult
-): string {
   return (
-    `Detached reserved IP ${result.reserved_ip.ip_address} from node ${result.node_id}.\n` +
+    `${verb} reserved IP ${result.reserved_ip.ip_address} ${preposition} node ${result.node_id}.\n` +
     `Status: ${result.reserved_ip.status ?? '--'}\n` +
     `Attached VM: ${result.reserved_ip.vm_name ?? '--'}\n` +
     `Message: ${result.message}\n`

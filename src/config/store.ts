@@ -12,13 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import { isNonEmptyString } from '../core/guards.js';
+import { isNonEmptyString, isRecord } from '../core/guards.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import {
   TIR_CONTEXT_FIELDS,
   type ConfigFile,
   type ProfileConfig,
-  type TirContext
+  type TirContext,
+  type TirContextField
 } from './types.js';
 
 const DEFAULT_DIRECTORY_NAME = '.e2e';
@@ -303,14 +304,14 @@ async function writeSecureConfigFile(
 }
 
 function validateConfigShape(value: unknown, configPath: string): ConfigFile {
-  if (!isObjectRecord(value)) {
+  if (!isRecord(value)) {
     throw invalidConfigShapeError(
       configPath,
       'Top-level config must be an object.'
     );
   }
 
-  if (!isObjectRecord(value.profiles)) {
+  if (!isRecord(value.profiles)) {
     throw invalidConfigShapeError(
       configPath,
       '"profiles" must be an object keyed by alias.'
@@ -344,7 +345,7 @@ function validateProfileShape(
   value: unknown,
   configPath: string
 ): ProfileConfig {
-  if (!isObjectRecord(value)) {
+  if (!isRecord(value)) {
     throw invalidConfigShapeError(
       configPath,
       `Profile "${alias}" must be an object.`
@@ -398,7 +399,7 @@ function validateTirContextShape(
   value: unknown,
   configPath: string
 ): TirContext {
-  if (!isObjectRecord(value)) {
+  if (!isRecord(value)) {
     throw invalidConfigShapeError(
       configPath,
       `Profile "${alias}" field "tir" must be an object when present.`
@@ -407,19 +408,14 @@ function validateTirContextShape(
 
   const context: TirContext = {};
   for (const field of TIR_CONTEXT_FIELDS) {
-    const fieldValue = value[field];
-    if (fieldValue === undefined) {
-      continue;
-    }
-
-    if (typeof fieldValue !== 'string') {
-      throw invalidConfigShapeError(
-        configPath,
-        `Profile "${alias}" field "tir.${field}" must be a string when present.`
+    if (value[field] !== undefined) {
+      context[field] = readOptionalProfileField(
+        alias,
+        `tir.${field}`,
+        value[field],
+        configPath
       );
     }
-
-    context[field] = fieldValue;
   }
 
   return context;
@@ -443,7 +439,7 @@ function readRequiredProfileField(
 
 function readOptionalProfileField(
   alias: string,
-  field: 'default_project_id' | 'default_location',
+  field: 'default_project_id' | 'default_location' | `tir.${TirContextField}`,
   value: unknown,
   configPath: string
 ): string {
@@ -469,10 +465,6 @@ function invalidConfigShapeError(configPath: string, reason: string): CliError {
         'Restore a valid config file or re-import your credentials, then retry.'
     }
   );
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function formatConfigPathForDisplay(configPath: string): string {

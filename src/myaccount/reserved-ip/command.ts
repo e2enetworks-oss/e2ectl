@@ -2,6 +2,7 @@ import { Command } from 'commander';
 
 import { addContextOptions } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/index.js';
+import { formatMyAccountCommand } from '../api.js';
 import { renderReservedIpResult } from './formatter.js';
 import {
   ReservedIpService,
@@ -198,7 +199,7 @@ function buildReservedIpAttachCommand(
       .description('Attach a reserved IP to a node.')
       .requiredOption(
         '--node-id <nodeId>',
-        'Node id shown by e2ectl myaccount node list/get.'
+        `Node id shown by ${formatMyAccountCommand('node list')} or ${formatMyAccountCommand('node get')}.`
       )
   ).action(
     async (
@@ -242,7 +243,7 @@ function buildReservedIpDetachCommand(
       .description('Detach a reserved IP from a node.')
       .requiredOption(
         '--node-id <nodeId>',
-        'Node id shown by e2ectl myaccount node list/get.'
+        `Node id shown by ${formatMyAccountCommand('node list')} or ${formatMyAccountCommand('node get')}.`
       )
   ).action(
     async (

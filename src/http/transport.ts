@@ -20,9 +20,18 @@ const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 
 type HttpMethod = NonNullable<ApiRequestOptions['method']>;
 
+export interface ProjectContextOptions {
+  // Next step shown when a request needs a project and location but the
+  // credentials have none.
+  missingContextSuggestion: string;
+}
+
 export interface HttpTransportOptions extends ApiClientOptions {
   // Names the API in error messages, for example "MyAccount".
   apiName: string;
+  // When set, every request sends the credentials' project_id and location
+  // unless the call passes includeProjectContext: false.
+  projectContext?: ProjectContextOptions;
 }
 
 export interface ApiTransport {
@@ -48,6 +57,7 @@ export class HttpTransport implements ApiTransport {
   private readonly baseUrl: string;
   private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
+  private readonly projectContext: ProjectContextOptions | undefined;
   private readonly timeoutMs: number;
 
   constructor(
@@ -58,6 +68,7 @@ export class HttpTransport implements ApiTransport {
     this.credentials = credentials;
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.fetchFn = options.fetchFn ?? (fetch as FetchLike);
+    this.projectContext = options.projectContext;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
@@ -266,25 +277,11 @@ export class HttpTransport implements ApiTransport {
     const url = new URL(normalizePath(options.path), this.baseUrl);
     url.searchParams.set('apikey', this.credentials.api_key);
 
-    if (options.includeProjectContext ?? true) {
-      if (
-        this.credentials.project_id === undefined ||
-        this.credentials.location === undefined
-      ) {
-        throw new AppError(
-          `${this.apiName} project context is required for this request.`,
-          {
-            code: 'MISSING_REQUEST_CONTEXT',
-            details: [`Path: ${options.path}`],
-            exitCode: EXIT_CODES.config,
-            suggestion:
-              'Pass --project-id and --location, set E2E_PROJECT_ID and E2E_LOCATION, or save default project/location values on the selected profile.'
-          }
-        );
-      }
-
-      url.searchParams.set('project_id', this.credentials.project_id);
-      url.searchParams.set('location', this.credentials.location);
+    if (
+      this.projectContext !== undefined &&
+      (options.includeProjectContext ?? true)
+    ) {
+      this.addProjectContext(url, options.path, this.projectContext);
     }
 
     for (const [key, value] of Object.entries(options.query ?? {})) {
@@ -294,6 +291,29 @@ export class HttpTransport implements ApiTransport {
     }
 
     return url.toString();
+  }
+
+  private addProjectContext(
+    url: URL,
+    path: string,
+    projectContext: ProjectContextOptions
+  ): void {
+    const { location, project_id: projectId } = this.credentials;
+
+    if (projectId === undefined || location === undefined) {
+      throw new AppError(
+        `${this.apiName} project context is required for this request.`,
+        {
+          code: 'MISSING_REQUEST_CONTEXT',
+          details: [`Path: ${path}`],
+          exitCode: EXIT_CODES.config,
+          suggestion: projectContext.missingContextSuggestion
+        }
+      );
+    }
+
+    url.searchParams.set('project_id', projectId);
+    url.searchParams.set('location', location);
   }
 }
 
@@ -334,7 +354,7 @@ interface ParsedResponseBody {
 interface FallbackApiErrorInput extends ParsedResponseBody {
   apiName: string;
   path: string;
-  request_url?: string;
+  request_url: string;
   response: FetchLikeResponse;
 }
 
@@ -429,9 +449,7 @@ function buildFallbackApiError(
   const details = [
     `HTTP status: ${response.status} ${response.statusText}`,
     `Path: ${path}`,
-    ...(input.request_url === undefined
-      ? []
-      : [`Request URL: ${input.request_url}`]),
+    `Request URL: ${input.request_url}`,
     ...extractFallbackApiDetails(payload),
     ...(preview === undefined || isRecord(payload)
       ? []
@@ -456,9 +474,7 @@ function buildInvalidResponseDetails(input: FallbackApiErrorInput): string[] {
   const details = [
     `HTTP status: ${input.response.status} ${input.response.statusText}`,
     `Path: ${input.path}`,
-    ...(input.request_url === undefined
-      ? []
-      : [`Request URL: ${input.request_url}`])
+    `Request URL: ${input.request_url}`
   ];
 
   if (input.parseError instanceof Error) {

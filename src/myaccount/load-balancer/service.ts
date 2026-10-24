@@ -5,6 +5,7 @@ import {
 import { normalizeRequiredNumericId } from '../node/index.js';
 import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
+import { isNonEmptyString } from '../../core/guards.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_MODES,
@@ -175,7 +176,6 @@ export class LoadBalancerService {
     const { backends, backendSummary, tcpBackend } = buildCreateBackendGroups({
       albBackendProtocol,
       algorithm,
-      isAlb,
       name: backendGroup,
       port,
       servers
@@ -993,11 +993,11 @@ function resolveCreateAlbBackendProtocol(
 }
 
 // A create request carries either one ALB backend group or one TCP backend
-// group. The other list is sent empty.
+// group. The other list is sent empty. A null ALB backend protocol means the
+// load balancer is not an ALB.
 function buildCreateBackendGroups(input: {
   albBackendProtocol: 'HTTP' | 'HTTPS' | null;
   algorithm: LoadBalancerAlgorithm;
-  isAlb: boolean;
   name: string;
   port: number;
   servers: LoadBalancerServer[];
@@ -1006,9 +1006,15 @@ function buildCreateBackendGroups(input: {
   backendSummary: LoadBalancerCreatedBackendSummary;
   tcpBackend: LoadBalancerTcpBackend[];
 } {
-  const { algorithm, name, port, servers } = input;
+  const {
+    albBackendProtocol: backendProtocol,
+    algorithm,
+    name,
+    port,
+    servers
+  } = input;
 
-  if (!input.isAlb) {
+  if (backendProtocol === null) {
     return {
       backends: [],
       backendSummary: summarizeTcpBackendGroup({
@@ -1021,7 +1027,6 @@ function buildCreateBackendGroups(input: {
     };
   }
 
-  const backendProtocol = input.albBackendProtocol!;
   return {
     backends: [
       buildAlbBackendGroup({
@@ -1064,7 +1069,7 @@ function pickCreateBillingSelectionOptions(
 function normalizeOptionalSecurityGroupId(
   securityGroupId: string | undefined
 ): number | null {
-  if (securityGroupId === undefined || securityGroupId.trim().length === 0) {
+  if (!isNonEmptyString(securityGroupId)) {
     return null;
   }
 
@@ -1116,7 +1121,7 @@ function assertUpdateSslOptions(
   }
 
   if (
-    (nextMode === 'HTTPS' || nextMode === 'BOTH') &&
+    LOAD_BALANCER_SSL_MODES.includes(nextMode) &&
     !hasSslCertificate(options, context)
   ) {
     throw new CliError(

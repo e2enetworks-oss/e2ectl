@@ -71,7 +71,11 @@ describe('runCli', () => {
   it.each([
     [
       ['node', 'list'],
-      'Error: Unknown command "node".\n\nNext step: Run e2ectl --help to see the commands. MyAccount commands start with "e2ectl myaccount", for example "e2ectl myaccount node list".\n'
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
+    ],
+    [
+      ['confg', 'list'],
+      'Error: Unknown command "confg".\n\nNext step: Run e2ectl --help to see the commands.\n'
     ],
     [
       ['myaccount', 'node', 'lst'],

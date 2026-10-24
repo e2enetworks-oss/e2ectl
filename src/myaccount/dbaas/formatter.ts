@@ -11,15 +11,11 @@ import type {
   DbaasListItem,
   DbaasListTypeItem,
   DbaasPlansTemplateItem,
-  DbaasPublicIpAttachCommandResult,
-  DbaasPublicIpDetachCommandResult,
   DbaasResetPasswordCommandResult,
   DbaasSummaryItem,
   DbaasVpcAttachCommandResult,
   DbaasVpcDetachCommandResult,
-  DbaasWhitelistedIpItem,
-  DbaasWhitelistListCommandResult,
-  DbaasWhitelistUpdateCommandResult
+  DbaasWhitelistedIpItem
 } from './types/index.js';
 
 export function renderDbaasResult(
@@ -125,13 +121,19 @@ export function formatDbaasCommittedSkusTable(
 
 // VPC, public IP and whitelist results are rendered in a separate switch to
 // keep each switch short.
-type DbaasNetworkCommandResult =
-  | DbaasPublicIpAttachCommandResult
-  | DbaasPublicIpDetachCommandResult
-  | DbaasVpcAttachCommandResult
-  | DbaasVpcDetachCommandResult
-  | DbaasWhitelistListCommandResult
-  | DbaasWhitelistUpdateCommandResult;
+type DbaasNetworkCommandResult = Extract<
+  DbaasCommandResult,
+  {
+    action:
+      | 'public-ip-attach'
+      | 'public-ip-detach'
+      | 'vpc-attach'
+      | 'vpc-detach'
+      | 'whitelist-add'
+      | 'whitelist-list'
+      | 'whitelist-remove';
+  }
+>;
 
 function renderDbaasHuman(result: DbaasCommandResult): string {
   switch (result.action) {

@@ -1,17 +1,15 @@
 // The TIR account, project and location a profile works in. Saved now so
 // old and new config files share one shape; TIR commands start using it in
 // a later release.
-export interface TirContext {
-  account_id?: string;
-  location?: string;
-  project_id?: string;
-}
-
 export const TIR_CONTEXT_FIELDS = [
   'account_id',
   'location',
   'project_id'
 ] as const;
+
+export type TirContextField = (typeof TIR_CONTEXT_FIELDS)[number];
+
+export type TirContext = Partial<Record<TirContextField, string>>;
 
 export interface ProfileConfig {
   api_key: string;

@@ -100,14 +100,30 @@ function rejectUnknownSubcommand(
   }
 
   const groupPath = formatCommandPath(actionCommand);
+  const movedTo = findPlatformWithCommand(actionCommand, unknownName);
   throw new CliError(`Unknown command "${unknownName}".`, {
     code: 'UNKNOWN_COMMAND',
     exitCode: EXIT_CODES.usage,
     suggestion:
-      actionCommand.parent === null
-        ? `Run ${groupPath} --help to see the commands. MyAccount commands start with "${groupPath} myaccount", for example "${groupPath} myaccount node list".`
-        : `Run ${groupPath} --help to see the commands.`
+      movedTo === undefined
+        ? `Run ${groupPath} --help to see the commands.`
+        : `Commands now start with the platform name. Did you mean "${groupPath} ${movedTo.name()} ${unknownName}"?`
   });
+}
+
+// At the top level, an unknown word may be a product that now lives under a
+// platform group, such as `node` under `myaccount`.
+function findPlatformWithCommand(
+  command: Command,
+  name: string
+): Command | undefined {
+  if (command.parent !== null) {
+    return undefined;
+  }
+
+  return command.commands.find((platform) =>
+    platform.commands.some((product) => product.name() === name)
+  );
 }
 
 function formatCommandPath(command: Command): string {

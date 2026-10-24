@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   insertAfterLastImport,
   insertAfterLastLine,
@@ -33,8 +35,11 @@ describe('parseDomainName', () => {
   it('keeps short names for MyAccount products', () => {
     expect(parseDomainName('myaccount/ssh-key')).toEqual({
       baseName: 'SshKey',
+      credentialsResolver: 'resolveStoredCredentials',
+      credentialsType: 'ResolvedCredentials',
       displayName: 'MyAccount',
       isMyAccount: true,
+      optionsHelper: 'addContextOptions',
       platform: 'myaccount',
       platformName: 'MyAccount',
       product: 'ssh-key'
@@ -191,12 +196,38 @@ describe('renderProductFiles', () => {
   it('keeps TIR products free of MyAccount project settings', () => {
     const files = renderProductFiles(parseDomainName('tir/foo'));
 
-    expect(files['src/tir/foo/client.ts']).toContain(
-      '{ includeProjectContext: false }'
-    );
     expect(files['src/tir/foo/service.ts']).toContain(
       'resolveStoredAccountCredentials'
     );
     expect(files['src/tir/foo/command.ts']).toContain('addAliasOption');
+  });
+});
+
+describe('the files the generator edits', () => {
+  // The generator finds its place in these files by matching lines of text.
+  // This fails as soon as one of them changes shape, rather than later when
+  // someone runs make new-domain.
+  function read(relativePath: string): string {
+    return readFileSync(relativePath, 'utf8');
+  }
+
+  it('still has every line the generator looks for', () => {
+    const tirFoo = parseDomainName('tir/foo');
+    const myAccountBar = parseDomainName('myaccount/bar');
+
+    expect(
+      registerInRuntime(read('src/app/runtime.ts'), tirFoo, {
+        addTransportImport: true
+      })
+    ).toContain('createTirFooClient: (credentials) =>');
+    expect(
+      registerInTestRuntime(read('tests/helpers/runtime.ts'), tirFoo)
+    ).toContain("createTirFooClient: unexpectedClient('TirFoo'),");
+    expect(
+      registerPlatformInProgram(read('src/app/program.ts'), tirFoo)
+    ).toContain('program.addCommand(buildTirCommand(runtime));');
+    expect(
+      registerInPlatformIndex(read('src/myaccount/index.ts'), myAccountBar)
+    ).toContain('command.addCommand(buildBarCommand(runtime));');
   });
 });

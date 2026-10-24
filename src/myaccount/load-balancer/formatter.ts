@@ -22,14 +22,21 @@ import type {
   LoadBalancerVpcAttachment
 } from './types/index.js';
 
-type LoadBalancerBackendOrNetworkResult =
-  | LoadBalancerBackendGroupListCommandResult
-  | LoadBalancerBackendGroupCreateCommandResult
-  | LoadBalancerBackendGroupUpdateCommandResult
-  | LoadBalancerBackendGroupDeleteCommandResult
-  | LoadBalancerBackendServerAddCommandResult
-  | LoadBalancerBackendServerDeleteCommandResult
-  | LoadBalancerNetworkCommandResult;
+type LoadBalancerBackendOrNetworkResult = Extract<
+  LoadBalancerCommandResult,
+  {
+    action:
+      | 'backend-group-add'
+      | 'backend-group-list'
+      | 'backend-group-remove'
+      | 'backend-group-update'
+      | 'backend-server-add'
+      | 'backend-server-remove'
+      | 'network-reserve-ip-reserve'
+      | 'network-vpc-attach'
+      | 'network-vpc-detach';
+  }
+>;
 
 export function renderLoadBalancerResult(
   result: LoadBalancerCommandResult,

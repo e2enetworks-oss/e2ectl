@@ -1,7 +1,10 @@
 export interface DomainNames {
   baseName: string;
+  credentialsResolver: string;
+  credentialsType: string;
   displayName: string;
   isMyAccount: boolean;
+  optionsHelper: string;
   platform: string;
   platformName: string;
   product: string;

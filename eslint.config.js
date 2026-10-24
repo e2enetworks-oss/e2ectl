@@ -52,9 +52,10 @@ export default tseslint.config(
     }
   },
   {
-    // MyAccount hints must say `e2ectl myaccount ...`; the helper adds it.
-    files: ['src/myaccount/**/*.ts'],
-    ignores: ['src/myaccount/api.ts'],
+    // Product hints must name their platform (`e2ectl myaccount ...`); each
+    // platform's api.ts has the helper that adds it. Products are the folders
+    // two levels below src, so api.ts itself is not covered.
+    files: ['src/*/*/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -64,7 +65,7 @@ export default tseslint.config(
               group: ['**/app/metadata.js'],
               importNames: ['formatCliCommand'],
               message:
-                'Use formatMyAccountCommand from src/myaccount/api.ts so the hint includes "myaccount".'
+                'Use your platform helper (for example formatMyAccountCommand from src/myaccount/api.ts) so the hint names the platform.'
             }
           ]
         }

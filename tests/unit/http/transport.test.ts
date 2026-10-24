@@ -2,6 +2,10 @@ import { AppError } from '../../../src/core/errors.js';
 import { HttpTransport } from '../../../src/http/transport.js';
 import type { ApiEnvelope, FetchLike } from '../../../src/http/types.js';
 
+const projectContext = {
+  missingContextSuggestion: 'Pass --project-id and --location.'
+};
+
 describe('HttpTransport', () => {
   const credentials = {
     api_key: 'api-key',
@@ -30,6 +34,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       baseUrl: 'https://example.test/root',
       fetchFn
     });
@@ -47,6 +52,23 @@ describe('HttpTransport', () => {
     expect(seenInit?.headers).toMatchObject({
       Authorization: 'Bearer auth-token'
     });
+  });
+
+  it('never adds project context when the API does not use it', async () => {
+    let seenInput = '';
+    const fetchFn = vi.fn((input: string) => {
+      seenInput = input;
+      return Promise.resolve(createFetchResponse(envelope({ ok: true })));
+    });
+    const transport = new HttpTransport(credentials, {
+      apiName: 'TIR',
+      baseUrl: 'https://example.test/root',
+      fetchFn
+    });
+
+    await transport.get('/teams/');
+
+    expect(seenInput).toBe('https://example.test/root/teams/?apikey=api-key');
   });
 
   it('omits project context when explicitly requested', async () => {
@@ -70,7 +92,12 @@ describe('HttpTransport', () => {
         auth_token: 'auth-token',
         source: 'profile'
       },
-      { apiName: 'MyAccount', baseUrl: 'https://example.test/', fetchFn }
+      {
+        apiName: 'MyAccount',
+        projectContext,
+        baseUrl: 'https://example.test/',
+        fetchFn
+      }
     );
 
     await transport.get<ApiEnvelope<{ valid: boolean }>>('/iam/multi-crn/', {
@@ -89,7 +116,7 @@ describe('HttpTransport', () => {
         auth_token: 'auth-token',
         source: 'profile'
       },
-      { apiName: 'MyAccount', fetchFn: vi.fn() }
+      { apiName: 'MyAccount', projectContext, fetchFn: vi.fn() }
     );
 
     await expect(
@@ -110,6 +137,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       baseUrl: 'https://example.test/',
       fetchFn
     });
@@ -142,6 +170,7 @@ describe('HttpTransport', () => {
   it('raises a CLI error when the API envelope indicates failure', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(
@@ -174,6 +203,7 @@ describe('HttpTransport', () => {
   it('raises a CLI error when the response is malformed', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse({
@@ -215,6 +245,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -251,6 +282,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -274,6 +306,7 @@ describe('HttpTransport', () => {
   it('extracts a DRF-style detail message from failed API responses', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -314,6 +347,7 @@ describe('HttpTransport', () => {
 
       const transport = new HttpTransport(credentials, {
         apiName: 'MyAccount',
+        projectContext,
         fetchFn
       });
 
@@ -329,6 +363,7 @@ describe('HttpTransport', () => {
   it('extracts message and status_code from non-envelope API failures', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -354,6 +389,7 @@ describe('HttpTransport', () => {
   it('treats a 200 response with errors=true as an API failure', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -390,6 +426,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -408,6 +445,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () => Promise.reject(new Error('socket hang up'))
     });
 
@@ -430,6 +468,7 @@ describe('HttpTransport', () => {
   it('uses a short response preview for non-json failed responses', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -463,6 +502,7 @@ describe('HttpTransport', () => {
 
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () => Promise.reject(new Error('network failure'))
     });
 
@@ -484,6 +524,7 @@ describe('HttpTransport', () => {
   it('supports endpoint-specific success parsing for future non-envelope domains', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse({
@@ -530,6 +571,7 @@ describe('HttpTransport', () => {
     );
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -567,6 +609,7 @@ describe('HttpTransport', () => {
     const fetchFn = vi.fn<FetchLike>(() => Promise.reject(abortError));
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -593,6 +636,7 @@ describe('HttpTransport', () => {
     );
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn
     });
 
@@ -614,6 +658,7 @@ describe('HttpTransport', () => {
   it('turns empty text bodies into invalid-response errors', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -635,6 +680,7 @@ describe('HttpTransport', () => {
     const preview = `${'X'.repeat(170)} end`;
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -661,6 +707,7 @@ describe('HttpTransport', () => {
   it('uses parser errors to explain invalid custom success parsing', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse({
@@ -695,6 +742,7 @@ describe('HttpTransport', () => {
   it('treats status_code failures with string errors as actionable API failures', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {
@@ -724,6 +772,7 @@ describe('HttpTransport', () => {
   it('surfaces json parser failures when text() is unavailable', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',
+      projectContext,
       fetchFn: () =>
         Promise.resolve(
           createFetchResponse(undefined, {

@@ -12,7 +12,6 @@ import type {
   LoadBalancerDetails,
   LoadBalancerListApiItem,
   LoadBalancerListApiResponse,
-  LoadBalancerListContext,
   LoadBalancerListPageResult,
   LoadBalancerPlan,
   LoadBalancerRawDetails,
@@ -121,9 +120,6 @@ function buildAppliancePath(lbId: string): string {
 function normalizeLoadBalancerSummary(
   item: LoadBalancerListApiItem
 ): LoadBalancerSummary {
-  const context = getSummaryContext(item);
-  const lbMode = resolveSummaryMode(item, context);
-  const lbType = resolveSummaryType(item, context);
   const publicIp = normalizePublicIp(
     item.public_ip ?? item.node_detail?.public_ip
   );
@@ -134,49 +130,36 @@ function normalizeLoadBalancerSummary(
   return {
     appliance_name: item.appliance_name ?? item.name ?? String(item.id),
     id: item.id,
-    ...(lbMode === undefined ? {} : { lb_mode: lbMode }),
-    ...(lbType === undefined ? {} : { lb_type: lbType }),
+    ...buildSummaryContextFields(item, publicIp),
     ...(publicIp === undefined ? {} : { public_ip: publicIp }),
-    public_ip_reserved: isSummaryPublicIpReserved(item, publicIp, context),
     ...(privateIp === undefined ? {} : { private_ip: privateIp }),
 
     status: item.status
   };
 }
 
-function getSummaryContext(
-  item: LoadBalancerListApiItem
-): LoadBalancerListContext | undefined {
-  return item.appliance_instance?.[0]?.context;
-}
-
-function resolveSummaryMode(
+// Mode, type and the reserved IP flag can sit on the list item itself or in
+// its first appliance context, so both places are checked.
+function buildSummaryContextFields(
   item: LoadBalancerListApiItem,
-  context: LoadBalancerListContext | undefined
-): string | undefined {
-  return normalizeLoadBalancerMode(
+  publicIp: string | null | undefined
+): Pick<LoadBalancerSummary, 'lb_mode' | 'lb_type' | 'public_ip_reserved'> {
+  const context = item.appliance_instance?.[0]?.context;
+  const lbMode = normalizeLoadBalancerMode(
     item.lb_mode ?? context?.lb_mode,
     context?.tcp_backend
   );
-}
+  const lbType = normalizeLoadBalancerType(item.lb_type ?? context?.lb_type);
 
-function resolveSummaryType(
-  item: LoadBalancerListApiItem,
-  context: LoadBalancerListContext | undefined
-): string | undefined {
-  return normalizeLoadBalancerType(item.lb_type ?? context?.lb_type);
-}
-
-function isSummaryPublicIpReserved(
-  item: LoadBalancerListApiItem,
-  publicIp: string | null | undefined,
-  context: LoadBalancerListContext | undefined
-): boolean {
-  return isLoadBalancerPublicIpReservedClient(
-    item.node_detail?.allow_reserve_ip?.is_already_reserved,
-    publicIp,
-    context?.lb_reserve_ip
-  );
+  return {
+    ...(lbMode === undefined ? {} : { lb_mode: lbMode }),
+    ...(lbType === undefined ? {} : { lb_type: lbType }),
+    public_ip_reserved: isLoadBalancerPublicIpReservedClient(
+      item.node_detail?.allow_reserve_ip?.is_already_reserved,
+      publicIp,
+      context?.lb_reserve_ip
+    )
+  };
 }
 
 function normalizeLoadBalancerMode(

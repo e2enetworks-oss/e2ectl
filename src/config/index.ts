@@ -20,6 +20,7 @@ export type {
   ResolvedAccountCredentials,
   ProfileSummary,
   ResolvedCredentials,
-  TirContext
+  TirContext,
+  TirContextField
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';

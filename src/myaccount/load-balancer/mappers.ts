@@ -710,17 +710,15 @@ export function normalizeLoadBalancerDetails(
   const context = (data.appliance_instance ?? [])
     .map((instance) => instance.context)
     .filter((item): item is NonNullable<typeof item> => item !== undefined);
-  const primaryContext = context?.[0] as PrimaryDetailsContext | undefined;
-  const result: LoadBalancerDetails = {
+  const primaryContext = context[0] as PrimaryDetailsContext | undefined;
+
+  return {
     ...data,
     appliance_name: data.appliance_name ?? data.name ?? String(data.id),
-    context
+    context,
+    ...buildDetailsModeAndType(data, primaryContext),
+    ...buildDetailsAddresses(data, primaryContext)
   };
-
-  assignDetailsModeAndType(result, data, primaryContext);
-  assignDetailsAddresses(result, data, primaryContext);
-
-  return result;
 }
 
 interface PrimaryDetailsContext {
@@ -729,43 +727,38 @@ interface PrimaryDetailsContext {
   lb_reserve_ip?: string | null;
 }
 
-function assignDetailsModeAndType(
-  result: LoadBalancerDetails,
+function buildDetailsModeAndType(
   data: LoadBalancerRawDetails,
   primaryContext: PrimaryDetailsContext | undefined
-): void {
+): Pick<LoadBalancerDetails, 'lb_mode' | 'lb_type'> {
   const lbMode = data.lb_mode ?? primaryContext?.lb_mode;
-  if (lbMode !== undefined) {
-    result.lb_mode = lbMode;
-  }
-
   const lbType = data.lb_type ?? primaryContext?.lb_type;
-  if (lbType !== undefined) {
-    result.lb_type = lbType;
-  }
+
+  return {
+    ...(lbMode === undefined ? {} : { lb_mode: lbMode }),
+    ...(lbType === undefined ? {} : { lb_type: lbType })
+  };
 }
 
-function assignDetailsAddresses(
-  result: LoadBalancerDetails,
+function buildDetailsAddresses(
   data: LoadBalancerRawDetails,
   primaryContext: PrimaryDetailsContext | undefined
-): void {
+): Pick<
+  LoadBalancerDetails,
+  'private_ip' | 'public_ip' | 'public_ip_reserved'
+> {
   const publicIp = data.public_ip ?? data.node_detail?.public_ip;
-  if (publicIp !== undefined) {
-    result.public_ip = publicIp;
-  }
-  result.public_ip_reserved = isLoadBalancerPublicIpReservedClient(
-    data.node_detail?.allow_reserve_ip?.is_already_reserved,
-    publicIp,
-    primaryContext?.lb_reserve_ip
-  );
-
   const privateIp = data.private_ip ?? data.node_detail?.private_ip;
-  if (privateIp !== undefined) {
-    (
-      result as LoadBalancerDetails & { private_ip?: string | null }
-    ).private_ip = privateIp;
-  }
+
+  return {
+    ...(publicIp === undefined ? {} : { public_ip: publicIp }),
+    public_ip_reserved: isLoadBalancerPublicIpReservedClient(
+      data.node_detail?.allow_reserve_ip?.is_already_reserved,
+      publicIp,
+      primaryContext?.lb_reserve_ip
+    ),
+    ...(privateIp === undefined ? {} : { private_ip: privateIp })
+  };
 }
 
 export function isLoadBalancerPublicIpReservedClient(

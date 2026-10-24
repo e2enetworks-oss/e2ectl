@@ -36,6 +36,15 @@ export function parseDomainName(input) {
     // How people write the platform name in messages, for example TIR.
     displayName: isMyAccount ? MYACCOUNT_NAME : platform.toUpperCase(),
     isMyAccount,
+    // MyAccount products need a project and location; products on other
+    // platforms only need a token and may pick their own context later.
+    credentialsType: isMyAccount
+      ? 'ResolvedCredentials'
+      : 'ResolvedAccountCredentials',
+    credentialsResolver: isMyAccount
+      ? 'resolveStoredCredentials'
+      : 'resolveStoredAccountCredentials',
+    optionsHelper: isMyAccount ? 'addContextOptions' : 'addAliasOption',
     platform,
     platformName,
     product
@@ -51,13 +60,9 @@ export function toPascalCase(name) {
 
 // Inserts `text` on the line after the last import statement.
 export function insertAfterLastImport(source, text) {
-  const lastImport = source.lastIndexOf('\nimport ');
-  const start =
-    lastImport === -1
-      ? source.startsWith('import ')
-        ? 0
-        : -1
-      : lastImport + 1;
+  // Searching "\n" + source finds an import on the first line too, and the
+  // index it returns is already the start of that line in source.
+  const start = `\n${source}`.lastIndexOf('\nimport ');
 
   if (start === -1) {
     throw new Error('No import statement found.');
@@ -137,9 +142,6 @@ export function registerPlatformInProgram(source, names) {
 }
 
 export function registerInRuntime(source, names, { addTransportImport }) {
-  const credentialsType = names.isMyAccount
-    ? 'ResolvedCredentials'
-    : 'ResolvedAccountCredentials';
   let next = insertAfterLastImport(
     source,
     `import {\n  ${names.baseName}ApiClient,\n  type ${names.baseName}Client\n} from '../${names.platform}/${names.product}/index.js';`
@@ -155,7 +157,7 @@ export function registerInRuntime(source, names, { addTransportImport }) {
   next = insertBeforeLine(
     next,
     '  credentialValidator: CredentialValidator;',
-    `  create${names.baseName}Client(credentials: ${credentialsType}): ${names.baseName}Client;`
+    `  create${names.baseName}Client(credentials: ${names.credentialsType}): ${names.baseName}Client;`
   );
 
   return insertBeforeLine(
@@ -273,7 +275,7 @@ export class ${baseName}ApiClient implements ${baseName}Client {
 
   async listItems(): Promise<${baseName}Item[]> {
     const response = await this.transport.get<ApiEnvelope<${baseName}Item[]>>(
-      ${pathConstant}${isMyAccount ? '' : ',\n      { includeProjectContext: false }'}
+      ${pathConstant}
     );
 
     return response.data;
@@ -308,7 +310,7 @@ export function render${baseName}Result(
 `,
     [`${directory}/command.ts`]: `import { Command } from 'commander';
 
-import { ${isMyAccount ? 'addContextOptions' : 'addAliasOption'} } from '../../app/context-options.js';
+import { ${names.optionsHelper} } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/runtime.js';
 import { render${baseName}Result } from './formatter.js';
 import { ${baseName}Service } from './service.js';
@@ -330,7 +332,7 @@ export function build${baseName}Command(runtime: CliRuntime): Command {
 
   command.helpCommand('help [command]', 'Show help for a ${product} command');
 
-  ${isMyAccount ? 'addContextOptions' : 'addAliasOption'}(
+  ${names.optionsHelper}(
     command.command('list').description('List ${product} items.')
   ).action(
     async (options: ${baseName}ContextOptions, commandInstance: Command) => {
@@ -365,13 +367,7 @@ export type {
 }
 
 function renderService(names) {
-  const { baseName, isMyAccount } = names;
-  const credentialsType = isMyAccount
-    ? 'ResolvedCredentials'
-    : 'ResolvedAccountCredentials';
-  const resolver = isMyAccount
-    ? 'resolveStoredCredentials'
-    : 'resolveStoredAccountCredentials';
+  const { baseName, credentialsResolver: resolver, credentialsType } = names;
 
   return `import {
   ${resolver},

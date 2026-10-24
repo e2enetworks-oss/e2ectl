@@ -164,9 +164,13 @@ export class ReservedIpService {
     const createdReservedIp = normalizeReservedIpItem(
       await client.createReservedIp()
     );
-    const reservedIp = await findReservedIpInInventoryWithRetry(
-      client,
-      createdReservedIp.ip_address
+    // A new reserved IP can take a moment to appear in the list.
+    const reservedIp = await pollUntilFound(
+      () => findReservedIpInInventory(client, createdReservedIp.ip_address),
+      {
+        attempts: RESERVED_IP_POLL_ATTEMPTS,
+        intervalMs: RESERVED_IP_POLL_INTERVAL_MS
+      }
     );
 
     if (reservedIp === undefined) {
@@ -415,19 +419,6 @@ function buildReservedIpNotFoundError(ipAddress: string): CliError {
     exitCode: EXIT_CODES.network,
     suggestion: `Run ${formatMyAccountCommand('reserved-ip list')} to inspect available reserved IPs, then retry with an exact ip_address.`
   });
-}
-
-async function findReservedIpInInventoryWithRetry(
-  client: ReservedIpClient,
-  ipAddress: string
-): Promise<ReservedIpItem | undefined> {
-  return await pollUntilFound(
-    () => findReservedIpInInventory(client, ipAddress),
-    {
-      attempts: RESERVED_IP_POLL_ATTEMPTS,
-      intervalMs: RESERVED_IP_POLL_INTERVAL_MS
-    }
-  );
 }
 
 async function findReservedIpInInventory(

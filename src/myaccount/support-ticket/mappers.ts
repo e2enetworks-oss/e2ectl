@@ -85,8 +85,8 @@ export function normalizeSupportTicketDetail(
 ): SupportTicketDetailItem {
   return {
     ...normalizeSupportTicketItem(item),
-    crn: normalizeOptionalString(item.crn) ?? null,
-    customer_type: normalizeOptionalString(item.customer_type) ?? null
+    crn: normalizeNullableString(item.crn),
+    customer_type: normalizeNullableString(item.customer_type)
   };
 }
 
@@ -102,8 +102,8 @@ export function buildDetailFromCreateResult(
     ...normalizeSupportTicketItem({ id: result.id }),
     crn: null,
     customer_type: null,
-    ticket_id: normalizeOptionalString(result.ticket_id) ?? null,
-    ticket_number: normalizeOptionalString(result.ticket_number) ?? null
+    ticket_id: normalizeNullableString(result.ticket_id),
+    ticket_number: normalizeNullableString(result.ticket_number)
   };
 }
 
@@ -111,11 +111,11 @@ export function normalizeSupportTicketDepartment(
   department: SupportTicketDepartment
 ): SupportTicketDepartmentItem {
   return {
-    description: normalizeOptionalString(department.description) ?? null,
+    description: normalizeNullableString(department.description),
     id: department.id,
     is_default: department.is_default === true,
     is_enabled: department.is_enabled === true,
-    name: normalizeOptionalString(department.name) ?? null
+    name: normalizeNullableString(department.name)
   };
 }
 
@@ -149,7 +149,7 @@ function normalizeThreadAttachments(
   thread: SupportTicketThread
 ): SupportTicketThreadItem['attachments'] {
   return (thread.attachment_list?.data ?? []).map((att) => ({
-    download_url: normalizeOptionalString(att.download_url) ?? null,
+    download_url: normalizeNullableString(att.download_url),
     file_name: normalizeOptionalString(att.file_name) ?? ''
   }));
 }
@@ -170,7 +170,7 @@ export function normalizeSupportTicketTimelineEvent(
       normalizeOptionalString(event.type) ??
       normalizeOptionalString(event.event) ??
       null,
-    status: normalizeOptionalString(event.status) ?? null,
+    status: normalizeNullableString(event.status),
     time:
       normalizeOptionalString(event.time) ??
       normalizeOptionalString(event.event_time) ??
