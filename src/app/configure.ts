@@ -2,11 +2,13 @@ import { Command } from 'commander';
 
 import {
   describePlatformSetup,
+  findProfile,
   pickValue,
   type PlatformConfigureCommandResult,
   type PlatformSetupResult,
   type ProfileConfig,
-  type SetupPlatform
+  type SetupPlatform,
+  type ValueSources
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
@@ -139,31 +141,33 @@ function renderConfigureResult(
 }
 
 // Key and token: in a terminal they are asked for (hidden); otherwise they
-// come from E2E_API_KEY and E2E_AUTH_TOKEN or the saved profile. They are
-// never taken as flags, so they stay out of shell history. The token is
-// checked against the API before anything is saved.
+// come from E2E_API_KEY and E2E_AUTH_TOKEN or the saved profile, in the
+// usual value order (a profile named with --alias beats the environment).
+// They are never taken as flags, so they stay out of shell history. The
+// token is checked against the API before anything is saved.
 async function saveKeyAndToken(
   runtime: CliRuntime,
   requestedAlias: string | undefined,
   canPrompt: boolean
 ): Promise<string> {
   const config = await runtime.store.read();
-  const alias = requestedAlias ?? config.default ?? 'default';
-  const saved = config.profiles[alias];
-  const apiKey = await readSecret(
-    runtime,
-    canPrompt,
-    'API key',
-    process.env.E2E_API_KEY,
-    saved?.api_key
-  );
-  const authToken = await readSecret(
-    runtime,
-    canPrompt,
-    'Auth token',
-    process.env.E2E_AUTH_TOKEN,
-    saved?.auth_token
-  );
+  const chosenAlias = normalizeAlias(requestedAlias);
+  const alias = chosenAlias ?? config.default ?? 'default';
+  const saved = findProfile(config, alias);
+  // --alias picks the saved key over the environment, as on every command.
+  const chosenByFlag = chosenAlias !== undefined;
+  const fromSaved = (field: 'api_key' | 'auth_token'): ValueSources => ({
+    flag: chosenByFlag ? saved?.[field] : undefined,
+    profile: chosenByFlag ? undefined : saved?.[field]
+  });
+  const apiKey = await readSecret(runtime, canPrompt, 'API key', {
+    env: process.env.E2E_API_KEY,
+    ...fromSaved('api_key')
+  });
+  const authToken = await readSecret(runtime, canPrompt, 'Auth token', {
+    env: process.env.E2E_AUTH_TOKEN,
+    ...fromSaved('auth_token')
+  });
 
   const check = await runtime.credentialValidator.validate({
     api_key: apiKey,
@@ -189,14 +193,29 @@ async function saveKeyAndToken(
   return alias;
 }
 
+// Names every object already has (like "constructor") cannot be saved as
+// profiles safely.
+function normalizeAlias(value: string | undefined): string | undefined {
+  const alias = value?.trim();
+  if (alias === undefined || (alias !== '' && !(alias in Object.prototype))) {
+    return alias;
+  }
+
+  throw new CliError(`"${value ?? ''}" cannot be a profile name.`, {
+    code: 'INVALID_ALIAS',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Pass a profile name such as work with --alias, or leave it out.'
+  });
+}
+
 async function readSecret(
   runtime: CliRuntime,
   canPrompt: boolean,
   label: 'API key' | 'Auth token',
-  fromEnv: string | undefined,
-  fromProfile: string | undefined
+  sources: ValueSources
 ): Promise<string> {
-  const fallback = pickValue({ env: fromEnv, profile: fromProfile })?.value;
+  const fallback = pickValue(sources)?.value;
 
   if (canPrompt) {
     const answer = (

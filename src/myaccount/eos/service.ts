@@ -56,7 +56,7 @@ export class EosService {
     name: string,
     options: EosContextOptions
   ): Promise<EosCommandResult> {
-    const bucket = requireText(name, 'Bucket name', 'the first argument');
+    const bucket = normalizeBucketName(name);
     const client = await this.createClient(options);
 
     return {
@@ -69,7 +69,7 @@ export class EosService {
     name: string,
     options: EosForceOptions
   ): Promise<EosCommandResult> {
-    const bucket = requireText(name, 'Bucket name', 'the first argument');
+    const bucket = normalizeBucketName(name);
     const confirmed = await this.confirmUnlessForced(
       options,
       `Delete bucket ${bucket} and every object in it? This cannot be undone.`
@@ -102,11 +102,22 @@ export class EosService {
     const name = normalizeKeyName(options.name);
     const client = await this.createClient(options);
     const created = await client.createKey(name);
+    // The secret is shown only here; without it the key is no use.
+    if (created.secret_key === undefined || created.secret_key === '') {
+      throw new CliError(
+        `Access key ${created.access_key} was created, but E2E sent no secret key for it.`,
+        {
+          code: 'EOS_KEY_SECRET_MISSING',
+          exitCode: EXIT_CODES.network,
+          suggestion: `Delete it with ${formatMyAccountCommand(`eos key delete ${created.access_key}`)} and create another.`
+        }
+      );
+    }
 
     return {
       action: 'key-create',
       endpoint: created.minio_host_url ?? null,
-      key: { ...toKeyItem(created), secret_key: created.secret_key ?? '' }
+      key: { ...toKeyItem(created), secret_key: created.secret_key }
     };
   }
 
@@ -115,6 +126,9 @@ export class EosService {
     options: EosForceOptions
   ): Promise<EosCommandResult> {
     const key = requireText(accessKey, 'Access key', 'the first argument');
+    const client = await this.createClient(options);
+    // E2E reports success for a key that does not exist, so check first.
+    await findKey(client, key);
     const confirmed = await this.confirmUnlessForced(
       options,
       `Delete access key ${key}? Anything using it stops working.`
@@ -123,7 +137,6 @@ export class EosService {
       return { access_key: key, action: 'key-delete', cancelled: true };
     }
 
-    const client = await this.createClient(options);
     const result = await client.deleteKey(key);
 
     return {
@@ -138,7 +151,7 @@ export class EosService {
     bucket: string,
     options: EosContextOptions
   ): Promise<EosCommandResult> {
-    const name = requireText(bucket, 'Bucket name', 'the first argument');
+    const name = normalizeBucketName(bucket);
     const client = await this.createClient(options);
 
     return {
@@ -152,7 +165,7 @@ export class EosService {
     bucket: string,
     options: EosAccessGrantOptions
   ): Promise<EosCommandResult> {
-    const name = requireText(bucket, 'Bucket name', 'the first argument');
+    const name = normalizeBucketName(bucket);
     const role = normalizeRole(options.role);
     const accessKey = requireText(
       options.accessKey,
@@ -160,17 +173,7 @@ export class EosService {
       '--access-key'
     );
     const client = await this.createClient(options);
-    const key = (await client.listKeys()).find(
-      (candidate) => candidate.access_key === accessKey
-    );
-
-    if (key === undefined) {
-      throw new CliError(`Access key ${accessKey} was not found.`, {
-        code: 'EOS_KEY_NOT_FOUND',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run ${formatMyAccountCommand('eos key list')} and pass a listed access key.`
-      });
-    }
+    const key = await findKey(client, accessKey);
 
     const items = await client.grantAccess(name, {
       role_name: ROLE_NAMES[role],
@@ -189,7 +192,7 @@ export class EosService {
     accessId: string,
     options: EosContextOptions
   ): Promise<EosCommandResult> {
-    const name = requireText(bucket, 'Bucket name', 'the first argument');
+    const name = normalizeBucketName(bucket);
     if (!/^\d+$/.test(accessId.trim())) {
       throw new CliError('Access ID must be numeric.', {
         code: 'INVALID_EOS_ACCESS_ID',
@@ -284,6 +287,40 @@ function normalizeKeyName(value: string): string {
     exitCode: EXIT_CODES.usage,
     suggestion:
       'Use 3 to 50 letters and digits, with no spaces or dashes, for example --name ci2026.'
+  });
+}
+
+async function findKey(
+  client: EosClient,
+  accessKey: string
+): Promise<EosKeyApiItem> {
+  const key = (await client.listKeys()).find(
+    (candidate) => candidate.access_key === accessKey
+  );
+  if (key !== undefined) {
+    return key;
+  }
+
+  throw new CliError(`Access key ${accessKey} was not found.`, {
+    code: 'EOS_KEY_NOT_FOUND',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Run ${formatMyAccountCommand('eos key list')} and pass a listed access key.`
+  });
+}
+
+// E2E's bucket name rule. Checking it also keeps names like ".." out of
+// the API path.
+function normalizeBucketName(value: string): string {
+  const name = value.trim();
+  if (/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(name)) {
+    return name;
+  }
+
+  throw new CliError(`"${value}" is not a valid bucket name.`, {
+    code: 'INVALID_EOS_BUCKET_NAME',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      'Use 3 to 63 lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.'
   });
 }
 

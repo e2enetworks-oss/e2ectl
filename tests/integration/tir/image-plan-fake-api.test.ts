@@ -170,7 +170,7 @@ describe('tir image and plan lists against a fake TIR API', () => {
       });
 
       expect(result.exitCode).toBe(4);
-      expect(result.stderr).toContain('No TIR project chosen.');
+      expect(result.stderr).toContain('No TIR project and location chosen.');
       expect(result.stderr).toContain('e2ectl tir configure');
     } finally {
       await tempHome.cleanup();

@@ -1,5 +1,6 @@
 import { createProgram } from '../../../../src/app/program.js';
 import { ConfigStore } from '../../../../src/config/store.js';
+import type { EosBucketApiItem } from '../../../../src/myaccount/eos/types.js';
 import {
   createTestConfigPath,
   createTestRuntime,
@@ -41,7 +42,7 @@ function eosMocks() {
     listAccess: vi.fn(() =>
       Promise.resolve([{ id: 5, role: { name: 'Odd Role' }, user: KEY }])
     ),
-    listBuckets: vi.fn(() => Promise.resolve([])),
+    listBuckets: vi.fn((): Promise<EosBucketApiItem[]> => Promise.resolve([])),
     listKeys: vi.fn(() => Promise.resolve([KEY])),
     revokeAccess: vi.fn(() => Promise.resolve({ message: 'OK' }))
   };
@@ -84,6 +85,30 @@ describe('eos buckets', () => {
     expect(output).toContain('eos access grant e2ectl-test');
   });
 
+  it('shows buckets as a table in text mode', async () => {
+    const mocks = eosMocks();
+    mocks.listBuckets.mockResolvedValueOnce([
+      { created_at: '2026-10-25', name: 'logs', status: 'NEW', used_MB: 3 }
+    ]);
+
+    const output = await run(['myaccount', 'eos', 'bucket', 'list'], mocks);
+
+    expect(output).toContain('logs');
+    expect(output).toContain('NEW');
+  });
+
+  it.each(['..', '.', 'ab', 'Logs', 'a/b'])(
+    'refuses the bucket name %s before calling E2E',
+    async (name) => {
+      const mocks = eosMocks();
+
+      await expect(
+        run(['myaccount', 'eos', 'bucket', 'delete', name, '--force'], mocks)
+      ).rejects.toMatchObject({ code: 'INVALID_EOS_BUCKET_NAME' });
+      expect(mocks.deleteBucket).not.toHaveBeenCalled();
+    }
+  );
+
   it('says so when there are no buckets', async () => {
     expect(await run(['myaccount', 'eos', 'bucket', 'list'])).toBe(
       'No buckets found.\n'
@@ -94,16 +119,19 @@ describe('eos buckets', () => {
     const mocks = eosMocks();
 
     expect(
-      await run(['myaccount', 'eos', 'bucket', 'delete', 'b'], mocks, false)
+      await run(['myaccount', 'eos', 'bucket', 'delete', 'logs'], mocks, false)
     ).toBe('Deletion cancelled.\n');
     expect(mocks.deleteBucket).not.toHaveBeenCalled();
     await expect(
-      run(['myaccount', 'eos', 'bucket', 'delete', 'b'], mocks)
+      run(['myaccount', 'eos', 'bucket', 'delete', 'logs'], mocks)
     ).rejects.toMatchObject({
       code: 'CONFIRMATION_REQUIRED'
     });
     expect(
-      await run(['myaccount', 'eos', 'bucket', 'delete', 'b', '--force'], mocks)
+      await run(
+        ['myaccount', 'eos', 'bucket', 'delete', 'logs', '--force'],
+        mocks
+      )
     ).toContain('in the background');
   });
 });
@@ -148,6 +176,38 @@ describe('eos keys', () => {
     }
   );
 
+  it('fails, naming the key, when E2E sends no secret', async () => {
+    const mocks = eosMocks();
+    mocks.createKey.mockResolvedValueOnce({
+      ...KEY,
+      minio_host_url: 'objectstore.example.com',
+      secret_key: ''
+    });
+
+    await expect(
+      run(['myaccount', 'eos', 'key', 'create', '--name', 'ci2026'], mocks)
+    ).rejects.toMatchObject({
+      code: 'EOS_KEY_SECRET_MISSING',
+      suggestion: expect.stringContaining('eos key delete AKEXAMPLE') as string
+    });
+  });
+
+  it('asks before deleting a key, and refuses an unknown one', async () => {
+    const mocks = eosMocks();
+
+    expect(
+      await run(
+        ['myaccount', 'eos', 'key', 'delete', 'AKEXAMPLE'],
+        mocks,
+        false
+      )
+    ).toBe('Deletion cancelled.\n');
+    await expect(
+      run(['myaccount', 'eos', 'key', 'delete', 'NOPE', '--force'], mocks)
+    ).rejects.toMatchObject({ code: 'EOS_KEY_NOT_FOUND' });
+    expect(mocks.deleteKey).not.toHaveBeenCalled();
+  });
+
   it('deletes a key by access key with --force', async () => {
     const mocks = eosMocks();
     await run(
@@ -170,7 +230,7 @@ describe('eos bucket access', () => {
           'eos',
           'access',
           'grant',
-          'b',
+          'logs',
           '--access-key',
           'AKEXAMPLE',
           '--role',
@@ -180,13 +240,13 @@ describe('eos bucket access', () => {
       )
     ) as unknown;
 
-    expect(mocks.grantAccess).toHaveBeenCalledWith('b', {
+    expect(mocks.grantAccess).toHaveBeenCalledWith('logs', {
       role_name: 'Bucket Writer',
       users: [{ id: 77 }]
     });
     expect(output).toEqual({
       action: 'access-grant',
-      bucket: 'b',
+      bucket: 'logs',
       items: [
         { access_key: 'AKEXAMPLE', id: 5, key_name: 'ci', role: 'writer' }
       ]
@@ -194,28 +254,36 @@ describe('eos bucket access', () => {
     expect(JSON.stringify(output)).not.toContain('must-never-print');
   });
 
+  it('shows access as a table in text mode, without secrets', async () => {
+    const output = await run(['myaccount', 'eos', 'access', 'list', 'logs']);
+
+    expect(output).toContain('AKEXAMPLE');
+    expect(output).toContain('Odd Role');
+    expect(output).not.toContain('must-never-print');
+  });
+
   it('keeps E2E role names it does not know', async () => {
     expect(
       JSON.parse(
-        await run(['--json', 'myaccount', 'eos', 'access', 'list', 'b'])
+        await run(['--json', 'myaccount', 'eos', 'access', 'list', 'logs'])
       )
     ).toMatchObject({ items: [{ role: 'Odd Role' }] });
   });
 
   it.each([
     [
-      ['grant', 'b', '--access-key', 'NOPE', '--role', 'writer'],
+      ['grant', 'logs', '--access-key', 'NOPE', '--role', 'writer'],
       'EOS_KEY_NOT_FOUND'
     ],
     [
-      ['grant', 'b', '--access-key', 'AKEXAMPLE', '--role', 'owner'],
+      ['grant', 'logs', '--access-key', 'AKEXAMPLE', '--role', 'owner'],
       'INVALID_EOS_ROLE'
     ],
     [
-      ['grant', 'b', '--access-key', 'AKEXAMPLE', '--role', 'constructor'],
+      ['grant', 'logs', '--access-key', 'AKEXAMPLE', '--role', 'constructor'],
       'INVALID_EOS_ROLE'
     ],
-    [['revoke', 'b', 'x'], 'INVALID_EOS_ACCESS_ID']
+    [['revoke', 'logs', 'x'], 'INVALID_EOS_ACCESS_ID']
   ])('refuses %o with %s', async (args, code) => {
     await expect(
       run(['myaccount', 'eos', 'access', ...args])
@@ -224,8 +292,8 @@ describe('eos bucket access', () => {
 
   it('revokes by access id', async () => {
     const mocks = eosMocks();
-    await run(['myaccount', 'eos', 'access', 'revoke', 'b', '5'], mocks);
+    await run(['myaccount', 'eos', 'access', 'revoke', 'logs', '5'], mocks);
 
-    expect(mocks.revokeAccess).toHaveBeenCalledWith('b', 5);
+    expect(mocks.revokeAccess).toHaveBeenCalledWith('logs', 5);
   });
 });

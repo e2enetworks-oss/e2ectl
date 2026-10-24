@@ -258,7 +258,7 @@ describe('TIR value order', () => {
       )
     );
 
-    expect(error.message).toBe('No TIR project chosen.');
+    expect(error.message).toBe('No TIR project and location chosen.');
     expect(error.suggestion).toContain('tir project list');
     expect(error.suggestion).toContain('tir configure');
   });

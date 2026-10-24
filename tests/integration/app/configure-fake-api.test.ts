@@ -74,6 +74,57 @@ describe('e2ectl configure against fake APIs', () => {
     }
   });
 
+  it('myaccount configure saves the project and location, and later commands use them', async () => {
+    const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/pbac/project/': () =>
+        ok([
+          { is_default: true, is_starred: false, name: 'main', project_id: 46 }
+        ]),
+      'GET /myaccount/api/v1/nodes/': () => ({
+        body: {
+          code: 200,
+          data: [],
+          errors: {},
+          message: 'OK',
+          total_count: 0,
+          total_page_number: 1
+        }
+      })
+    });
+    const tempHome = await createTempHome();
+    const env = {
+      HOME: tempHome.path,
+      [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+    };
+
+    try {
+      await tempHome.writeConfig({
+        default: 'work',
+        profiles: { work: { api_key: 'saved-key', auth_token: 'saved-token' } }
+      });
+
+      const saved = await runBuiltCli(
+        ['myaccount', 'configure', '--project', '46', '--location', 'Chennai'],
+        { env }
+      );
+      expect(saved.exitCode).toBe(0);
+      expect((await tempHome.readConfig()).profiles.work).toMatchObject({
+        default_location: 'Chennai',
+        default_project_id: '46'
+      });
+
+      const nodes = await runBuiltCli(['myaccount', 'node', 'list'], { env });
+      expect(nodes.exitCode).toBe(0);
+      expect(server.requests.at(-1)?.query).toMatchObject({
+        location: 'Chennai',
+        project_id: '46'
+      });
+    } finally {
+      await server.close();
+      await tempHome.cleanup();
+    }
+  });
+
   it('without a terminal and without --platform, says how to choose one', async () => {
     const tempHome = await createTempHome();
 

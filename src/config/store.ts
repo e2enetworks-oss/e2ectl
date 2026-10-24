@@ -140,6 +140,17 @@ export class ConfigStore {
   }
 }
 
+// Looks a profile up by a name the user typed. Own keys only, so names like
+// "constructor" or "__proto__" are not found on Object.prototype.
+export function findProfile(
+  config: ConfigFile,
+  alias: string
+): ProfileConfig | undefined {
+  return Object.hasOwn(config.profiles, alias)
+    ? config.profiles[alias]
+    : undefined;
+}
+
 export function createEmptyConfig(): ConfigFile {
   return {
     profiles: {}

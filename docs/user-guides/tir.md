@@ -9,8 +9,9 @@ command uses them.
 
 ## Before You Start
 
-- Save a profile with `e2ectl config import --file <path>`, or set `E2E_API_KEY` and
-  `E2E_AUTH_TOKEN`.
+- Run `e2ectl configure` to save your key and token in a profile and choose TIR. `tir configure`
+  needs a saved profile; in scripts without one, set `E2E_API_KEY`, `E2E_AUTH_TOKEN` and the
+  `E2E_TIR_*` variables instead.
 - TIR runs in Delhi and Chennai.
 
 ## Common Tasks
@@ -119,7 +120,7 @@ e2ectl --json tir plan list --image-version-id <version-id>
 | Message                                         | What to do                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------- |
 | `No TIR account chosen.`                        | Run `e2ectl tir account list`, then pass `--account-id` or run `tir configure`. |
-| `No TIR project chosen.`                        | Run `e2ectl tir project list`, then `e2ectl tir configure`.                     |
+| `No TIR project and location chosen.`           | Run `e2ectl tir project list`, then `e2ectl tir configure`.                     |
 | `No TIR <value> given.`                         | Add the flag the message names, or run the command in a terminal.               |
 | `TIR account <id> is not one your key can use.` | Pick an id from `e2ectl tir account list`.                                      |
 | `TIR is not turned on for account <id>.`        | Pick another account, or ask its owner to turn TIR on.                          |

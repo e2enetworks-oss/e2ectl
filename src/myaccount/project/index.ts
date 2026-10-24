@@ -9,4 +9,4 @@ export type {
   ProjectStarUnstarResult,
   ProjectSummary
 } from './types.js';
-export { configureMyAccount, createMyAccountSetupSteps } from './configure.js';
+export { configureMyAccount } from './configure.js';

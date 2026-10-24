@@ -240,6 +240,42 @@ describe('e2ectl configure without a terminal', () => {
     expect(config.profiles.default?.default_project_id).toBe('46');
   });
 
+  it('keeps the saved key of a profile named with --alias over the environment', async () => {
+    const flags = [
+      '--platform',
+      'myaccount',
+      '--project',
+      '46',
+      '--location',
+      'Delhi'
+    ];
+
+    const named = await configure(['configure', '--alias', 'work', ...flags], {
+      savedProfile: true
+    });
+    const unnamed = await configure(['configure', ...flags], {
+      savedProfile: true
+    });
+
+    expect(named.config.profiles.work?.api_key).toBe('saved-key');
+    expect(unnamed.config.profiles.work?.api_key).toBe('env-key');
+  });
+
+  it.each(['', '  ', '__proto__', 'constructor'])(
+    'refuses the profile name "%s"',
+    async (alias) => {
+      const error = await configureError([
+        'configure',
+        '--alias',
+        alias,
+        '--platform',
+        'tir'
+      ]);
+
+      expect(error.code).toBe('INVALID_ALIAS');
+    }
+  );
+
   it('asks for --platform with the exact message', async () => {
     const error = await configureError(['configure']);
 

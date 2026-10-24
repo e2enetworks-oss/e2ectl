@@ -340,6 +340,26 @@ describe('volume snapshots', () => {
     expect(output).toContain('The volume itself is not changed.');
   });
 
+  it('asks before deleting, refuses without a terminal, and checks the id', async () => {
+    const mocks = volumeMocks(9);
+    const volume = volumeClient(mocks);
+    const args = ['myaccount', 'volume', 'snapshot', 'delete', '5'];
+
+    expect(await run([...args, '7'], { volume }, false)).toBe(
+      'Snapshot deletion cancelled.\n'
+    );
+    await expect(run([...args, '7'], { volume })).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED'
+    });
+    await expect(
+      run([...args, 'abc', '--force'], { volume })
+    ).rejects.toMatchObject({
+      code: 'INVALID_SNAPSHOT_ID',
+      message: 'Volume snapshot IDs are numbers.'
+    });
+    expect(mocks.deleteSnapshot).not.toHaveBeenCalled();
+  });
+
   it('deletes one with --force', async () => {
     const mocks = volumeMocks(9);
     const client = volumeClient(mocks);

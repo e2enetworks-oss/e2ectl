@@ -160,6 +160,20 @@ describe('configurePlatform', () => {
     ).toBe('Delhi');
   });
 
+  it('stops before asking when there are no projects', async () => {
+    const error = await capture(
+      configurePlatform(
+        { ...steps(false), listProjects: () => Promise.resolve([]) },
+        'work',
+        { location: 'Delhi' },
+        { io: io({ canPrompt: true }), store: await storeWith() }
+      )
+    );
+
+    expect(error.code).toBe('SETUP_NO_PROJECTS');
+    expect(error.message).toBe('There are no MyAccount projects.');
+  });
+
   it('does not use the saved project after switching accounts', async () => {
     const store = await storeWith({
       tir: { account_id: '22', location: 'Delhi', project_id: '44' }

@@ -13,8 +13,13 @@ export {
   resolveStoredTirCredentials,
   resolveTirCredentials
 } from './resolver.js';
-export { pickValue } from './value-order.js';
-export { ConfigStore, createEmptyConfig, normalizeConfig } from './store.js';
+export { pickValue, type ValueSources } from './value-order.js';
+export {
+  ConfigStore,
+  createEmptyConfig,
+  findProfile,
+  normalizeConfig
+} from './store.js';
 export type {
   AuthField,
   ConfigFile,

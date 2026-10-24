@@ -2,6 +2,7 @@ import { CliError, EXIT_CODES } from '../core/errors.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
+import { findProfile } from './store.js';
 import { pickValue } from './value-order.js';
 
 export type SetupPlatform = 'myaccount' | 'tir';
@@ -121,7 +122,7 @@ export async function findSetupProfile(
   const config = await store.read();
   const chosen = alias ?? config.default;
 
-  if (chosen !== undefined && config.profiles[chosen] !== undefined) {
+  if (chosen !== undefined && findProfile(config, chosen) !== undefined) {
     return chosen;
   }
 
@@ -179,7 +180,7 @@ export async function configurePlatform(
   dependencies: { io: SetupIo; store: SetupStore }
 ): Promise<PlatformSetupResult> {
   const { io, store } = dependencies;
-  const profile = (await store.read()).profiles[alias];
+  const profile = findProfile(await store.read(), alias);
   if (profile === undefined) {
     throw profileNotFoundError(`Profile "${alias}" was not found.`);
   }
@@ -276,6 +277,18 @@ async function chooseProject(
   io: SetupIo
 ): Promise<SetupProject> {
   const projects = await steps.listProjects(accountId);
+  if (projects.length === 0) {
+    const where = accountId === undefined ? '' : ` in account ${accountId}`;
+    throw new CliError(
+      `There are no ${PLATFORM_NAMES[steps.platform]} projects${where}.`,
+      {
+        code: 'SETUP_NO_PROJECTS',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Create a project on ${PLATFORM_NAMES[steps.platform]} first, then run configure again.`
+      }
+    );
+  }
+
   const raw = await readValue(steps, 'project', flags, saved, io, {
     choices: projects.map((project) => `${project.id}  ${project.name}`),
     onlyChoice: projects.length === 1 ? String(projects[0]?.id) : undefined

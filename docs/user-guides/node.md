@@ -18,7 +18,7 @@ e2ectl myaccount node catalog os
 ```
 
 The rows include GPU nodes where the location offers them: display category `GPU`, category `Gpu`.
-On the test account those are in Delhi only.
+A location without GPUs shows no GPU rows.
 
 ### Discover Exact Plans And Images
 

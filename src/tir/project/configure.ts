@@ -17,9 +17,12 @@ export async function configureTir(
   canPrompt: boolean
 ): Promise<PlatformConfigureCommandResult> {
   const alias = await findSetupProfile(runtime.store, input.alias);
+  // The key comes from the same place later commands take it from: the
+  // --alias profile, otherwise the environment, otherwise the default profile.
+  const keySource = input.alias === undefined ? {} : { alias: input.alias };
   const credentials = await resolveStoredTirCredentials(
     runtime.store,
-    { alias },
+    keySource,
     'auth'
   );
   const steps = createTirSetupSteps({

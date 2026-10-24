@@ -68,8 +68,8 @@ e2ectl myaccount volume snapshot list <volume-id>
 e2ectl myaccount volume snapshot delete <volume-id> <snapshot-id>
 ```
 
-The volume must be attached to a node; E2E takes the snapshot through that node. Snapshots
-work the same way as node snapshots: the same columns, checks, messages and `--json`.
+The volume must be attached to a node; E2E takes the snapshot through that node. The
+snapshot list has the same columns as node snapshots. Volume snapshot ids are numbers.
 
 To restore, save a snapshot as a new volume. The volume it came from is never overwritten, and
 the new volume is billed like any other:

@@ -1,6 +1,6 @@
 import { createProgram } from '../../../../src/app/program.js';
 import { ConfigStore } from '../../../../src/config/store.js';
-import { AppError, CliError } from '../../../../src/core/errors.js';
+import { AppError, CliError, EXIT_CODES } from '../../../../src/core/errors.js';
 import {
   normalizeNodeCatalogPlanFilters,
   normalizeNodeCatalogPlanItems,
@@ -296,6 +296,27 @@ describe('node create --wait', () => {
     expect((error as CliError).message).toContain('Node 101 was created');
   });
 
+  it('keeps the exit code of an auth failure while waiting', async () => {
+    const error = await service(
+      fakeClient({
+        getNode: () =>
+          Promise.reject(
+            new AppError('MyAccount API request failed: Unauthorized', {
+              code: 'API_REQUEST_FAILED',
+              exitCode: EXIT_CODES.auth
+            })
+          )
+      })
+    )
+      .createNode({ ...CREATE, wait: true })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      code: 'NODE_WAIT_FAILED',
+      exitCode: EXIT_CODES.auth
+    });
+  });
+
   it('cannot wait when E2E returns no node', async () => {
     const error = await service(
       fakeClient({
@@ -576,6 +597,36 @@ describe('node commands for the additions', () => {
     ).toMatchObject({
       node: { id: 101, status: 'Running' }
     });
+  });
+
+  it('explains in text when the plan filters match nothing', async () => {
+    const output = await run(fakeClient(), [
+      'myaccount',
+      'node',
+      'catalog',
+      'plans',
+      '--display-category',
+      'Linux Virtual Node',
+      '--category',
+      'Ubuntu',
+      '--os',
+      'Ubuntu',
+      '--os-version',
+      '24.04',
+      '--gpu-type',
+      'H100',
+      '--min-vcpu',
+      '4',
+      '--min-ram',
+      '8'
+    ]);
+
+    expect(output).toContain('GPU=H100');
+    expect(output).toContain('vCPU>=4');
+    expect(output).toContain('RAM>=8 GB');
+    expect(output).toContain(
+      'No configs match the --gpu-type, --min-vcpu and --min-ram filters.'
+    );
   });
 
   it('shows deletion protection in node get', async () => {

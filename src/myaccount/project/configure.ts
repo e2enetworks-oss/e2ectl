@@ -48,9 +48,13 @@ export async function configureMyAccount(
   canPrompt: boolean
 ): Promise<PlatformConfigureCommandResult> {
   const alias = await findSetupProfile(runtime.store, input.alias);
-  const credentials = await resolveStoredAccountCredentials(runtime.store, {
-    alias
-  });
+  // The key comes from the same place later commands take it from: the
+  // --alias profile, otherwise the environment, otherwise the default profile.
+  const keySource = input.alias === undefined ? {} : { alias: input.alias };
+  const credentials = await resolveStoredAccountCredentials(
+    runtime.store,
+    keySource
+  );
   const steps = createMyAccountSetupSteps(
     runtime.createProjectClient(credentials)
   );

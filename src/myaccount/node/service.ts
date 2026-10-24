@@ -1132,7 +1132,7 @@ export class NodeService {
     client: NodeClient,
     result: NodeCreateResult
   ): Promise<NodeDetails> {
-    const nodeId = result.node_create_response[0]?.id;
+    const nodeId = result.node_create_response?.[0]?.id;
     if (nodeId === undefined) {
       throw new CliError(
         'E2E did not return the new node, so the CLI cannot wait for it.',
@@ -1263,7 +1263,9 @@ function toNodeWaitError(error: unknown, nodeId: number): CliError {
       cause: error,
       code: 'NODE_WAIT_FAILED',
       details: error instanceof Error ? [`Reason: ${error.message}`] : [],
-      exitCode: EXIT_CODES.network,
+      // Keep the exit code of what went wrong, for example 3 for a revoked
+      // token; anything else counts as a network failure.
+      exitCode: error instanceof AppError ? error.exitCode : EXIT_CODES.network,
       suggestion: `The node exists and is billed. Check it with ${formatMyAccountCommand(`node get ${nodeId}`)}.`
     }
   );

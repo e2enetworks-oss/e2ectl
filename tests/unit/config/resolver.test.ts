@@ -292,7 +292,7 @@ describe('resolveCredentials', () => {
       'Expected environment variables: E2E_PROJECT_ID, E2E_LOCATION',
       'Config path: /tmp/config.json'
     ]);
-    expect(error.suggestion).toContain('Fix the saved default profile');
+    expect(error.suggestion).toContain('configure');
   });
 
   it('includes flag details when a stale default alias still leaves auth unresolved', () => {

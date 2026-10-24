@@ -17,6 +17,7 @@ import {
   TIR_CONTEXT_ENV_VAR_BY_FIELD,
   VALID_LOCATIONS
 } from './types.js';
+import { findProfile } from './store.js';
 import { pickValue, type PickedValue } from './value-order.js';
 import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
@@ -194,7 +195,7 @@ function selectProfile(options: ResolveCredentialsOptions): SelectedProfile {
   const defaultProfile =
     defaultAlias === undefined
       ? undefined
-      : options.config.profiles[defaultAlias];
+      : findProfile(options.config, defaultAlias);
   if (defaultProfile === undefined) {
     return {
       alias: undefined,
@@ -322,7 +323,7 @@ function assertTirContext(
   }
 
   if (context.project_id === undefined || context.location === undefined) {
-    throw new CliError('No TIR project chosen.', {
+    throw new CliError('No TIR project and location chosen.', {
       code: 'MISSING_TIR_PROJECT',
       exitCode: EXIT_CODES.config,
       suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account <id> --project <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
@@ -366,7 +367,7 @@ function requireProfile(
   options: ResolveCredentialsOptions,
   alias: string
 ): ProfileConfig {
-  const profile = options.config.profiles[alias];
+  const profile = findProfile(options.config, alias);
   if (profile !== undefined) {
     return profile;
   }
@@ -431,8 +432,7 @@ function assertDefaultProfileUsable(
       code: 'INVALID_DEFAULT_PROFILE',
       details,
       exitCode: EXIT_CODES.config,
-      suggestion:
-        'Fix the saved default profile or provide E2E_API_KEY, E2E_AUTH_TOKEN, and either E2E_PROJECT_ID/E2E_LOCATION or --project-id/--location.'
+      suggestion: `Save it again with \`${formatCliCommand('configure')}\`, or pick another profile with --alias.`
     }
   );
 }

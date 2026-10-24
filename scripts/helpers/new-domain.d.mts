@@ -1,5 +1,7 @@
 export interface DomainNames {
   baseName: string;
+  clientOptions: string;
+  contextFields: string[];
   credentialsResolver: string;
   credentialsType: string;
   displayName: string;
@@ -7,6 +9,8 @@ export interface DomainNames {
   platform: string;
   platformName: string;
   product: string;
+  resolverRequirement: string;
+  testProfile: string;
 }
 
 export function parseDomainName(input: string | undefined): DomainNames;

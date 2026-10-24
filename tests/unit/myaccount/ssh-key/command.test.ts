@@ -286,6 +286,36 @@ describe('ssh-key commands', () => {
     expect(stdout.buffer).toContain('Type: ED25519');
   });
 
+  it('says in text mode that the same key is already saved', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const publicKeyPath = createTestConfigPath('ssh-key-public-same');
+    await writeFile(
+      publicKeyPath,
+      'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA other-comment\n',
+      'utf8'
+    );
+
+    await createProgram(runtime).parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'myaccount',
+      'ssh-key',
+      'create',
+      '--alias',
+      'prod',
+      '--label',
+      'other',
+      '--public-key-file',
+      publicKeyPath
+    ]);
+
+    expect(stdout.buffer).toContain(
+      'This key is already saved as "demo"; returning it instead of adding a copy.'
+    );
+    expect(stub.createSshKey).not.toHaveBeenCalled();
+  });
+
   it('gets one SSH key in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
     await seedProfile(runtime);
