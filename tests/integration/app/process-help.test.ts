@@ -10,7 +10,30 @@ describe('built CLI help', () => {
     expect(result.stdout).toContain(`Usage: ${CLI_COMMAND_NAME}`);
     expect(result.stdout).toContain('Commands:');
     expect(result.stdout).toContain('config');
-    expect(result.stdout).toContain('node');
+    expect(result.stdout).toContain('myaccount');
+  });
+
+  it('lists every MyAccount product in the myaccount help', async () => {
+    const result = await runBuiltCli(['myaccount', '--help']);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    for (const product of [
+      'project',
+      'dbaas',
+      'lb',
+      'node',
+      'image',
+      'reserved-ip',
+      'volume',
+      'vpc',
+      'security-group',
+      'ssh-key',
+      'ssl',
+      'support-ticket'
+    ]) {
+      expect(result.stdout).toMatch(new RegExp(`^\\s+${product}\\b`, 'm'));
+    }
   });
 
   it('does not expose config add in compiled help output', async () => {

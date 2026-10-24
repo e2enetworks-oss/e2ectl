@@ -69,16 +69,59 @@ export function pathsReferToSameFile(
 }
 
 function prepareProgramForCli(program: Command): void {
-  program.allowExcessArguments(false);
-  program.configureOutput({
+  program.hook('preAction', rejectUnknownSubcommand);
+  prepareCommandForCli(program);
+}
+
+function prepareCommandForCli(command: Command): void {
+  // A command group (one with subcommands) lets an unknown word through so
+  // rejectUnknownSubcommand can name it, instead of Commander's "too many
+  // arguments".
+  command.allowExcessArguments(command.commands.length > 0);
+  command.configureOutput({
     outputError: () => {},
     writeErr: () => {}
   });
-  program.exitOverride();
+  command.exitOverride();
 
-  for (const command of program.commands) {
-    prepareProgramForCli(command);
+  for (const subcommand of command.commands) {
+    prepareCommandForCli(subcommand);
   }
+}
+
+function rejectUnknownSubcommand(
+  _program: Command,
+  actionCommand: Command
+): void {
+  const [unknownName] = actionCommand.args;
+
+  if (actionCommand.commands.length === 0 || unknownName === undefined) {
+    return;
+  }
+
+  const groupPath = formatCommandPath(actionCommand);
+  throw new CliError(`Unknown command "${unknownName}".`, {
+    code: 'UNKNOWN_COMMAND',
+    exitCode: EXIT_CODES.usage,
+    suggestion:
+      actionCommand.parent === null
+        ? `Run ${groupPath} --help to see the commands. MyAccount commands start with "${groupPath} myaccount", for example "${groupPath} myaccount node list".`
+        : `Run ${groupPath} --help to see the commands.`
+  });
+}
+
+function formatCommandPath(command: Command): string {
+  const names: string[] = [];
+
+  for (
+    let current: Command | null = command;
+    current !== null;
+    current = current.parent
+  ) {
+    names.unshift(current.name());
+  }
+
+  return names.join(' ');
 }
 
 function isCommanderSuccessExit(error: unknown): error is CommanderError {

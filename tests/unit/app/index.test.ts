@@ -68,6 +68,52 @@ describe('runCli', () => {
     );
   });
 
+  it.each([
+    [
+      ['node', 'list'],
+      'Error: Unknown command "node".\n\nNext step: Run e2ectl --help to see the commands. MyAccount commands start with "e2ectl myaccount", for example "e2ectl myaccount node list".\n'
+    ],
+    [
+      ['myaccount', 'node', 'lst'],
+      'Error: Unknown command "lst".\n\nNext step: Run e2ectl myaccount node --help to see the commands.\n'
+    ]
+  ])('names an unknown command in %j', async (args, expected) => {
+    const { runtime, stderr, stdout } = createRuntimeFixture();
+
+    const exitCode = await runCli(
+      ['node', CLI_COMMAND_NAME, ...args],
+      runtime,
+      stderr
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stdout.buffer).toBe('');
+    expect(stderr.buffer).toBe(expected);
+  });
+
+  it('still shows help for a command group typed on its own', async () => {
+    const { runtime, stderr } = createRuntimeFixture();
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+
+    try {
+      const exitCode = await runCli(
+        ['node', CLI_COMMAND_NAME, 'myaccount'],
+        runtime,
+        stderr
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stderr.buffer).toBe('');
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Usage: e2ectl myaccount')
+      );
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
   it('formats invalid node ids through the same CLI contract', async () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 

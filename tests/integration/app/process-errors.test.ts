@@ -17,6 +17,16 @@ describe('built CLI errors', () => {
     );
   });
 
+  it('tells people who type an old command where it moved', async () => {
+    const result = await runBuiltCli(['node', 'list']);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'Error: Unknown command "node".\n\nNext step: Run e2ectl --help to see the commands. MyAccount commands start with "e2ectl myaccount", for example "e2ectl myaccount node list".\n'
+    );
+  });
+
   it('formats invalid node ids through the CLI contract', async () => {
     const result = await runBuiltCli(['myaccount', 'node', 'get', 'node-abc']);
 
