@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/http/index.js';
 import { VolumeApiClient } from '../../../../src/myaccount/volume/client.js';
 import type { VolumeCreateRequest } from '../../../../src/myaccount/volume/index.js';
+import { createStubTransport } from '../../../helpers/stub-transport.js';
 
 class StubTransport implements ApiTransport {
   readonly deleteMock = vi.fn();
@@ -298,3 +299,71 @@ function envelope<TData>(
     message: overrides.message ?? 'Success'
   };
 }
+
+describe('VolumeApiClient additions', () => {
+  it.each([
+    [
+      'listSnapshots',
+      (client: VolumeApiClient) => client.listSnapshots(5),
+      { method: 'GET', options: undefined, path: '/block_storage/5/snapshot/' }
+    ],
+    [
+      'createSnapshot',
+      (client: VolumeApiClient) => client.createSnapshot(5, 'before'),
+      {
+        method: 'POST',
+        options: { body: { name: 'before' } },
+        path: '/block_storage/5/snapshot/'
+      }
+    ],
+    [
+      'deleteSnapshot',
+      (client: VolumeApiClient) => client.deleteSnapshot(5, '7'),
+      {
+        method: 'DELETE',
+        options: undefined,
+        path: '/block_storage/5/snapshot/7'
+      }
+    ],
+    [
+      'saveSnapshotAsVolume',
+      (client: VolumeApiClient) =>
+        client.saveSnapshotAsVolume(5, {
+          name: 'copy',
+          snapshot_id: 7,
+          vm_id: 9
+        }),
+      {
+        method: 'REQUEST',
+        options: {
+          body: { name: 'copy', snapshot_id: 7, vm_id: 9 },
+          method: 'PUT',
+          path: '/block_storage/5/restore/'
+        }
+      }
+    ],
+    [
+      'resizeVolume',
+      (client: VolumeApiClient) =>
+        client.resizeVolume(5, {
+          block_storage_size: 200,
+          name: 'data',
+          vm_id: 9
+        }),
+      {
+        method: 'REQUEST',
+        options: {
+          body: { block_storage_size: 200, name: 'data', vm_id: 9 },
+          method: 'PUT',
+          path: '/block_storage/5/vm/upgrade/'
+        }
+      }
+    ]
+  ])('%s calls the right path', async (_name, call, expected) => {
+    const { calls, transport } = createStubTransport({});
+
+    await call(new VolumeApiClient(transport));
+
+    expect(calls).toEqual([expected]);
+  });
+});
