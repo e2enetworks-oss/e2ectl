@@ -193,6 +193,20 @@ describe('node delete with protection on', () => {
     });
   });
 
+  it('also reads the protection notice from the error message', async () => {
+    const refused = new AppError(
+      'The Delete action cannot be performed while the accidental protection mode is enabled.',
+      { code: 'API_REQUEST_FAILED' }
+    );
+    const error = await service(
+      fakeClient({ deleteNode: () => Promise.reject(refused) })
+    )
+      .deleteNode('101', { force: true })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'NODE_DELETE_PROTECTED' });
+  });
+
   it('passes other delete failures through', async () => {
     const other = new AppError('MyAccount API request failed: Not Found', {
       code: 'API_REQUEST_FAILED',

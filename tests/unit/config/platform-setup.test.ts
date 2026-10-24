@@ -160,6 +160,24 @@ describe('configurePlatform', () => {
     ).toBe('Delhi');
   });
 
+  it('does not use the saved project after switching accounts', async () => {
+    const store = await storeWith({
+      tir: { account_id: '22', location: 'Delhi', project_id: '44' }
+    });
+
+    const error = await capture(
+      configurePlatform(
+        steps(true),
+        'work',
+        { account: '11' },
+        { io: io(), store }
+      )
+    );
+
+    expect(error.code).toBe('MISSING_SETUP_VALUE');
+    expect(error.message).toBe('No TIR project given.');
+  });
+
   it('asks in a terminal, offering the saved value as the default', async () => {
     const prompt = vi
       .fn<SetupIo['prompt']>()

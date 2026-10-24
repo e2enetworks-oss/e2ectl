@@ -225,7 +225,7 @@ function parsePlatforms(values: string[]): SetupPlatform[] {
   const platforms = new Set<SetupPlatform>();
 
   for (const value of values) {
-    const platform = PLATFORM_BY_NAME[value.trim().toLowerCase()];
+    const platform = lookupPlatform(PLATFORM_BY_NAME, value);
     if (platform === undefined) {
       throw new CliError(`Unknown platform "${value}".`, {
         code: 'INVALID_PLATFORM',
@@ -265,10 +265,19 @@ function readPlatformAnswer(answer: string): SetupPlatform[] {
     ...new Set(
       answer
         .split(',')
-        .map((part) => PLATFORM_BY_MENU_ANSWER[part.trim().toLowerCase()])
+        .map((part) => lookupPlatform(PLATFORM_BY_MENU_ANSWER, part))
         .filter((platform): platform is SetupPlatform => platform !== undefined)
     )
   ];
+}
+
+// Own keys only, so a typed "constructor" or "toString" is not a platform.
+function lookupPlatform(
+  table: Record<string, SetupPlatform>,
+  text: string
+): SetupPlatform | undefined {
+  const key = text.trim().toLowerCase();
+  return Object.hasOwn(table, key) ? table[key] : undefined;
 }
 
 // --account, --project and --location hold one platform's values; TIR and

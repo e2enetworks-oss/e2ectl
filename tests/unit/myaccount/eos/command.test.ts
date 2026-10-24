@@ -211,6 +211,10 @@ describe('eos bucket access', () => {
       ['grant', 'b', '--access-key', 'AKEXAMPLE', '--role', 'owner'],
       'INVALID_EOS_ROLE'
     ],
+    [
+      ['grant', 'b', '--access-key', 'AKEXAMPLE', '--role', 'constructor'],
+      'INVALID_EOS_ROLE'
+    ],
     [['revoke', 'b', 'x'], 'INVALID_EOS_ACCESS_ID']
   ])('refuses %o with %s', async (args, code) => {
     await expect(

@@ -289,7 +289,8 @@ function normalizeKeyName(value: string): string {
 
 function normalizeRole(value: string): EosRole {
   const role = value.trim().toLowerCase();
-  if (role in ROLE_NAMES) {
+  // Own keys only: `in` also accepts names like "constructor".
+  if (Object.hasOwn(ROLE_NAMES, role)) {
     return role as EosRole;
   }
 

@@ -186,7 +186,19 @@ export async function configurePlatform(
 
   const saved = steps.readSaved(profile);
   const account = await chooseAccount(steps, flags, saved, io);
-  const project = await chooseProject(steps, account?.id, flags, saved, io);
+  // A saved project belongs to the saved account, so it is not offered
+  // after switching to another account.
+  const savedForAccount =
+    account !== undefined && saved.account !== String(account.id)
+      ? { ...saved, project: undefined }
+      : saved;
+  const project = await chooseProject(
+    steps,
+    account?.id,
+    flags,
+    savedForAccount,
+    io
+  );
   const location = await chooseLocation(steps, flags, saved, io);
 
   await store.updateProfile(

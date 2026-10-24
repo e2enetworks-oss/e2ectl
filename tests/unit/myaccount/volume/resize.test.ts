@@ -7,7 +7,7 @@ import {
   MemoryWriter
 } from '../../../helpers/runtime.js';
 
-function volumeMocks(volume: { size_string: string; vm_id?: number }) {
+function volumeMocks(volume: { size_string: string; vm_id?: number | null }) {
   return {
     getVolume: vi.fn(() =>
       Promise.resolve({
@@ -106,6 +106,7 @@ describe('volume resize', () => {
 
   it.each([
     [{ size_string: '100 GB' }, '200', 'VOLUME_NOT_ATTACHED'],
+    [{ size_string: '100 GB', vm_id: null }, '200', 'VOLUME_NOT_ATTACHED'],
     [{ size_string: '200 GB', vm_id: 9 }, '100', 'VOLUME_SIZE_NOT_LARGER'],
     [{ size_string: '100 GB', vm_id: 9 }, '150', 'INVALID_VOLUME_SIZE'],
     [{ size_string: '100 GB', vm_id: 9 }, 'big', 'INVALID_NUMERIC_VALUE']

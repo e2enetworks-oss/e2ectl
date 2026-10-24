@@ -271,7 +271,8 @@ describe('e2ectl configure without a terminal', () => {
       '--account is only for TIR.'
     ],
     [['--platform', 'gcp'], 'Unknown platform "gcp".'],
-    [['--platform', '1'], 'Unknown platform "1".']
+    [['--platform', '1'], 'Unknown platform "1".'],
+    [['--platform', 'toString'], 'Unknown platform "toString".']
   ])('refuses %o before saving anything', async (flags, message) => {
     const error = await configureError(['configure', ...flags]);
 

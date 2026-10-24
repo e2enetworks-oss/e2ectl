@@ -1,7 +1,7 @@
 export interface VolumeApiAttachment {
   all_action_disabled?: boolean;
   node_id?: number;
-  vm_id?: number;
+  vm_id?: number | null;
   vm_name?: string;
 }
 

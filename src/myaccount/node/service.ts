@@ -1214,9 +1214,12 @@ export class NodeService {
 // E2E refuses to delete a node with deletion protection on; say how to
 // turn it off instead of the generic API hint.
 function explainProtectedDelete(error: unknown, nodeId: number): unknown {
+  // The wording can arrive in the API's message or in its errors field.
   if (
     !(error instanceof AppError) ||
-    !error.details.some((detail) => /accidental protection/i.test(detail))
+    ![error.message, ...error.details].some((text) =>
+      /accidental protection/i.test(text)
+    )
   ) {
     return error;
   }

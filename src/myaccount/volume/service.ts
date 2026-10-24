@@ -1234,8 +1234,9 @@ function assertListedSize(sizeGb: number, plans: VolumePlanItem[]): void {
 
 // E2E snapshots and resizes a volume through the node it is attached to.
 function requireAttachedVmId(volume: VolumeDetails, volumeId: number): number {
+  // E2E can send vm_id as null for a detached volume.
   const vmId = volume.vm_detail?.vm_id;
-  if (vmId !== undefined) {
+  if (typeof vmId === 'number') {
     return vmId;
   }
 
