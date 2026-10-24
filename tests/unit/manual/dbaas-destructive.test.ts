@@ -60,6 +60,7 @@ describe('manual DBaaS destructive helpers', () => {
     expect(createCommand.stdin).toBe(`${createPassword}\n`);
 
     expect(resetCommand.args).toEqual([
+      'myaccount',
       'dbaas',
       'reset-password',
       '7869',
@@ -80,21 +81,21 @@ describe('manual DBaaS destructive helpers', () => {
 
     await expect(
       runDbaasJsonCommand(
-        ['dbaas', 'create', '--password', password],
+        ['myaccount', 'dbaas', 'create', '--password', password],
         createManualEnv(),
         { sensitiveValues: [password] }
       )
     ).rejects.toThrow(
       [
-        'Command failed: e2ectl dbaas create --password <redacted>',
+        'Command failed: e2ectl myaccount dbaas create --password <redacted>',
         'STDERR: backend rejected <redacted>',
         'STDOUT: raw output <redacted>'
       ].join('\n')
     );
 
     expect(
-      redactCliArgs(['dbaas', 'create', `--password=${password}`])
-    ).toEqual(['dbaas', 'create', '--password=<redacted>']);
+      redactCliArgs(['myaccount', 'dbaas', 'create', `--password=${password}`])
+    ).toEqual(['myaccount', 'dbaas', 'create', '--password=<redacted>']);
   });
 
   it('preserves the manifest and fails cleanup when DBaaS delete fails', async () => {
@@ -104,7 +105,7 @@ describe('manual DBaaS destructive helpers', () => {
       dbaas_deleted: false
     });
     const runJsonCommand = vi.fn((args: string[]) => {
-      if (args[0] === 'dbaas' && args[1] === 'delete') {
+      if (args[1] === 'dbaas' && args[2] === 'delete') {
         return Promise.reject(new Error('delete failed'));
       }
 
@@ -132,7 +133,7 @@ describe('manual DBaaS destructive helpers', () => {
       vpc_id: 9876
     });
     const runJsonCommand = vi.fn((args: string[]) => {
-      if (args[0] === 'vpc' && args[1] === 'delete') {
+      if (args[1] === 'vpc' && args[2] === 'delete') {
         return Promise.reject(new Error('vpc is still in use'));
       }
 
@@ -172,9 +173,18 @@ describe('manual DBaaS destructive helpers', () => {
 
     expect(result.exitCode).toBe(0);
     expect(runJsonCommand.mock.calls.map(([args]) => args)).toEqual([
-      ['dbaas', 'network', 'vpc', 'detach', '7869', '--vpc-id', '9876'],
-      ['dbaas', 'delete', '7869', '--force'],
-      ['vpc', 'delete', '9876', '--force']
+      [
+        'myaccount',
+        'dbaas',
+        'network',
+        'vpc',
+        'detach',
+        '7869',
+        '--vpc-id',
+        '9876'
+      ],
+      ['myaccount', 'dbaas', 'delete', '7869', '--force'],
+      ['myaccount', 'vpc', 'delete', '9876', '--force']
     ]);
   });
 
@@ -199,8 +209,8 @@ describe('manual DBaaS destructive helpers', () => {
 
     expect(result.exitCode).toBe(0);
     expect(runJsonCommand.mock.calls.map(([args]) => args)).toEqual([
-      ['dbaas', 'delete', '7869', '--force'],
-      ['vpc', 'delete', '9876', '--force']
+      ['myaccount', 'dbaas', 'delete', '7869', '--force'],
+      ['myaccount', 'vpc', 'delete', '9876', '--force']
     ]);
   });
 
@@ -223,8 +233,8 @@ describe('manual DBaaS destructive helpers', () => {
 
     expect(result).toEqual({ exitCode: 0, stderr: '', stdout: '' });
     expect(runJsonCommand.mock.calls.map(([args]) => args)).toEqual([
-      ['dbaas', 'delete', '7869', '--force'],
-      ['vpc', 'delete', '9876', '--force']
+      ['myaccount', 'dbaas', 'delete', '7869', '--force'],
+      ['myaccount', 'vpc', 'delete', '9876', '--force']
     ]);
     await expect(access(manifestPath)).rejects.toThrow();
   });

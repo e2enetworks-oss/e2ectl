@@ -72,7 +72,7 @@ export function resolveCredentials(
 export function resolveAccountCredentials(
   options: ResolveCredentialsOptions
 ): ResolvedAccountCredentials {
-  return resolveCredentialSet(options, 'account') as ResolvedAccountCredentials;
+  return resolveCredentialSet(options, 'account');
 }
 
 type ResolutionScope = 'account' | 'project';

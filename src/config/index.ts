@@ -1,3 +1,9 @@
+export {
+  ApiCredentialValidator,
+  type CreateValidationTransport,
+  type CredentialValidationResult,
+  type CredentialValidator
+} from './credential-validator.js';
 export { buildConfigCommand } from './command.js';
 export {
   resolveAccountCredentials,
@@ -13,6 +19,8 @@ export type {
   ProfileConfig,
   ResolvedAccountCredentials,
   ProfileSummary,
-  ResolvedCredentials
+  ResolvedCredentials,
+  TirContext,
+  TirContextField
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';

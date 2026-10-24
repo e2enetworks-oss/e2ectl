@@ -125,7 +125,7 @@ async function getFallbackClients() {
 
 async function createFallbackClients() {
   const [
-    { MyAccountApiTransport },
+    { createMyAccountTransport },
     { NodeApiClient },
     { ReservedIpApiClient },
     { SecurityGroupApiClient },
@@ -133,16 +133,16 @@ async function createFallbackClients() {
     { VolumeApiClient },
     { VpcApiClient }
   ] = await Promise.all([
-    import('../dist/myaccount/index.js'),
-    import('../dist/node/index.js'),
-    import('../dist/reserved-ip/index.js'),
-    import('../dist/security-group/index.js'),
-    import('../dist/ssh-key/index.js'),
-    import('../dist/volume/index.js'),
-    import('../dist/vpc/index.js')
+    import('../dist/myaccount/api.js'),
+    import('../dist/myaccount/node/index.js'),
+    import('../dist/myaccount/reserved-ip/index.js'),
+    import('../dist/myaccount/security-group/index.js'),
+    import('../dist/myaccount/ssh-key/index.js'),
+    import('../dist/myaccount/volume/index.js'),
+    import('../dist/myaccount/vpc/index.js')
   ]);
 
-  const transport = new MyAccountApiTransport(
+  const transport = createMyAccountTransport(
     {
       api_key: cliEnv.E2E_API_KEY,
       auth_token: cliEnv.E2E_AUTH_TOKEN,

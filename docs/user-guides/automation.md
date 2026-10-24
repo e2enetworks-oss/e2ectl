@@ -25,9 +25,9 @@ Use a private file path or a secret-mounted workspace location. Do not paste the
 ## Recipe: Capture Discovery Output With `--json`
 
 ```bash
-e2ectl --json node catalog os > os.json
-e2ectl --json node list > nodes.json
-e2ectl --json volume plans --size <size-gb> > volume-plans.json
+e2ectl --json myaccount node catalog os > os.json
+e2ectl --json myaccount node list > nodes.json
+e2ectl --json myaccount volume plans --size <size-gb> > volume-plans.json
 ```
 
 Human-readable output is best for operators. `--json` is for automation contracts.
@@ -44,7 +44,7 @@ e2ectl config import \
   --default-location <location> \
   --no-input
 
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image> \
@@ -77,14 +77,14 @@ Keep secrets in the workflow's secret store. Do not echo token values into logs.
 ## Recipe: Build A Catalog-First Provision Flow
 
 ```bash
-e2ectl --json node catalog plans \
+e2ectl --json myaccount node catalog plans \
   --display-category "<display-category>" \
   --category "<category>" \
   --os "<os>" \
   --os-version "<os-version>" \
   --billing-type hourly > node-plans.json
 
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>
@@ -96,11 +96,11 @@ The exact `plan`, `image`, and committed-plan identifiers should come from the c
 
 ```bash
 # 1. Find the template_id of the saved image
-e2ectl --json image list > images.json
+e2ectl --json myaccount image list > images.json
 
 # 2. Create using the same --plan and --image as a regular node create,
 #    plus --saved-image-template-id from the Template ID column
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image> \
@@ -113,10 +113,10 @@ e2ectl node create \
 
 ```bash
 # 1. Discover available plans
-e2ectl --json lb plans > lb-plans.json
+e2ectl --json myaccount lb plans > lb-plans.json
 
 # 2. Create an ALB (plan name from plans output)
-e2ectl lb create \
+e2ectl myaccount lb create \
   --name my-alb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTP \
@@ -126,21 +126,21 @@ e2ectl lb create \
   --backend-group-server server-1:10.0.0.1:8080
 
 # 3. List load balancers and capture the id
-e2ectl --json lb list > lbs.json
+e2ectl --json myaccount lb list > lbs.json
 # { "action": "list", "items": [{ "id": 42, "appliance_name": "my-alb", ... }] }
 
 LB_ID=42
 
 # 4. Inspect backend groups and servers in the full LB detail
-e2ectl --json lb get "$LB_ID" > lb-detail.json
+e2ectl --json myaccount lb get "$LB_ID" > lb-detail.json
 
 # 5. Add a second server to an existing group
-e2ectl lb backend server add "$LB_ID" \
+e2ectl myaccount lb backend server add "$LB_ID" \
   --backend-group-name web \
   --backend-group-server server-2:10.0.0.2:8080
 
 # 6. Delete when done
-e2ectl lb delete "$LB_ID" --force
+e2ectl myaccount lb delete "$LB_ID" --force
 ```
 
 The `--json` flag on `lb list` returns an object with `action` and `items`. Each item contains `id`, `appliance_name`, `status`, `lb_mode`, `lb_type`, `public_ip`, `public_ip_reserved`, and `private_ip`.
@@ -152,10 +152,10 @@ The `--json` flag on `lb get` returns the backend load balancer detail object. F
 Destructive commands should stay obvious and targeted:
 
 ```bash
-e2ectl reserved-ip delete <ip-address> --force
-e2ectl volume delete <volume-id> --force
-e2ectl vpc delete <vpc-id> --force
-e2ectl ssh-key delete <ssh-key-id> --force
+e2ectl myaccount reserved-ip delete <ip-address> --force
+e2ectl myaccount volume delete <volume-id> --force
+e2ectl myaccount vpc delete <vpc-id> --force
+e2ectl myaccount ssh-key delete <ssh-key-id> --force
 ```
 
 Prefer recording the ids you create so teardown steps know exactly what to delete.

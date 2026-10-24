@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl dbaas` discovers supported DBaaS engine types and plans, creates MariaDB, MySQL, and PostgreSQL clusters, lists and inspects them, manages whitelisted IPs, manages VPC/public IP networking, resets passwords, and deletes clusters.
+`e2ectl myaccount dbaas` discovers supported DBaaS engine types and plans, creates MariaDB, MySQL, and PostgreSQL clusters, lists and inspects them, manages whitelisted IPs, manages VPC/public IP networking, resets passwords, and deletes clusters.
 
 ## Before You Start
 
@@ -15,19 +15,19 @@
 ### Discover Supported Engine Types
 
 ```bash
-e2ectl dbaas types
+e2ectl myaccount dbaas types
 ```
 
 Filter to one database family:
 
 ```bash
-e2ectl dbaas types --type postgres
+e2ectl myaccount dbaas types --type postgres
 ```
 
 ### Discover Plans For An Engine Version
 
 ```bash
-e2ectl dbaas plans --type postgres --db-version 16
+e2ectl myaccount dbaas plans --type postgres --db-version 16
 ```
 
 This shows all hourly template plans and committed SKU options for that engine version. Use the plan name with `--plan` and the committed SKU ID with `--billing-type committed --committed-plan-id <id>` when creating a cluster.
@@ -35,13 +35,13 @@ This shows all hourly template plans and committed SKU options for that engine v
 ### List DBaaS Clusters
 
 ```bash
-e2ectl dbaas list
+e2ectl myaccount dbaas list
 ```
 
 Filter the list to one supported engine family:
 
 ```bash
-e2ectl dbaas list --type sql
+e2ectl myaccount dbaas list --type sql
 ```
 
 List output includes the cluster name, DB version, database name, admin username, connection endpoint with the public IP in parentheses when available, connection port, and status.
@@ -49,19 +49,19 @@ List output includes the cluster name, DB version, database name, admin username
 ### Get DBaaS Details
 
 ```bash
-e2ectl dbaas get <dbaas-id>
+e2ectl myaccount dbaas get <dbaas-id>
 ```
 
 The detail view includes the list fields (including database name and admin username) plus plan name, price, configuration, VPC connections, whitelisted IPs, public IP state, and connection port.
 
 ```bash
-e2ectl --json dbaas get <dbaas-id>
+e2ectl --json myaccount dbaas get <dbaas-id>
 ```
 
 ### Create A DBaaS Cluster
 
 ```bash
-e2ectl dbaas create \
+e2ectl myaccount dbaas create \
   --name <cluster-name> \
   --type sql \
   --db-version 8.0 \
@@ -79,7 +79,7 @@ If you want a different admin user, also pass `--username <username>`.
 Use `--billing-type committed` with a SKU ID from `dbaas plans`:
 
 ```bash
-e2ectl dbaas create \
+e2ectl myaccount dbaas create \
   --name <cluster-name> \
   --type sql \
   --db-version 8.0 \
@@ -97,7 +97,7 @@ By default the committed term auto-renews. Pass `--committed-renewal hourly` to 
 Attach the cluster to a VPC at creation time using the `network_id` from `vpc list`:
 
 ```bash
-e2ectl dbaas create \
+e2ectl myaccount dbaas create \
   --name <cluster-name> \
   --type postgres \
   --db-version 16 \
@@ -116,13 +116,13 @@ When a VPC is attached during creation, public IP access is enabled by default. 
 The cluster must be in Running state. Attach with the network vpc command:
 
 ```bash
-e2ectl dbaas network vpc attach <dbaas-id> --vpc-id <vpc-id>
+e2ectl myaccount dbaas network vpc attach <dbaas-id> --vpc-id <vpc-id>
 ```
 
 Detach a VPC:
 
 ```bash
-e2ectl dbaas network vpc detach <dbaas-id> --vpc-id <vpc-id>
+e2ectl myaccount dbaas network vpc detach <dbaas-id> --vpc-id <vpc-id>
 ```
 
 For non-default VPCs, add `--subnet-id <subnet-id>`.
@@ -132,19 +132,19 @@ For non-default VPCs, add `--subnet-id <subnet-id>`.
 Attaching a public IP enables external access:
 
 ```bash
-e2ectl dbaas network public-ip attach <dbaas-id>
+e2ectl myaccount dbaas network public-ip attach <dbaas-id>
 ```
 
 Detaching a public IP removes external access. The CLI warns that connectivity will be lost and asks for confirmation:
 
 ```bash
-e2ectl dbaas network public-ip detach <dbaas-id>
+e2ectl myaccount dbaas network public-ip detach <dbaas-id>
 ```
 
 For non-interactive automation, pass `--force` only when you explicitly accept the connectivity loss:
 
 ```bash
-e2ectl dbaas network public-ip detach <dbaas-id> --force
+e2ectl myaccount dbaas network public-ip detach <dbaas-id> --force
 ```
 
 ### Manage Whitelisted IPs
@@ -152,31 +152,31 @@ e2ectl dbaas network public-ip detach <dbaas-id> --force
 Whitelist an IPv4 address:
 
 ```bash
-e2ectl dbaas whitelist add <dbaas-id> --ip 203.0.113.10
+e2ectl myaccount dbaas whitelist add <dbaas-id> --ip 203.0.113.10
 ```
 
 List whitelisted IPs:
 
 ```bash
-e2ectl dbaas whitelist list <dbaas-id>
+e2ectl myaccount dbaas whitelist list <dbaas-id>
 ```
 
 Remove a whitelisted IP:
 
 ```bash
-e2ectl dbaas whitelist remove <dbaas-id> --ip 203.0.113.10
+e2ectl myaccount dbaas whitelist remove <dbaas-id> --ip 203.0.113.10
 ```
 
 ### Reset The Admin Password
 
 ```bash
-e2ectl dbaas reset-password <dbaas-id> --password-file /secure/path/dbaas-password.txt
+e2ectl myaccount dbaas reset-password <dbaas-id> --password-file /secure/path/dbaas-password.txt
 ```
 
 ### Delete A DBaaS Cluster
 
 ```bash
-e2ectl dbaas delete <dbaas-id>
+e2ectl myaccount dbaas delete <dbaas-id>
 ```
 
 For non-interactive flows, add `--force`.
@@ -187,13 +187,13 @@ Full discovery-to-create flow for a PostgreSQL cluster:
 
 ```bash
 # 1. See what versions are available
-e2ectl dbaas types --type postgres
+e2ectl myaccount dbaas types --type postgres
 
 # 2. See hourly plans and committed options for that version
-e2ectl dbaas plans --type postgres --db-version 16
+e2ectl myaccount dbaas plans --type postgres --db-version 16
 
 # 3. Create with hourly billing
-e2ectl dbaas create \
+e2ectl myaccount dbaas create \
   --name analytics-db \
   --type postgres \
   --db-version 16 \
@@ -206,9 +206,9 @@ Create a MySQL cluster with committed billing attached to a VPC:
 
 ```bash
 # Get the committed SKU ID from plans output
-e2ectl dbaas plans --type sql --db-version 8.0
+e2ectl myaccount dbaas plans --type sql --db-version 8.0
 
-e2ectl dbaas create \
+e2ectl myaccount dbaas create \
   --name prod-db \
   --type sql \
   --db-version 8.0 \
@@ -223,7 +223,7 @@ e2ectl dbaas create \
 List clusters in machine-readable form so later steps can consume ids:
 
 ```bash
-e2ectl --json dbaas list
+e2ectl --json myaccount dbaas list
 ```
 
 ## Automation Notes

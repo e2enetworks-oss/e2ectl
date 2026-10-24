@@ -4,29 +4,33 @@ import path from 'node:path';
 import { CLI_COMMAND_NAME } from '../../../src/app/metadata.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
-import type { ResolvedCredentials } from '../../../src/config/index.js';
 import {
   ApiCredentialValidator,
-  MyAccountApiTransport,
-  type ApiAuthCredentials,
-  type CredentialValidationResult
-} from '../../../src/myaccount/index.js';
-import { NodeApiClient } from '../../../src/node/index.js';
-import { ReservedIpApiClient } from '../../../src/reserved-ip/index.js';
-import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
-import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
-import { VolumeApiClient } from '../../../src/volume/index.js';
-import { VpcApiClient } from '../../../src/vpc/index.js';
-import { LoadBalancerApiClient } from '../../../src/load-balancer/index.js';
+  type CredentialValidationResult,
+  type ResolvedCredentials
+} from '../../../src/config/index.js';
+import type { ApiAuthCredentials } from '../../../src/http/index.js';
+import { createMyAccountTransport } from '../../../src/myaccount/api.js';
+import { NodeApiClient } from '../../../src/myaccount/node/index.js';
+import { ReservedIpApiClient } from '../../../src/myaccount/reserved-ip/index.js';
+import { SecurityGroupApiClient } from '../../../src/myaccount/security-group/index.js';
+import { SshKeyApiClient } from '../../../src/myaccount/ssh-key/index.js';
+import { VolumeApiClient } from '../../../src/myaccount/volume/index.js';
+import { VpcApiClient } from '../../../src/myaccount/vpc/index.js';
+import { LoadBalancerApiClient } from '../../../src/myaccount/load-balancer/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
-import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
+import {
+  createTestConfigPath,
+  createTestRuntime,
+  MemoryWriter
+} from '../../helpers/runtime.js';
 
 class StubCredentialValidator extends ApiCredentialValidator {
   readonly calls: ApiAuthCredentials[] = [];
   private readonly result: CredentialValidationResult;
 
   constructor(result: CredentialValidationResult = { valid: true }) {
-    super();
+    super((credentials) => createMyAccountTransport(credentials));
     this.result = result;
   }
 
@@ -61,48 +65,28 @@ describe('config commands', () => {
     return {
       confirm,
       prompt,
-      runtime: {
+      runtime: createTestRuntime({
         confirm,
-        createImageClient: vi.fn(() => {
-          throw new Error('Image client should not be created for this test.');
-        }) as unknown as CliRuntime['createImageClient'],
-        createDbaasClient: vi.fn(() => {
-          throw new Error('DBaaS client should not be created for this test.');
-        }) as unknown as CliRuntime['createDbaasClient'],
         createNodeClient: (credentials: ResolvedCredentials) =>
-          new NodeApiClient(new MyAccountApiTransport(credentials)),
-        createProjectClient: vi.fn(() => {
-          throw new Error(
-            'Project client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createProjectClient'],
+          new NodeApiClient(createMyAccountTransport(credentials)),
         createReservedIpClient: (credentials: ResolvedCredentials) =>
-          new ReservedIpApiClient(new MyAccountApiTransport(credentials)),
+          new ReservedIpApiClient(createMyAccountTransport(credentials)),
         createSecurityGroupClient: (credentials: ResolvedCredentials) =>
-          new SecurityGroupApiClient(new MyAccountApiTransport(credentials)),
+          new SecurityGroupApiClient(createMyAccountTransport(credentials)),
         createSshKeyClient: (credentials: ResolvedCredentials) =>
-          new SshKeyApiClient(new MyAccountApiTransport(credentials)),
-        createSslClient: vi.fn(() => {
-          throw new Error('SSL client should not be created for this test.');
-        }) as unknown as CliRuntime['createSslClient'],
-        createSupportTicketClient: vi.fn(() => {
-          throw new Error(
-            'Support ticket client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createSupportTicketClient'],
+          new SshKeyApiClient(createMyAccountTransport(credentials)),
         createVolumeClient: (credentials: ResolvedCredentials) =>
-          new VolumeApiClient(new MyAccountApiTransport(credentials)),
+          new VolumeApiClient(createMyAccountTransport(credentials)),
         createLoadBalancerClient: (credentials: ResolvedCredentials) =>
-          new LoadBalancerApiClient(new MyAccountApiTransport(credentials)),
+          new LoadBalancerApiClient(createMyAccountTransport(credentials)),
         createVpcClient: (credentials: ResolvedCredentials) =>
-          new VpcApiClient(new MyAccountApiTransport(credentials)),
+          new VpcApiClient(createMyAccountTransport(credentials)),
         credentialValidator: validator,
         isInteractive: true,
         prompt,
-        stderr: new MemoryWriter(),
         stdout,
         store
-      },
+      }),
       stdout,
       validator,
       store

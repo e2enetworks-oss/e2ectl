@@ -1,40 +1,47 @@
 import { createInterface } from 'node:readline/promises';
 
+import type { ApiClientOptions } from '../http/index.js';
 import {
   ApiCredentialValidator,
-  type ApiClientOptions,
-  type CredentialValidator,
-  MyAccountApiTransport
-} from '../myaccount/index.js';
-import {
   ConfigStore,
+  type CredentialValidator,
   type ResolvedAccountCredentials,
   type ResolvedCredentials
 } from '../config/index.js';
-import { ImageApiClient, type ImageClient } from '../image/index.js';
-import { DbaasApiClient, type DbaasClient } from '../dbaas/index.js';
+import { createMyAccountTransport } from '../myaccount/api.js';
+import { ImageApiClient, type ImageClient } from '../myaccount/image/index.js';
+import { DbaasApiClient, type DbaasClient } from '../myaccount/dbaas/index.js';
 import {
   LoadBalancerApiClient,
   type LoadBalancerClient
-} from '../load-balancer/index.js';
-import { NodeApiClient, type NodeClient } from '../node/index.js';
-import { ProjectApiClient, type ProjectClient } from '../project/index.js';
+} from '../myaccount/load-balancer/index.js';
+import { NodeApiClient, type NodeClient } from '../myaccount/node/index.js';
+import {
+  ProjectApiClient,
+  type ProjectClient
+} from '../myaccount/project/index.js';
 import {
   ReservedIpApiClient,
   type ReservedIpClient
-} from '../reserved-ip/index.js';
+} from '../myaccount/reserved-ip/index.js';
 import {
   SecurityGroupApiClient,
   type SecurityGroupClient
-} from '../security-group/index.js';
-import { SshKeyApiClient, type SshKeyClient } from '../ssh-key/index.js';
-import { SslApiClient, type SslClient } from '../ssl/index.js';
+} from '../myaccount/security-group/index.js';
+import {
+  SshKeyApiClient,
+  type SshKeyClient
+} from '../myaccount/ssh-key/index.js';
+import { SslApiClient, type SslClient } from '../myaccount/ssl/index.js';
 import {
   SupportTicketApiClient,
   type SupportTicketClient
-} from '../support-ticket/index.js';
-import { VolumeApiClient, type VolumeClient } from '../volume/index.js';
-import { VpcApiClient, type VpcClient } from '../vpc/index.js';
+} from '../myaccount/support-ticket/index.js';
+import {
+  VolumeApiClient,
+  type VolumeClient
+} from '../myaccount/volume/index.js';
+import { VpcApiClient, type VpcClient } from '../myaccount/vpc/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -68,7 +75,7 @@ export interface CliRuntime {
   store: ConfigStore;
 }
 
-// Internal test hook for pointing the compiled CLI at a fake MyAccount server.
+// Internal test hook for pointing the compiled CLI at a fake API server.
 export const MYACCOUNT_BASE_URL_ENV_VAR = 'E2ECTL_MYACCOUNT_BASE_URL';
 
 export function createRuntime(): CliRuntime {
@@ -78,53 +85,51 @@ export function createRuntime(): CliRuntime {
     confirm: promptForConfirmation,
     createImageClient: (credentials) =>
       new ImageApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createDbaasClient: (credentials) =>
       new DbaasApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createLoadBalancerClient: (credentials) =>
       new LoadBalancerApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createNodeClient: (credentials) =>
       new NodeApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createProjectClient: (credentials) =>
       new ProjectApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createReservedIpClient: (credentials) =>
       new ReservedIpApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createSecurityGroupClient: (credentials) =>
       new SecurityGroupApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createSshKeyClient: (credentials) =>
       new SshKeyApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createSslClient: (credentials) =>
-      new SslApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
-      ),
+      new SslApiClient(createMyAccountTransport(credentials, apiClientOptions)),
     createSupportTicketClient: (credentials) =>
       new SupportTicketApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createVolumeClient: (credentials) =>
       new VolumeApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
+        createMyAccountTransport(credentials, apiClientOptions)
       ),
     createVpcClient: (credentials) =>
-      new VpcApiClient(
-        new MyAccountApiTransport(credentials, apiClientOptions)
-      ),
-    credentialValidator: new ApiCredentialValidator(apiClientOptions),
+      new VpcApiClient(createMyAccountTransport(credentials, apiClientOptions)),
+    credentialValidator: new ApiCredentialValidator((credentials) =>
+      createMyAccountTransport(credentials, apiClientOptions)
+    ),
     isInteractive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     prompt: promptForInput,
     stderr: process.stderr,

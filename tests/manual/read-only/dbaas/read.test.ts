@@ -50,7 +50,7 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
         };
 
         const listTypes = await runJsonCommand<DbaasListTypesJson>(
-          ['dbaas', 'types'],
+          ['myaccount', 'dbaas', 'types'],
           configBackedCliEnv
         );
 
@@ -63,6 +63,7 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
 
         const plans = await runJsonCommand<DbaasPlansJson>(
           [
+            'myaccount',
             'dbaas',
             'plans',
             '--type',
@@ -85,7 +86,11 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
     'covers dbaas list-safe flows via the built CLI',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const list = await runJsonCommand<DbaasListJson>(['dbaas', 'list']);
+      const list = await runJsonCommand<DbaasListJson>([
+        'myaccount',
+        'dbaas',
+        'list'
+      ]);
 
       expect(list.action).toBe('list');
       expect(Array.isArray(list.items)).toBe(true);
@@ -98,6 +103,7 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
     async () => {
       const dbaasId = readOnlyEnv.fixtures.dbaasId!;
       const response = await runJsonCommand<DbaasGetJson>([
+        'myaccount',
         'dbaas',
         'get',
         dbaasId
@@ -112,7 +118,7 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
     'renders dbaas list in human mode',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const result = await runBuiltCli(['dbaas', 'list'], {
+      const result = await runBuiltCli(['myaccount', 'dbaas', 'list'], {
         env: readOnlyEnv.cliEnv,
         timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
       });
@@ -135,7 +141,7 @@ describeManual('manual DBaaS read-only built CLI checks', () => {
     'renders dbaas types in human mode',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const result = await runBuiltCli(['dbaas', 'types'], {
+      const result = await runBuiltCli(['myaccount', 'dbaas', 'types'], {
         env: readOnlyEnv.cliEnv,
         timeoutMs: MANUAL_READ_ONLY_COMMAND_TIMEOUT_MS
       });

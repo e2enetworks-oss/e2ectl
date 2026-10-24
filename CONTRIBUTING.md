@@ -6,8 +6,8 @@ If you are using the CLI, start with [README.md](./README.md) and the [user guid
 
 ## Requirements
 
-- Node.js 24+
-- npm
+- Node.js 26 for development, the version in `.nvmrc`. With nvm, run `nvm use` in the repo. The published CLI still supports Node.js 24 and later, and CI tests both.
+- npm (the version bundled with that Node.js)
 
 ## Local Setup
 
@@ -34,6 +34,7 @@ node dist/app/index.js --help
 ## Branch Target
 
 - `develop` is the normal target for feature work.
+- While 1.0 is being built, 1.0 work targets `platform-split`, which merges into `develop` when 1.0 is ready.
 - `main` is the release branch.
 - Use a release-only branch or PR target only when maintainers explicitly ask for it.
 
@@ -41,20 +42,13 @@ node dist/app/index.js --help
 
 ```text
 src/
-  app/
-  core/
-  myaccount/
-  config/
-  project/
-  load-balancer/
-  node/
-  dbaas/
-  reserved-ip/
-  security-group/
-  volume/
-  vpc/
-  ssh-key/
-  support-ticket/
+  app/          program, runtime, shared command options
+  core/         errors, JSON, guards, waiting
+  http/         shared HTTP transport and API failure handling
+  config/       profiles, login and token check
+  myaccount/    `e2ectl myaccount ...`: api.ts, index.ts and one folder per product
+    dbaas/ image/ load-balancer/ node/ project/ reserved-ip/
+    security-group/ ssh-key/ ssl/ support-ticket/ volume/ vpc/
 docs/
   user-guides/
   maintainers/
@@ -67,7 +61,9 @@ docs/
 - `client.ts` owns reusable API paths and response parsing.
 - `formatter.ts` owns human-readable output and deterministic `--json` output.
 - `types/` owns interfaces and type aliases only.
-- Shared transport and API failure handling stay in `src/myaccount/`.
+- Shared transport and API failure handling stay in `src/http/`.
+- A product is a folder such as `src/myaccount/node/`. Other code uses it only through its `index.ts`; the lint step enforces this.
+- Start a new product with `make new-domain <platform>/<product>`, for example `make new-domain myaccount/eos`. It creates the files above with one `list` command and a test, and registers the product.
 - Keep changes explicit and local. Avoid speculative abstractions and broad refactors.
 
 For larger command families, prefer these supporting files when the domain needs them:
@@ -100,7 +96,7 @@ npm pack --dry-run
 
 What each command covers:
 
-- `make lint`: Prettier check, ESLint, and TypeScript `--noEmit`
+- `make lint`: Prettier check, oxlint (`oxlint --type-aware --deny-warnings`, configured in `.oxlintrc.json`), and TypeScript `--noEmit`
 - `make test`: default unit test lane
 - `make build`: production build of the CLI
 - `npm run docs:check`: repo-local Markdown link and anchor verification
@@ -110,8 +106,8 @@ What each command covers:
 
 ## Testing Expectations
 
-- Put unit tests under `tests/unit/<domain>/`.
-- Put integration tests under `tests/integration/<domain>/`.
+- Put unit tests under `tests/unit/<platform>/<product>/`, for example `tests/unit/myaccount/node/`.
+- Put integration tests under `tests/integration/<platform>/<product>/`.
 - Update tests in the domain you changed.
 - Treat `--json` output as a contract.
 - Manual live lanes are opt-in only. Do not run destructive live smoke as part of normal feature work.

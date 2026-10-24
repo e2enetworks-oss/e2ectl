@@ -427,6 +427,36 @@ describe('ConfigService', () => {
     });
   });
 
+  it('keeps the saved TIR context when --force replaces an alias', async () => {
+    const file = await createImportFile({
+      prod: {
+        api_auth_token: 'auth-prod',
+        api_key: 'api-prod'
+      }
+    });
+    const { getConfig, service } = createServiceFixture(
+      createConfig({
+        prod: {
+          api_key: 'api-old',
+          auth_token: 'auth-old',
+          tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
+        }
+      })
+    );
+
+    await service.importProfiles({
+      file,
+      force: true,
+      input: false
+    });
+
+    expect(getConfig().profiles.prod).toEqual({
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
+    });
+  });
+
   it('applies project-only and location-only imported defaults independently', async () => {
     const file = await createImportFile({
       prod: {

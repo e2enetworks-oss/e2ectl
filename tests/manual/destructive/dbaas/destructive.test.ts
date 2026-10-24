@@ -229,6 +229,7 @@ async function createVpcStep(
 ): Promise<{ vpcId: number }> {
   const vpcCreate = await runJsonCommand<VpcCreateJson>(
     [
+      'myaccount',
       'vpc',
       'create',
       '--name',
@@ -268,7 +269,7 @@ async function waitForVpcState(
   while (Date.now() <= deadline) {
     try {
       const vpcGet = await runJsonCommand<VpcGetJson>(
-        ['vpc', 'get', String(vpcId)],
+        ['myaccount', 'vpc', 'get', String(vpcId)],
         context.dbaasEnv
       );
 
@@ -327,7 +328,7 @@ async function createDbaasStep(
 
   // Verify creation with get
   const dbaasGet = await runJsonCommand<DbaasGetJson>(
-    ['dbaas', 'get', String(dbaasId)],
+    ['myaccount', 'dbaas', 'get', String(dbaasId)],
     context.dbaasEnv
   );
 
@@ -356,7 +357,14 @@ async function attachPublicIpStep(
   }
 ): Promise<void> {
   await runJsonCommand<DbaasNetworkAttachJson>(
-    ['dbaas', 'network', 'public-ip', 'attach', String(options.dbaasId)],
+    [
+      'myaccount',
+      'dbaas',
+      'network',
+      'public-ip',
+      'attach',
+      String(options.dbaasId)
+    ],
     context.dbaasEnv
   );
 
@@ -373,6 +381,7 @@ async function detachPublicIpStep(
 ): Promise<void> {
   await runJsonCommand<DbaasNetworkDetachJson>(
     [
+      'myaccount',
       'dbaas',
       'network',
       'public-ip',
@@ -397,6 +406,7 @@ async function detachVpcStep(
 ): Promise<void> {
   await runJsonCommand<DbaasNetworkDetachJson>(
     [
+      'myaccount',
       'dbaas',
       'network',
       'vpc',
@@ -442,7 +452,7 @@ async function deleteDbaasStep(
   }
 ): Promise<void> {
   await runJsonCommand<DbaasDeleteJson>(
-    ['dbaas', 'delete', String(options.dbaasId), '--force'],
+    ['myaccount', 'dbaas', 'delete', String(options.dbaasId), '--force'],
     context.dbaasEnv
   );
 
@@ -465,7 +475,7 @@ async function deleteVpcStep(
   while (Date.now() <= deadline) {
     try {
       await runJsonCommand<VpcDeleteJson>(
-        ['vpc', 'delete', String(options.vpcId), '--force'],
+        ['myaccount', 'vpc', 'delete', String(options.vpcId), '--force'],
         context.dbaasEnv
       );
 

@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl node` covers catalog discovery, node lifecycle management, power actions, saved-image capture, public-IP detach, and attachment flows for VPCs, volumes, security groups, and SSH keys.
+`e2ectl myaccount node` covers catalog discovery, node lifecycle management, power actions, saved-image capture, public-IP detach, and attachment flows for VPCs, volumes, security groups, and SSH keys.
 
 ## Before You Start
 
@@ -14,13 +14,13 @@
 ### Discover OS Rows
 
 ```bash
-e2ectl node catalog os
+e2ectl myaccount node catalog os
 ```
 
 ### Discover Exact Plans And Images
 
 ```bash
-e2ectl node catalog plans \
+e2ectl myaccount node catalog plans \
   --display-category "<display-category>" \
   --category "<category>" \
   --os "<os>" \
@@ -31,14 +31,14 @@ e2ectl node catalog plans \
 ### List And Inspect Nodes
 
 ```bash
-e2ectl node list
-e2ectl node get <node-id>
+e2ectl myaccount node list
+e2ectl myaccount node get <node-id>
 ```
 
 ### Create A Node
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>
@@ -51,19 +51,19 @@ For `E1` and `E1WC` plans, also pass `--disk <size-gb>`.
 To create from a saved image, use the same `--image` value as a regular node create and add `--saved-image-template-id`:
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <catalog-image> \
   --saved-image-template-id <template-id>
 ```
 
-`<catalog-image>` is the same image identifier from `node catalog plans` (e.g. `Ubuntu-24.04-Distro`). Find `<template-id>` in the `Template ID` column of `e2ectl image list`.
+`<catalog-image>` is the same image identifier from `node catalog plans` (e.g. `Ubuntu-24.04-Distro`). Find `<template-id>` in the `Template ID` column of `e2ectl myaccount image list`.
 
 ### Upgrade A Node
 
 ```bash
-e2ectl node upgrade <node-id> \
+e2ectl myaccount node upgrade <node-id> \
   --plan <plan> \
   --image <image>
 ```
@@ -71,29 +71,29 @@ e2ectl node upgrade <node-id> \
 ### Power A Node Off Or On
 
 ```bash
-e2ectl node action power-off <node-id>
-e2ectl node action power-on <node-id>
+e2ectl myaccount node action power-off <node-id>
+e2ectl myaccount node action power-on <node-id>
 ```
 
 ### Save A Node As An Image
 
 ```bash
-e2ectl node action save-image <node-id> --name <image-name>
+e2ectl myaccount node action save-image <node-id> --name <image-name>
 ```
 
-Manage saved images later with `e2ectl image list`, `e2ectl image rename`, and `e2ectl image delete`. Create nodes from saved images with `e2ectl node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
+Manage saved images later with `e2ectl myaccount image list`, `e2ectl myaccount image rename`, and `e2ectl myaccount image delete`. Create nodes from saved images with `e2ectl myaccount node create --image <catalog-image> --saved-image-template-id <template-id>` — `--image` takes the same catalog image value as a regular node create.
 
 ### Detach The Current Primary Public IP
 
 ```bash
-e2ectl node action public-ip detach <node-id>
+e2ectl myaccount node action public-ip detach <node-id>
 ```
 
 ### Delete A Node
 
 ```bash
-e2ectl node delete <node-id>
-e2ectl node delete <node-id> --reserve-public-ip
+e2ectl myaccount node delete <node-id>
+e2ectl myaccount node delete <node-id> --reserve-public-ip
 ```
 
 ## Examples
@@ -101,13 +101,13 @@ e2ectl node delete <node-id> --reserve-public-ip
 Attach a volume to an existing node:
 
 ```bash
-e2ectl node action volume attach <node-id> --volume-id <volume-id>
+e2ectl myaccount node action volume attach <node-id> --volume-id <volume-id>
 ```
 
 Attach a VPC with an explicit subnet:
 
 ```bash
-e2ectl node action vpc attach <node-id> \
+e2ectl myaccount node action vpc attach <node-id> \
   --vpc-id <vpc-id> \
   --subnet-id <subnet-id>
 ```
@@ -115,7 +115,7 @@ e2ectl node action vpc attach <node-id> \
 Attach multiple security groups:
 
 ```bash
-e2ectl node action security-group attach <node-id> \
+e2ectl myaccount node action security-group attach <node-id> \
   --security-group-id <security-group-id-1> \
   --security-group-id <security-group-id-2>
 ```

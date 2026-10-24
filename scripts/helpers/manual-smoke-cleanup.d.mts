@@ -28,4 +28,13 @@ export function formatError(error: unknown): string;
 
 export function isAlreadyGoneMessage(message: string): boolean;
 
+export function isBusyRefusal(message: string): boolean;
+
+export function retryWhileBusy<T>(
+  run: () => Promise<T>,
+  options?: { attempts: number; delayMs: number }
+): Promise<T>;
+
+export function shouldRetryVpcDeleteError(message: string): boolean;
+
 export function isMissingFileError(error: unknown): boolean;

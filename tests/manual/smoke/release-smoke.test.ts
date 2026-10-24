@@ -175,6 +175,14 @@ describe('manual release smoke workflow', () => {
   );
 });
 
+// Each test in this file keeps its own manifest, so the second run can
+// never overwrite the record the first run's cleanup needs.
+function manifestPathForRun(basePath: string, runPrefix: string): string {
+  const extension = path.extname(basePath);
+
+  return `${basePath.slice(0, basePath.length - extension.length)}-${runPrefix}${extension}`;
+}
+
 async function prepareSmokeContext(
   runPrefix: string
 ): Promise<SmokeStepContext & { rulesFilePath: string }> {
@@ -198,7 +206,7 @@ async function prepareSmokeContext(
     ...(smokeEnv.manifestPath === undefined
       ? {}
       : {
-          manifestPath: smokeEnv.manifestPath
+          manifestPath: manifestPathForRun(smokeEnv.manifestPath, runPrefix)
         }),
     tempRulesFilePath: rulesFilePath
   });

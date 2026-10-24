@@ -1,6 +1,12 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
+import {
+  isAlreadyGoneMessage,
+  retryWhileBusy
+} from '../../../../scripts/helpers/manual-smoke-cleanup.mjs';
+import { pollUntilFound } from '../../../../src/core/waiter.js';
 import { runBuiltCli } from '../../../helpers/process.js';
 import {
   readRequiredEnvValues,
@@ -162,13 +168,18 @@ interface LbDeleteJson {
   cancelled: boolean;
 }
 
-interface VpcListJson {
+interface VpcCreateJson {
   action: string;
-  items: Array<{
+  vpc: {
     id: number;
-    name: string;
+  };
+}
+
+interface VpcGetJson {
+  action: string;
+  vpc: {
     state: string;
-  }>;
+  };
 }
 
 interface LbSmokeManifest {
@@ -249,13 +260,16 @@ describeManual('manual LB destructive built CLI checks', () => {
       const runPrefix = `${manualEnv.prefix}-${Date.now().toString(36)}`;
       const context = await prepareLbContext(runPrefix);
       let lbId: number | undefined;
-      let vpcIdToUse: string | undefined;
       let cleanupError: Error | undefined;
       let workflowError: unknown;
 
       try {
-        // 1. Resolve VPC ID
-        vpcIdToUse = lbConfig.vpcId ?? (await findAvailableVpc(context));
+        // 1. Use the given VPC, or create one for this run. Borrowing any
+        // VPC on the account can pick one another run is about to delete.
+        // A new VPC takes a few minutes to become Active; that wait runs
+        // just before the attach step, while the load balancer starts up.
+        const vpcIdToUse =
+          lbConfig.vpcId ?? (await createOwnVpc(context, `${runPrefix}-vpc`));
 
         // 2. Create load balancer
         const lbResult = await createLbStep(context, {
@@ -277,16 +291,15 @@ describeManual('manual LB destructive built CLI checks', () => {
           name: `${runPrefix}-lb-v2`
         });
 
-        // 6. VPC attach
-        if (vpcIdToUse) {
-          await attachVpcStep(context, lbId, vpcIdToUse);
-          await getLbVerifyVpcAttachedStep(context, lbId, vpcIdToUse);
-        }
+        // 6. VPC attach, once the VPC is Active
+        await waitForVpcActiveStep(context, vpcIdToUse);
+        await attachVpcStep(context, lbId, vpcIdToUse);
+        await getLbVerifyVpcAttachedStep(context, lbId, vpcIdToUse);
 
-        // 7. VPC detach
-        if (vpcIdToUse) {
-          await detachVpcStep(context, lbId, vpcIdToUse);
-        }
+        // 7. VPC detach, then let the load balancer settle: E2E can drop a
+        // change made while it is still applying the detach
+        await detachVpcStep(context, lbId, vpcIdToUse);
+        await waitForLbRunningStep(context, lbId);
 
         // 8. Add a second backend group
         await addBackendGroupStep(context, lbId, {
@@ -294,8 +307,8 @@ describeManual('manual LB destructive built CLI checks', () => {
           server: lbConfig.backendServer.replace(/^[^:]+/, 'srv-extra')
         });
 
-        // 9. List backend groups
-        await listBackendGroupsStep(context, lbId);
+        // 9. List backend groups until the new one shows up
+        await listBackendGroupsStep(context, lbId, `${runPrefix}-grp`);
 
         // 10. Update backend group (rename)
         await updateBackendGroupStep(context, lbId, {
@@ -340,6 +353,9 @@ describeManual('manual LB destructive built CLI checks', () => {
             );
           }
         }
+
+        const vpcDeleteError = await cleanupOwnVpc(context);
+        cleanupError ??= vpcDeleteError;
       }
 
       if (workflowError !== undefined) {
@@ -367,18 +383,109 @@ async function prepareLbContext(runPrefix: string): Promise<LbTestContext> {
   };
 }
 
-async function findAvailableVpc(
-  context: LbTestContext
-): Promise<string | undefined> {
-  const vpcList = await runJsonCommand<VpcListJson>(
-    ['vpc', 'list'],
+async function createOwnVpc(
+  context: LbTestContext,
+  name: string
+): Promise<string> {
+  const created = await runJsonCommand<VpcCreateJson>(
+    [
+      'myaccount',
+      'vpc',
+      'create',
+      '--name',
+      name,
+      '--billing-type',
+      'hourly',
+      '--cidr-source',
+      'e2e'
+    ],
     context.lbEnv
   );
+  const vpcId = created.vpc.id;
 
-  const activeVpc = vpcList.items.find((v) => v.state === 'Active');
-  if (activeVpc) {
-    return String(activeVpc.id);
+  // Recorded straight away so cleanup removes the VPC even if a later step,
+  // including the wait for it to become Active, fails.
+  await updateManifest(context, (manifest) => {
+    manifest.vpc_id = vpcId;
+    manifest.vpc_created = true;
+  });
+
+  return String(vpcId);
+}
+
+async function waitForVpcActiveStep(
+  context: LbTestContext,
+  vpcId: string
+): Promise<void> {
+  const active = await pollUntilFound(
+    async () => {
+      const vpcGet = await runJsonCommand<VpcGetJson>(
+        ['myaccount', 'vpc', 'get', vpcId],
+        context.lbEnv
+      );
+
+      return vpcGet.vpc.state === 'Active' ? true : undefined;
+    },
+    { attempts: 60, intervalMs: 10_000 }
+  );
+
+  if (active === undefined) {
+    throw new Error(`VPC ${vpcId} did not become Active in time.`);
   }
+}
+
+// Deletes the VPC this run created, if any. Returns an error instead of
+// throwing so cleanup of other resources still happens.
+async function cleanupOwnVpc(
+  context: LbTestContext
+): Promise<Error | undefined> {
+  const manifest = await readManifest(context);
+
+  if (
+    !manifest.vpc_created ||
+    manifest.vpc_id === null ||
+    manifest.vpc_deleted
+  ) {
+    return undefined;
+  }
+
+  const vpcId = String(manifest.vpc_id);
+  const vpcDeleteError = await deleteOwnVpc(context, vpcId);
+
+  if (vpcDeleteError !== undefined) {
+    console.error(`VPC ID for manual cleanup: ${vpcId}`);
+  }
+
+  return vpcDeleteError;
+}
+
+// E2E refuses to delete a VPC for a while after a load balancer leaves it,
+// so busy refusals are retried. A VPC that is already gone counts as
+// deleted.
+async function deleteOwnVpc(
+  context: LbTestContext,
+  vpcId: string
+): Promise<Error | undefined> {
+  try {
+    await retryWhileBusy(
+      () =>
+        runJsonCommand(
+          ['myaccount', 'vpc', 'delete', vpcId, '--force'],
+          context.lbEnv
+        ),
+      { attempts: 30, delayMs: 20_000 }
+    );
+  } catch (error: unknown) {
+    const deleteError = toError(error);
+
+    if (!isAlreadyGoneMessage(deleteError.message)) {
+      return deleteError;
+    }
+  }
+
+  await updateManifest(context, (manifest) => {
+    manifest.vpc_deleted = true;
+  });
 
   return undefined;
 }
@@ -394,6 +501,7 @@ async function createLbStep(
 ): Promise<{ lbId: number }> {
   const lbCreate = await runJsonCommand<LbCreateJson>(
     [
+      'myaccount',
       'lb',
       'create',
       '--name',
@@ -436,7 +544,7 @@ async function waitForLbRunningStep(
   while (Date.now() <= deadline) {
     try {
       const lbGet = await runJsonCommand<LbGetJson>(
-        ['lb', 'get', String(lbId)],
+        ['myaccount', 'lb', 'get', String(lbId)],
         context.lbEnv
       );
 
@@ -449,7 +557,7 @@ async function waitForLbRunningStep(
     }
 
     if (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      await delay(10_000);
     }
   }
 
@@ -458,7 +566,7 @@ async function waitForLbRunningStep(
 
 async function getLbStep(context: LbTestContext, lbId: number): Promise<void> {
   const lbGet = await runJsonCommand<LbGetJson>(
-    ['lb', 'get', String(lbId)],
+    ['myaccount', 'lb', 'get', String(lbId)],
     context.lbEnv
   );
 
@@ -475,7 +583,7 @@ async function updateLbStep(
   }
 ): Promise<void> {
   const lbUpdate = await runJsonCommand<LbUpdateJson>(
-    ['lb', 'update', String(lbId), '--name', options.name],
+    ['myaccount', 'lb', 'update', String(lbId), '--name', options.name],
     context.lbEnv
   );
 
@@ -494,7 +602,16 @@ async function attachVpcStep(
   vpcId: string
 ): Promise<void> {
   const result = await runJsonCommand<LbAttachVpcJson>(
-    ['lb', 'network', 'vpc', 'attach', String(lbId), '--vpc-id', vpcId],
+    [
+      'myaccount',
+      'lb',
+      'network',
+      'vpc',
+      'attach',
+      String(lbId),
+      '--vpc-id',
+      vpcId
+    ],
     context.lbEnv
   );
 
@@ -509,7 +626,7 @@ async function getLbVerifyVpcAttachedStep(
   vpcId: string
 ): Promise<void> {
   const lbGet = await runJsonCommand<LbGetJson>(
-    ['lb', 'get', String(lbId)],
+    ['myaccount', 'lb', 'get', String(lbId)],
     context.lbEnv
   );
 
@@ -527,7 +644,16 @@ async function detachVpcStep(
   vpcId: string
 ): Promise<void> {
   const result = await runJsonCommand<LbDetachVpcJson>(
-    ['lb', 'network', 'vpc', 'detach', String(lbId), '--vpc-id', vpcId],
+    [
+      'myaccount',
+      'lb',
+      'network',
+      'vpc',
+      'detach',
+      String(lbId),
+      '--vpc-id',
+      vpcId
+    ],
     context.lbEnv
   );
 
@@ -546,6 +672,7 @@ async function addBackendGroupStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupAddJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'group',
@@ -564,20 +691,38 @@ async function addBackendGroupStep(
   }
 }
 
+// Lists the groups until the one just added shows up. E2E can drop a change
+// made while it is still applying an earlier one (such as a VPC detach), so
+// this fails with a clear message instead of letting the next step report
+// "not found".
 async function listBackendGroupsStep(
   context: LbTestContext,
-  lbId: number
+  lbId: number,
+  expectedGroupName: string
 ): Promise<void> {
-  const result = await runJsonCommand<LbBackendGroupListJson>(
-    ['lb', 'backend', 'group', 'list', String(lbId)],
-    context.lbEnv
+  const found = await pollUntilFound(
+    async () => {
+      const result = await runJsonCommand<LbBackendGroupListJson>(
+        ['myaccount', 'lb', 'backend', 'group', 'list', String(lbId)],
+        context.lbEnv
+      );
+
+      if (result.action !== 'backend-group-list') {
+        throw new Error('Expected backend group list to succeed.');
+      }
+
+      return result.backends.some((group) => group.name === expectedGroupName)
+        ? true
+        : undefined;
+    },
+    { attempts: 12, intervalMs: 15_000 }
   );
 
-  if (result.action !== 'backend-group-list') {
-    throw new Error('Expected backend group list to succeed.');
+  if (found === undefined) {
+    throw new Error(
+      `Backend group "${expectedGroupName}" was added but did not appear on load balancer ${lbId} within 3 minutes.`
+    );
   }
-
-  expect(Array.isArray(result.backends)).toBe(true);
 }
 
 async function updateBackendGroupStep(
@@ -590,6 +735,7 @@ async function updateBackendGroupStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupUpdateJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'group',
@@ -617,6 +763,7 @@ async function addBackendServerStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendServerAddJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'server',
@@ -645,6 +792,7 @@ async function removeBackendServerStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendServerRemoveJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'server',
@@ -669,7 +817,7 @@ async function removeBackendGroupStep(
   groupName: string
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupRemoveJson>(
-    ['lb', 'backend', 'group', 'remove', String(lbId), groupName],
+    ['myaccount', 'lb', 'backend', 'group', 'remove', String(lbId), groupName],
     context.lbEnv
   );
 
@@ -683,7 +831,7 @@ async function reserveIpStep(
   lbId: number
 ): Promise<void> {
   const result = await runJsonCommand<LbReserveIpJson>(
-    ['lb', 'network', 'reserve-ip', 'reserve', String(lbId)],
+    ['myaccount', 'lb', 'network', 'reserve-ip', 'reserve', String(lbId)],
     context.lbEnv
   );
 
@@ -697,7 +845,7 @@ async function deleteLbStep(
   lbId: number
 ): Promise<void> {
   const result = await runJsonCommand<LbDeleteJson>(
-    ['lb', 'delete', String(lbId), '--force'],
+    ['myaccount', 'lb', 'delete', String(lbId), '--force'],
     context.lbEnv
   );
 
@@ -721,7 +869,7 @@ async function runLbCleanup(
 
   try {
     const result = await runBuiltCli(
-      ['lb', 'delete', String(lbId), '--force', '--json'],
+      ['myaccount', 'lb', 'delete', String(lbId), '--force', '--json'],
       {
         env: context.lbEnv.cliEnv,
         timeoutMs: 5 * 60 * 1000
@@ -777,12 +925,17 @@ async function runJsonCommand<T>(
   }
 }
 
+async function readManifest(context: LbTestContext): Promise<LbSmokeManifest> {
+  const content = await readFile(context.manifestPath, 'utf8');
+
+  return JSON.parse(content) as LbSmokeManifest;
+}
+
 async function updateManifest(
   context: LbTestContext,
   mutate: (manifest: LbSmokeManifest) => void
 ): Promise<void> {
-  const content = await readFile(context.manifestPath, 'utf8');
-  const manifest = JSON.parse(content) as LbSmokeManifest;
+  const manifest = await readManifest(context);
   mutate(manifest);
   await writeFile(
     context.manifestPath,

@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl volume` discovers plans, creates block storage volumes, lists and inspects them, and deletes them. Volume attach and detach flows use `e2ectl node action volume`.
+`e2ectl myaccount volume` discovers plans, creates block storage volumes, lists and inspects them, and deletes them. Volume attach and detach flows use `e2ectl myaccount node action volume`.
 
 ## Before You Start
 
@@ -14,26 +14,26 @@
 ### Discover Available Volume Sizes
 
 ```bash
-e2ectl volume plans
+e2ectl myaccount volume plans
 ```
 
 Inspect one size in more detail:
 
 ```bash
-e2ectl volume plans --size <size-gb>
+e2ectl myaccount volume plans --size <size-gb>
 ```
 
 ### List And Inspect Volumes
 
 ```bash
-e2ectl volume list
-e2ectl volume get <volume-id>
+e2ectl myaccount volume list
+e2ectl myaccount volume get <volume-id>
 ```
 
 ### Create A Volume
 
 ```bash
-e2ectl volume create \
+e2ectl myaccount volume create \
   --name <volume-name> \
   --size <size-gb> \
   --billing-type hourly
@@ -44,14 +44,14 @@ For committed billing, add `--committed-plan-id <committed-plan-id>` and, if nee
 ### Attach Or Detach A Volume From A Node
 
 ```bash
-e2ectl node action volume attach <node-id> --volume-id <volume-id>
-e2ectl node action volume detach <node-id> --volume-id <volume-id>
+e2ectl myaccount node action volume attach <node-id> --volume-id <volume-id>
+e2ectl myaccount node action volume detach <node-id> --volume-id <volume-id>
 ```
 
 ### Delete A Volume
 
 ```bash
-e2ectl volume delete <volume-id>
+e2ectl myaccount volume delete <volume-id>
 ```
 
 ## Examples
@@ -59,13 +59,13 @@ e2ectl volume delete <volume-id>
 List only currently available sizes:
 
 ```bash
-e2ectl volume plans --available-only
+e2ectl myaccount volume plans --available-only
 ```
 
 Delete a volume without the confirmation prompt:
 
 ```bash
-e2ectl volume delete <volume-id> --force
+e2ectl myaccount volume delete <volume-id> --force
 ```
 
 ## Automation Notes

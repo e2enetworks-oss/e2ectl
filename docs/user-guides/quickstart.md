@@ -53,13 +53,13 @@ If you only need account-scoped project commands, see the [project guide](./proj
 Start with OS discovery:
 
 ```bash
-e2ectl node catalog os
+e2ectl myaccount node catalog os
 ```
 
 Then ask for exact plans and images:
 
 ```bash
-e2ectl node catalog plans \
+e2ectl myaccount node catalog plans \
   --display-category "<display-category>" \
   --category "<category>" \
   --os "<os>" \
@@ -72,7 +72,7 @@ Use the exact `plan`, `image`, and committed-plan identifiers returned by the ca
 ## 6. Create Your First Node
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>

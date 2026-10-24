@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - develop
+      - platform-split
   pull_request:
     branches:
       - develop
       - main
+      - platform-split
   merge_group:
     branches:
       - main
@@ -26,12 +28,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -47,7 +49,7 @@ jobs:
         run: npm run coverage:unit
 
       - name: Upload unit coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: e2enetworks-oss/e2ectl
@@ -60,7 +62,7 @@ jobs:
         run: npm run coverage:integration
 
       - name: Upload integration coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: e2enetworks-oss/e2ectl
@@ -72,18 +74,57 @@ jobs:
       - name: Package dry run
         run: npm pack --dry-run
 
+      # Runs last because it changes the checkout: generates a throwaway
+      # product and checks that it builds, lints and passes its own test.
+      - name: New product generator
+        run: |
+          make new-domain tir/foo
+          npm run typecheck
+          npx oxlint --type-aware --deny-warnings src/tir src/app tests/unit/tir tests/helpers
+          npx vitest run tests/unit/tir/foo tests/unit/app
+
+  verify-node-24:
+    # Node 24 is the oldest version e2ectl supports (engines.node); the other
+    # jobs run on the development version in .nvmrc.
+    name: verify (node 24 test build)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: make test
+
+      - name: Build
+        run: make build
+
+      - name: Integration tests
+        run: npm run test:integration
+
   verify-macos:
     name: verify (macos build test package)
     runs-on: macos-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -107,12 +148,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies

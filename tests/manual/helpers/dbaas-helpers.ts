@@ -140,7 +140,12 @@ export async function waitForDbaasStatus(
 
   while (Date.now() <= deadline) {
     try {
-      const result = await runCommand(['dbaas', 'get', String(dbaasId)]);
+      const result = await runCommand([
+        'myaccount',
+        'dbaas',
+        'get',
+        String(dbaasId)
+      ]);
 
       if (
         result.dbaas.status !== null &&

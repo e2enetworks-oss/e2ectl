@@ -1,6 +1,6 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { formatCliCommand } from '../app/metadata.js';
-import type { ApiAuthCredentials } from '../myaccount/index.js';
+import type { ApiAuthCredentials } from '../http/index.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
@@ -488,7 +488,9 @@ function applyImportedDefaults(
 
 function preserveExistingProfileContext(
   profile: ProfileConfig | undefined
-): Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>> {
+): Partial<
+  Pick<ProfileConfig, 'default_project_id' | 'default_location' | 'tir'>
+> {
   if (profile === undefined) {
     return {};
   }
@@ -503,7 +505,8 @@ function preserveExistingProfileContext(
       ? {}
       : {
           default_location: profile.default_location
-        })
+        }),
+    ...(profile.tir === undefined ? {} : { tir: profile.tir })
   };
 }
 

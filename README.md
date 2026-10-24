@@ -36,9 +36,9 @@ e2ectl config import --file ~/Downloads/myaccount-config.json
 3. Discover an exact node plan and image:
 
 ```bash
-e2ectl node catalog os
+e2ectl myaccount node catalog os
 
-e2ectl node catalog plans \
+e2ectl myaccount node catalog plans \
   --display-category "<display-category>" \
   --category "<category>" \
   --os "<os>" \
@@ -49,7 +49,7 @@ e2ectl node catalog plans \
 4. Create your first node:
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>

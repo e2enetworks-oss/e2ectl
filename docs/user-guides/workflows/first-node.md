@@ -29,13 +29,13 @@ This is the moment to confirm the default alias and shared default project/locat
 ## 3. Discover Projects If You Still Need One
 
 ```bash
-e2ectl project list
+e2ectl myaccount project list
 ```
 
 If you need a new project first:
 
 ```bash
-e2ectl project create --name <project-name>
+e2ectl myaccount project create --name <project-name>
 ```
 
 ## 4. Find A Known-Good Catalog Row
@@ -43,13 +43,13 @@ e2ectl project create --name <project-name>
 Start with the available OS rows:
 
 ```bash
-e2ectl node catalog os
+e2ectl myaccount node catalog os
 ```
 
 Then choose one row and ask for exact hourly plans and images:
 
 ```bash
-e2ectl node catalog plans \
+e2ectl myaccount node catalog plans \
   --display-category "<display-category>" \
   --category "<category>" \
   --os "<os>" \
@@ -64,16 +64,16 @@ For a first node, an hourly path keeps the decision surface smaller. You can rev
 **From a catalog image (standard):**
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image>
 ```
 
-**From a saved image** — use the same `--plan` and `--image` as above, plus the `Template ID` from `e2ectl image list`:
+**From a saved image** — use the same `--plan` and `--image` as above, plus the `Template ID` from `e2ectl myaccount image list`:
 
 ```bash
-e2ectl node create \
+e2ectl myaccount node create \
   --name <node-name> \
   --plan <plan> \
   --image <image> \
@@ -87,8 +87,8 @@ If you already have a saved SSH key id, you can add it during create with repeat
 ## 6. Confirm The Result
 
 ```bash
-e2ectl node list
-e2ectl node get <node-id>
+e2ectl myaccount node list
+e2ectl myaccount node get <node-id>
 ```
 
 You have reached the first success milestone once the new node appears in list output and `node get` returns the expected record.

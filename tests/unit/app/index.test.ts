@@ -10,7 +10,11 @@ import {
   runCli,
   type CliRuntime
 } from '../../../src/app/index.js';
-import { createTestConfigPath, MemoryWriter } from '../../helpers/runtime.js';
+import {
+  createTestConfigPath,
+  createTestRuntime,
+  MemoryWriter
+} from '../../helpers/runtime.js';
 
 describe('runCli', () => {
   function createRuntimeFixture(options?: { isInteractive?: boolean }): {
@@ -22,67 +26,14 @@ describe('runCli', () => {
     const stderr = new MemoryWriter();
 
     return {
-      runtime: {
-        confirm: vi.fn(() => Promise.resolve(false)),
-        createImageClient: vi.fn(() => {
-          throw new Error('Image client should not be created for this test.');
-        }),
-        createDbaasClient: vi.fn(() => {
-          throw new Error('DBaaS client should not be created for this test.');
-        }) as unknown as CliRuntime['createDbaasClient'],
-        createNodeClient: vi.fn(() => {
-          throw new Error('Node client should not be created for this test.');
-        }),
-        createProjectClient: vi.fn(() => {
-          throw new Error(
-            'Project client should not be created for this test.'
-          );
-        }),
-        createReservedIpClient: vi.fn(() => {
-          throw new Error(
-            'Reserved IP client should not be created for this test.'
-          );
-        }),
-        createSecurityGroupClient: vi.fn(() => {
-          throw new Error(
-            'Security group client should not be created for this test.'
-          );
-        }),
-        createSshKeyClient: vi.fn(() => {
-          throw new Error(
-            'SSH key client should not be created for this test.'
-          );
-        }),
-        createSslClient: vi.fn(() => {
-          throw new Error('SSL client should not be created for this test.');
-        }) as unknown as CliRuntime['createSslClient'],
-        createSupportTicketClient: vi.fn(() => {
-          throw new Error(
-            'Support ticket client should not be created for this test.'
-          );
-        }) as unknown as CliRuntime['createSupportTicketClient'],
-        createLoadBalancerClient: vi.fn(() => {
-          throw new Error(
-            'Load balancer client should not be created for this test.'
-          );
-        }),
-        createVolumeClient: vi.fn(() => {
-          throw new Error('Volume client should not be created for this test.');
-        }),
-        createVpcClient: vi.fn(() => {
-          throw new Error('VPC client should not be created for this test.');
-        }),
-        credentialValidator: {
-          validate: vi.fn()
-        },
+      runtime: createTestRuntime({
         isInteractive: options?.isInteractive ?? true,
-        prompt: vi.fn(() => Promise.resolve('')),
         stderr,
         stdout,
         store: new ConfigStore({
           configPath: createTestConfigPath('app-cli')
         })
-      },
+      }),
       stderr,
       stdout
     };
@@ -92,7 +43,15 @@ describe('runCli', () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'create', '--plan', 'plan-123'],
+      [
+        'node',
+        CLI_COMMAND_NAME,
+        'myaccount',
+        'node',
+        'create',
+        '--plan',
+        'plan-123'
+      ],
       runtime,
       stderr
     );
@@ -104,11 +63,130 @@ describe('runCli', () => {
     );
   });
 
+  it.each([
+    [
+      ['node', 'list'],
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
+    ],
+    [
+      ['node', 'get', '123', '--alias', 'prod', '--json'],
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node get"?\n'
+    ],
+    [
+      ['--json', 'dbaas', 'create', '--password', 'secret-value'],
+      'Error: Unknown command "dbaas".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount dbaas create"?\n'
+    ],
+    [
+      ['list'],
+      'Error: Unknown command "list".\n\nNext step: Run e2ectl --help to see the commands.\n'
+    ],
+    [
+      ['confg', 'list'],
+      'Error: Unknown command "confg".\n\nNext step: Did you mean "e2ectl config"? Run e2ectl --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', 'node', 'lst'],
+      'Error: Unknown command "lst".\n\nNext step: Did you mean "e2ectl myaccount node list"? Run e2ectl myaccount node --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', 'nod', 'list', '--alias', 'prod'],
+      'Error: Unknown command "nod".\n\nNext step: Did you mean "e2ectl myaccount node"? Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', '--json', 'nod', 'list'],
+      'Error: Unknown command "nod".\n\nNext step: Did you mean "e2ectl myaccount node"? Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
+      ['nod', 'list', '--alias', 'prod'],
+      'Error: Unknown command "nod".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
+    ],
+    [
+      ['dbaas', 'create', 'hunter2'],
+      'Error: Unknown command "dbaas".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount dbaas create"?\n'
+    ],
+    [
+      ['ls'],
+      'Error: Unknown command "ls".\n\nNext step: Run e2ectl --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', 'rm'],
+      'Error: Unknown command "rm".\n\nNext step: Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
+      ['help', 'node'],
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
+    ],
+    [
+      ['xyz', '--alias', 'prod'],
+      'Error: Unknown command "xyz".\n\nNext step: Run e2ectl --help to see the commands.\n'
+    ]
+  ])('names an unknown command in %j', async (args, expected) => {
+    const { runtime, stderr, stdout } = createRuntimeFixture();
+
+    const exitCode = await runCli(
+      ['node', CLI_COMMAND_NAME, ...args],
+      runtime,
+      stderr
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stdout.buffer).toBe('');
+    expect(stderr.buffer).toBe(expected);
+  });
+
+  it.each([
+    [['help', 'myaccount']],
+    [['myaccount', 'help', 'node']],
+    [['myaccount', 'node', 'help', 'list']]
+  ])('exits 0 after showing help through %j', async (args) => {
+    const { runtime, stderr } = createRuntimeFixture();
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+
+    try {
+      const exitCode = await runCli(
+        ['node', CLI_COMMAND_NAME, ...args],
+        runtime,
+        stderr
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stderr.buffer).toBe('');
+      expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('still shows help for a command group typed on its own', async () => {
+    const { runtime, stderr } = createRuntimeFixture();
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+
+    try {
+      const exitCode = await runCli(
+        ['node', CLI_COMMAND_NAME, 'myaccount'],
+        runtime,
+        stderr
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stderr.buffer).toBe('');
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Usage: e2ectl myaccount')
+      );
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
   it('formats invalid node ids through the same CLI contract', async () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'get', 'node-abc'],
+      ['node', CLI_COMMAND_NAME, 'myaccount', 'node', 'get', 'node-abc'],
       runtime,
       stderr
     );
@@ -126,7 +204,7 @@ describe('runCli', () => {
     });
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'delete', '101'],
+      ['node', CLI_COMMAND_NAME, 'myaccount', 'node', 'delete', '101'],
       runtime,
       stderr
     );

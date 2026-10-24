@@ -1,7 +1,7 @@
 {
   "name": "@e2enetworks-oss/e2ectl",
   "version": "0.6.1",
-  "description": "Command-line interface for managing E2E Networks MyAccount resources from the terminal.",
+  "description": "Command-line interface for managing E2E Networks resources from the terminal.",
   "homepage": "https://github.com/e2enetworks-oss/e2ectl#readme",
   "bugs": {
     "url": "https://github.com/e2enetworks-oss/e2ectl/issues"
@@ -34,7 +34,7 @@
     "docs:check": "node ./scripts/docs-check.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint src tests scripts/**/*.mjs vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts vitest.manual-destructive.config.ts vitest.manual-smoke.config.ts",
+    "lint": "oxlint --type-aware --deny-warnings src tests scripts vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts vitest.manual-destructive.config.ts vitest.manual-smoke.config.ts",
     "prepack": "npm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
@@ -54,22 +54,20 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@types/node": "^25.4.0",
-    "@vitest/coverage-v8": "^4.0.18",
-    "c8": "^11.0.0",
-    "eslint": "^9.39.4",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.4.0",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0",
-    "vitest": "^4.0.18"
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "c8": "12.0.0",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   },
   "dependencies": {
-    "cli-table3": "^0.6.5",
-    "commander": "^14.0.3",
-    "node-html-parser": "^7.1.0"
+    "cli-table3": "0.6.5",
+    "commander": "15.0.0",
+    "node-html-parser": "9.0.5"
   }
 }

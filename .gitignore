@@ -50,9 +50,6 @@ web_modules/
 # Optional npm cache directory
 .npm
 
-# Optional eslint cache
-.eslintcache
-
 # Optional stylelint cache
 .stylelintcache
 
@@ -143,3 +140,7 @@ vite.config.ts.timestamp-*
 .DS_Store
 reviews/*
 
+# Manifests written by the live test runs (tests/manual)
+.manual-dbaas/
+.manual-lb/
+.manual-smoke/

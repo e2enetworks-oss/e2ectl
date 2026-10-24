@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { retryWhileBusy } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
 import { runBuiltCli } from '../../helpers/process.js';
 import type { SmokeEnv } from './smoke-env.js';
 
@@ -30,6 +31,8 @@ export interface VolumeGetJson {
 }
 
 export interface SmokeJsonCommandOptions {
+  // For detach and delete steps only; see retryWhileBusy.
+  retryWhileBusy?: boolean;
   stdin?: string;
   timeoutMs?: number;
 }
@@ -44,7 +47,7 @@ export async function discoverAvailableVolumeSize(
   smokeEnv: SmokeEnv
 ): Promise<number> {
   const volumePlans = await runJsonCommand<VolumePlansJson>(
-    ['volume', 'plans', '--available-only'],
+    ['myaccount', 'volume', 'plans', '--available-only'],
     smokeEnv
   );
   const size = volumePlans.items[0]?.size_gb;
@@ -62,6 +65,16 @@ export async function runJsonCommand<T>(
   args: string[],
   smokeEnv: SmokeEnv,
   options: SmokeJsonCommandOptions = {}
+): Promise<T> {
+  const run = () => runJsonCommandOnce<T>(args, smokeEnv, options);
+
+  return options.retryWhileBusy === true ? retryWhileBusy(run) : run();
+}
+
+async function runJsonCommandOnce<T>(
+  args: string[],
+  smokeEnv: SmokeEnv,
+  options: SmokeJsonCommandOptions
 ): Promise<T> {
   const result = await runBuiltCli(['--json', ...args], {
     env: smokeEnv.cliEnv,
@@ -130,7 +143,7 @@ export async function waitForNodeStatus(
   while (Date.now() <= deadline) {
     try {
       const nodeGet = await runJsonCommand<NodeGetJson>(
-        ['node', 'get', String(nodeId)],
+        ['myaccount', 'node', 'get', String(nodeId)],
         smokeEnv
       );
       const normalizedStatus = normalizeNodeStatus(nodeGet.node.status);
@@ -192,7 +205,7 @@ export async function waitForVolumeStatus(
   while (Date.now() <= deadline) {
     try {
       const volumeGet = await runJsonCommand<VolumeGetJson>(
-        ['volume', 'get', String(volumeId)],
+        ['myaccount', 'volume', 'get', String(volumeId)],
         smokeEnv
       );
       const normalizedStatus = normalizeLifecycleStatus(

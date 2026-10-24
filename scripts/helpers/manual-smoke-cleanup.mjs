@@ -45,19 +45,69 @@ export function classifyCleanupMessage(message) {
 }
 
 export function classifyCleanupError(error) {
-  return classifyCleanupMessage(formatError(error));
+  // Only the message: details hold the HTTP status line, and a 404 from a
+  // wrong address must not be mistaken for "already deleted".
+  return classifyCleanupMessage(
+    error instanceof Error ? error.message : String(error)
+  );
 }
 
+// The fallback clients throw errors whose message can be as short as
+// "MyAccount API request failed: Bad Request", with E2E's own words in a
+// `details` list. Those details are included so callers such as
+// isBusyRefusal see them.
 export function formatError(error) {
-  if (error instanceof Error) {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const details = 'details' in error ? error.details : undefined;
+
+  if (!isStringList(details) || details.length === 0) {
     return error.message;
   }
 
-  return String(error);
+  return [error.message, ...details].join('\n');
 }
 
 export function isAlreadyGoneMessage(message) {
   return /\bnot found\b/i.test(message) || /\balready gone\b/i.test(message);
+}
+
+// E2E refuses some changes for a while after an earlier change to the same
+// resource (a detach soon after attach, a node delete soon after a detach,
+// a VPC delete while a load balancer or node is still leaving it) and
+// accepts the same request later. These are the ways E2E says so. The
+// match is on E2E's own words only: the CLI's own error footer ends with
+// "try again" for every failure.
+export function isBusyRefusal(message) {
+  return /HTTP status: 500|invalid node state|please try again|running servers on this vpc/i.test(
+    message
+  );
+}
+
+const BUSY_RETRY_ATTEMPTS = 6;
+const BUSY_RETRY_DELAY_MS = 30_000;
+
+// Retries while E2E answers "busy, try later" (see isBusyRefusal), by
+// default up to six tries 30 seconds apart. Any other failure is thrown at
+// once. Only use it for detach and delete steps: retrying a create could
+// create twice.
+export async function retryWhileBusy(
+  run,
+  options = { attempts: BUSY_RETRY_ATTEMPTS, delayMs: BUSY_RETRY_DELAY_MS }
+) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      if (!isBusyRefusal(formatError(error)) || attempt >= options.attempts) {
+        throw error;
+      }
+
+      await delay(options.delayMs);
+    }
+  }
 }
 
 export function shouldRetryVpcDeleteError(message) {
@@ -90,6 +140,7 @@ async function cleanupAddonReservedIpAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'reserved-ip',
     'detach',
     'node',
@@ -171,6 +222,7 @@ async function cleanupVolumeAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'action',
     'volume',
@@ -233,6 +285,7 @@ async function cleanupVpcAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'action',
     'vpc',
@@ -286,6 +339,7 @@ async function cleanupNode(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'delete',
     String(manifest.node_id),
@@ -301,7 +355,9 @@ async function cleanupNode(context, fail) {
   try {
     const clients = await context.getFallbackClients();
 
-    await clients.node.deleteNode(String(manifest.node_id));
+    await retryWhileBusy(() =>
+      clients.node.deleteNode(String(manifest.node_id))
+    );
 
     await markNodeDeleted(context);
     context.logInfo(`Fallback-deleted node ${manifest.node_id}.`);
@@ -325,6 +381,7 @@ async function cleanupReservedIp(context, fail, ipField, deletedField) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'reserved-ip',
     'delete',
     ipAddress,
@@ -380,6 +437,7 @@ async function cleanupVolume(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'volume',
     'delete',
     String(volumeId),
@@ -437,6 +495,7 @@ async function cleanupVpc(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'vpc',
     'delete',
     String(vpcId),
@@ -640,6 +699,7 @@ async function cleanupSshKey(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'ssh-key',
     'delete',
     String(sshKeyId),
@@ -687,6 +747,7 @@ async function cleanupSecurityGroup(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'security-group',
     'delete',
     String(manifest.security_group_id),
@@ -788,6 +849,12 @@ function assertNodeVmId(vmId, nodeId) {
   }
 
   return vmId;
+}
+
+function isStringList(value) {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
 }
 
 function normalizeLifecycleStatus(status) {

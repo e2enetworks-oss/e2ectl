@@ -1,3 +1,5 @@
+import { shouldRetryVpcDeleteError } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
+import { pollUntilFound } from '../../../src/core/waiter.js';
 import type { SmokeEnv } from './smoke-env.js';
 import { updateSmokeManifest } from './smoke-manifest.js';
 import {
@@ -273,6 +275,7 @@ export async function createNodeStep(
 }> {
   const nodeCreate = await runJsonCommand<NodeCreateJson>(
     [
+      'myaccount',
       'node',
       'create',
       '--name',
@@ -317,6 +320,7 @@ export async function runSecurityGroupSteps(
 }> {
   const securityGroupCreate = await runJsonCommand<SecurityGroupCreateJson>(
     [
+      'myaccount',
       'security-group',
       'create',
       '--name',
@@ -339,7 +343,7 @@ export async function runSecurityGroupSteps(
   });
 
   const securityGroupGet = await runJsonCommand<SecurityGroupGetJson>(
-    ['security-group', 'get', String(securityGroupId)],
+    ['myaccount', 'security-group', 'get', String(securityGroupId)],
     context.smokeEnv
   );
 
@@ -353,6 +357,7 @@ export async function runSecurityGroupSteps(
 
   const securityGroupUpdate = await runJsonCommand<SecurityGroupUpdateJson>(
     [
+      'myaccount',
       'security-group',
       'update',
       String(securityGroupId),
@@ -388,6 +393,7 @@ export async function runSecurityGroupSteps(
 
   await runJsonCommand(
     [
+      'myaccount',
       'node',
       'action',
       'security-group',
@@ -405,6 +411,7 @@ export async function runSecurityGroupSteps(
 
   await runJsonCommand(
     [
+      'myaccount',
       'node',
       'action',
       'security-group',
@@ -413,7 +420,8 @@ export async function runSecurityGroupSteps(
       '--security-group-id',
       String(securityGroupId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {
@@ -432,7 +440,7 @@ export async function runAddonReservedIpSteps(
   }
 ): Promise<void> {
   const addonReservedIpCreate = await runJsonCommand<ReservedIpCreateJson>(
-    ['reserved-ip', 'create'],
+    ['myaccount', 'reserved-ip', 'create'],
     context.smokeEnv
   );
   const addonReservedIp = addonReservedIpCreate.reserved_ip.ip_address;
@@ -446,7 +454,7 @@ export async function runAddonReservedIpSteps(
   });
 
   const addonReservedIpGet = await runJsonCommand<ReservedIpGetJson>(
-    ['reserved-ip', 'get', addonReservedIp],
+    ['myaccount', 'reserved-ip', 'get', addonReservedIp],
     context.smokeEnv
   );
 
@@ -456,6 +464,7 @@ export async function runAddonReservedIpSteps(
 
   await runJsonCommand(
     [
+      'myaccount',
       'reserved-ip',
       'attach',
       'node',
@@ -472,6 +481,7 @@ export async function runAddonReservedIpSteps(
 
   await runJsonCommand(
     [
+      'myaccount',
       'reserved-ip',
       'detach',
       'node',
@@ -479,7 +489,8 @@ export async function runAddonReservedIpSteps(
       '--node-id',
       String(options.nodeId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {
@@ -487,7 +498,7 @@ export async function runAddonReservedIpSteps(
   });
 
   await runJsonCommand(
-    ['reserved-ip', 'delete', addonReservedIp, '--force'],
+    ['myaccount', 'reserved-ip', 'delete', addonReservedIp, '--force'],
     context.smokeEnv
   );
 
@@ -510,6 +521,7 @@ export async function runVolumeSteps(
   );
   const volumeCreate = await runJsonCommand<VolumeCreateJson>(
     [
+      'myaccount',
       'volume',
       'create',
       '--name',
@@ -532,7 +544,7 @@ export async function runVolumeSteps(
   });
 
   const volumeGet = await runJsonCommand<VolumeGetJson>(
-    ['volume', 'get', String(volumeId)],
+    ['myaccount', 'volume', 'get', String(volumeId)],
     context.smokeEnv
   );
 
@@ -547,6 +559,7 @@ export async function runVolumeSteps(
 
   const volumeAttach = await runJsonCommand<VolumeAttachDetachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'volume',
@@ -579,6 +592,7 @@ export async function runVolumeSteps(
 
   const volumeDetach = await runJsonCommand<VolumeAttachDetachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'volume',
@@ -587,7 +601,8 @@ export async function runVolumeSteps(
       '--volume-id',
       String(volumeId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -610,7 +625,7 @@ export async function runVolumeSteps(
   });
 
   const volumeDelete = await runJsonCommand<VolumeDeleteJson>(
-    ['volume', 'delete', String(volumeId), '--force'],
+    ['myaccount', 'volume', 'delete', String(volumeId), '--force'],
     context.smokeEnv
   );
 
@@ -638,6 +653,7 @@ export async function runVpcSteps(
 }> {
   const vpcCreate = await runJsonCommand<VpcCreateJson>(
     [
+      'myaccount',
       'vpc',
       'create',
       '--name',
@@ -660,7 +676,7 @@ export async function runVpcSteps(
   });
 
   const vpcGet = await runJsonCommand<VpcGetJson>(
-    ['vpc', 'get', String(vpcId)],
+    ['myaccount', 'vpc', 'get', String(vpcId)],
     context.smokeEnv
   );
 
@@ -675,6 +691,7 @@ export async function runVpcSteps(
 
   const vpcAttach = await runJsonCommand<VpcAttachDetachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'vpc',
@@ -707,6 +724,7 @@ export async function runVpcSteps(
 
   const vpcDetach = await runJsonCommand<VpcAttachDetachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'vpc',
@@ -715,7 +733,8 @@ export async function runVpcSteps(
       '--vpc-id',
       String(vpcId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -756,6 +775,7 @@ export async function runSshKeyCreateAndAttachSteps(
 }> {
   const sshKeyCreate = await runJsonCommand<SshKeyCreateJson>(
     [
+      'myaccount',
       'ssh-key',
       'create',
       '--label',
@@ -779,7 +799,7 @@ export async function runSshKeyCreateAndAttachSteps(
   });
 
   const sshKeyGet = await runJsonCommand<SshKeyGetJson>(
-    ['ssh-key', 'get', String(sshKeyId)],
+    ['myaccount', 'ssh-key', 'get', String(sshKeyId)],
     context.smokeEnv
   );
 
@@ -789,6 +809,7 @@ export async function runSshKeyCreateAndAttachSteps(
 
   const sshKeyAttach = await runJsonCommand<SshKeyAttachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'ssh-key',
@@ -832,7 +853,7 @@ export async function runNodeLifecycleActionSteps(
   let publicIp = requirePublicIp(nodeGet, options.nodeId);
 
   const powerOff = await runJsonCommand<NodePowerJson>(
-    ['node', 'action', 'power-off', String(options.nodeId)],
+    ['myaccount', 'node', 'action', 'power-off', String(options.nodeId)],
     context.smokeEnv
   );
 
@@ -846,7 +867,7 @@ export async function runNodeLifecycleActionSteps(
   });
 
   const powerOn = await runJsonCommand<NodePowerJson>(
-    ['node', 'action', 'power-on', String(options.nodeId)],
+    ['myaccount', 'node', 'action', 'power-on', String(options.nodeId)],
     context.smokeEnv
   );
 
@@ -861,6 +882,7 @@ export async function runNodeLifecycleActionSteps(
 
   const saveImage = await runJsonCommand<NodeSaveImageJson>(
     [
+      'myaccount',
       'node',
       'action',
       'save-image',
@@ -870,7 +892,10 @@ export async function runNodeLifecycleActionSteps(
     ],
     context.smokeEnv
   );
-  const savedImageId = saveImage.result.image_id?.trim() ?? '';
+  const savedImageId =
+    saveImage.result.image_id?.trim() ||
+    (await findSavedImageId(context, options.saveImageName)) ||
+    '';
 
   if (
     saveImage.action !== 'save-image' ||
@@ -890,6 +915,7 @@ export async function runNodeLifecycleActionSteps(
 
   const upgrade = await runJsonCommand<NodeUpgradeJson>(
     [
+      'myaccount',
       'node',
       'upgrade',
       String(options.nodeId),
@@ -935,6 +961,7 @@ export async function runNodePublicIpDetachStep(
   const publicIp = requirePublicIp(nodeGet, options.nodeId);
   const detachResult = await runJsonCommand<NodePublicIpDetachJson>(
     [
+      'myaccount',
       'node',
       'action',
       'public-ip',
@@ -942,7 +969,8 @@ export async function runNodePublicIpDetachStep(
       String(options.nodeId),
       '--force'
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -977,7 +1005,7 @@ export async function runNodeDeleteSteps(
   });
 
   const preserveNodeIp = await runJsonCommand<ReservedIpReserveNodeJson>(
-    ['reserved-ip', 'reserve', 'node', String(options.nodeId)],
+    ['myaccount', 'reserved-ip', 'reserve', 'node', String(options.nodeId)],
     context.smokeEnv
   );
   const preservedReservedIp = preserveNodeIp.ip_address;
@@ -993,8 +1021,9 @@ export async function runNodeDeleteSteps(
   });
 
   await runJsonCommand(
-    ['node', 'delete', String(options.nodeId), '--force'],
-    context.smokeEnv
+    ['myaccount', 'node', 'delete', String(options.nodeId), '--force'],
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {
@@ -1007,7 +1036,7 @@ export async function runNodeDeleteSteps(
   });
 
   const preservedIpGet = await runJsonCommand<ReservedIpGetJson>(
-    ['reserved-ip', 'get', preservedReservedIp],
+    ['myaccount', 'reserved-ip', 'get', preservedReservedIp],
     context.smokeEnv
   );
 
@@ -1018,7 +1047,7 @@ export async function runNodeDeleteSteps(
   }
 
   await runJsonCommand(
-    ['reserved-ip', 'delete', preservedReservedIp, '--force'],
+    ['myaccount', 'reserved-ip', 'delete', preservedReservedIp, '--force'],
     context.smokeEnv
   );
 
@@ -1034,7 +1063,7 @@ export async function runSshKeyDeleteStep(
   }
 ): Promise<void> {
   const sshKeyDelete = await runJsonCommand<SshKeyDeleteJson>(
-    ['ssh-key', 'delete', String(options.sshKeyId), '--force'],
+    ['myaccount', 'ssh-key', 'delete', String(options.sshKeyId), '--force'],
     context.smokeEnv
   );
 
@@ -1080,7 +1109,7 @@ async function waitForNodeVpcAttachmentState(
   while (Date.now() <= deadline) {
     try {
       const nodeGet = await runJsonCommand<NodeGetJson>(
-        ['node', 'get', String(nodeId)],
+        ['myaccount', 'node', 'get', String(nodeId)],
         context.smokeEnv
       );
 
@@ -1119,7 +1148,7 @@ async function deleteVpcWithRetry(
   while (Date.now() <= deadline) {
     try {
       return await runJsonCommand<VpcDeleteJson>(
-        ['vpc', 'delete', String(vpcId), '--force'],
+        ['myaccount', 'vpc', 'delete', String(vpcId), '--force'],
         context.smokeEnv
       );
     } catch (error: unknown) {
@@ -1163,7 +1192,7 @@ async function waitForVpcState(
   while (Date.now() <= deadline) {
     try {
       const vpcGet = await runJsonCommand<VpcGetJson>(
-        ['vpc', 'get', String(vpcId)],
+        ['myaccount', 'vpc', 'get', String(vpcId)],
         context.smokeEnv
       );
       const normalizedState = normalizeLifecycleState(vpcGet.vpc.state);
@@ -1199,14 +1228,6 @@ async function waitForVpcState(
   );
 }
 
-function shouldRetryVpcDeleteError(message: string): boolean {
-  return (
-    /you have running servers on this vpc/i.test(message) ||
-    /vpc is in creating state/i.test(message) ||
-    /please try again later/i.test(message)
-  );
-}
-
 function normalizeLifecycleState(state: string | undefined): string {
   return (state ?? '')
     .trim()
@@ -1217,4 +1238,30 @@ function normalizeLifecycleState(state: string | undefined): string {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+interface ImageListJson {
+  items: Array<{ image_id: string; image_name: string | null }>;
+}
+
+// E2E's save-image reply carries no image id: the image shows up in the
+// list a little later, under the given name plus a time stamp. Without this
+// lookup the cleanup never deletes the saved image.
+async function findSavedImageId(
+  context: SmokeStepContext,
+  saveImageName: string
+): Promise<string | undefined> {
+  return await pollUntilFound(
+    async () => {
+      const images = await runJsonCommand<ImageListJson>(
+        ['myaccount', 'image', 'list'],
+        context.smokeEnv
+      );
+
+      return images.items.find((image) =>
+        (image.image_name ?? '').startsWith(saveImageName)
+      )?.image_id;
+    },
+    { attempts: 20, intervalMs: 15_000 }
+  );
 }

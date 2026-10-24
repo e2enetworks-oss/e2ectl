@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Run Release Please
         id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
@@ -31,21 +31,17 @@ jobs:
 
       - name: Checkout tagged release
         if: ${{ steps.release.outputs.release_created == 'true' }}
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.release.outputs.tag_name }}
 
       - name: Setup Node.js
         if: ${{ steps.release.outputs.release_created == 'true' }}
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm for trusted publishing
-        if: ${{ steps.release.outputs.release_created == 'true' }}
-        run: npm install -g npm@^11.5.1
 
       - name: Validate release tag
         if: ${{ steps.release.outputs.release_created == 'true' }}

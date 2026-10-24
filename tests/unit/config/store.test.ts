@@ -236,6 +236,116 @@ describe('ConfigStore', () => {
   });
 });
 
+describe('ConfigStore TIR context', () => {
+  async function createStoreWithFile(contents: unknown): Promise<{
+    configPath: string;
+    store: ConfigStore;
+  }> {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'e2ectl-config-'));
+    const configPath = path.join(root, '.e2e', 'config.json');
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify(contents), 'utf8');
+    await chmod(configPath, 0o600);
+
+    return { configPath, store: new ConfigStore({ configPath }) };
+  }
+
+  it('reads a config file written before the TIR context existed', async () => {
+    const oldConfig = {
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-prod',
+          auth_token: 'auth-prod',
+          default_location: 'Chennai',
+          default_project_id: '46429'
+        }
+      }
+    };
+    const { configPath, store } = await createStoreWithFile(oldConfig);
+
+    await expect(store.read()).resolves.toEqual(oldConfig);
+    expect(JSON.parse(await readFile(configPath, 'utf8'))).toEqual(oldConfig);
+  });
+
+  it('saves a trimmed TIR context and drops empty values', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'e2ectl-config-'));
+    const store = new ConfigStore({
+      configPath: path.join(root, '.e2e', 'config.json')
+    });
+
+    await store.upsertProfile('prod', {
+      api_key: 'api-prod',
+      auth_token: 'auth-prod',
+      tir: { account_id: ' 1234 ', location: '', project_id: '91011' }
+    });
+    await store.upsertProfile('dev', {
+      api_key: 'api-dev',
+      auth_token: 'auth-dev',
+      tir: { account_id: ' ' }
+    });
+
+    const config = await store.read();
+
+    expect(config.profiles.prod?.tir).toEqual({
+      account_id: '1234',
+      project_id: '91011'
+    });
+    expect(config.profiles.dev).toEqual({
+      api_key: 'api-dev',
+      auth_token: 'auth-dev'
+    });
+  });
+
+  it('keeps the TIR context when the MyAccount defaults change', async () => {
+    const { store } = await createStoreWithFile({
+      profiles: {
+        prod: {
+          api_key: 'api-prod',
+          auth_token: 'auth-prod',
+          tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
+        }
+      }
+    });
+
+    const nextConfig = await store.updateProfile('prod', {
+      default_location: 'Chennai',
+      default_project_id: '46429'
+    });
+
+    expect(nextConfig.profiles.prod?.tir).toEqual({
+      account_id: '1234',
+      location: 'Delhi',
+      project_id: '91011'
+    });
+  });
+
+  it.each([
+    [
+      'not an object',
+      'not-an-object',
+      'Profile "prod" field "tir" must be an object when present.'
+    ],
+    [
+      'a field that is not text',
+      { project_id: 91011 },
+      'Profile "prod" field "tir.project_id" must be a string when present.'
+    ]
+  ])('rejects a TIR context that is %s', async (_label, tir, problem) => {
+    const { store } = await createStoreWithFile({
+      profiles: {
+        prod: { api_key: 'api-prod', auth_token: 'auth-prod', tir }
+      }
+    });
+
+    await expect(store.read()).rejects.toMatchObject({
+      code: 'CONFIG_INVALID_SHAPE',
+      exitCode: EXIT_CODES.config,
+      details: expect.arrayContaining([`Problem: ${problem}`]) as unknown
+    });
+  });
+});
+
 describe('ConfigStore – atomic write guarantees', () => {
   const baseConfig: ConfigFile = {
     profiles: {
