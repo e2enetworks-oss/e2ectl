@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl reserved-ip` lists, allocates, inspects, attaches, detaches, reserves, and deletes MyAccount reserved IP addresses.
+`e2ectl myaccount reserved-ip` lists, allocates, inspects, attaches, detaches, reserves, and deletes MyAccount reserved IP addresses.
 
 ## Before You Start
 
@@ -14,43 +14,43 @@
 ### List Reserved IPs
 
 ```bash
-e2ectl reserved-ip list
+e2ectl myaccount reserved-ip list
 ```
 
 ### Inspect One Reserved IP
 
 ```bash
-e2ectl reserved-ip get <ip-address>
+e2ectl myaccount reserved-ip get <ip-address>
 ```
 
 ### Allocate A New Reserved IP
 
 ```bash
-e2ectl reserved-ip create
+e2ectl myaccount reserved-ip create
 ```
 
 ### Preserve A Node's Current Public IP
 
 ```bash
-e2ectl reserved-ip reserve node <node-id>
+e2ectl myaccount reserved-ip reserve node <node-id>
 ```
 
 ### Attach A Reserved IP To A Node
 
 ```bash
-e2ectl reserved-ip attach node <ip-address> --node-id <node-id>
+e2ectl myaccount reserved-ip attach node <ip-address> --node-id <node-id>
 ```
 
 ### Detach A Reserved IP From A Node
 
 ```bash
-e2ectl reserved-ip detach node <ip-address> --node-id <node-id>
+e2ectl myaccount reserved-ip detach node <ip-address> --node-id <node-id>
 ```
 
 ### Delete A Reserved IP
 
 ```bash
-e2ectl reserved-ip delete <ip-address>
+e2ectl myaccount reserved-ip delete <ip-address>
 ```
 
 ## Examples
@@ -58,13 +58,13 @@ e2ectl reserved-ip delete <ip-address>
 Delete a reserved IP without an interactive confirmation:
 
 ```bash
-e2ectl reserved-ip delete <ip-address> --force
+e2ectl myaccount reserved-ip delete <ip-address> --force
 ```
 
 Capture reserved IP inventory for an automation step:
 
 ```bash
-e2ectl --json reserved-ip list
+e2ectl --json myaccount reserved-ip list
 ```
 
 ## Automation Notes

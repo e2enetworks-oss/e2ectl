@@ -139,7 +139,7 @@ Required smoke env vars:
 - `E2ECTL_SMOKE_UPGRADE_PLAN`
 - `E2ECTL_SMOKE_UPGRADE_IMAGE`
 
-For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full `items[].plan` value from `e2ectl --json node catalog plans ...`, not the shorter `sku` label.
+For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full `items[].plan` value from `e2ectl --json myaccount node catalog plans ...`, not the shorter `sku` label.
 
 Optional smoke env vars:
 
@@ -193,7 +193,7 @@ Cleanup behavior:
 
 - cleanup still tries the built CLI first for supported delete and detach flows
 - it falls back to direct clients only when CLI cleanup fails
-- saved image cleanup should use `e2ectl image delete` first and fall back to the cleanup-only direct client path only if CLI cleanup fails
+- saved image cleanup should use `e2ectl myaccount image delete` first and fall back to the cleanup-only direct client path only if CLI cleanup fails
 - already-gone cleanup responses are treated as successful so interrupted smoke runs can be replayed safely
 
 ### DBaaS Destructive Lane

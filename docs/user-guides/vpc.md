@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl vpc` discovers billing plans, creates VPC networks, lists and inspects them, and deletes them. VPC attach and detach flows use `e2ectl node action vpc`.
+`e2ectl myaccount vpc` discovers billing plans, creates VPC networks, lists and inspects them, and deletes them. VPC attach and detach flows use `e2ectl myaccount node action vpc`.
 
 ## Before You Start
 
@@ -15,20 +15,20 @@
 ### Discover VPC Billing Options
 
 ```bash
-e2ectl vpc plans
+e2ectl myaccount vpc plans
 ```
 
 ### List And Inspect VPCs
 
 ```bash
-e2ectl vpc list
-e2ectl vpc get <vpc-id>
+e2ectl myaccount vpc list
+e2ectl myaccount vpc get <vpc-id>
 ```
 
 ### Create A VPC
 
 ```bash
-e2ectl vpc create \
+e2ectl myaccount vpc create \
   --name <vpc-name> \
   --billing-type hourly \
   --cidr-source e2e
@@ -41,8 +41,8 @@ For committed billing, add `--committed-plan-id <committed-plan-id>` and, if nee
 ### Attach Or Detach A VPC From A Node
 
 ```bash
-e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
-e2ectl node action vpc detach <node-id> --vpc-id <vpc-id>
+e2ectl myaccount node action vpc attach <node-id> --vpc-id <vpc-id>
+e2ectl myaccount node action vpc detach <node-id> --vpc-id <vpc-id>
 ```
 
 Add `--subnet-id <subnet-id>` or `--private-ip <private-ip>` only when your workflow needs them.
@@ -50,7 +50,7 @@ Add `--subnet-id <subnet-id>` or `--private-ip <private-ip>` only when your work
 ### Delete A VPC
 
 ```bash
-e2ectl vpc delete <vpc-id>
+e2ectl myaccount vpc delete <vpc-id>
 ```
 
 ## Examples
@@ -58,7 +58,7 @@ e2ectl vpc delete <vpc-id>
 Create a VPC with a custom CIDR:
 
 ```bash
-e2ectl vpc create \
+e2ectl myaccount vpc create \
   --name <vpc-name> \
   --billing-type hourly \
   --cidr-source custom \
@@ -68,7 +68,7 @@ e2ectl vpc create \
 Delete a VPC without the confirmation prompt:
 
 ```bash
-e2ectl vpc delete <vpc-id> --force
+e2ectl myaccount vpc delete <vpc-id> --force
 ```
 
 ## Automation Notes

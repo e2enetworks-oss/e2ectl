@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl ssh-key` creates, lists, inspects, and deletes saved SSH public keys. Attach flows use `e2ectl node action ssh-key`.
+`e2ectl myaccount ssh-key` creates, lists, inspects, and deletes saved SSH public keys. Attach flows use `e2ectl myaccount node action ssh-key`.
 
 ## Before You Start
 
@@ -14,14 +14,14 @@
 ### List And Inspect SSH Keys
 
 ```bash
-e2ectl ssh-key list
-e2ectl ssh-key get <ssh-key-id>
+e2ectl myaccount ssh-key list
+e2ectl myaccount ssh-key get <ssh-key-id>
 ```
 
 ### Create A Key From A File
 
 ```bash
-e2ectl ssh-key create \
+e2ectl myaccount ssh-key create \
   --label <key-label> \
   --public-key-file ~/.ssh/id_ed25519.pub
 ```
@@ -29,7 +29,7 @@ e2ectl ssh-key create \
 ### Create A Key From Stdin
 
 ```bash
-cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
+cat ~/.ssh/id_ed25519.pub | e2ectl myaccount ssh-key create \
   --label <key-label> \
   --public-key-file -
 ```
@@ -37,7 +37,7 @@ cat ~/.ssh/id_ed25519.pub | e2ectl ssh-key create \
 ### Attach Saved SSH Keys To A Node
 
 ```bash
-e2ectl node action ssh-key attach <node-id> \
+e2ectl myaccount node action ssh-key attach <node-id> \
   --ssh-key-id <ssh-key-id>
 ```
 
@@ -46,7 +46,7 @@ Repeat `--ssh-key-id` to attach more than one key.
 ### Delete A Saved SSH Key
 
 ```bash
-e2ectl ssh-key delete <ssh-key-id>
+e2ectl myaccount ssh-key delete <ssh-key-id>
 ```
 
 ## Examples
@@ -54,13 +54,13 @@ e2ectl ssh-key delete <ssh-key-id>
 Capture SSH key inventory for automation:
 
 ```bash
-e2ectl --json ssh-key list
+e2ectl --json myaccount ssh-key list
 ```
 
 Delete a key without the confirmation prompt:
 
 ```bash
-e2ectl ssh-key delete <ssh-key-id> --force
+e2ectl myaccount ssh-key delete <ssh-key-id> --force
 ```
 
 ## Automation Notes

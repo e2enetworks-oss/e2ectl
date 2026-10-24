@@ -4,7 +4,7 @@ This workflow covers the common follow-up path after a node already exists: add 
 
 ## Before You Start
 
-- Confirm the target node id with `e2ectl node list`.
+- Confirm the target node id with `e2ectl myaccount node list`.
 - Decide which resources you actually need. Not every node needs every attachment type.
 - Keep the workflow explicit so later cleanup is straightforward.
 
@@ -13,13 +13,13 @@ This workflow covers the common follow-up path after a node already exists: add 
 Discover the size and billing option first:
 
 ```bash
-e2ectl volume plans --size <size-gb>
+e2ectl myaccount volume plans --size <size-gb>
 ```
 
 Create the volume:
 
 ```bash
-e2ectl volume create \
+e2ectl myaccount volume create \
   --name <volume-name> \
   --size <size-gb> \
   --billing-type hourly
@@ -28,7 +28,7 @@ e2ectl volume create \
 Attach it to the node:
 
 ```bash
-e2ectl node action volume attach <node-id> --volume-id <volume-id>
+e2ectl myaccount node action volume attach <node-id> --volume-id <volume-id>
 ```
 
 ## 2. Attach A VPC
@@ -36,13 +36,13 @@ e2ectl node action volume attach <node-id> --volume-id <volume-id>
 Review the available billing options:
 
 ```bash
-e2ectl vpc plans
+e2ectl myaccount vpc plans
 ```
 
 Create the VPC:
 
 ```bash
-e2ectl vpc create \
+e2ectl myaccount vpc create \
   --name <vpc-name> \
   --billing-type hourly \
   --cidr-source e2e
@@ -51,7 +51,7 @@ e2ectl vpc create \
 Attach it to the node:
 
 ```bash
-e2ectl node action vpc attach <node-id> --vpc-id <vpc-id>
+e2ectl myaccount node action vpc attach <node-id> --vpc-id <vpc-id>
 ```
 
 Add `--subnet-id <subnet-id>` or `--private-ip <private-ip>` only when your network design calls for them.
@@ -61,14 +61,14 @@ Add `--subnet-id <subnet-id>` or `--private-ip <private-ip>` only when your netw
 Allocate a new reserved IP or preserve the node's current public IP:
 
 ```bash
-e2ectl reserved-ip create
-e2ectl reserved-ip reserve node <node-id>
+e2ectl myaccount reserved-ip create
+e2ectl myaccount reserved-ip reserve node <node-id>
 ```
 
 Attach the reserved IP to the node:
 
 ```bash
-e2ectl reserved-ip attach node <ip-address> --node-id <node-id>
+e2ectl myaccount reserved-ip attach node <ip-address> --node-id <node-id>
 ```
 
 ## 4. Attach Security Groups And SSH Keys
@@ -76,7 +76,7 @@ e2ectl reserved-ip attach node <ip-address> --node-id <node-id>
 Create or update the security group:
 
 ```bash
-e2ectl security-group create \
+e2ectl myaccount security-group create \
   --name <security-group-name> \
   --rules-file ./rules.json
 ```
@@ -84,14 +84,14 @@ e2ectl security-group create \
 Attach it to the node:
 
 ```bash
-e2ectl node action security-group attach <node-id> \
+e2ectl myaccount node action security-group attach <node-id> \
   --security-group-id <security-group-id>
 ```
 
 Create an SSH key if needed:
 
 ```bash
-e2ectl ssh-key create \
+e2ectl myaccount ssh-key create \
   --label <key-label> \
   --public-key-file ~/.ssh/id_ed25519.pub
 ```
@@ -99,34 +99,34 @@ e2ectl ssh-key create \
 Attach it to the node:
 
 ```bash
-e2ectl node action ssh-key attach <node-id> \
+e2ectl myaccount node action ssh-key attach <node-id> \
   --ssh-key-id <ssh-key-id>
 ```
 
 ## 5. Verify What Changed
 
 ```bash
-e2ectl node get <node-id>
-e2ectl volume get <volume-id>
-e2ectl vpc get <vpc-id>
-e2ectl reserved-ip get <ip-address>
+e2ectl myaccount node get <node-id>
+e2ectl myaccount volume get <volume-id>
+e2ectl myaccount vpc get <vpc-id>
+e2ectl myaccount reserved-ip get <ip-address>
 ```
 
 ## 6. Detach Or Clean Up Later
 
 ```bash
-e2ectl node action volume detach <node-id> --volume-id <volume-id>
-e2ectl node action vpc detach <node-id> --vpc-id <vpc-id>
-e2ectl reserved-ip detach node <ip-address> --node-id <node-id>
-e2ectl node action security-group detach <node-id> --security-group-id <security-group-id>
+e2ectl myaccount node action volume detach <node-id> --volume-id <volume-id>
+e2ectl myaccount node action vpc detach <node-id> --vpc-id <vpc-id>
+e2ectl myaccount reserved-ip detach node <ip-address> --node-id <node-id>
+e2ectl myaccount node action security-group detach <node-id> --security-group-id <security-group-id>
 ```
 
 Then delete any disposable resources you no longer need:
 
 ```bash
-e2ectl volume delete <volume-id> --force
-e2ectl vpc delete <vpc-id> --force
-e2ectl reserved-ip delete <ip-address> --force
+e2ectl myaccount volume delete <volume-id> --force
+e2ectl myaccount vpc delete <vpc-id> --force
+e2ectl myaccount reserved-ip delete <ip-address> --force
 ```
 
 ## Related Guides

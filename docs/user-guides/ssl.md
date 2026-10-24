@@ -12,7 +12,7 @@ Every command accepts `--json` for machine-readable output.
 ## List Certificates
 
 ```bash
-e2ectl ssl list
+e2ectl myaccount ssl list
 ```
 
 Output columns:
@@ -32,7 +32,7 @@ Once you have the certificate ID from `ssl list`, pass it when creating or updat
 
 ```bash
 # Create an HTTPS load balancer
-e2ectl lb create \
+e2ectl myaccount lb create \
   --name secure-lb \
   --plan E2E-LB-2 \
   --frontend-protocol HTTPS \
@@ -42,12 +42,12 @@ e2ectl lb create \
   --backend-group-server web-1:192.168.1.1:8443
 
 # Switch an existing ALB to HTTPS
-e2ectl lb update <lbId> \
+e2ectl myaccount lb update <lbId> \
   --frontend-protocol HTTPS \
   --ssl-certificate-id <id>
 
 # Enable HTTPS with HTTP redirect
-e2ectl lb update <lbId> \
+e2ectl myaccount lb update <lbId> \
   --frontend-protocol BOTH \
   --ssl-certificate-id <id> \
   --redirect-http-to-https

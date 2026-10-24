@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl support-ticket` raises, tracks, and resolves MyAccount support tickets from the terminal: create a ticket, list and filter your tickets, read the reply thread, post replies with attachments, close, reopen, and review a ticket's activity timeline.
+`e2ectl myaccount support-ticket` raises, tracks, and resolves MyAccount support tickets from the terminal: create a ticket, list and filter your tickets, read the reply thread, post replies with attachments, close, reopen, and review a ticket's activity timeline.
 
 ## Before You Start
 
@@ -16,7 +16,7 @@
 ### Discover Department Ids
 
 ```bash
-e2ectl support-ticket departments
+e2ectl myaccount support-ticket departments
 ```
 
 Pass an id from the `ID` column as `create --department <department-id>`.
@@ -24,16 +24,16 @@ Pass an id from the `ID` column as `create --department <department-id>`.
 ### List And Inspect Tickets
 
 ```bash
-e2ectl support-ticket list
-e2ectl support-ticket get <ticket-id>
+e2ectl myaccount support-ticket list
+e2ectl myaccount support-ticket get <ticket-id>
 ```
 
 Filter the list:
 
 ```bash
-e2ectl support-ticket list --status open --priority urgent
-e2ectl support-ticket list --category Cloud --category Billing --year 2026
-e2ectl support-ticket list --page-no 2 --per-page 25
+e2ectl myaccount support-ticket list --status open --priority urgent
+e2ectl myaccount support-ticket list --category Cloud --category Billing --year 2026
+e2ectl myaccount support-ticket list --page-no 2 --per-page 25
 ```
 
 - `--status open` covers `Open`, `On Hold`, `Waiting on Customer`, and `Escalated`; `--status resolved` covers `Resolved` and `Closed`. You can also pass exact statuses (`New`, `Open`, `On Hold`, `Waiting on Customer`, `Escalated`, `Resolved`, `Closed`).
@@ -44,7 +44,7 @@ e2ectl support-ticket list --page-no 2 --per-page 25
 ### Read The Reply Thread
 
 ```bash
-e2ectl support-ticket get-replies <ticket-id>
+e2ectl myaccount support-ticket get-replies <ticket-id>
 ```
 
 Shows the original description plus every follow-up, with author, channel, and attachments.
@@ -52,7 +52,7 @@ Shows the original description plus every follow-up, with author, channel, and a
 ### Open A New Ticket
 
 ```bash
-e2ectl support-ticket create \
+e2ectl myaccount support-ticket create \
   --department <department-id> \
   --subject "<subject>" \
   --description "<description>" \
@@ -75,7 +75,7 @@ Category rules:
 ### Reply To A Ticket
 
 ```bash
-e2ectl support-ticket reply <ticket-id> --comment "<reply-body>"
+e2ectl myaccount support-ticket reply <ticket-id> --comment "<reply-body>"
 ```
 
 Add `--attachment <file>` (repeatable) to include screenshots or documents.
@@ -83,7 +83,7 @@ Add `--attachment <file>` (repeatable) to include screenshots or documents.
 ### Close A Ticket
 
 ```bash
-e2ectl support-ticket close <ticket-id> --comment "<closing-comment>"
+e2ectl myaccount support-ticket close <ticket-id> --comment "<closing-comment>"
 ```
 
 Closing posts the comment and resolves the ticket in a single call.
@@ -91,7 +91,7 @@ Closing posts the comment and resolves the ticket in a single call.
 ### Reopen A Ticket
 
 ```bash
-e2ectl support-ticket reopen <ticket-id> --comment "<reason-for-reopening>"
+e2ectl myaccount support-ticket reopen <ticket-id> --comment "<reason-for-reopening>"
 ```
 
 Reopening posts the comment and moves a closed ticket back into an active state.
@@ -99,8 +99,8 @@ Reopening posts the comment and moves a closed ticket back into an active state.
 ### Review A Ticket's Timeline
 
 ```bash
-e2ectl support-ticket timeline <ticket-id>
-e2ectl support-ticket timeline <ticket-id> --month 5 --year 2026
+e2ectl myaccount support-ticket timeline <ticket-id>
+e2ectl myaccount support-ticket timeline <ticket-id> --month 5 --year 2026
 ```
 
 Lists the ticket's activity (creation, status changes, comments) in chronological order. Narrow the view with the optional `--month` (1-12) and `--year` filters.
@@ -110,9 +110,9 @@ Lists the ticket's activity (creation, status changes, comments) in chronologica
 SOC and Abuse tickets are tracked separately. Add the matching flag to `get`, `get-replies`, or `reply` so the request is routed correctly:
 
 ```bash
-e2ectl support-ticket get <ticket-id> --soc-ticket
-e2ectl support-ticket get-replies <ticket-id> --abuse-ticket
-e2ectl support-ticket reply <ticket-id> --abuse-ticket --comment "..."
+e2ectl myaccount support-ticket get <ticket-id> --soc-ticket
+e2ectl myaccount support-ticket get-replies <ticket-id> --abuse-ticket
+e2ectl myaccount support-ticket reply <ticket-id> --abuse-ticket --comment "..."
 ```
 
 `--soc-ticket` and `--abuse-ticket` are mutually exclusive.
@@ -122,7 +122,7 @@ e2ectl support-ticket reply <ticket-id> --abuse-ticket --comment "..."
 Open a Cloud ticket with linked resources — `--resource` takes `id:name` or `id:name:ip` and is repeatable:
 
 ```bash
-e2ectl support-ticket create \
+e2ectl myaccount support-ticket create \
   --department 1 \
   --subject "Node 4567 reachability" \
   --description "Node has been unreachable since 14:00 IST." \
@@ -136,7 +136,7 @@ e2ectl support-ticket create \
 Open a Billing ticket with CCs and an attached invoice:
 
 ```bash
-e2ectl support-ticket create \
+e2ectl myaccount support-ticket create \
   --department 2 \
   --subject "Invoice clarification for April 2026" \
   --description "Please review the highlighted line items in the attached invoice." \
@@ -151,7 +151,7 @@ e2ectl support-ticket create \
 Post a reply with a screenshot:
 
 ```bash
-e2ectl support-ticket reply <ticket-id> \
+e2ectl myaccount support-ticket reply <ticket-id> \
   --comment "See the attached screenshot from the dashboard." \
   --attachment ./dashboard.jpg
 ```
@@ -159,7 +159,7 @@ e2ectl support-ticket reply <ticket-id> \
 Capture ticket inventory for automation:
 
 ```bash
-e2ectl --json support-ticket list --status open
+e2ectl --json myaccount support-ticket list --status open
 ```
 
 ## Automation Notes

@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl project` manages account-scoped MyAccount projects. These commands need authentication, but they do not require `--project-id` or `--location`.
+`e2ectl myaccount project` manages account-scoped MyAccount projects. These commands need authentication, but they do not require `--project-id` or `--location`.
 
 ## Before You Start
 
@@ -14,25 +14,25 @@
 ### List Accessible Projects
 
 ```bash
-e2ectl project list
+e2ectl myaccount project list
 ```
 
 ### Create A Project
 
 ```bash
-e2ectl project create --name <project-name>
+e2ectl myaccount project create --name <project-name>
 ```
 
 ### Star A Project
 
 ```bash
-e2ectl project star <project-id>
+e2ectl myaccount project star <project-id>
 ```
 
 ### Unstar A Project
 
 ```bash
-e2ectl project unstar <project-id>
+e2ectl myaccount project unstar <project-id>
 ```
 
 ## Examples
@@ -40,13 +40,13 @@ e2ectl project unstar <project-id>
 List projects with a specific saved alias:
 
 ```bash
-e2ectl project list --alias <profile-alias>
+e2ectl myaccount project list --alias <profile-alias>
 ```
 
 Capture project output for scripts:
 
 ```bash
-e2ectl --json project list
+e2ectl --json myaccount project list
 ```
 
 ## Automation Notes

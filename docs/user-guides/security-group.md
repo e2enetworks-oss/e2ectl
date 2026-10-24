@@ -2,7 +2,7 @@
 
 ## What This Command Group Does
 
-`e2ectl security-group` creates, updates, lists, inspects, and deletes security groups. Attach and detach flows use `e2ectl node action security-group`.
+`e2ectl myaccount security-group` creates, updates, lists, inspects, and deletes security groups. Attach and detach flows use `e2ectl myaccount node action security-group`.
 
 ## Before You Start
 
@@ -14,14 +14,14 @@
 ### List And Inspect Security Groups
 
 ```bash
-e2ectl security-group list
-e2ectl security-group get <security-group-id>
+e2ectl myaccount security-group list
+e2ectl myaccount security-group get <security-group-id>
 ```
 
 ### Create A Security Group
 
 ```bash
-e2ectl security-group create \
+e2ectl myaccount security-group create \
   --name <security-group-name> \
   --rules-file ./rules.json
 ```
@@ -29,7 +29,7 @@ e2ectl security-group create \
 ### Update A Security Group
 
 ```bash
-e2ectl security-group update <security-group-id> \
+e2ectl myaccount security-group update <security-group-id> \
   --name <security-group-name> \
   --rules-file ./rules.json
 ```
@@ -37,10 +37,10 @@ e2ectl security-group update <security-group-id> \
 ### Attach Or Detach Security Groups On A Node
 
 ```bash
-e2ectl node action security-group attach <node-id> \
+e2ectl myaccount node action security-group attach <node-id> \
   --security-group-id <security-group-id>
 
-e2ectl node action security-group detach <node-id> \
+e2ectl myaccount node action security-group detach <node-id> \
   --security-group-id <security-group-id>
 ```
 
@@ -49,7 +49,7 @@ Repeat `--security-group-id` to attach or detach more than one group in a single
 ### Delete A Security Group
 
 ```bash
-e2ectl security-group delete <security-group-id>
+e2ectl myaccount security-group delete <security-group-id>
 ```
 
 ## Examples
@@ -57,7 +57,7 @@ e2ectl security-group delete <security-group-id>
 Create a default security group with a description:
 
 ```bash
-e2ectl security-group create \
+e2ectl myaccount security-group create \
   --name <security-group-name> \
   --rules-file ./rules.json \
   --description "<description>" \
@@ -67,7 +67,7 @@ e2ectl security-group create \
 Read the rules JSON from stdin:
 
 ```bash
-cat ./rules.json | e2ectl security-group create \
+cat ./rules.json | e2ectl myaccount security-group create \
   --name <security-group-name> \
   --rules-file -
 ```

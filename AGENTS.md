@@ -71,14 +71,10 @@ npm pack --dry-run
 Keep the source tree organized around these domains:
 
 - `src/app` - bootstrap, Commander wiring, runtime, shared dependencies
-- `src/core` - low-level shared primitives only
-- `src/myaccount` - transport, API envelope typing, credential validation, centralized API failure handling
-- `src/config` - alias storage, imports, default alias/context resolution
-- `src/node` - node workflows
-- `src/reserved-ip` - reserved IP workflows
-- `src/volume` - block storage workflows
-- `src/vpc` - VPC workflows
-- `src/ssh-key` - SSH key workflows
+- `src/core` - low-level shared primitives only, including waiting
+- `src/http` - transport, API envelope typing, centralized API failure handling
+- `src/config` - alias storage, imports, credential validation, default alias/context resolution
+- `src/myaccount` - the `e2ectl myaccount` group: `api.ts`, `index.ts`, and one folder per product (`node`, `reserved-ip`, `volume`, `vpc`, `ssh-key`, and so on)
 
 Rules:
 
@@ -86,8 +82,9 @@ Rules:
 - Services orchestrate validation, defaults, prompts, and resolution. They should not own rendering.
 - Clients own endpoint paths and response parsing.
 - Formatters own human-readable output and deterministic `--json` output.
-- Keep generic API execution and failure handling centralized in `src/myaccount/transport.ts`.
-- Cross-domain imports should go through each domain's `index.ts`.
+- Keep generic API execution and failure handling centralized in `src/http/transport.ts`.
+- Cross-product imports go through each product's `index.ts`; ESLint enforces this.
+- Start a new product with `make new-domain <platform>/<product>`.
 
 ## Documentation Contract
 
@@ -100,7 +97,7 @@ Rules:
 ## Git And Release
 
 - Use `gh` for PR and GitHub Actions workflows in this repository.
-- Unless the user asks otherwise, raise feature PRs against `develop`.
+- Unless the user asks otherwise, raise feature PRs against `develop`. While 1.0 is being built, 1.0 work targets `platform-split`.
 - Use Conventional Commits when committing.
 - Release Please owns versioning and release PRs on `main`.
 
