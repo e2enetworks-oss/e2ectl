@@ -63,7 +63,7 @@ async function listPlansOrExplain(
       throw new CliError(`TIR does not know image version ${imageVersionId}.`, {
         cause: error,
         code: 'TIR_IMAGE_VERSION_NOT_FOUND',
-        details: [`API said: ${error.message}`, ...error.details],
+        details: error.details,
         exitCode: EXIT_CODES.usage,
         suggestion: `Run \`${formatTirCommand('image list')}\` and pass a listed version id with --image-version-id.`
       });
