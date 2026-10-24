@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { RuleTester } from 'oxlint/plugins-dev';
 
 import { productImportsRule } from '../../../scripts/helpers/product-imports-rule.mjs';
@@ -65,6 +67,13 @@ ruleTester.run('product-imports', productImportsRule, {
       code: "export { NodeApiClient } from '../node/client.js';",
       filename: '/repo/src/myaccount/vpc/index.ts',
       options,
+      errors: [{ messageId: 'deepImport' }]
+    },
+    {
+      name: 'a source folder given relative to the repo root',
+      code: "import type { VpcSummary } from '../vpc/types.js';",
+      filename: path.join(process.cwd(), 'src/myaccount/dbaas/mappers.ts'),
+      options: [{ sourceRoot: 'src' }],
       errors: [{ messageId: 'deepImport' }]
     },
     {

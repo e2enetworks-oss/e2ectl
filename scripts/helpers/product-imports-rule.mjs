@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..');
+
 // A product is a folder two levels below src, such as src/myaccount/node.
 // Code outside a product may use it only through the product's index.ts, so
 // each product can change its other files without breaking its neighbours.
@@ -24,9 +26,10 @@ export const productImportsRule = {
     ]
   },
   create(context) {
-    // sourceRoot is relative to where lint runs (the repo root), so the
-    // config can stay a plain JSON file.
-    const sourceRoot = path.resolve(context.cwd, context.options[0].sourceRoot);
+    // sourceRoot is relative to the repo root, found from this file's own
+    // place (scripts/helpers), so the rule works the same whichever folder
+    // lint or an editor starts from.
+    const sourceRoot = path.resolve(REPO_ROOT, context.options[0].sourceRoot);
     const filename = context.filename;
     const ownProduct = findProduct(sourceRoot, filename);
 

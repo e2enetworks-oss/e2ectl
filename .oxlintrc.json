@@ -1,16 +1,17 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true
+  },
   "plugins": ["eslint", "typescript"],
   "categories": {
-    "correctness": "off",
-    "suspicious": "off",
-    "pedantic": "off",
-    "perf": "off",
-    "style": "off",
-    "restriction": "off",
-    "nursery": "off"
+    "correctness": "off"
   },
-  "ignorePatterns": ["coverage/**", "dist/**", "node_modules/**", ".tmp/**"],
+  "env": {
+    "node": true,
+    "es2022": true
+  },
   "jsPlugins": ["./scripts/helpers/oxlint-e2ectl-plugin.mjs"],
   "rules": {
     "typescript/await-thenable": "error",
@@ -51,14 +52,7 @@
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
     "typescript/no-unsafe-unary-minus": "error",
-    "eslint/no-unused-expressions": [
-      "error",
-      {
-        "allowShortCircuit": false,
-        "allowTaggedTemplates": false,
-        "allowTernary": false
-      }
-    ],
+    "eslint/no-unused-expressions": "error",
     "eslint/no-unused-vars": "error",
     "typescript/no-wrapper-object-types": "error",
     "typescript/only-throw-error": "error",
@@ -76,73 +70,35 @@
     "eslint/no-compare-neg-zero": "error",
     "eslint/no-cond-assign": ["error", "except-parens"],
     "eslint/no-constant-binary-expression": "error",
-    "eslint/no-constant-condition": [
-      "error",
-      {
-        "checkLoops": "allExceptWhileTrue"
-      }
-    ],
+    "eslint/no-constant-condition": "error",
     "eslint/no-control-regex": "error",
     "eslint/no-debugger": "error",
     "eslint/no-delete-var": "error",
     "eslint/no-dupe-else-if": "error",
     "eslint/no-duplicate-case": "error",
-    "eslint/no-empty": [
-      "error",
-      {
-        "allowEmptyCatch": false
-      }
-    ],
+    "eslint/no-empty": "error",
     "eslint/no-empty-character-class": "error",
-    "eslint/no-empty-pattern": [
-      "error",
-      {
-        "allowObjectPatternsAsParameters": false
-      }
-    ],
+    "eslint/no-empty-pattern": "error",
     "eslint/no-empty-static-block": "error",
     "eslint/no-ex-assign": "error",
-    "eslint/no-extra-boolean-cast": ["error", {}],
-    "eslint/no-fallthrough": [
-      "error",
-      {
-        "allowEmptyCase": false,
-        "reportUnusedFallthroughComment": false
-      }
-    ],
-    "eslint/no-global-assign": [
-      "error",
-      {
-        "exceptions": []
-      }
-    ],
-    "eslint/no-invalid-regexp": ["error", {}],
+    "eslint/no-extra-boolean-cast": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/no-global-assign": "error",
+    "eslint/no-invalid-regexp": "error",
     "eslint/no-irregular-whitespace": [
       "error",
       {
-        "skipComments": false,
         "skipJSXText": false,
         "skipRegExps": false,
-        "skipStrings": true,
         "skipTemplates": false
       }
     ],
     "eslint/no-loss-of-precision": "error",
-    "eslint/no-misleading-character-class": [
-      "error",
-      {
-        "allowEscape": false
-      }
-    ],
+    "eslint/no-misleading-character-class": "error",
     "eslint/no-nonoctal-decimal-escape": "error",
     "eslint/no-prototype-builtins": "error",
     "eslint/no-regex-spaces": "error",
-    "eslint/no-self-assign": [
-      "error",
-      {
-        "props": true
-      }
-    ],
+    "eslint/no-self-assign": "error",
     "eslint/no-shadow-restricted-names": [
       "error",
       {
@@ -151,46 +107,19 @@
     ],
     "eslint/no-sparse-arrays": "error",
     "eslint/no-unsafe-finally": "error",
-    "eslint/no-unsafe-optional-chaining": [
-      "error",
-      {
-        "disallowArithmeticOperators": false
-      }
-    ],
+    "eslint/no-unsafe-optional-chaining": "error",
     "eslint/no-unused-labels": "error",
     "eslint/no-unused-private-class-members": "error",
     "eslint/no-useless-backreference": "error",
     "eslint/no-useless-catch": "error",
-    "eslint/no-useless-escape": [
-      "error",
-      {
-        "allowRegexCharacters": []
-      }
-    ],
+    "eslint/no-useless-escape": "error",
     "eslint/no-var": "error",
-    "eslint/prefer-const": [
-      "error",
-      {
-        "destructuring": "any",
-        "ignoreReadBeforeAssign": false
-      }
-    ],
+    "eslint/prefer-const": "error",
     "eslint/prefer-rest-params": "error",
     "eslint/prefer-spread": "error",
     "eslint/require-yield": "error",
-    "eslint/use-isnan": [
-      "error",
-      {
-        "enforceForIndexOf": false,
-        "enforceForSwitchCase": true
-      }
-    ],
-    "eslint/valid-typeof": [
-      "error",
-      {
-        "requireStringLiterals": false
-      }
-    ]
+    "eslint/use-isnan": "error",
+    "eslint/valid-typeof": "error"
   },
   "overrides": [
     {
@@ -266,12 +195,7 @@
         "typescript/restrict-template-expressions": "off",
         "typescript/unbound-method": "off",
         "eslint/constructor-super": "error",
-        "eslint/getter-return": [
-          "error",
-          {
-            "allowImplicit": false
-          }
-        ],
+        "eslint/getter-return": "error",
         "eslint/no-class-assign": "error",
         "eslint/no-const-assign": "error",
         "eslint/no-dupe-class-members": "error",
@@ -280,36 +204,14 @@
         "eslint/no-import-assign": "error",
         "eslint/no-new-native-nonconstructor": "error",
         "eslint/no-obj-calls": "error",
-        "eslint/no-redeclare": [
-          "error",
-          {
-            "builtinGlobals": true
-          }
-        ],
+        "eslint/no-redeclare": "error",
         "eslint/no-setter-return": "error",
         "eslint/no-this-before-super": "error",
-        "eslint/no-undef": [
-          "error",
-          {
-            "typeof": false
-          }
-        ],
+        "eslint/no-undef": "error",
         "eslint/no-unreachable": "error",
-        "eslint/no-unsafe-negation": [
-          "error",
-          {
-            "enforceForOrderingRelations": false
-          }
-        ],
+        "eslint/no-unsafe-negation": "error",
         "eslint/no-with": "error"
-      },
-      "env": {
-        "node": true
       }
     }
-  ],
-  "env": {
-    "node": true,
-    "es2022": true
-  }
+  ]
 }
