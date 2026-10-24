@@ -30,7 +30,6 @@ vi.mock('../../manual/helpers/smoke-commands.js', () => ({
     const normalized = value.trim();
     return normalized.length === 0 || normalized === '[]' ? null : normalized;
   }),
-  retryOnServerError: vi.fn((run: () => Promise<unknown>) => run()),
   runJsonCommand: vi.fn(),
   waitForNodeReadiness: vi.fn(),
   waitForNodeStatus: vi.fn(),
@@ -176,7 +175,8 @@ describe('manual smoke step helpers', () => {
         '--security-group-id',
         '88'
       ],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(manifest.security_group_id).toBe(88);
     expect(manifest.security_group_attached_node_id).toBeNull();
@@ -234,7 +234,8 @@ describe('manual smoke step helpers', () => {
         '--node-id',
         '101'
       ],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(manifest.addon_reserved_ip).toBe('203.0.113.20');
     expect(manifest.addon_reserved_ip_attached_node_id).toBeNull();
@@ -360,7 +361,8 @@ describe('manual smoke step helpers', () => {
         '--volume-id',
         '8801'
       ],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(waitForVolumeStatusMock).toHaveBeenNthCalledWith(
       1,
@@ -499,7 +501,8 @@ describe('manual smoke step helpers', () => {
         '--vpc-id',
         '23082'
       ],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(manifest.vpc_id).toBe(23082);
     expect(manifest.vpc_attached_node_id).toBeNull();
@@ -965,7 +968,8 @@ describe('manual smoke step helpers', () => {
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       2,
       ['myaccount', 'node', 'delete', '101', '--force'],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(manifest.preserved_reserved_ip).toBe('203.0.113.21');
     expect(manifest.node_deleted).toBe(true);
@@ -1009,7 +1013,8 @@ describe('manual smoke step helpers', () => {
     });
     expect(runJsonCommandMock).toHaveBeenCalledWith(
       ['myaccount', 'node', 'action', 'public-ip', 'detach', '101', '--force'],
-      context.smokeEnv
+      context.smokeEnv,
+      { retryWhileBusy: true }
     );
     expect(waitForNodeStatusMock).toHaveBeenCalledWith(101, context.smokeEnv, {
       acceptedStatuses: ['Running'],

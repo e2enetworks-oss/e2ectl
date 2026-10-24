@@ -1,7 +1,7 @@
 import {
   classifyCleanupError,
   classifyCleanupMessage,
-  shouldRetryNodeDeleteError
+  isBusyRefusal
 } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
 
 describe('manual smoke cleanup classification', () => {
@@ -24,16 +24,16 @@ describe('manual smoke cleanup classification', () => {
   });
 });
 
-describe('shouldRetryNodeDeleteError', () => {
+describe('isBusyRefusal', () => {
   it('retries while E2E says the node is busy', () => {
     expect(
-      shouldRetryNodeDeleteError(
+      isBusyRefusal(
         'Errors: "Invalid node state to perform \'Delete\' action."'
       )
     ).toBe(true);
   });
 
-  it('does not retry other delete failures', () => {
-    expect(shouldRetryNodeDeleteError('Node not found.')).toBe(false);
+  it('does not treat other failures as busy', () => {
+    expect(isBusyRefusal('Node not found.')).toBe(false);
   });
 });

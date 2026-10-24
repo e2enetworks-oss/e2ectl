@@ -60,10 +60,11 @@ export function isAlreadyGoneMessage(message) {
   return /\bnot found\b/i.test(message) || /\balready gone\b/i.test(message);
 }
 
-// E2E refuses to delete a node that is still busy (for example just after a
-// volume detach); the same delete works once the node settles.
-export function shouldRetryNodeDeleteError(message) {
-  return /invalid node state/i.test(message);
+// E2E refuses some changes for a while after an earlier change to the same
+// resource (a detach soon after attach, a node delete soon after a detach)
+// and accepts the same request later. These are the ways it says so.
+export function isBusyRefusal(message) {
+  return /HTTP status: 500|invalid node state|try again/i.test(message);
 }
 
 export function shouldRetryVpcDeleteError(message) {
@@ -545,10 +546,7 @@ async function deleteNodeWithRetry(nodeClient, nodeId) {
       await nodeClient.deleteNode(nodeId);
       return;
     } catch (error) {
-      if (
-        !shouldRetryNodeDeleteError(formatError(error)) ||
-        Date.now() > deadline
-      ) {
+      if (!isBusyRefusal(formatError(error)) || Date.now() > deadline) {
         throw error;
       }
     }

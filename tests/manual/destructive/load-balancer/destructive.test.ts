@@ -305,8 +305,8 @@ describeManual('manual LB destructive built CLI checks', () => {
           server: lbConfig.backendServer.replace(/^[^:]+/, 'srv-extra')
         });
 
-        // 9. List backend groups
-        await listBackendGroupsStep(context, lbId);
+        // 9. List backend groups until the new one shows up
+        await listBackendGroupsStep(context, lbId, `${runPrefix}-grp`);
 
         // 10. Update backend group (rename)
         await updateBackendGroupStep(context, lbId, {
@@ -648,20 +648,35 @@ async function addBackendGroupStep(
   }
 }
 
+// Lists the groups until the one just added shows up. E2E can drop a change
+// made while it is still applying an earlier one (such as a VPC detach), so
+// this fails with a clear message instead of letting the next step report
+// "not found".
 async function listBackendGroupsStep(
   context: LbTestContext,
-  lbId: number
+  lbId: number,
+  expectedGroupName: string
 ): Promise<void> {
-  const result = await runJsonCommand<LbBackendGroupListJson>(
-    ['myaccount', 'lb', 'backend', 'group', 'list', String(lbId)],
-    context.lbEnv
-  );
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const result = await runJsonCommand<LbBackendGroupListJson>(
+      ['myaccount', 'lb', 'backend', 'group', 'list', String(lbId)],
+      context.lbEnv
+    );
 
-  if (result.action !== 'backend-group-list') {
-    throw new Error('Expected backend group list to succeed.');
+    if (result.action !== 'backend-group-list') {
+      throw new Error('Expected backend group list to succeed.');
+    }
+
+    if (result.backends.some((group) => group.name === expectedGroupName)) {
+      return;
+    }
+
+    await delay(15_000);
   }
 
-  expect(Array.isArray(result.backends)).toBe(true);
+  throw new Error(
+    `Backend group "${expectedGroupName}" was added but did not appear on load balancer ${lbId} within 3 minutes.`
+  );
 }
 
 async function updateBackendGroupStep(

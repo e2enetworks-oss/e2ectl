@@ -3,7 +3,6 @@ import { updateSmokeManifest } from './smoke-manifest.js';
 import {
   discoverAvailableVolumeSize,
   normalizeObservedPublicIp,
-  retryOnServerError,
   runJsonCommand,
   waitForNodeReadiness,
   waitForNodeStatus,
@@ -419,7 +418,8 @@ export async function runSecurityGroupSteps(
       '--security-group-id',
       String(securityGroupId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {
@@ -487,7 +487,8 @@ export async function runAddonReservedIpSteps(
       '--node-id',
       String(options.nodeId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {
@@ -587,22 +588,19 @@ export async function runVolumeSteps(
     description: 'Attached'
   });
 
-  const volumeDetach = await retryOnServerError(
-    () =>
-      runJsonCommand<VolumeAttachDetachJson>(
-        [
-          'myaccount',
-          'node',
-          'action',
-          'volume',
-          'detach',
-          String(options.nodeId),
-          '--volume-id',
-          String(volumeId)
-        ],
-        context.smokeEnv
-      ),
-    { attempts: 6, delayMs: 30_000 }
+  const volumeDetach = await runJsonCommand<VolumeAttachDetachJson>(
+    [
+      'myaccount',
+      'node',
+      'action',
+      'volume',
+      'detach',
+      String(options.nodeId),
+      '--volume-id',
+      String(volumeId)
+    ],
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -733,7 +731,8 @@ export async function runVpcSteps(
       '--vpc-id',
       String(vpcId)
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -965,7 +964,8 @@ export async function runNodePublicIpDetachStep(
       String(options.nodeId),
       '--force'
     ],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   if (
@@ -1017,7 +1017,8 @@ export async function runNodeDeleteSteps(
 
   await runJsonCommand(
     ['myaccount', 'node', 'delete', String(options.nodeId), '--force'],
-    context.smokeEnv
+    context.smokeEnv,
+    { retryWhileBusy: true }
   );
 
   await updateManifest(context, (manifest) => {

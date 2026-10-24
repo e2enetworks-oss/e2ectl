@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { isBusyRefusal } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
 import { runBuiltCli } from '../../helpers/process.js';
 import type { SmokeEnv } from './smoke-env.js';
 
@@ -30,6 +31,8 @@ export interface VolumeGetJson {
 }
 
 export interface SmokeJsonCommandOptions {
+  // For detach and delete steps only; see retryWhileBusy.
+  retryWhileBusy?: boolean;
   stdin?: string;
   timeoutMs?: number;
 }
@@ -63,6 +66,12 @@ export async function runJsonCommand<T>(
   smokeEnv: SmokeEnv,
   options: SmokeJsonCommandOptions = {}
 ): Promise<T> {
+  if (options.retryWhileBusy === true) {
+    return await retryWhileBusy(() =>
+      runJsonCommand<T>(args, smokeEnv, { ...options, retryWhileBusy: false })
+    );
+  }
+
   const result = await runBuiltCli(['--json', ...args], {
     env: smokeEnv.cliEnv,
     ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
@@ -265,20 +274,22 @@ function normalizeLifecycleStatus(status: string): string {
     .trim();
 }
 
-// Retries a command that E2E sometimes answers with a 500 while a resource
-// is still settling (for example a volume detach soon after attach); the
-// same request works a little later. Other failures are thrown at once.
-export async function retryOnServerError<T>(
+const BUSY_RETRY_ATTEMPTS = 6;
+const BUSY_RETRY_DELAY_MS = 30_000;
+
+// Retries while E2E answers "busy, try later" (see isBusyRefusal), up to
+// six tries 30 seconds apart. Any other failure is thrown at once. Only use
+// it for detach and delete steps: retrying a create could create twice.
+export async function retryWhileBusy<T>(
   run: () => Promise<T>,
-  options: { attempts: number; delayMs: number }
+  options = { attempts: BUSY_RETRY_ATTEMPTS, delayMs: BUSY_RETRY_DELAY_MS }
 ): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await run();
     } catch (error: unknown) {
-      const isServerError =
-        error instanceof Error && error.message.includes('HTTP status: 500');
-      if (!isServerError || attempt >= options.attempts) {
+      const busy = error instanceof Error && isBusyRefusal(error.message);
+      if (!busy || attempt >= options.attempts) {
         throw error;
       }
 
