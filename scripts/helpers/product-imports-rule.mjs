@@ -24,7 +24,9 @@ export const productImportsRule = {
     ]
   },
   create(context) {
-    const { sourceRoot } = context.options[0];
+    // sourceRoot is relative to where lint runs (the repo root), so the
+    // config can stay a plain JSON file.
+    const sourceRoot = path.resolve(context.cwd, context.options[0].sourceRoot);
     const filename = context.filename;
     const ownProduct = findProduct(sourceRoot, filename);
 

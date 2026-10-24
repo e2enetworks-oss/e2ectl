@@ -80,7 +80,7 @@ jobs:
         run: |
           make new-domain tir/foo
           npm run typecheck
-          npx eslint src/tir src/app tests/unit/tir tests/helpers
+          npx oxlint --type-aware --deny-warnings src/tir src/app tests/unit/tir tests/helpers
           npx vitest run tests/unit/tir/foo tests/unit/app
 
   verify-node-24:

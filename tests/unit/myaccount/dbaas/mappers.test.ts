@@ -106,21 +106,21 @@ describe('dbaas mappers', () => {
       normalizeDbaasStatusTitle({
         status: 'Running',
         status_title: 'Provisioning'
-      } as DbaasClusterSummary)
+      })
     ).toBe('Provisioning');
 
     expect(
       normalizeDbaasStatusTitle({
         status: 'Running',
         status_title: ''
-      } as DbaasClusterSummary)
+      })
     ).toBe('Running');
 
     expect(
       normalizeDbaasStatusTitle({
         status: '',
         status_title: ''
-      } as DbaasClusterSummary)
+      })
     ).toBeNull();
   });
 
@@ -182,15 +182,15 @@ describe('dbaas mappers', () => {
     expect(
       buildConnectionString('PostgreSQL', 'analytics', 'admin', {
         ...postgresNode,
-        port: null as unknown as string,
-        public_port: null as unknown as number
+        port: null,
+        public_port: null
       })
     ).toBe('psql -h pg.example.com -U admin -d analytics');
     expect(
       buildConnectionString('PostgreSQL', null, 'admin', {
         ...postgresNode,
-        port: null as unknown as string,
-        public_port: null as unknown as number
+        port: null,
+        public_port: null
       })
     ).toBe('psql -h pg.example.com -U admin');
     expect(

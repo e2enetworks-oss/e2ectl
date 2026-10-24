@@ -1,13 +1,10 @@
-import { RuleTester } from 'eslint';
-import tseslint from 'typescript-eslint';
+import { RuleTester } from 'oxlint/plugins-dev';
 
-import { productImportsRule } from '../../../scripts/helpers/eslint-product-imports.mjs';
+import { productImportsRule } from '../../../scripts/helpers/product-imports-rule.mjs';
 
 const sourceRoot = '/repo/src';
 const options = [{ sourceRoot }];
-const ruleTester = new RuleTester({
-  languageOptions: { parser: tseslint.parser }
-});
+const ruleTester = new RuleTester({ eslintCompat: true });
 
 ruleTester.run('product-imports', productImportsRule, {
   valid: [

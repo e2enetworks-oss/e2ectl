@@ -69,7 +69,7 @@ export class HttpTransport implements ApiTransport {
     this.apiName = options.apiName;
     this.credentials = credentials;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
-    this.fetchFn = options.fetchFn ?? (fetch as FetchLike);
+    this.fetchFn = options.fetchFn ?? fetch;
     this.projectContext = options.projectContext;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }

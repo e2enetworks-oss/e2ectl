@@ -4,7 +4,6 @@ import type {
 } from '../../../../src/config/index.js';
 import { DbaasService } from '../../../../src/myaccount/dbaas/service.js';
 import type { DbaasClient } from '../../../../src/myaccount/dbaas/index.js';
-import type { VpcClient } from '../../../../src/myaccount/vpc/index.js';
 
 function createConfig(): ConfigFile {
   return {
@@ -157,16 +156,15 @@ function createServiceFixture(options?: { isInteractive?: boolean }): {
   const service = new DbaasService({
     confirm,
     createDbaasClient,
-    createVpcClient: () =>
-      ({
-        attachNodeVpc: vi.fn(),
-        createVpc: vi.fn(),
-        deleteVpc: vi.fn(),
-        detachNodeVpc: vi.fn(),
-        getVpc,
-        listVpcPlans: vi.fn(),
-        listVpcs: vi.fn()
-      }) as unknown as VpcClient,
+    createVpcClient: () => ({
+      attachNodeVpc: vi.fn(),
+      createVpc: vi.fn(),
+      deleteVpc: vi.fn(),
+      detachNodeVpc: vi.fn(),
+      getVpc,
+      listVpcPlans: vi.fn(),
+      listVpcs: vi.fn()
+    }),
     isInteractive: options?.isInteractive ?? true,
     readPasswordFile,
     readPasswordFromStdin,

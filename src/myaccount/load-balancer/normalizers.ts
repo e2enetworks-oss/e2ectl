@@ -30,9 +30,7 @@ import type {
 export function assertLbType(lbType: string | undefined): LoadBalancerVpc {
   if (lbType === undefined) return 'external';
   const lower = lbType.toLowerCase() as LoadBalancerVpc;
-  if (
-    !LOAD_BALANCER_TYPES.includes(lower as (typeof LOAD_BALANCER_TYPES)[number])
-  ) {
+  if (!LOAD_BALANCER_TYPES.includes(lower)) {
     throw new CliError(
       `Invalid --lb-type "${lbType}". Must be one of: ${LOAD_BALANCER_TYPES.join(', ')}.`,
       {

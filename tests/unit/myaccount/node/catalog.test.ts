@@ -139,7 +139,7 @@ describe('node catalog helpers', () => {
                 committed_sku_price: 3000
               }
             ],
-            cpu: 3.5 as unknown as number,
+            cpu: 3.5,
             disk_space: undefined as unknown as number,
             family: ' GPU ',
             minimum_billing_amount: Number.NaN,

@@ -1401,7 +1401,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue({
         ...createAlbDetails(),
         context: undefined
-      } as LoadBalancerDetails);
+      });
 
       await expect(
         service.createBackendGroup('10', {
@@ -1727,7 +1727,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue({
         ...createAlbDetails(),
         context: undefined
-      } as LoadBalancerDetails);
+      });
 
       await expect(
         service.deleteBackendGroup('10', 'web', {})
@@ -1819,7 +1819,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue({
         ...createAlbDetails(),
         context: undefined
-      } as LoadBalancerDetails);
+      });
 
       await expect(
         service.addBackendServer('10', {
@@ -2048,7 +2048,7 @@ describe('LoadBalancerService', () => {
       getLoadBalancer.mockResolvedValue({
         ...createAlbDetails(),
         context: undefined
-      } as LoadBalancerDetails);
+      });
 
       await expect(
         service.deleteBackendServer('10', {
