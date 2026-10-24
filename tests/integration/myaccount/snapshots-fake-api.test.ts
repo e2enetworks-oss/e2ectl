@@ -15,7 +15,7 @@ const SNAPSHOT = {
   is_locked: false,
   name: 'before-upgrade',
   snapshot_id: '7',
-  snapshot_size: '1.5',
+  snapshot_size: '1.5 GB',
   snapshot_uuid: '901',
   status: 'Ready'
 };

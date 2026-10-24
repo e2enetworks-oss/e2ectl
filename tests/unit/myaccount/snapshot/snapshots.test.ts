@@ -18,8 +18,8 @@ const API_SNAPSHOT: SnapshotApiItem = {
   is_locked: false,
   name: 'before-upgrade',
   snapshot_id: '7',
-  snapshot_size: '1.5',
-  snapshot_uuid: '901',
+  snapshot_size: '1.5 GB',
+  snapshot_uuid: '92250583-5db2-4907-805c-358cad55d91d',
   status: 'Ready'
 };
 
@@ -100,7 +100,7 @@ describe('shared snapshot items', () => {
   it('uses the id each resource is addressed by', () => {
     expect(toSnapshotItem(API_SNAPSHOT, 'snapshot_uuid')).toEqual({
       created_at: '25-10-2026 10:00',
-      id: '901',
+      id: '92250583-5db2-4907-805c-358cad55d91d',
       locked: false,
       name: 'before-upgrade',
       size_gb: 1.5,
@@ -129,7 +129,7 @@ describe('node snapshots', () => {
       )
     ).toMatchObject({
       action: 'snapshot-list',
-      items: [{ id: '901' }],
+      items: [{ id: '92250583-5db2-4907-805c-358cad55d91d' }],
       node_id: 101
     });
   });
@@ -161,7 +161,14 @@ describe('node snapshots', () => {
 
     expect(
       await run(
-        ['myaccount', 'node', 'snapshot', 'delete', '101', '901'],
+        [
+          'myaccount',
+          'node',
+          'snapshot',
+          'delete',
+          '101',
+          '92250583-5db2-4907-805c-358cad55d91d'
+        ],
         { node: client },
         false
       )
@@ -169,17 +176,38 @@ describe('node snapshots', () => {
     expect(mocks.deleteSnapshot).not.toHaveBeenCalled();
 
     await run(
-      ['myaccount', 'node', 'snapshot', 'delete', '101', '901', '--force'],
+      [
+        'myaccount',
+        'node',
+        'snapshot',
+        'delete',
+        '101',
+        '92250583-5db2-4907-805c-358cad55d91d',
+        '--force'
+      ],
       { node: client }
     );
-    expect(mocks.deleteSnapshot).toHaveBeenCalledWith('101', '901');
+    expect(mocks.deleteSnapshot).toHaveBeenCalledWith(
+      '101',
+      '92250583-5db2-4907-805c-358cad55d91d'
+    );
   });
 
   it('refuses to delete without a terminal or --force', async () => {
     await expect(
-      run(['myaccount', 'node', 'snapshot', 'delete', '101', '901'], {
-        node: nodeClient()
-      })
+      run(
+        [
+          'myaccount',
+          'node',
+          'snapshot',
+          'delete',
+          '101',
+          '92250583-5db2-4907-805c-358cad55d91d'
+        ],
+        {
+          node: nodeClient()
+        }
+      )
     ).rejects.toMatchObject({ code: 'CONFIRMATION_REQUIRED' });
   });
 
@@ -194,7 +222,7 @@ describe('node snapshots', () => {
         'snapshot',
         'save-image',
         '101',
-        '901',
+        '92250583-5db2-4907-805c-358cad55d91d',
         '--name',
         'restored'
       ],
@@ -203,7 +231,7 @@ describe('node snapshots', () => {
 
     expect(mocks.saveSnapshotAsImage).toHaveBeenCalledWith(
       '101',
-      '901',
+      '92250583-5db2-4907-805c-358cad55d91d',
       'restored'
     );
     expect(output).toContain('The node is not changed.');
@@ -213,7 +241,7 @@ describe('node snapshots', () => {
   it('refuses a non-numeric snapshot id', async () => {
     await expect(
       run(
-        ['myaccount', 'node', 'snapshot', 'delete', '101', 'abc', '--force'],
+        ['myaccount', 'node', 'snapshot', 'delete', '101', '../x', '--force'],
         { node: nodeClient() }
       )
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT_ID' });

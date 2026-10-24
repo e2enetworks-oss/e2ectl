@@ -530,6 +530,13 @@ export class VolumeService {
   ): Promise<VolumeSnapshotCommandResult> {
     const normalizedVolumeId = assertVolumeId(volumeId);
     const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+    if (!/^\d+$/.test(normalizedSnapshotId)) {
+      throw new CliError('Volume snapshot IDs are numbers.', {
+        code: 'INVALID_SNAPSHOT_ID',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass the ID column from ${formatMyAccountCommand(`volume snapshot list ${normalizedVolumeId}`)}.`
+      });
+    }
     const name = normalizeSnapshotName(options.name, '--name');
     const client = await this.createClient(options);
     const vmId = requireAttachedVmId(

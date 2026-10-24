@@ -14,8 +14,9 @@ export interface SnapshotApiItem {
   status?: string;
 }
 
-// Node snapshots are addressed by snapshot_uuid, volume snapshots by
-// snapshot_id; each item's id is the one its own commands take.
+// Node snapshots are addressed by snapshot_uuid (a UUID), volume snapshots
+// by snapshot_id (a number); each item's id is the one its own commands
+// take.
 export type SnapshotIdField = 'snapshot_id' | 'snapshot_uuid';
 
 export interface SnapshotItem {
@@ -31,14 +32,15 @@ export function toSnapshotItem(
   item: SnapshotApiItem,
   idField: SnapshotIdField
 ): SnapshotItem {
-  const size = Number(item.snapshot_size);
+  // E2E writes the size as text, for example "4.32 GB".
+  const size = Number.parseFloat(String(item.snapshot_size));
 
   return {
     created_at: item.date ?? '',
     id: String(item[idField] ?? ''),
     locked: item.is_locked === true,
     name: item.name,
-    size_gb: item.snapshot_size === null || Number.isNaN(size) ? null : size,
+    size_gb: Number.isFinite(size) ? size : null,
     status: item.status ?? ''
   };
 }
@@ -67,15 +69,18 @@ export function formatSnapshotTable(items: SnapshotItem[]): string {
 
 export function normalizeSnapshotId(value: string): string {
   const trimmed = value.trim();
-  if (/^\d+$/.test(trimmed)) {
+  if (/^[\w-]+$/.test(trimmed)) {
     return trimmed;
   }
 
-  throw new CliError('Snapshot ID must be numeric.', {
-    code: 'INVALID_SNAPSHOT_ID',
-    exitCode: EXIT_CODES.usage,
-    suggestion: 'Pass the ID column from snapshot list.'
-  });
+  throw new CliError(
+    'Snapshot ID can only contain letters, digits and dashes.',
+    {
+      code: 'INVALID_SNAPSHOT_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass the ID column from snapshot list.'
+    }
+  );
 }
 
 export function normalizeSnapshotName(value: string, flag: string): string {
