@@ -423,12 +423,8 @@ describe('node commands', () => {
       createSshKeyClient: vi.fn(() => sshKeyStub.stub),
       createVolumeClient: vi.fn(() => volumeStub.stub),
       createVpcClient: vi.fn(() => vpcStub.stub),
-      credentialValidator: {
-        validate: vi.fn()
-      },
       isInteractive: options?.isInteractive ?? true,
       prompt,
-      stderr: new MemoryWriter(),
       stdout,
       store
     });

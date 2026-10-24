@@ -4,17 +4,16 @@ import {
   type ApiClientCredentials,
   type ApiClientOptions,
   type ApiTransport,
-  type ProjectContextOptions
+  type TransportProjectContext
 } from '../http/index.js';
 
 const MYACCOUNT_COMMAND = 'myaccount';
 
-export const MYACCOUNT_API_BASE_URL =
-  'https://api.e2enetworks.com/myaccount/api/v1';
+const MYACCOUNT_API_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1';
 
 // Every MyAccount request carries a project and location unless the call
 // turns it off.
-export const MYACCOUNT_PROJECT_CONTEXT: ProjectContextOptions = {
+const MYACCOUNT_PROJECT_CONTEXT: TransportProjectContext = {
   missingContextSuggestion:
     'Pass --project-id and --location, set E2E_PROJECT_ID and E2E_LOCATION, or save default project/location values on the selected profile.'
 };

@@ -193,31 +193,19 @@ describe('lb commands', () => {
       listVpcs: vi.fn()
     };
 
-    const throwNotUsed = (name: string) => () => {
-      throw new Error(`${name} should not be called in this test`);
-    };
-
     const runtime: CliRuntime = createTestRuntime({
       confirm,
       createLoadBalancerClient: (resolvedCredentials) => {
         credentials = resolvedCredentials;
         return lbStub.stub;
       },
-      createNodeClient: throwNotUsed(
-        'NodeClient'
-      ) as unknown as CliRuntime['createNodeClient'],
-      createProjectClient: throwNotUsed(
-        'ProjectClient'
-      ) as unknown as CliRuntime['createProjectClient'],
       createReservedIpClient: vi.fn(() => reservedIpStub.stub) as unknown as (
         c: ResolvedCredentials
       ) => ReservedIpClient,
       createVpcClient: vi.fn(() => vpcClient) as unknown as (
         c: ResolvedCredentials
       ) => VpcClient,
-      credentialValidator: { validate: vi.fn() },
       isInteractive: options?.isInteractive ?? true,
-      prompt: vi.fn(() => Promise.resolve('')),
       stderr,
       stdout,
       store

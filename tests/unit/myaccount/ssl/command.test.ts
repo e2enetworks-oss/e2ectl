@@ -28,8 +28,6 @@ async function createRuntimeWithSslClient(
     createSslClient: vi
       .fn()
       .mockReturnValue(sslClient) as unknown as CliRuntime['createSslClient'],
-    credentialValidator: { validate: vi.fn() },
-    isInteractive: false,
     prompt: vi.fn(),
     stderr,
     stdout,

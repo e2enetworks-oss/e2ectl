@@ -408,9 +408,9 @@ function renderNodeAttachmentHuman(
         ].join('\n') + '\n'
       );
     case 'vpc-attach':
-      return formatNodeVpcResult('attach', result);
+      return formatNodeVpcResult(result);
     case 'vpc-detach':
-      return formatNodeVpcResult('detach', result);
+      return formatNodeVpcResult(result);
   }
 }
 
@@ -462,9 +462,9 @@ function formatNodeCatalogPlansResult(
 }
 
 function formatNodeVpcResult(
-  verb: 'attach' | 'detach',
   result: Extract<NodeCommandResult, { action: 'vpc-attach' | 'vpc-detach' }>
 ): string {
+  const verb = result.action === 'vpc-attach' ? 'attach' : 'detach';
   const lines = [
     `Requested VPC ${verb} for node ${result.node_id}.`,
     `VPC ID: ${result.vpc.id}`,

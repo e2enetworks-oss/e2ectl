@@ -72,12 +72,7 @@ describe('project commands', () => {
         credentials = resolvedCredentials;
         return stub.stub;
       },
-      credentialValidator: {
-        validate: vi.fn()
-      },
       isInteractive: true,
-      prompt: vi.fn(() => Promise.resolve('')),
-      stderr: new MemoryWriter(),
       stdout,
       store
     });

@@ -27,12 +27,7 @@ describe('runCli', () => {
 
     return {
       runtime: createTestRuntime({
-        confirm: vi.fn(() => Promise.resolve(false)),
-        credentialValidator: {
-          validate: vi.fn()
-        },
         isInteractive: options?.isInteractive ?? true,
-        prompt: vi.fn(() => Promise.resolve('')),
         stderr,
         stdout,
         store: new ConfigStore({

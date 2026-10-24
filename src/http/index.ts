@@ -2,7 +2,7 @@ export {
   HttpTransport,
   type ApiTransport,
   type HttpTransportOptions,
-  type ProjectContextOptions
+  type TransportProjectContext
 } from './transport.js';
 export type {
   ApiAuthCredentials,

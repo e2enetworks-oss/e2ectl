@@ -84,7 +84,6 @@ describe('config commands', () => {
         credentialValidator: validator,
         isInteractive: true,
         prompt,
-        stderr: new MemoryWriter(),
         stdout,
         store
       }),

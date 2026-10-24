@@ -135,9 +135,7 @@ describe('support-ticket commands', () => {
         credentials = resolvedCredentials;
         return supportTicketStub.stub;
       },
-      credentialValidator: { validate: vi.fn() },
       isInteractive: true,
-      prompt: vi.fn(() => Promise.resolve('')),
       stderr,
       stdout,
       store

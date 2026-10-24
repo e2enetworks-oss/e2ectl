@@ -19,7 +19,7 @@ const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 
 type HttpMethod = NonNullable<ApiRequestOptions['method']>;
 
-export interface ProjectContextOptions {
+export interface TransportProjectContext {
   // Next step shown when a request needs a project and location but the
   // credentials have none.
   missingContextSuggestion: string;
@@ -33,7 +33,7 @@ export interface HttpTransportOptions extends ApiClientOptions {
   baseUrl: string;
   // When set, every request sends the credentials' project_id and location
   // unless the call passes includeProjectContext: false.
-  projectContext?: ProjectContextOptions;
+  projectContext?: TransportProjectContext;
 }
 
 export interface ApiTransport {
@@ -59,7 +59,7 @@ export class HttpTransport implements ApiTransport {
   private readonly baseUrl: string;
   private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
-  private readonly projectContext: ProjectContextOptions | undefined;
+  private readonly projectContext: TransportProjectContext | undefined;
   private readonly timeoutMs: number;
 
   constructor(
@@ -298,7 +298,7 @@ export class HttpTransport implements ApiTransport {
   private addProjectContext(
     url: URL,
     path: string,
-    projectContext: ProjectContextOptions
+    projectContext: TransportProjectContext
   ): void {
     const { location, project_id: projectId } = this.credentials;
 
