@@ -573,6 +573,55 @@ describe('HttpTransport', () => {
     });
   });
 
+  it.each([
+    [
+      412,
+      'Precondition Failed',
+      { message: 'Precondition Failed', errors: 'Node not found.' },
+      1,
+      'Node not found.'
+    ],
+    [
+      400,
+      'Bad Request',
+      { message: 'Bad Request', errors: {} },
+      1,
+      'Bad Request'
+    ],
+    [
+      404,
+      'Not Found',
+      { message: 'No client found for API Key api-key' },
+      3,
+      'No client found for API Key ****-key'
+    ],
+    [429, 'Too Many Requests', { message: 'Slow down' }, 5, 'Slow down'],
+    [502, 'Bad Gateway', { message: 'Upstream down' }, 5, 'Upstream down']
+  ])(
+    'turns a %s reply into exit %s with a useful message',
+    async (status, statusText, payload, exitCode, message) => {
+      const transport = new HttpTransport(credentials, {
+        apiName: 'MyAccount',
+        baseUrl: MYACCOUNT_BASE_URL,
+        projectContext,
+        fetchFn: () =>
+          Promise.resolve(
+            createFetchResponse(payload, { ok: false, status, statusText })
+          )
+      });
+
+      const error = await transport
+        .request({ method: 'DELETE', path: '/nodes/1/' })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toMatchObject({
+        exitCode,
+        message: `MyAccount API request failed: ${message}`
+      });
+      expect(JSON.stringify(error)).not.toContain('api-key"');
+    }
+  );
+
   it('hides secret keys in a response preview and keeps the HTTP status', async () => {
     const transport = new HttpTransport(credentials, {
       apiName: 'MyAccount',

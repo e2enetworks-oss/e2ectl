@@ -22,7 +22,10 @@ export function buildEosCommand(runtime: CliRuntime): Command {
   const service = new EosService({
     confirm: (message) => runtime.confirm(message),
     createEosClient: (credentials) => runtime.createEosClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const write: Writer = (result, commandInstance) => {

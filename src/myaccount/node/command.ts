@@ -64,7 +64,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     createVolumeClient: (credentials) =>
       runtime.createVolumeClient(credentials),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('node').description('Manage MyAccount nodes.');

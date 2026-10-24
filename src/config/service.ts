@@ -11,7 +11,6 @@ export interface ImportProfilesInput {
   defaultProjectId?: string;
   file: string;
   force?: boolean;
-  input?: boolean;
 }
 
 export interface RemoveProfileInput {
@@ -95,7 +94,7 @@ export class ConfigService {
     const importedAliases = Object.keys(importedSecrets).sort((left, right) =>
       left.localeCompare(right)
     );
-    const canPrompt = this.canPromptForInput(options);
+    const canPrompt = this.dependencies.isInteractive;
     const currentConfig = await this.dependencies.store.read();
 
     await this.confirmOverwriteIfNeeded(
@@ -242,12 +241,6 @@ export class ConfigService {
         suggestion: `Run \`${formatCliCommand('config list')}\` to inspect the saved aliases.`
       });
     }
-  }
-
-  private canPromptForInput(
-    options: Pick<ImportProfilesInput, 'input'>
-  ): boolean {
-    return this.dependencies.isInteractive && (options.input ?? true);
   }
 
   private async confirmOverwriteIfNeeded(

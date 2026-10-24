@@ -1,3 +1,4 @@
+import { formatCliCommand } from '../app/metadata.js';
 import Table from 'cli-table3';
 
 import { stableStringify, type JsonValue } from '../core/json.js';
@@ -78,7 +79,7 @@ function renderConfigHuman(result: ConfigCommandResult): string {
     case 'list': {
       const profiles = summarizeProfiles(result.config);
       return profiles.length === 0
-        ? 'No profiles saved.\n'
+        ? `No profiles saved. Run ${formatCliCommand('configure')} to save one.\n`
         : `${formatProfilesTable(profiles)}\n`;
     }
     case 'removed':

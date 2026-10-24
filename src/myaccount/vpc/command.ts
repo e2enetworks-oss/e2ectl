@@ -19,7 +19,10 @@ export function buildVpcCommand(runtime: CliRuntime): Command {
   const service = new VpcService({
     confirm: (message) => runtime.confirm(message),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('vpc').description(

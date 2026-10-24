@@ -21,7 +21,10 @@ export function buildSshKeyCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createSshKeyClient: (credentials) =>
       runtime.createSshKeyClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     readPublicKeyFile: async (path) => await readFile(path, 'utf8'),
     readPublicKeyFromStdin: readAllFromStdin,
     store: runtime.store

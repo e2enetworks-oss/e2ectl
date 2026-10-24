@@ -1,5 +1,6 @@
-import { AppError, EXIT_CODES } from '../core/errors.js';
+import { AppError, EXIT_CODES, type ExitCode } from '../core/errors.js';
 import { isNonEmptyString, isRecord } from '../core/guards.js';
+import { maskSecret } from '../core/mask.js';
 import { sanitizeUrl } from '../core/url.js';
 import { sleep } from '../core/waiter.js';
 
@@ -192,6 +193,7 @@ export class HttpTransport implements ApiTransport {
       payload,
       request_url: sanitizeUrl(requestUrl),
       response,
+      secrets: [this.credentials.api_key, this.credentials.auth_token],
       ...(parseError === undefined ? {} : { parseError }),
       ...(preview === undefined ? {} : { preview })
     };
@@ -383,6 +385,8 @@ interface FallbackApiErrorInput extends ParsedResponseBody {
   path: string;
   request_url: string;
   response: FetchLikeResponse;
+  // The key and token: never repeated in an error, even when the API does.
+  secrets: string[];
 }
 
 function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
@@ -472,7 +476,11 @@ function buildFallbackApiError(
     return undefined;
   }
 
-  const message = extractFallbackApiMessage(payload) ?? 'Unexpected API error';
+  const hide = (text: string): string => hideSecrets(text, input.secrets);
+  const message = hide(
+    chooseFallbackApiMessage(payload, response.statusText) ??
+      'Unexpected API error'
+  );
   const details = [
     `HTTP status: ${response.status} ${response.statusText}`,
     `Path: ${path}`,
@@ -481,21 +489,60 @@ function buildFallbackApiError(
     ...(preview === undefined || isRecord(payload)
       ? []
       : [`Response preview: ${preview}`])
-  ];
+  ].map(hide);
 
   return new AppError(`${input.apiName} API request failed: ${message}`, {
     code: 'API_REQUEST_FAILED',
     details,
-    exitCode:
-      response.status === 401 || response.status === 403
-        ? EXIT_CODES.auth
-        : EXIT_CODES.network,
+    exitCode: chooseFailureExitCode(response.status, message),
     httpStatus: response.status,
     suggestion: chooseFailureSuggestion(
       response.status,
       input.forbiddenSuggestion
     )
   });
+}
+
+// 3 for a key or token E2E refuses (it answers an unknown key with 404),
+// 5 for failures worth retrying (timeouts, rate limits, server errors), and
+// 1 for anything else E2E refused, such as a bad id: retrying will not help.
+function chooseFailureExitCode(status: number, message: string): ExitCode {
+  if (status === 401 || status === 403 || /no client found/i.test(message)) {
+    return EXIT_CODES.auth;
+  }
+
+  if (status === 408 || status === 429 || status >= 500) {
+    return EXIT_CODES.network;
+  }
+
+  return EXIT_CODES.general;
+}
+
+// The API's message, unless it only repeats the HTTP status text and a
+// string in errors says what actually went wrong.
+function chooseFallbackApiMessage(
+  payload: unknown,
+  statusText: string
+): string | undefined {
+  const message = extractFallbackApiMessage(payload);
+  const isOnlyStatusText =
+    message !== undefined &&
+    message.toLowerCase() === statusText.trim().toLowerCase();
+
+  return isOnlyStatusText &&
+    isRecord(payload) &&
+    isNonEmptyString(payload.errors)
+    ? payload.errors.trim()
+    : message;
+}
+
+function hideSecrets(text: string, secrets: string[]): string {
+  return secrets
+    .filter((secret) => secret.length > 0)
+    .reduce(
+      (masked, secret) => masked.split(secret).join(maskSecret(secret)),
+      text
+    );
 }
 
 function chooseFailureSuggestion(

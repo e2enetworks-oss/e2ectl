@@ -1007,7 +1007,8 @@ describe('node commands', () => {
       '--project-id',
       '46429',
       '--location',
-      'Chennai'
+      'Chennai',
+      '--force'
     ]);
 
     expect(receivedCredentials()).toMatchObject({
@@ -1016,9 +1017,8 @@ describe('node commands', () => {
       project_id: '46429'
     });
     expect(nodeStub.getNode).toHaveBeenCalledWith('101');
-    expect(confirm).toHaveBeenCalledWith(
-      'Detach public IP 1.1.1.1 from node 101? The node may no longer be publicly reachable.'
-    );
+    // --json never asks; --force is what lets it go ahead.
+    expect(confirm).not.toHaveBeenCalled();
     expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
       public_ip: '1.1.1.1',
       type: 'detach',
@@ -1422,12 +1422,11 @@ describe('node commands', () => {
       '--image',
       'Ubuntu-24.04-Distro',
       '--alias',
-      'prod'
+      'prod',
+      '--force'
     ]);
 
-    expect(confirm).toHaveBeenCalledWith(
-      'Upgrade node 101 to plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi with image Ubuntu-24.04-Distro? This is disruptive.'
-    );
+    expect(confirm).not.toHaveBeenCalled();
     expect(nodeStub.upgradeNode).toHaveBeenCalledWith('101', {
       image: 'Ubuntu-24.04-Distro',
       plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
@@ -1968,7 +1967,6 @@ describe('node commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      '--json',
       'myaccount',
       'node',
       'delete',
@@ -1981,14 +1979,7 @@ describe('node commands', () => {
       'Delete node 101? This cannot be undone.'
     );
     expect(nodeStub.deleteNode).not.toHaveBeenCalled();
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'delete',
-        cancelled: true,
-        node_id: 101,
-        reserve_public_ip_requested: false
-      })
-    );
+    expect(stdout.buffer.toLowerCase()).toContain('cancelled');
   });
 
   it('requires force outside an interactive terminal', async () => {

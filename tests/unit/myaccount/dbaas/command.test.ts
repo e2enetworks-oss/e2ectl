@@ -752,12 +752,10 @@ describe('dbaas commands', () => {
   it('prompts for confirmation when deleting without --force', async () => {
     const { runtime, stdout } = createRuntimeFixture();
     await seedProfile(runtime);
-    const program = createProgram(runtime);
 
-    await program.parseAsync([
+    await createProgram(runtime).parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      '--json',
       'myaccount',
       'dbaas',
       'delete',
@@ -766,8 +764,26 @@ describe('dbaas commands', () => {
       'prod'
     ]);
 
-    expect(stdout.buffer).toContain('"action": "delete"');
-    expect(stdout.buffer).toContain('"cancelled": false');
+    expect(stdout.buffer).not.toContain('cancelled');
+  });
+
+  it('never prompts with --json, even in a terminal', async () => {
+    const { runtime } = createRuntimeFixture();
+    await seedProfile(runtime);
+
+    await expect(
+      createProgram(runtime).parseAsync([
+        'node',
+        CLI_COMMAND_NAME,
+        '--json',
+        'myaccount',
+        'dbaas',
+        'delete',
+        '7869',
+        '--alias',
+        'prod'
+      ])
+    ).rejects.toThrow(/confirmation/i);
   });
 
   it('reads the password from a file when --password-file is provided', async () => {

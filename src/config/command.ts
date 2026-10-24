@@ -18,7 +18,10 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
   const service = new ConfigService({
     confirm: (message) => runtime.confirm(message),
     credentialValidator: runtime.credentialValidator,
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     prompt: (message) => runtime.prompt(message),
     store: runtime.store
   });
@@ -44,10 +47,6 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
     )
     .option('--default <alias>', 'Alias to make default after import.')
     .option('--force', 'Overwrite existing aliases without confirmation.')
-    .option(
-      '--no-input',
-      'Disable prompts for default selection and optional default context.'
-    )
     .action(async (options: ImportProfilesInput, commandInstance: Command) => {
       const result = await service.importProfiles(options);
       runtime.stdout.write(

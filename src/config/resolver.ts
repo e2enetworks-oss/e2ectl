@@ -368,8 +368,7 @@ function requireProfile(
     code: 'PROFILE_NOT_FOUND',
     details,
     exitCode: EXIT_CODES.config,
-    suggestion:
-      'Choose an existing profile alias or set E2E_API_KEY and E2E_AUTH_TOKEN.'
+    suggestion: `Pick one from \`${formatCliCommand('config list')}\`, save it with \`${formatCliCommand(`configure --alias ${alias}`)}\`, or set E2E_API_KEY and E2E_AUTH_TOKEN.`
   });
 }
 
@@ -451,8 +450,7 @@ function assertAuthResolved(
     code: 'MISSING_AUTH_CREDENTIALS',
     details,
     exitCode: EXIT_CODES.auth,
-    suggestion:
-      'Set E2E_API_KEY and E2E_AUTH_TOKEN or add a saved profile before running API-backed commands.'
+    suggestion: `Run \`${formatCliCommand('configure')}\`, or set E2E_API_KEY and E2E_AUTH_TOKEN.`
   });
 }
 
@@ -475,12 +473,11 @@ function throwMissingContextError(
     details.push(`Config path: ${options.configPath}`);
   }
 
-  throw new CliError('Unable to resolve MyAccount project context.', {
+  throw new CliError('No MyAccount project and location chosen.', {
     code: 'MISSING_REQUEST_CONTEXT',
     details,
     exitCode: EXIT_CODES.config,
-    suggestion:
-      'Pass --project-id and --location, set E2E_PROJECT_ID and E2E_LOCATION, or save default project/location values on the selected profile.'
+    suggestion: `Run \`${formatCliCommand('myaccount configure')}\`, pass --project-id and --location, or set E2E_PROJECT_ID and E2E_LOCATION.`
   });
 }
 

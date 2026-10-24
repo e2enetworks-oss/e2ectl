@@ -78,3 +78,28 @@ export function formatError(error: unknown): string {
 
   return 'Unexpected error: an unknown failure occurred.\n';
 }
+
+// The --json form of an error, for scripts and agents: the same facts as
+// formatError, with the code and exit code an agent can branch on.
+export function formatErrorJson(error: unknown): string {
+  const body = isAppError(error)
+    ? {
+        code: error.code,
+        details: error.details,
+        exit_code: error.exitCode,
+        message: error.message,
+        next_step: error.suggestion ?? null
+      }
+    : {
+        code: 'UNEXPECTED_ERROR',
+        details: [],
+        exit_code: EXIT_CODES.general,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'an unknown failure occurred',
+        next_step: null
+      };
+
+  return `${JSON.stringify({ error: body }, null, 2)}\n`;
+}

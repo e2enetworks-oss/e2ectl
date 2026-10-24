@@ -1,6 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 
+import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ApiClientOptions } from '../http/index.js';
 import {
   ApiCredentialValidator,
@@ -195,17 +196,32 @@ async function promptForConfirmation(message: string): Promise<boolean> {
   return /^(y|yes)$/i.test(answer.trim());
 }
 
+// Questions go to stderr, so stdout holds only the command's output.
 async function promptForInput(message: string): Promise<string> {
   const readline = createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stderr
   });
 
   try {
     return await readline.question(message);
+  } catch (error: unknown) {
+    throw toCancelledError(error);
   } finally {
     readline.close();
   }
+}
+
+// Ctrl+C or Ctrl+D at a question ends the command plainly.
+function toCancelledError(error: unknown): unknown {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return new CliError('Cancelled.', {
+      code: 'CANCELLED',
+      exitCode: EXIT_CODES.general
+    });
+  }
+
+  return error;
 }
 
 // Shows the question, then hides the answer while it is typed.
@@ -214,7 +230,7 @@ async function promptForSecret(message: string): Promise<string> {
   const output = new Writable({
     write(chunk: Buffer | string, _encoding, callback) {
       if (!muted) {
-        process.stdout.write(chunk);
+        process.stderr.write(chunk);
       }
       callback();
     }
@@ -229,8 +245,10 @@ async function promptForSecret(message: string): Promise<string> {
     const answer = readline.question(message);
     muted = true;
     return await answer;
+  } catch (error: unknown) {
+    throw toCancelledError(error);
   } finally {
     readline.close();
-    process.stdout.write('\n');
+    process.stderr.write('\n');
   }
 }

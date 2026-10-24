@@ -272,6 +272,7 @@ describe('ConfigService', () => {
       }
     });
     const { service } = createServiceFixture(createConfig(), {
+      isInteractive: false,
       validateResults: [
         {
           message: 'Token expired.',
@@ -282,8 +283,7 @@ describe('ConfigService', () => {
 
     await expect(
       service.importProfiles({
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORTED_CREDENTIALS',
@@ -299,13 +299,13 @@ describe('ConfigService', () => {
       }
     });
     const { service } = createServiceFixture(createConfig(), {
+      isInteractive: false,
       validateResults: [{ valid: false }]
     });
 
     await expect(
       service.importProfiles({
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORTED_CREDENTIALS',
@@ -325,12 +325,13 @@ describe('ConfigService', () => {
       }
     });
 
-    const explicitFixture = createServiceFixture(createConfig());
+    const explicitFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await expect(
       explicitFixture.service.importProfiles({
         default: 'missing',
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORT_DEFAULT_ALIAS'
@@ -364,13 +365,13 @@ describe('ConfigService', () => {
           default_location: 'Delhi',
           default_project_id: '123'
         }
-      })
+      }),
+      { isInteractive: false }
     );
 
     await service.importProfiles({
       file,
-      force: true,
-      input: false
+      force: true
     });
 
     expect(getConfig().profiles.prod).toEqual({
@@ -395,13 +396,13 @@ describe('ConfigService', () => {
           auth_token: 'auth-old',
           tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
         }
-      })
+      }),
+      { isInteractive: false }
     );
 
     await service.importProfiles({
       file,
-      force: true,
-      input: false
+      force: true
     });
 
     expect(getConfig().profiles.prod).toEqual({
@@ -419,11 +420,12 @@ describe('ConfigService', () => {
       }
     });
 
-    const projectOnlyFixture = createServiceFixture(createConfig());
+    const projectOnlyFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await projectOnlyFixture.service.importProfiles({
       defaultProjectId: '555',
-      file,
-      input: false
+      file
     });
     expect(projectOnlyFixture.getConfig()).toEqual({
       profiles: {
@@ -435,11 +437,12 @@ describe('ConfigService', () => {
       }
     });
 
-    const locationOnlyFixture = createServiceFixture(createConfig());
+    const locationOnlyFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await locationOnlyFixture.service.importProfiles({
       defaultLocation: 'Chennai',
-      file,
-      input: false
+      file
     });
     expect(locationOnlyFixture.getConfig()).toEqual({
       profiles: {

@@ -138,7 +138,7 @@ describe('resolveCredentials', () => {
         configPath: '/tmp/config.json',
         env: {}
       })
-    ).toThrowError(/Unable to resolve MyAccount project context/);
+    ).toThrowError(/No MyAccount project and location chosen/);
   });
 
   it('omits config-path details when context resolution fails without a config file path', () => {

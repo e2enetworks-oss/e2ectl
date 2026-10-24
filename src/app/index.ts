@@ -8,6 +8,7 @@ import {
   CliError,
   EXIT_CODES,
   formatError,
+  formatErrorJson,
   isCliError
 } from '../core/errors.js';
 import { createProgram } from './program.js';
@@ -43,7 +44,11 @@ export async function runCli(
     }
 
     const normalizedError = normalizeCliExecutionError(error);
-    stderr.write(formatError(normalizedError));
+    stderr.write(
+      argv.slice(2).includes('--json')
+        ? formatErrorJson(normalizedError)
+        : formatError(normalizedError)
+    );
 
     return isCliError(normalizedError)
       ? normalizedError.exitCode

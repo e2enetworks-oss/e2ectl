@@ -95,7 +95,9 @@ describe('config formatter', () => {
       false
     );
 
-    expect(output).toBe('No profiles saved.\n');
+    expect(output).toBe(
+      'No profiles saved. Run e2ectl configure to save one.\n'
+    );
   });
 
   it('renders human list output with profile table when profiles exist', () => {

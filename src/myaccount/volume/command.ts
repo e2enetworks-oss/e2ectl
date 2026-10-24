@@ -23,7 +23,10 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createVolumeClient: (credentials) =>
       runtime.createVolumeClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('volume').description(

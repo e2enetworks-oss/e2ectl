@@ -22,7 +22,7 @@ vi.mock('node:readline/promises', () => ({
 describe('promptSecret', () => {
   it('shows the question but not the typed secret', async () => {
     const write = vi
-      .spyOn(process.stdout, 'write')
+      .spyOn(process.stderr, 'write')
       .mockImplementation(() => true);
 
     try {

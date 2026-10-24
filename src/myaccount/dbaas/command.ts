@@ -33,7 +33,10 @@ export function buildDbaasCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createDbaasClient: (credentials) => runtime.createDbaasClient(credentials),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     readPasswordFile: async (path) => await readFile(path, 'utf8'),
     readPasswordFromStdin: readAllFromStdin,
     store: runtime.store

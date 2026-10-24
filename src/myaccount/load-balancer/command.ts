@@ -34,7 +34,10 @@ export function buildLoadBalancerCommand(runtime: CliRuntime): Command {
     createReservedIpClient: (credentials) =>
       runtime.createReservedIpClient(credentials),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
 
