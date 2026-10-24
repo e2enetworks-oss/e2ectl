@@ -819,7 +819,7 @@ describe('manual smoke step helpers', () => {
     expect(manifest.saved_image_id).toBe('img-455');
   });
 
-  it('accepts save-image responses without an image id and skips saved-image cleanup tracking', async () => {
+  it('looks up the saved image id when save-image does not return one, so cleanup can delete it', async () => {
     const { context, manifest } = createFixture();
 
     waitForNodeReadinessMock
@@ -896,6 +896,16 @@ describe('manual smoke step helpers', () => {
         }
       })
       .mockResolvedValueOnce({
+        action: 'list',
+        items: [
+          { image_id: '3001', image_name: 'someone-elses-image' },
+          {
+            image_id: '3053',
+            image_name: 'release-smoke-image_1792855557_1792855557'
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
         action: 'upgrade',
         details: {
           location: 'Delhi',
@@ -923,8 +933,12 @@ describe('manual smoke step helpers', () => {
     expect(result).toEqual({
       publicIp: '203.0.113.12'
     });
-    expect(manifest.saved_image_deleted).toBe(true);
-    expect(manifest.saved_image_id).toBeNull();
+    expect(runJsonCommandMock).toHaveBeenCalledWith(
+      ['myaccount', 'image', 'list'],
+      context.smokeEnv
+    );
+    expect(manifest.saved_image_deleted).toBe(false);
+    expect(manifest.saved_image_id).toBe('3053');
   });
 
   it('reserves a node public ip, deletes the node, and deletes the preserved reserved ip', async () => {

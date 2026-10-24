@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { isBusyRefusal } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
+import { retryWhileBusy } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
 import { runBuiltCli } from '../../helpers/process.js';
 import type { SmokeEnv } from './smoke-env.js';
 
@@ -66,12 +66,16 @@ export async function runJsonCommand<T>(
   smokeEnv: SmokeEnv,
   options: SmokeJsonCommandOptions = {}
 ): Promise<T> {
-  if (options.retryWhileBusy === true) {
-    return await retryWhileBusy(() =>
-      runJsonCommand<T>(args, smokeEnv, { ...options, retryWhileBusy: false })
-    );
-  }
+  const run = () => runJsonCommandOnce<T>(args, smokeEnv, options);
 
+  return options.retryWhileBusy === true ? retryWhileBusy(run) : run();
+}
+
+async function runJsonCommandOnce<T>(
+  args: string[],
+  smokeEnv: SmokeEnv,
+  options: SmokeJsonCommandOptions
+): Promise<T> {
   const result = await runBuiltCli(['--json', ...args], {
     env: smokeEnv.cliEnv,
     ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
@@ -272,28 +276,4 @@ function normalizeLifecycleStatus(status: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-}
-
-const BUSY_RETRY_ATTEMPTS = 6;
-const BUSY_RETRY_DELAY_MS = 30_000;
-
-// Retries while E2E answers "busy, try later" (see isBusyRefusal), up to
-// six tries 30 seconds apart. Any other failure is thrown at once. Only use
-// it for detach and delete steps: retrying a create could create twice.
-export async function retryWhileBusy<T>(
-  run: () => Promise<T>,
-  options = { attempts: BUSY_RETRY_ATTEMPTS, delayMs: BUSY_RETRY_DELAY_MS }
-): Promise<T> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await run();
-    } catch (error: unknown) {
-      const busy = error instanceof Error && isBusyRefusal(error.message);
-      if (!busy || attempt >= options.attempts) {
-        throw error;
-      }
-
-      await delay(options.delayMs);
-    }
-  }
 }

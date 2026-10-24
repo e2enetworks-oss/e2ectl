@@ -1,3 +1,5 @@
+import { shouldRetryVpcDeleteError } from '../../../scripts/helpers/manual-smoke-cleanup.mjs';
+import { pollUntilFound } from '../../../src/core/waiter.js';
 import type { SmokeEnv } from './smoke-env.js';
 import { updateSmokeManifest } from './smoke-manifest.js';
 import {
@@ -890,7 +892,10 @@ export async function runNodeLifecycleActionSteps(
     ],
     context.smokeEnv
   );
-  const savedImageId = saveImage.result.image_id?.trim() ?? '';
+  const savedImageId =
+    saveImage.result.image_id?.trim() ||
+    (await findSavedImageId(context, options.saveImageName)) ||
+    '';
 
   if (
     saveImage.action !== 'save-image' ||
@@ -1223,14 +1228,6 @@ async function waitForVpcState(
   );
 }
 
-function shouldRetryVpcDeleteError(message: string): boolean {
-  return (
-    /you have running servers on this vpc/i.test(message) ||
-    /vpc is in creating state/i.test(message) ||
-    /please try again later/i.test(message)
-  );
-}
-
 function normalizeLifecycleState(state: string | undefined): string {
   return (state ?? '')
     .trim()
@@ -1241,4 +1238,30 @@ function normalizeLifecycleState(state: string | undefined): string {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+interface ImageListJson {
+  items: Array<{ image_id: string; image_name: string | null }>;
+}
+
+// E2E's save-image reply carries no image id: the image shows up in the
+// list a little later, under the given name plus a time stamp. Without this
+// lookup the cleanup never deletes the saved image.
+async function findSavedImageId(
+  context: SmokeStepContext,
+  saveImageName: string
+): Promise<string | undefined> {
+  return await pollUntilFound(
+    async () => {
+      const images = await runJsonCommand<ImageListJson>(
+        ['myaccount', 'image', 'list'],
+        context.smokeEnv
+      );
+
+      return images.items.find((image) =>
+        (image.image_name ?? '').startsWith(saveImageName)
+      )?.image_id;
+    },
+    { attempts: 20, intervalMs: 15_000 }
+  );
 }
