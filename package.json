@@ -34,7 +34,7 @@
     "docs:check": "node ./scripts/docs-check.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint src tests scripts/**/*.mjs vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts vitest.manual-destructive.config.ts vitest.manual-smoke.config.ts",
+    "lint": "eslint src tests scripts/*.mjs scripts/**/*.mjs vitest.config.ts vitest.integration.config.ts vitest.manual.config.ts vitest.manual-destructive.config.ts vitest.manual-smoke.config.ts",
     "prepack": "npm run build",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",

@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
+import { productImportsRule } from './scripts/helpers/eslint-product-imports.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
@@ -27,11 +29,45 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-confusing-void-expression': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': [
         'error',
         { checksVoidReturn: false }
+      ]
+    }
+  },
+  {
+    files: ['src/**/*.ts'],
+    plugins: {
+      e2ectl: { rules: { 'product-imports': productImportsRule } }
+    },
+    rules: {
+      complexity: ['error', 15],
+      'e2ectl/product-imports': [
+        'error',
+        { sourceRoot: path.join(__dirname, 'src') }
+      ]
+    }
+  },
+  {
+    // MyAccount hints must say `e2ectl myaccount ...`; the helper adds it.
+    files: ['src/myaccount/**/*.ts'],
+    ignores: ['src/myaccount/api.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/app/metadata.js'],
+              importNames: ['formatCliCommand'],
+              message:
+                'Use formatMyAccountCommand from src/myaccount/api.ts so the hint includes "myaccount".'
+            }
+          ]
+        }
       ]
     }
   },
