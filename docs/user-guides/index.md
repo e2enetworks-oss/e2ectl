@@ -23,6 +23,7 @@ The guides are split into two paths:
 - [Config](./config.md)
 - [Project](./project.md)
 - [DBaaS](./dbaas.md)
+- [EOS](./eos.md)
 - [Load Balancer](./load-balancer.md)
 - [SSL](./ssl.md)
 - [Node](./node.md)

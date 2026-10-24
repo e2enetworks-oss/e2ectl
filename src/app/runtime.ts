@@ -55,6 +55,7 @@ import {
 } from '../tir/project/index.js';
 import { TirImageApiClient, type TirImageClient } from '../tir/image/index.js';
 import { TirPlanApiClient, type TirPlanClient } from '../tir/plan/index.js';
+import { EosApiClient, type EosClient } from '../myaccount/eos/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -84,6 +85,7 @@ export interface CliRuntime {
   createTirProjectClient(credentials: ResolvedTirCredentials): TirProjectClient;
   createTirImageClient(credentials: ResolvedTirCredentials): TirImageClient;
   createTirPlanClient(credentials: ResolvedTirCredentials): TirPlanClient;
+  createEosClient(credentials: ResolvedCredentials): EosClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
@@ -164,6 +166,8 @@ export function createRuntime(): CliRuntime {
       new TirPlanApiClient(
         createTirTransport(credentials, tirApiClientOptions)
       ),
+    createEosClient: (credentials) =>
+      new EosApiClient(createMyAccountTransport(credentials, apiClientOptions)),
     credentialValidator: new ApiCredentialValidator((credentials) =>
       createMyAccountTransport(credentials, apiClientOptions)
     ),

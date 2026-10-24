@@ -85,6 +85,7 @@ Command guides:
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
 - [DBaaS](./docs/user-guides/dbaas.md)
+- [EOS](./docs/user-guides/eos.md)
 - [Load Balancer](./docs/user-guides/load-balancer.md)
 - [SSL](./docs/user-guides/ssl.md)
 - [Node](./docs/user-guides/node.md)

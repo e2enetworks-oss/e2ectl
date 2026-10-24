@@ -65,6 +65,15 @@ const EXPECTED_COMMANDS = [
   'myaccount node snapshot create',
   'myaccount node snapshot delete',
   'myaccount node snapshot save-image',
+  'myaccount eos bucket list',
+  'myaccount eos bucket create',
+  'myaccount eos bucket delete',
+  'myaccount eos key list',
+  'myaccount eos key create',
+  'myaccount eos key delete',
+  'myaccount eos access list',
+  'myaccount eos access grant',
+  'myaccount eos access revoke',
   'myaccount node list',
   'myaccount node create',
   'myaccount node get',
@@ -149,7 +158,7 @@ describe('createProgram', () => {
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(113);
+    expect(EXPECTED_COMMANDS).toHaveLength(122);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });

@@ -16,10 +16,11 @@ import { buildSslCommand } from './ssl/index.js';
 import { buildSupportTicketCommand } from './support-ticket/index.js';
 import { buildVolumeCommand } from './volume/index.js';
 import { buildVpcCommand } from './vpc/index.js';
+import { buildEosCommand } from './eos/index.js';
 
 export function buildMyAccountCommand(runtime: CliRuntime): Command {
   const command = new Command('myaccount').description(
-    'Manage E2E MyAccount resources: nodes, storage, networking, databases, load balancers, projects and support tickets.'
+    'Manage E2E MyAccount resources: nodes, storage, object storage (EOS), networking, databases, load balancers, projects and support tickets.'
   );
 
   command.helpCommand('help [command]', 'Show help for a myaccount command');
@@ -37,6 +38,7 @@ export function buildMyAccountCommand(runtime: CliRuntime): Command {
   command.addCommand(buildSshKeyCommand(runtime));
   command.addCommand(buildSslCommand(runtime));
   command.addCommand(buildSupportTicketCommand(runtime));
+  command.addCommand(buildEosCommand(runtime));
 
   command.action(() => {
     command.outputHelp();

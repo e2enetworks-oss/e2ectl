@@ -40,6 +40,7 @@ export function createTestRuntime(
     createTirProjectClient: unexpectedClient('TirProject'),
     createTirImageClient: unexpectedClient('TirImage'),
     createTirPlanClient: unexpectedClient('TirPlan'),
+    createEosClient: unexpectedClient('Eos'),
     credentialValidator: { validate: vi.fn() },
     isInteractive: false,
     prompt: vi.fn(() => Promise.resolve('')),
