@@ -14,7 +14,12 @@ import path from 'node:path';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { isNonEmptyString } from '../core/guards.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
-import type { ConfigFile, ProfileConfig } from './types.js';
+import {
+  TIR_CONTEXT_FIELDS,
+  type ConfigFile,
+  type ProfileConfig,
+  type TirContext
+} from './types.js';
 
 const DEFAULT_DIRECTORY_NAME = '.e2e';
 const DEFAULT_CONFIG_FILE_NAME = 'config.json';
@@ -194,7 +199,31 @@ function normalizeProfile(profile: ProfileConfig): ProfileConfig {
     normalizedProfile.default_location = profile.default_location.trim();
   }
 
+  const tir = normalizeTirContext(profile.tir);
+  if (tir !== undefined) {
+    normalizedProfile.tir = tir;
+  }
+
   return normalizedProfile;
+}
+
+// Trims values and drops empty ones; returns undefined when nothing is left.
+function normalizeTirContext(
+  context: TirContext | undefined
+): TirContext | undefined {
+  if (context === undefined) {
+    return undefined;
+  }
+
+  const normalized: TirContext = {};
+  for (const field of TIR_CONTEXT_FIELDS) {
+    const value = context[field];
+    if (isNonEmptyString(value)) {
+      normalized[field] = value.trim();
+    }
+  }
+
+  return Object.keys(normalized).length === 0 ? undefined : normalized;
 }
 
 function firstProfileAlias(
@@ -357,7 +386,43 @@ function validateProfileShape(
     );
   }
 
+  if (value.tir !== undefined) {
+    profile.tir = validateTirContextShape(alias, value.tir, configPath);
+  }
+
   return profile;
+}
+
+function validateTirContextShape(
+  alias: string,
+  value: unknown,
+  configPath: string
+): TirContext {
+  if (!isObjectRecord(value)) {
+    throw invalidConfigShapeError(
+      configPath,
+      `Profile "${alias}" field "tir" must be an object when present.`
+    );
+  }
+
+  const context: TirContext = {};
+  for (const field of TIR_CONTEXT_FIELDS) {
+    const fieldValue = value[field];
+    if (fieldValue === undefined) {
+      continue;
+    }
+
+    if (typeof fieldValue !== 'string') {
+      throw invalidConfigShapeError(
+        configPath,
+        `Profile "${alias}" field "tir.${field}" must be a string when present.`
+      );
+    }
+
+    context[field] = fieldValue;
+  }
+
+  return context;
 }
 
 function readRequiredProfileField(

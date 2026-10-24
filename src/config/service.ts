@@ -488,7 +488,9 @@ function applyImportedDefaults(
 
 function preserveExistingProfileContext(
   profile: ProfileConfig | undefined
-): Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>> {
+): Partial<
+  Pick<ProfileConfig, 'default_project_id' | 'default_location' | 'tir'>
+> {
   if (profile === undefined) {
     return {};
   }
@@ -503,7 +505,8 @@ function preserveExistingProfileContext(
       ? {}
       : {
           default_location: profile.default_location
-        })
+        }),
+    ...(profile.tir === undefined ? {} : { tir: profile.tir })
   };
 }
 
