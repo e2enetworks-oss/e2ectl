@@ -37,6 +37,12 @@ export interface VolumeClient {
     snapshotId: string
   ): Promise<{ message: string }>;
   listSnapshots(volumeId: number): Promise<SnapshotApiItem[]>;
+  // E2E resizes through the attached node and renames the volume to
+  // `name`, so the current name must be sent to keep it.
+  resizeVolume(
+    volumeId: number,
+    body: { block_storage_size: number; name: string; vm_id: number }
+  ): Promise<{ message: string }>;
   saveSnapshotAsVolume(
     volumeId: number,
     body: { name: string; snapshot_id: number; vm_id: number }
@@ -103,6 +109,19 @@ export class VolumeApiClient implements VolumeClient {
     );
 
     return response.data;
+  }
+
+  async resizeVolume(
+    volumeId: number,
+    body: { block_storage_size: number; name: string; vm_id: number }
+  ): Promise<{ message: string }> {
+    const response = await this.transport.request({
+      body,
+      method: 'PUT',
+      path: `${buildVolumePath(volumeId)}vm/upgrade/`
+    });
+
+    return { message: response.message };
   }
 
   async saveSnapshotAsVolume(

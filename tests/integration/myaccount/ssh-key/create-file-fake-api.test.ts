@@ -8,6 +8,9 @@ import { createTempHome } from '../../../helpers/temp-home.js';
 describe('ssh-key create from a file against a fake MyAccount API', () => {
   it('reads file content locally and posts the normalized key payload', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/ssh_keys/': () => ({
+        body: { code: 200, data: [], errors: {}, message: 'OK' }
+      }),
       'POST /myaccount/api/v1/ssh_keys/': () => ({
         body: {
           code: 200,
@@ -56,6 +59,7 @@ describe('ssh-key create from a file against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'create',
+          created: true,
           item: {
             attached_nodes: 0,
             created_at: '19-Feb-2025',
@@ -69,8 +73,9 @@ describe('ssh-key create from a file against a fake MyAccount API', () => {
         })}\n`
       );
 
-      expect(server.requests).toHaveLength(1);
-      expect(server.requests[0]).toMatchObject({
+      expect(server.requests).toHaveLength(2);
+      expect(server.requests[0]?.method).toBe('GET');
+      expect(server.requests[1]).toMatchObject({
         method: 'POST',
         pathname: '/myaccount/api/v1/ssh_keys/',
         query: {
@@ -79,7 +84,7 @@ describe('ssh-key create from a file against a fake MyAccount API', () => {
           project_id: '46429'
         }
       });
-      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
         label: 'demo',
         ssh_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA demo@laptop'
       });

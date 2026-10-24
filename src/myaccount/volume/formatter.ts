@@ -10,6 +10,7 @@ import type {
   VolumeListItem,
   VolumePlanItem,
   VolumePlansCommandResult,
+  VolumeResizeCommandResult,
   VolumeSnapshotCommandResult
 } from './service.js';
 
@@ -111,6 +112,15 @@ function formatVolumeCommittedPlanReferenceTable(
   return table.toString();
 }
 
+function formatVolumeResize(result: VolumeResizeCommandResult): string {
+  const from =
+    result.previous_size_gb === null
+      ? ''
+      : ` from ${result.previous_size_gb} GB`;
+
+  return `Resizing volume ${result.volume_id}${from} to ${result.size_gb} GB. ${result.message}\nCheck the new size with ${formatMyAccountCommand(`volume get ${result.volume_id}`)}.\n`;
+}
+
 function renderVolumeHuman(result: VolumeCommandResult): string {
   switch (result.action) {
     case 'create': {
@@ -137,6 +147,8 @@ function renderVolumeHuman(result: VolumeCommandResult): string {
         `Next: run ${formatMyAccountCommand('volume list')} to inspect the current state.\n`
       );
     }
+    case 'resize':
+      return formatVolumeResize(result);
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -205,6 +217,8 @@ function normalizeVolumeJson(result: VolumeCommandResult): JsonValue {
           name: result.volume.name
         }
       };
+    case 'resize':
+      return { ...result };
     case 'delete':
       return result.cancelled
         ? {

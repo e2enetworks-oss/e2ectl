@@ -208,6 +208,7 @@ describe('ssh-key commands', () => {
 
   it('creates SSH keys from files in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
+    stub.listSshKeys.mockResolvedValueOnce([]);
     await seedProfile(runtime);
     const program = createProgram(runtime);
     const publicKeyPath = createTestConfigPath('ssh-key-public');
@@ -239,6 +240,7 @@ describe('ssh-key commands', () => {
     expect(stdout.buffer).toBe(
       `${stableStringify({
         action: 'create',
+        created: true,
         item: {
           attached_nodes: 0,
           created_at: '19-Feb-2025',
@@ -254,7 +256,8 @@ describe('ssh-key commands', () => {
   });
 
   it('renders human create output when json mode is off', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    stub.listSshKeys.mockResolvedValueOnce([]);
     await seedProfile(runtime);
     const program = createProgram(runtime);
     const publicKeyPath = createTestConfigPath('ssh-key-public-human');

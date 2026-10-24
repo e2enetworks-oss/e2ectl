@@ -85,6 +85,7 @@ const EXPECTED_COMMANDS = [
   'myaccount volume snapshot delete',
   'myaccount volume snapshot save-volume',
   'myaccount volume list',
+  'myaccount volume resize',
   'myaccount volume plans',
   'myaccount volume create',
   'myaccount volume get',
@@ -148,7 +149,7 @@ describe('createProgram', () => {
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(112);
+    expect(EXPECTED_COMMANDS).toHaveLength(113);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });

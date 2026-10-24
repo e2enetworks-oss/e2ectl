@@ -16,6 +16,7 @@ import type {
   VolumeCommittedPlan,
   VolumeCreateRequest,
   VolumeCreateResult,
+  VolumeDetails,
   VolumePlan,
   VolumeSummary
 } from './types.js';
@@ -141,6 +142,18 @@ export interface VolumeGetCommandResult {
   volume: VolumeDetailItem;
 }
 
+export interface VolumeResizeOptions extends VolumeContextOptions {
+  size: string;
+}
+
+export interface VolumeResizeCommandResult {
+  action: 'resize';
+  message: string;
+  previous_size_gb: number | null;
+  size_gb: number;
+  volume_id: number;
+}
+
 export interface VolumeSnapshotDeleteOptions extends VolumeContextOptions {
   force?: boolean;
 }
@@ -169,6 +182,7 @@ export type VolumeSnapshotCommandResult =
     };
 
 export type VolumeCommandResult =
+  | VolumeResizeCommandResult
   | VolumeCreateCommandResult
   | VolumeDeleteCommandResult
   | VolumeGetCommandResult
@@ -397,6 +411,38 @@ export class VolumeService {
     };
   }
 
+  async resizeVolume(
+    volumeId: string,
+    options: VolumeResizeOptions
+  ): Promise<VolumeResizeCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const sizeGb = normalizePositiveInteger(options.size, 'Size', '--size');
+    const client = await this.createClient(options);
+    const volume = await client.getVolume(normalizedVolumeId);
+    const vmId = requireAttachedVmId(volume, normalizedVolumeId);
+    const currentSizeGb = normalizeVolumeDetailItem(volume).size_gb;
+
+    assertCanGrowTo(sizeGb, currentSizeGb, normalizedVolumeId);
+    assertListedSize(
+      sizeGb,
+      summarizeVolumePlans(await client.listVolumePlans())
+    );
+
+    const result = await client.resizeVolume(normalizedVolumeId, {
+      block_storage_size: sizeGb,
+      name: volume.name,
+      vm_id: vmId
+    });
+
+    return {
+      action: 'resize',
+      message: result.message,
+      previous_size_gb: currentSizeGb,
+      size_gb: sizeGb,
+      volume_id: normalizedVolumeId
+    };
+  }
+
   async listSnapshots(
     volumeId: string,
     options: VolumeContextOptions
@@ -422,7 +468,10 @@ export class VolumeService {
     const normalizedVolumeId = assertVolumeId(volumeId);
     const name = normalizeSnapshotName(options.name, '--name');
     const client = await this.createClient(options);
-    await requireAttachedVmId(client, normalizedVolumeId);
+    requireAttachedVmId(
+      await client.getVolume(normalizedVolumeId),
+      normalizedVolumeId
+    );
     const result = await client.createSnapshot(normalizedVolumeId, name);
 
     return {
@@ -483,7 +532,10 @@ export class VolumeService {
     const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
     const name = normalizeSnapshotName(options.name, '--name');
     const client = await this.createClient(options);
-    const vmId = await requireAttachedVmId(client, normalizedVolumeId);
+    const vmId = requireAttachedVmId(
+      await client.getVolume(normalizedVolumeId),
+      normalizedVolumeId
+    );
     const result = await client.saveSnapshotAsVolume(normalizedVolumeId, {
       name,
       snapshot_id: Number(normalizedSnapshotId),
@@ -1147,12 +1199,41 @@ function assertCanDelete(isInteractive: boolean, resourceName: string): void {
   );
 }
 
-// E2E snapshots and resizes a volume through the node it is attached to.
-async function requireAttachedVmId(
-  client: VolumeClient,
+// E2E only grows volumes.
+function assertCanGrowTo(
+  sizeGb: number,
+  currentSizeGb: number | null,
   volumeId: number
-): Promise<number> {
-  const vmId = (await client.getVolume(volumeId)).vm_detail?.vm_id;
+): void {
+  if (currentSizeGb === null || sizeGb > currentSizeGb) {
+    return;
+  }
+
+  throw new CliError(
+    `Volume ${volumeId} is already ${currentSizeGb} GB; it can only grow.`,
+    {
+      code: 'VOLUME_SIZE_NOT_LARGER',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a size above ${currentSizeGb} GB from ${formatMyAccountCommand('volume plans')}.`
+    }
+  );
+}
+
+function assertListedSize(sizeGb: number, plans: VolumePlanItem[]): void {
+  if (plans.some((plan) => plan.size_gb === sizeGb)) {
+    return;
+  }
+
+  throw new CliError(`${sizeGb} GB is not a volume size E2E offers.`, {
+    code: 'INVALID_VOLUME_SIZE',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Pick a size from ${formatMyAccountCommand('volume plans')}.`
+  });
+}
+
+// E2E snapshots and resizes a volume through the node it is attached to.
+function requireAttachedVmId(volume: VolumeDetails, volumeId: number): number {
+  const vmId = volume.vm_detail?.vm_id;
   if (vmId !== undefined) {
     return vmId;
   }

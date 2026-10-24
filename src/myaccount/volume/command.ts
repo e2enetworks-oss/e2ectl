@@ -10,6 +10,7 @@ import {
   type VolumeCreateOptions,
   type VolumeDeleteOptions,
   type VolumePlansOptions,
+  type VolumeResizeOptions,
   type VolumeSnapshotDeleteOptions
 } from './service.js';
 
@@ -101,6 +102,29 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
       )
     );
   });
+
+  addContextOptions(
+    command
+      .command('resize <volumeId>')
+      .description(
+        'Grow an attached volume to a larger size from volume plans. E2E resizes it through the node it is attached to; the volume keeps its name and data.'
+      )
+      .requiredOption('--size <size>', 'New size in GB, from volume plans.')
+  ).action(
+    async (
+      volumeId: string,
+      options: VolumeResizeOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.resizeVolume(volumeId, options);
+      runtime.stdout.write(
+        renderVolumeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
 
   addContextOptions(
     command.command('get <volumeId>').description('Get details for a volume.')

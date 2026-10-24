@@ -32,7 +32,9 @@ function renderSshKeyHuman(result: SshKeyCommandResult): string {
   switch (result.action) {
     case 'create':
       return (
-        `Added SSH key: ${result.item.label}\n` +
+        (result.created
+          ? `Added SSH key: ${result.item.label}\n`
+          : `This key is already saved as "${result.item.label}"; returning it instead of adding a copy.\n`) +
         `ID: ${result.item.id}\n` +
         `Type: ${result.item.type}\n`
       );
@@ -58,6 +60,7 @@ function normalizeJsonResult(result: SshKeyCommandResult): JsonValue {
     case 'create':
       return {
         action: 'create',
+        created: result.created,
         item: normalizeJsonItem(result.item)
       };
     case 'delete':

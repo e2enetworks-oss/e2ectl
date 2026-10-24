@@ -52,6 +52,8 @@ export interface SshKeyListCommandResult {
 
 export interface SshKeyCreateCommandResult {
   action: 'create';
+  // False when the same key was already saved and is returned instead.
+  created: boolean;
   item: SshKeyItem;
 }
 
@@ -101,12 +103,25 @@ export class SshKeyService {
     const input = normalizeSshKeyCreateInput(options);
     const publicKey = await this.loadPublicKey(input.publicKeyFile);
     const client = await this.createClient(options);
+    const existing = (await client.listSshKeys()).find(
+      (key) => keyMaterial(key.ssh_key) === keyMaterial(publicKey)
+    );
+
+    if (existing !== undefined) {
+      return {
+        action: 'create',
+        created: false,
+        item: summarizeListedSshKey(existing)
+      };
+    }
+
     const createdKey = await client.createSshKey(
       buildSshKeyCreateRequest(input.label, publicKey)
     );
 
     return {
       action: 'create',
+      created: true,
       item: summarizeCreatedSshKey(createdKey)
     };
   }
@@ -196,6 +211,12 @@ export class SshKeyService {
       throw wrapPublicKeyReadError(publicKeyFile, error);
     }
   }
+}
+
+// The key type and key body; the comment after them does not make a key
+// different.
+function keyMaterial(publicKey: string): string {
+  return publicKey.trim().split(/\s+/).slice(0, 2).join(' ');
 }
 
 function inferSshKeyType(publicKey: string): string {

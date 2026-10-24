@@ -227,6 +227,7 @@ function createServiceFixture(options?: {
     deleteSnapshot: vi.fn(),
     listSnapshots: vi.fn(),
     saveSnapshotAsVolume: vi.fn(),
+    resizeVolume: vi.fn(),
     attachVolumeToNode,
     createVolume: vi.fn(),
     deleteVolume: vi.fn(),

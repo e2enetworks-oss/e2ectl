@@ -8,6 +8,9 @@ import { createTempHome } from '../../../helpers/temp-home.js';
 describe('ssh-key create from stdin against a fake MyAccount API', () => {
   it('reads stdin when --public-key-file - is used', async () => {
     const server = await startTestHttpServer({
+      'GET /myaccount/api/v1/ssh_keys/': () => ({
+        body: { code: 200, data: [], errors: {}, message: 'OK' }
+      }),
       'POST /myaccount/api/v1/ssh_keys/': () => ({
         body: {
           code: 200,
@@ -53,6 +56,7 @@ describe('ssh-key create from stdin against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'create',
+          created: true,
           item: {
             attached_nodes: 0,
             created_at: '19-Feb-2025',
@@ -66,8 +70,9 @@ describe('ssh-key create from stdin against a fake MyAccount API', () => {
         })}\n`
       );
 
-      expect(server.requests).toHaveLength(1);
-      expect(JSON.parse(server.requests[0]!.body)).toEqual({
+      expect(server.requests).toHaveLength(2);
+      expect(server.requests[0]?.method).toBe('GET');
+      expect(JSON.parse(server.requests[1]!.body)).toEqual({
         label: 'demo',
         ssh_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ demo@laptop'
       });
