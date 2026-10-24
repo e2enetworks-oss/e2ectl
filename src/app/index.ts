@@ -34,6 +34,7 @@ export async function runCli(
   prepareProgramForCli(program);
 
   try {
+    rejectMovedCommand(program, argv.slice(2));
     await program.parseAsync(argv);
     return EXIT_CODES.success;
   } catch (error: unknown) {
@@ -99,30 +100,59 @@ function rejectUnknownSubcommand(
     return;
   }
 
-  const groupPath = formatCommandPath(actionCommand);
-  const movedTo = findPlatformWithCommand(actionCommand, unknownName);
   throw new CliError(`Unknown command "${unknownName}".`, {
     code: 'UNKNOWN_COMMAND',
     exitCode: EXIT_CODES.usage,
-    suggestion:
-      movedTo === undefined
-        ? `Run ${groupPath} --help to see the commands.`
-        : `Commands now start with the platform name. Did you mean "${groupPath} ${movedTo.name()} ${unknownName}"?`
+    suggestion: `Run ${formatCommandPath(actionCommand)} --help to see the commands.`
   });
 }
 
-// At the top level, an unknown word may be a product that now lives under a
-// platform group, such as `node` under `myaccount`.
-function findPlatformWithCommand(
-  command: Command,
-  name: string
-): Command | undefined {
-  if (command.parent !== null) {
-    return undefined;
+// Catches commands typed in their old place, such as `e2ectl node list`,
+// before Commander parses options, so a command with options of its own
+// (`--alias prod`) still gets the hint. The hint repeats only the command
+// words, never option values, so a password typed on the line is not
+// echoed back.
+function rejectMovedCommand(program: Command, args: string[]): void {
+  // Root options such as --json take no value, so they can be skipped.
+  const firstWordIndex = args.findIndex((arg) => !arg.startsWith('-'));
+  const commandWords: string[] = [];
+  for (const arg of firstWordIndex === -1 ? [] : args.slice(firstWordIndex)) {
+    if (arg.startsWith('-')) {
+      break;
+    }
+    commandWords.push(arg);
   }
 
-  return command.commands.find((platform) =>
-    platform.commands.some((product) => product.name() === name)
+  const [firstWord] = commandWords;
+  if (
+    firstWord === undefined ||
+    program.commands.some((command) => command.name() === firstWord)
+  ) {
+    return;
+  }
+
+  const platform = findPlatformWithProduct(program, firstWord);
+  if (platform === undefined) {
+    return;
+  }
+
+  throw new CliError(`Unknown command "${firstWord}".`, {
+    code: 'UNKNOWN_COMMAND',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Commands now start with the platform name. Did you mean "${program.name()} ${platform.name()} ${commandWords.join(' ')}"?`
+  });
+}
+
+// A platform is a top-level group whose commands have commands of their own
+// (myaccount > node > list). config is not one: its commands are leaves.
+function findPlatformWithProduct(
+  program: Command,
+  productName: string
+): Command | undefined {
+  return program.commands.find((platform) =>
+    platform.commands.some(
+      (product) => product.name() === productName && product.commands.length > 0
+    )
   );
 }
 
@@ -144,7 +174,8 @@ function isCommanderSuccessExit(error: unknown): error is CommanderError {
   return (
     error instanceof CommanderError &&
     (error.code === 'commander.helpDisplayed' ||
-      error.code === 'commander.version')
+      error.code === 'commander.version' ||
+      (error.code === 'commander.help' && error.exitCode === 0))
   );
 }
 

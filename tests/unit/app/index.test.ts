@@ -71,7 +71,19 @@ describe('runCli', () => {
   it.each([
     [
       ['node', 'list'],
-      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
+    ],
+    [
+      ['node', 'get', '123', '--alias', 'prod', '--json'],
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node get 123"?\n'
+    ],
+    [
+      ['--json', 'dbaas', 'create', '--password', 'secret-value'],
+      'Error: Unknown command "dbaas".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount dbaas create"?\n'
+    ],
+    [
+      ['list'],
+      'Error: Unknown command "list".\n\nNext step: Run e2ectl --help to see the commands.\n'
     ],
     [
       ['confg', 'list'],
@@ -93,6 +105,31 @@ describe('runCli', () => {
     expect(exitCode).toBe(2);
     expect(stdout.buffer).toBe('');
     expect(stderr.buffer).toBe(expected);
+  });
+
+  it.each([
+    [['help', 'myaccount']],
+    [['myaccount', 'help', 'node']],
+    [['myaccount', 'node', 'help', 'list']]
+  ])('exits 0 after showing help through %j', async (args) => {
+    const { runtime, stderr } = createRuntimeFixture();
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+
+    try {
+      const exitCode = await runCli(
+        ['node', CLI_COMMAND_NAME, ...args],
+        runtime,
+        stderr
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stderr.buffer).toBe('');
+      expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
+    } finally {
+      writeSpy.mockRestore();
+    }
   });
 
   it('still shows help for a command group typed on its own', async () => {

@@ -65,6 +65,17 @@ describe('parseDomainName', () => {
   });
 });
 
+describe('reserved names', () => {
+  it.each(['app/foo', 'config/foo', 'core/foo', 'http/foo'])(
+    'refuses %s because that folder is shared code',
+    (input) => {
+      expect(() => parseDomainName(input)).toThrow(
+        'is shared code under src, not a platform'
+      );
+    }
+  );
+});
+
 describe('text insertion', () => {
   it('adds a line after a multi-line last import', () => {
     expect(

@@ -8,6 +8,9 @@ const NAME_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 // (createMyAccountTransport, not createMyaccountTransport).
 const MYACCOUNT_NAME = 'MyAccount';
 
+// Shared folders under src that must never become a platform.
+const RESERVED_PLATFORMS = new Set(['app', 'config', 'core', 'http']);
+
 export function parseDomainName(input) {
   const parts = (input ?? '').trim().split('/');
 
@@ -22,6 +25,12 @@ export function parseDomainName(input) {
   }
 
   const [platform, product] = parts;
+  if (RESERVED_PLATFORMS.has(platform)) {
+    throw new Error(
+      `"${platform}" is shared code under src, not a platform. Use a platform such as myaccount or tir.`
+    );
+  }
+
   const isMyAccount = platform === 'myaccount';
   const platformName = isMyAccount ? MYACCOUNT_NAME : toPascalCase(platform);
   // MyAccount products keep short names (NodeApiClient). Products on other
@@ -190,8 +199,9 @@ import {
   type ApiTransport
 } from '../http/index.js';
 
-// Uses the shared E2E API address. Pass a different baseUrl here if this
-// platform's API lives elsewhere.
+// Until this platform has its own address, requests go to HttpTransport's
+// default address, which is the MyAccount API. Pass this platform's
+// baseUrl here once it is known.
 export function create${platformName}Transport(
   credentials: ApiClientCredentials,
   options: ApiClientOptions = {}

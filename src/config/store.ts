@@ -394,6 +394,8 @@ function validateProfileShape(
   return profile;
 }
 
+// Keeps only the known TIR fields; any other key under "tir" is dropped and
+// disappears from the file on the next save.
 function validateTirContextShape(
   alias: string,
   value: unknown,

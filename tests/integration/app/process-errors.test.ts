@@ -23,7 +23,7 @@ describe('built CLI errors', () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
     );
   });
 
