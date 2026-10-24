@@ -203,7 +203,7 @@ describe('tir account, project and configure against a fake TIR API', () => {
       );
 
       expect(result.exitCode).toBe(3);
-      expect(result.stderr).toContain('TIR API request failed: Forbidden');
+      expect(result.stderr).toContain('TIR API request failed: User not found');
       expect(result.stderr).toContain(
         'Next step: Check the TIR account and project'
       );

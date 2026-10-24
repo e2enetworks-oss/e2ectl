@@ -245,7 +245,7 @@ describe('node upgrade against a fake MyAccount API', () => {
         }
       );
 
-      expect(result.exitCode).toBe(5);
+      expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe('');
       expect(result.stderr).toContain(
         'Error: MyAccount API request failed: Action not allowed on Resources that are part of Disaster Recovery Plan\n'
