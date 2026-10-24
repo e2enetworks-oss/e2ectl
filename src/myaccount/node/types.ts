@@ -197,10 +197,7 @@ export interface NodeUpgradeResult {
 }
 
 export type NodeActionType =
-  | 'add_ssh_keys'
-  | 'power_off'
-  | 'power_on'
-  | 'save_images';
+  'add_ssh_keys' | 'power_off' | 'power_on' | 'save_images';
 
 export interface NodeActionSshKey {
   label: string;

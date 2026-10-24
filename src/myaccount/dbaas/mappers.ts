@@ -225,9 +225,7 @@ export function summarizeSupportedClusterOrNull(
   cluster: DbaasClusterSummary
 ): DbaasSummaryItem | null {
   const software = cluster.software as
-    | DbaasClusterSummary['software']
-    | null
-    | undefined;
+    DbaasClusterSummary['software'] | null | undefined;
   if (!software?.name || !software?.version) {
     return null;
   }

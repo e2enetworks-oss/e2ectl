@@ -19,10 +19,7 @@ interface NodeCatalogPlansOptionsInput {
 }
 
 type NodeCatalogPlansEmptyReason =
-  | 'no_committed'
-  | 'no_committed_for_family'
-  | 'no_family_match'
-  | 'no_plans';
+  'no_committed' | 'no_committed_for_family' | 'no_family_match' | 'no_plans';
 
 interface NodeCatalogPlansSummary {
   available_families: string[];

@@ -56,9 +56,7 @@ export interface ImageRenameCommandResult {
 }
 
 export type ImageCommandResult =
-  | ImageDeleteCommandResult
-  | ImageListCommandResult
-  | ImageRenameCommandResult;
+  ImageDeleteCommandResult | ImageListCommandResult | ImageRenameCommandResult;
 
 interface ImageStore {
   readonly configPath: string;

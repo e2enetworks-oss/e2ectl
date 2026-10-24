@@ -186,8 +186,7 @@ export interface NodeUpgradeCompletedCommandResult {
 }
 
 export type NodeUpgradeCommandResult =
-  | NodeUpgradeCancelledCommandResult
-  | NodeUpgradeCompletedCommandResult;
+  NodeUpgradeCancelledCommandResult | NodeUpgradeCompletedCommandResult;
 
 export interface NodeCatalogOsCommandResult {
   action: 'catalog-os';
@@ -202,10 +201,7 @@ export interface NodeCatalogPlansCommandResult {
 }
 
 export type NodeCatalogPlansEmptyReason =
-  | 'no_committed'
-  | 'no_committed_for_family'
-  | 'no_family_match'
-  | 'no_plans';
+  'no_committed' | 'no_committed_for_family' | 'no_family_match' | 'no_plans';
 
 export interface NodeCatalogPlansSummary {
   available_families: string[];

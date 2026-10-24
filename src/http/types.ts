@@ -37,12 +37,7 @@ export type ApiResponse<
 > = ApiEnvelope<TData> & TExtra;
 
 export type ApiErrorValue =
-  | null
-  | string
-  | string[]
-  | number
-  | boolean
-  | Record<string, unknown>;
+  null | string | string[] | number | boolean | Record<string, unknown>;
 
 export interface ApiRequestOptions<TResponse = ApiEnvelope<unknown>> {
   body?: unknown;

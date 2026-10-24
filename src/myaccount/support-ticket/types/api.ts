@@ -12,9 +12,7 @@ export type SupportTicketPriority = 'High' | 'Low' | 'Medium';
 export type SupportTicketCategory = 'Billing' | 'Cloud' | 'Network' | 'Sales';
 
 export type SupportTicketFilterCategory =
-  | SupportTicketCategory
-  | 'Abuse'
-  | 'SOC';
+  SupportTicketCategory | 'Abuse' | 'SOC';
 
 export interface SupportTicketResource {
   id?: string;
@@ -23,10 +21,7 @@ export interface SupportTicketResource {
 }
 
 export type SupportTicketContactPersonType =
-  | 'Admin'
-  | 'Billing'
-  | 'Manager'
-  | 'Technical Lead';
+  'Admin' | 'Billing' | 'Manager' | 'Technical Lead';
 
 export interface SupportTicketSummary {
   assignee_id?: string | null;

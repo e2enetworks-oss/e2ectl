@@ -186,9 +186,7 @@ export interface LoadBalancerBackendServerDeleteCommandResult {
 
 export interface LoadBalancerNetworkCommandResult {
   action:
-    | 'network-reserve-ip-reserve'
-    | 'network-vpc-attach'
-    | 'network-vpc-detach';
+    'network-reserve-ip-reserve' | 'network-vpc-attach' | 'network-vpc-detach';
   lb_id: string;
   lb_name: string;
   message: string;
