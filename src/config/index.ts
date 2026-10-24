@@ -9,7 +9,10 @@ export {
   resolveAccountCredentials,
   resolveCredentials,
   resolveStoredAccountCredentials,
-  resolveStoredCredentials
+  resolveStoredCredentials,
+  resolveStoredTirCredentials,
+  resolveTirCredentials,
+  type TirRequirement
 } from './resolver.js';
 export { ConfigStore, createEmptyConfig, normalizeConfig } from './store.js';
 export type {
@@ -20,6 +23,7 @@ export type {
   ResolvedAccountCredentials,
   ProfileSummary,
   ResolvedCredentials,
+  ResolvedTirCredentials,
   TirContext,
   TirContextField
 } from './types.js';

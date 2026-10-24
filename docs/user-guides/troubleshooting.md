@@ -14,7 +14,7 @@ Checks:
 
 - confirm the credential file came from MyAccount API & IAM
 - rerun `e2ectl config list` and make sure the expected alias exists
-- if you exported `E2E_API_KEY` or `E2E_AUTH_TOKEN`, remember they override the saved alias
+- if you exported `E2E_API_KEY` or `E2E_AUTH_TOKEN`, they win over the default profile; pass `--alias` to use a saved profile's key and token instead (see [Which value wins](./config.md#which-value-wins))
 
 Fixes:
 

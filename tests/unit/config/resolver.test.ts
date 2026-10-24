@@ -205,8 +205,19 @@ describe('resolveCredentials', () => {
       auth_token: 'auth-env',
       project_id: '456',
       location: 'Chennai',
-      source: 'mixed'
+      source: 'env'
     });
+  });
+
+  it('reports mixed auth when the key and token come from different places', () => {
+    const result = resolveCredentials({
+      config,
+      env: { E2E_API_KEY: 'api-env' }
+    });
+
+    expect(result.api_key).toBe('api-env');
+    expect(result.auth_token).toBe('auth-prod');
+    expect(result.source).toBe('mixed');
   });
 
   it('ignores a stale default alias when env auth and env context are complete', () => {

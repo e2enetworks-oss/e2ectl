@@ -58,21 +58,27 @@ e2ectl config set-default --alias <profile-alias>
 e2ectl config remove --alias <profile-alias>
 ```
 
-### Understand Resolution Order
+### Which Value Wins
 
-Authentication resolves in this order:
+Every value is picked in the same order: the command's flag, then its environment variable,
+then the saved profile. The first one that is set wins.
 
-1. `E2E_API_KEY` and `E2E_AUTH_TOKEN`
-2. `--alias`
-3. the default saved alias
+| Value              | Flag                             | Environment variable            | Saved profile                       |
+| ------------------ | -------------------------------- | ------------------------------- | ----------------------------------- |
+| API key and token  | `--alias` (the profile it names) | `E2E_API_KEY`, `E2E_AUTH_TOKEN` | the default profile                 |
+| MyAccount project  | `--project-id`                   | `E2E_PROJECT_ID`                | `default_project_id` on the profile |
+| MyAccount location | `--location`                     | `E2E_LOCATION`                  | `default_location` on the profile   |
 
-Project context resolves in this order:
+Two things follow from this:
 
-1. `--project-id` and `--location`
-2. `E2E_PROJECT_ID` and `E2E_LOCATION`
-3. the saved defaults on the selected alias
+- `--alias prod` uses the `prod` key and token even when `E2E_API_KEY` and `E2E_AUTH_TOKEN`
+  are set. Without `--alias`, those environment variables win over the default profile.
+- `--alias` only chooses the key and token. If `E2E_PROJECT_ID` or `E2E_LOCATION` is set, it
+  still wins over the project and location saved on that profile. Unset them, or pass
+  `--project-id` and `--location`, when you switch profiles.
 
-Account-scoped `project` commands use the same auth path, but they do not require project or location context.
+Account-scoped `project` commands use the same key and token, but they do not need a project or
+location.
 
 ## Examples
 

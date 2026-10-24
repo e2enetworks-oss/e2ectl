@@ -1,6 +1,5 @@
-// The TIR account, project and location a profile works in. Saved now so
-// old and new config files share one shape; TIR commands start using it in
-// a later release.
+// The TIR account, project and location a profile works in, saved by
+// `tir configure` and used by every later `tir` command.
 export const TIR_CONTEXT_FIELDS = [
   'account_id',
   'location',
@@ -28,13 +27,16 @@ export interface ConfigFile {
   default?: string;
 }
 
+// Where the key and token came from.
+export type CredentialSource = 'env' | 'profile' | 'mixed';
+
 export interface ResolvedCredentials {
   api_key: string;
   auth_token: string;
   alias?: string;
   location: string;
   project_id: string;
-  source: 'env' | 'profile' | 'mixed';
+  source: CredentialSource;
 }
 
 export interface ResolvedAccountCredentials {
@@ -43,7 +45,19 @@ export interface ResolvedAccountCredentials {
   alias?: string;
   location?: string;
   project_id?: string;
-  source: 'env' | 'profile' | 'mixed';
+  source: CredentialSource;
+}
+
+// TIR credentials carry only TIR context, never the MyAccount project and
+// location, so one platform's values cannot leak into the other's requests.
+export interface ResolvedTirCredentials {
+  api_key: string;
+  auth_token: string;
+  account_id?: string;
+  alias?: string;
+  location?: string;
+  project_id?: string;
+  source: CredentialSource;
 }
 
 export interface ProfileSummary {
@@ -70,4 +84,10 @@ export const AUTH_ENV_VAR_BY_FIELD: Record<AuthField, string> = {
 export const CONTEXT_ENV_VAR_BY_FIELD: Record<ContextField, string> = {
   project_id: 'E2E_PROJECT_ID',
   location: 'E2E_LOCATION'
+};
+
+export const TIR_CONTEXT_ENV_VAR_BY_FIELD: Record<TirContextField, string> = {
+  account_id: 'E2E_TIR_ACCOUNT_ID',
+  location: 'E2E_TIR_LOCATION',
+  project_id: 'E2E_TIR_PROJECT_ID'
 };
