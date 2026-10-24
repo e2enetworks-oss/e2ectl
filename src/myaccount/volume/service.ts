@@ -4,6 +4,7 @@ import {
   type ResolvedCredentials
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
+import { confirmUnlessForced } from '../../core/confirm.js';
 import { CliError, EXIT_CODES, isAppError } from '../../core/errors.js';
 import {
   normalizeSnapshotId,
@@ -142,12 +143,14 @@ export interface VolumeGetCommandResult {
 }
 
 export interface VolumeResizeOptions extends VolumeContextOptions {
+  force?: boolean;
   size: string;
 }
 
 export interface VolumeResizeCommandResult {
   action: 'resize';
-  message: string;
+  cancelled: boolean;
+  message: string | null;
   previous_size_gb: number | null;
   size_gb: number;
   volume_id: number;
@@ -427,6 +430,22 @@ export class VolumeService {
     assertCanGrowTo(sizeGb, currentSizeGb, normalizedVolumeId);
     assertListedSize(sizeGb, summarizeVolumePlans(plans));
 
+    const outcome = {
+      action: 'resize' as const,
+      previous_size_gb: currentSizeGb,
+      size_gb: sizeGb,
+      volume_id: normalizedVolumeId
+    };
+    // Volumes only grow, and the bigger size is billed, so ask first.
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
+      `Grow volume ${normalizedVolumeId} to ${sizeGb} GB? A volume cannot be shrunk again.`
+    );
+    if (!confirmed) {
+      return { ...outcome, cancelled: true, message: null };
+    }
+
     const result = await client.resizeVolume(normalizedVolumeId, {
       block_storage_size: sizeGb,
       name: volume.name,
@@ -434,11 +453,9 @@ export class VolumeService {
     });
 
     return {
-      action: 'resize',
-      message: result.message,
-      previous_size_gb: currentSizeGb,
-      size_gb: sizeGb,
-      volume_id: normalizedVolumeId
+      ...outcome,
+      cancelled: false,
+      message: result.message
     };
   }
 
@@ -491,20 +508,18 @@ export class VolumeService {
     const normalizedVolumeId = assertVolumeId(volumeId);
     const normalizedSnapshotId = normalizeSnapshotId(snapshotId, 'snapshot_id');
 
-    if (!(options.force ?? false)) {
-      assertCanDelete(this.dependencies.isInteractive, 'snapshot');
-      if (
-        !(await this.dependencies.confirm(
-          `Delete snapshot ${normalizedSnapshotId} of volume ${normalizedVolumeId}? This cannot be undone.`
-        ))
-      ) {
-        return {
-          action: 'snapshot-delete',
-          cancelled: true,
-          snapshot_id: normalizedSnapshotId,
-          volume_id: normalizedVolumeId
-        };
-      }
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
+      `Delete snapshot ${normalizedSnapshotId} of volume ${normalizedVolumeId}? This cannot be undone.`
+    );
+    if (!confirmed) {
+      return {
+        action: 'snapshot-delete',
+        cancelled: true,
+        snapshot_id: normalizedSnapshotId,
+        volume_id: normalizedVolumeId
+      };
     }
 
     const client = await this.createClient(options);

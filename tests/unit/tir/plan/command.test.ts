@@ -186,7 +186,11 @@ describe('tir plan list', () => {
         Promise.reject(
           new AppError('TIR API request failed: Bad Request', {
             code: 'API_REQUEST_FAILED',
-            details: ['HTTP status: 400 Bad Request']
+            details: [
+              'HTTP status: 400 Bad Request',
+              'Errors: "Image Version is either invalid or not provided"'
+            ],
+            httpStatus: 400
           })
         ),
       [],
@@ -200,18 +204,25 @@ describe('tir plan list', () => {
     });
   });
 
-  it('passes other API failures through unchanged', async () => {
-    const failure = new AppError('TIR API request failed: Forbidden', {
-      code: 'API_REQUEST_FAILED',
-      details: ['HTTP status: 403 Forbidden']
-    });
+  it.each([
+    [403, 'HTTP status: 403 Forbidden'],
+    [400, 'Errors: "Location is not valid"']
+  ])(
+    'passes other API failures (%s) through unchanged',
+    async (status, detail) => {
+      const failure = new AppError('TIR API request failed', {
+        code: 'API_REQUEST_FAILED',
+        details: [detail],
+        httpStatus: status
+      });
 
-    await expect(
-      runTirPlanList(
-        () => Promise.reject(failure),
-        [],
-        ['--image-version-id', '999']
-      )
-    ).rejects.toBe(failure);
-  });
+      await expect(
+        runTirPlanList(
+          () => Promise.reject(failure),
+          [],
+          ['--image-version-id', '999']
+        )
+      ).rejects.toBe(failure);
+    }
+  );
 });

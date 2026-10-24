@@ -3,6 +3,7 @@ import {
   type ConfigFile,
   type ResolvedCredentials
 } from '../../config/index.js';
+import { confirmUnlessForced } from '../../core/confirm.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { EosClient } from './client.js';
@@ -70,8 +71,9 @@ export class EosService {
     options: EosForceOptions
   ): Promise<EosCommandResult> {
     const bucket = normalizeBucketName(name);
-    const confirmed = await this.confirmUnlessForced(
-      options,
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
       `Delete bucket ${bucket} and every object in it? This cannot be undone.`
     );
     if (!confirmed) {
@@ -129,8 +131,9 @@ export class EosService {
     const client = await this.createClient(options);
     // E2E reports success for a key that does not exist, so check first.
     await findKey(client, key);
-    const confirmed = await this.confirmUnlessForced(
-      options,
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
       `Delete access key ${key}? Anything using it stops working.`
     );
     if (!confirmed) {
@@ -211,28 +214,6 @@ export class EosService {
       bucket: name,
       message: result.message
     };
-  }
-
-  private async confirmUnlessForced(
-    options: EosForceOptions,
-    question: string
-  ): Promise<boolean> {
-    if (options.force ?? false) {
-      return true;
-    }
-
-    if (!this.dependencies.isInteractive) {
-      throw new CliError(
-        'This delete needs confirmation in an interactive terminal.',
-        {
-          code: 'CONFIRMATION_REQUIRED',
-          exitCode: EXIT_CODES.usage,
-          suggestion: 'Re-run the command with --force to skip the prompt.'
-        }
-      );
-    }
-
-    return await this.dependencies.confirm(question);
   }
 
   private async createClient(options: EosContextOptions): Promise<EosClient> {

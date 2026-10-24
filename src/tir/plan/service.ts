@@ -54,11 +54,14 @@ async function listPlansOrExplain(
   try {
     return await client.listPlans(imageVersionId);
   } catch (error: unknown) {
-    // TIR answers 400 for an image version it does not know.
+    // TIR answers 400, naming the image version, for one it does not know.
     if (
       imageVersionId !== undefined &&
       error instanceof AppError &&
-      error.details.some((detail) => detail.startsWith('HTTP status: 400'))
+      error.httpStatus === 400 &&
+      [error.message, ...error.details].some((text) =>
+        /image version/i.test(text)
+      )
     ) {
       throw new CliError(`TIR does not know image version ${imageVersionId}.`, {
         cause: error,

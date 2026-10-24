@@ -113,12 +113,16 @@ function formatVolumeCommittedPlanReferenceTable(
 }
 
 function formatVolumeResize(result: VolumeResizeCommandResult): string {
+  if (result.cancelled) {
+    return 'Resize cancelled.\n';
+  }
+
   const from =
     result.previous_size_gb === null
       ? ''
       : ` from ${result.previous_size_gb} GB`;
 
-  return `Resizing volume ${result.volume_id}${from} to ${result.size_gb} GB. ${result.message}\nCheck the new size with ${formatMyAccountCommand(`volume get ${result.volume_id}`)}.\n`;
+  return `Resizing volume ${result.volume_id}${from} to ${result.size_gb} GB. ${result.message ?? ''}\nCheck the new size with ${formatMyAccountCommand(`volume get ${result.volume_id}`)}.\n`;
 }
 
 function renderVolumeHuman(result: VolumeCommandResult): string {

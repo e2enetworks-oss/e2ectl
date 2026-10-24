@@ -576,6 +576,35 @@ describe('HttpTransport', () => {
     });
   });
 
+  it('hides secret keys in a response preview and keeps the HTTP status', async () => {
+    const transport = new HttpTransport(credentials, {
+      apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
+      projectContext,
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            json: () => Promise.reject(new SyntaxError('Unexpected end')),
+            text: () =>
+              Promise.resolve('[{"access_key":"AK1","secret_key":"TOPSECRET"')
+          })
+        )
+    });
+
+    const error = await transport
+      .get('/storage/core/list/users/')
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ httpStatus: 500 });
+    expect(JSON.stringify(error)).not.toContain('TOPSECRET');
+    expect((error as { details: string[] }).details.join('\n')).toContain(
+      '"secret_key":"[REDACTED]"'
+    );
+  });
+
   it('wraps network failures in an actionable CLI error', async () => {
     vi.useFakeTimers();
 

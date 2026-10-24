@@ -14,6 +14,9 @@ export interface AppErrorOptions {
   code: string;
   details?: string[];
   exitCode?: ExitCode;
+  // The HTTP status of a failed API call, so callers can tell replies apart
+  // without reading the message.
+  httpStatus?: number;
   suggestion?: string;
 }
 
@@ -23,12 +26,14 @@ export class AppError extends Error {
   readonly code: string;
   readonly details: string[];
   readonly exitCode: ExitCode;
+  readonly httpStatus: number | undefined;
   readonly suggestion: string | undefined;
 
   constructor(message: string, options: AppErrorOptions) {
     super(message);
     this.code = options.code;
     this.exitCode = options.exitCode ?? EXIT_CODES.general;
+    this.httpStatus = options.httpStatus;
     this.details = options.details ?? [];
     this.suggestion = options.suggestion;
     this.cause = options.cause;

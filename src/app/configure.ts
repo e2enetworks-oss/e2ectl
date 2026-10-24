@@ -249,8 +249,9 @@ function parsePlatforms(values: string[]): SetupPlatform[] {
       throw new CliError(`Unknown platform "${value}".`, {
         code: 'INVALID_PLATFORM',
         exitCode: EXIT_CODES.usage,
+        // The menu's numbers only work in the interactive menu.
         suggestion:
-          'Use --platform tir or --platform myaccount (TIR is recommended).'
+          '--platform takes a name: --platform tir or --platform myaccount (TIR is recommended).'
       });
     }
     platforms.add(platform);

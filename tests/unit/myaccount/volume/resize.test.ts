@@ -46,7 +46,8 @@ function volumeMocks(volume: { size_string: string; vm_id?: number | null }) {
 async function resize(
   mocks: ReturnType<typeof volumeMocks>,
   size: string,
-  json = false
+  json = false,
+  confirmAnswer?: boolean
 ): Promise<string> {
   const store = new ConfigStore({
     configPath: createTestConfigPath('volume-resize')
@@ -60,7 +61,9 @@ async function resize(
   const stdout = new MemoryWriter();
   await createProgram(
     createTestRuntime({
+      confirm: () => Promise.resolve(confirmAnswer ?? false),
       createVolumeClient: () => mocks as unknown as VolumeClient,
+      isInteractive: confirmAnswer !== undefined,
       stdout,
       store
     })
@@ -73,12 +76,23 @@ async function resize(
     'resize',
     '5',
     '--size',
-    size
+    size,
+    // Without an answer to give, the test runs as a script would: --force.
+    ...(confirmAnswer === undefined ? ['--force'] : [])
   ]);
   return stdout.buffer;
 }
 
 describe('volume resize', () => {
+  it('asks first, and does nothing when the answer is no', async () => {
+    const mocks = volumeMocks({ size_string: '100 GB', vm_id: 9 });
+
+    expect(await resize(mocks, '200', false, false)).toBe(
+      'Resize cancelled.\n'
+    );
+    expect(mocks.resizeVolume).not.toHaveBeenCalled();
+  });
+
   it('grows the volume through its node and keeps its name', async () => {
     const mocks = volumeMocks({ size_string: '100 GB', vm_id: 9 });
 
@@ -91,6 +105,7 @@ describe('volume resize', () => {
     });
     expect(output).toEqual({
       action: 'resize',
+      cancelled: false,
       message: 'Block Storage is upgraded.',
       previous_size_gb: 100,
       size_gb: 200,

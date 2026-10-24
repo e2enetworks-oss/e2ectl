@@ -110,6 +110,7 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
         'Grow an attached volume to a larger size from volume plans. E2E resizes it through the node it is attached to; the volume keeps its name and data.'
       )
       .requiredOption('--size <size>', 'New size in GB, from volume plans.')
+      .option('--force', 'Skip the confirmation prompt.')
   ).action(
     async (
       volumeId: string,

@@ -4,6 +4,7 @@ import {
   type ResolvedCredentials
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
+import { confirmUnlessForced } from '../../core/confirm.js';
 import { AppError, CliError, EXIT_CODES } from '../../core/errors.js';
 import { pollUntilFound, type PollOptions } from '../../core/waiter.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
@@ -946,23 +947,18 @@ export class NodeService {
     const client = await this.createNodeClient(options);
     await assertSnapshotExists(client, normalizedNodeId, normalizedSnapshotId);
 
-    if (!(options.force ?? false)) {
-      assertConfirmationAllowed(
-        this.dependencies.isInteractive,
-        'Deleting a snapshot requires confirmation in an interactive terminal.'
-      );
-      if (
-        !(await this.dependencies.confirm(
-          `Delete snapshot ${normalizedSnapshotId} of node ${normalizedNodeId}? This cannot be undone.`
-        ))
-      ) {
-        return {
-          action: 'snapshot-delete',
-          cancelled: true,
-          node_id: normalizedNodeId,
-          snapshot_id: normalizedSnapshotId
-        };
-      }
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
+      `Delete snapshot ${normalizedSnapshotId} of node ${normalizedNodeId}? This cannot be undone.`
+    );
+    if (!confirmed) {
+      return {
+        action: 'snapshot-delete',
+        cancelled: true,
+        node_id: normalizedNodeId,
+        snapshot_id: normalizedSnapshotId
+      };
     }
 
     const result = await client.deleteSnapshot(

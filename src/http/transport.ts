@@ -490,6 +490,7 @@ function buildFallbackApiError(
       response.status === 401 || response.status === 403
         ? EXIT_CODES.auth
         : EXIT_CODES.network,
+    httpStatus: response.status,
     suggestion: chooseFailureSuggestion(
       response.status,
       input.forbiddenSuggestion
@@ -587,7 +588,11 @@ function hasStatusCodeFailure(payload: Record<string, unknown>): boolean {
 }
 
 function summarizeResponseBody(value: string): string | undefined {
-  const normalized = value.replace(/\s+/g, ' ').trim();
+  // Some replies (EOS key and access lists) carry secret keys; never show them.
+  const normalized = value
+    .replace(/("secret_key"\s*:\s*")[^"]*"/g, '$1[REDACTED]"')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (normalized.length === 0) {
     return undefined;
   }
