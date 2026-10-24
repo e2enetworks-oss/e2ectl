@@ -22,21 +22,3 @@ export function normalizeLocation(value: string): Location {
     suggestion: 'Use Delhi or Chennai.'
   });
 }
-
-// label names the value, for example "TIR project ID".
-export function parseNumericId(
-  value: string,
-  label: string,
-  flag: string
-): number {
-  const typed = value.trim();
-  if (/^\d+$/.test(typed)) {
-    return Number(typed);
-  }
-
-  throw new CliError(`${label} must be numeric.`, {
-    code: 'INVALID_ID',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a numeric id with ${flag}.`
-  });
-}

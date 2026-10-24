@@ -20,6 +20,14 @@ export function addContextOptions<TCommand extends Command>(
     .option('--location <location>', 'Override the location for this command.');
 }
 
+// The flags addTirContextOptions adds.
+export interface TirContextOptions {
+  accountId?: string;
+  alias?: string;
+  location?: string;
+  projectId?: string;
+}
+
 // TIR commands that work inside a project. Each flag wins over its
 // E2E_TIR_* environment variable and over the profile's saved TIR context.
 export function addTirContextOptions<TCommand extends Command>(

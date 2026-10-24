@@ -2,7 +2,6 @@ import {
   resolveStoredCredentials,
   type ResolvedCredentials
 } from '../../config/index.js';
-import { normalizeRequiredNumericId } from '../node/index.js';
 import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import { isNonEmptyString } from '../../core/guards.js';
@@ -93,6 +92,7 @@ import type {
   ResolvedLoadBalancerCreateBilling
 } from './types/index.js';
 import type { VpcClient } from '../vpc/index.js';
+import { normalizeRequiredNumericId } from '../../core/normalize.js';
 
 export class LoadBalancerService {
   constructor(private readonly dependencies: LoadBalancerServiceDependencies) {}

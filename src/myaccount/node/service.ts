@@ -39,10 +39,7 @@ import {
 import { buildDefaultNodeCreateRequest } from './defaults.js';
 import {
   normalizeBillingType,
-  normalizeOptionalNumericId,
-  normalizeOptionalString,
-  normalizeRequiredNumericId,
-  normalizeRequiredString
+  normalizeOptionalString
 } from './normalizers.js';
 import type {
   NodeActionSshKey,
@@ -58,6 +55,11 @@ import type {
   NodeCommittedCreateStatus,
   NodeUpgradeResult
 } from './types.js';
+import {
+  normalizeOptionalNumericId,
+  normalizeRequiredNumericId,
+  normalizeRequiredString
+} from '../../core/normalize.js';
 
 export interface NodeContextOptions {
   alias?: string;

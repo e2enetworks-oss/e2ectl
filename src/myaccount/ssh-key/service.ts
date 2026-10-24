@@ -7,6 +7,7 @@ import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import type { SshKeyClient, SshKeyCreateRequest } from './client.js';
 import type { SshKeyCreateResult, SshKeySummary } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 const SSH_KEY_TYPE_LABELS: Record<string, string> = {
   'ecdsa-sha2-nistp256': 'ECDSA',
@@ -322,23 +323,6 @@ function summarizeListedSshKey(item: SshKeySummary): SshKeyItem {
     public_key: item.ssh_key,
     type: item.ssh_key_type ?? inferSshKeyType(item.ssh_key)
   };
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function assertCanDelete(isInteractive: boolean, resourceName: string): void {

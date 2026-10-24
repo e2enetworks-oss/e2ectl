@@ -12,11 +12,11 @@ import type {
   NodeCatalogPlanItem,
   NodeCatalogQuery
 } from './types.js';
+import { normalizeBillingType } from './normalizers.js';
 import {
-  normalizeBillingType,
   normalizeRequiredNumericId,
   normalizeRequiredString
-} from './normalizers.js';
+} from '../../core/normalize.js';
 
 interface NodeCatalogPlansOptionsInput {
   category: string;

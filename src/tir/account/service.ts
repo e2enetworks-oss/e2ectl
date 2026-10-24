@@ -1,6 +1,6 @@
 import {
   resolveStoredTirCredentials,
-  type ConfigFile,
+  type CredentialResolutionStore,
   type ResolvedTirCredentials
 } from '../../config/index.js';
 import type { TirAccountClient } from './client.js';
@@ -11,14 +11,9 @@ import type {
   TirAccountListCommandResult
 } from './types.js';
 
-interface TirAccountStore {
-  readonly configPath: string;
-  read(): Promise<ConfigFile>;
-}
-
 export interface TirAccountServiceDependencies {
   createTirAccountClient(credentials: ResolvedTirCredentials): TirAccountClient;
-  store: TirAccountStore;
+  store: CredentialResolutionStore;
 }
 
 export class TirAccountService {

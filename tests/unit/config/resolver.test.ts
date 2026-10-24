@@ -399,7 +399,7 @@ describe('resolveCredentials', () => {
       })
     );
 
-    expect(projectError.code).toBe('INVALID_ID');
+    expect(projectError.code).toBe('INVALID_NUMERIC_ID');
     expect(locationError.code).toBe('INVALID_LOCATION');
   });
 });
@@ -570,7 +570,7 @@ describe('resolveAccountCredentials', () => {
       })
     );
 
-    expect(invalidProject.code).toBe('INVALID_ID');
+    expect(invalidProject.code).toBe('INVALID_NUMERIC_ID');
     expect(invalidLocation.code).toBe('INVALID_LOCATION');
   });
 });

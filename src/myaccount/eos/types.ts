@@ -66,14 +66,18 @@ export interface EosKeyCreateOptions extends EosContextOptions {
 
 export interface EosAccessGrantOptions extends EosContextOptions {
   accessKey: string;
-  role: string;
+  role: EosRole;
+}
+
+export interface EosAccessRevokeOptions extends EosContextOptions {
+  accessKey: string;
 }
 
 export type EosCommandResult =
   | { action: 'access-grant'; bucket: string; items: EosAccessItem[] }
   | { action: 'access-list'; bucket: string; items: EosAccessItem[] }
   | {
-      access_id: number;
+      access_key: string;
       action: 'access-revoke';
       bucket: string;
       message: string;

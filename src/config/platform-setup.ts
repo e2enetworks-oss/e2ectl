@@ -1,6 +1,7 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
-import { findLocation, normalizeLocation, parseNumericId } from './checks.js';
+import { normalizeRequiredNumericId } from '../core/normalize.js';
+import { findLocation, normalizeLocation } from './checks.js';
 import { findProfile } from './store.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
@@ -307,7 +308,7 @@ function checkFormat(run: SetupRun, field: SetupField, value: string): void {
     return;
   }
 
-  parseNumericId(
+  normalizeRequiredNumericId(
     value,
     `${platformName(run.steps.platform)} ${field} ID`,
     flagName(run, field)
@@ -334,7 +335,7 @@ async function chooseAccount(
     ),
     onlyChoice: usable.length === 1 ? String(usable[0]?.id) : undefined
   });
-  const id = parseNumericId(
+  const id = normalizeRequiredNumericId(
     raw,
     `${name} account ID`,
     flagName(run, 'account')
@@ -382,7 +383,7 @@ async function chooseProject(
     choices: projects.map((project) => `${project.id}  ${project.name}`),
     onlyChoice: projects.length === 1 ? String(projects[0]?.id) : undefined
   });
-  const id = parseNumericId(
+  const id = normalizeRequiredNumericId(
     raw,
     `${name} project ID`,
     flagName(run, 'project')

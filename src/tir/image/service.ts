@@ -1,32 +1,25 @@
+import type { TirContextOptions } from '../../app/context-options.js';
 import {
   resolveStoredTirCredentials,
-  type ConfigFile,
+  type CredentialResolutionStore,
   type ResolvedTirCredentials
 } from '../../config/index.js';
 import type { TirImageClient } from './client.js';
 import type {
   TirImageApiItem,
-  TirImageContextOptions,
   TirImageItem,
   TirImageListCommandResult
 } from './types.js';
 
-interface TirImageStore {
-  readonly configPath: string;
-  read(): Promise<ConfigFile>;
-}
-
 export interface TirImageServiceDependencies {
   createTirImageClient(credentials: ResolvedTirCredentials): TirImageClient;
-  store: TirImageStore;
+  store: CredentialResolutionStore;
 }
 
 export class TirImageService {
   constructor(private readonly dependencies: TirImageServiceDependencies) {}
 
-  async list(
-    options: TirImageContextOptions
-  ): Promise<TirImageListCommandResult> {
+  async list(options: TirContextOptions): Promise<TirImageListCommandResult> {
     const credentials = await resolveStoredTirCredentials(
       this.dependencies.store,
       options,

@@ -1,3 +1,4 @@
+import { runCli } from '../../../../src/app/index.js';
 import { createProgram } from '../../../../src/app/program.js';
 import { ConfigStore } from '../../../../src/config/store.js';
 import type { EosBucketApiItem } from '../../../../src/myaccount/eos/types.js';
@@ -275,25 +276,63 @@ describe('eos bucket access', () => {
       ['grant', 'logs', '--access-key', 'NOPE', '--role', 'writer'],
       'EOS_KEY_NOT_FOUND'
     ],
-    [
-      ['grant', 'logs', '--access-key', 'AKEXAMPLE', '--role', 'owner'],
-      'INVALID_EOS_ROLE'
-    ],
-    [
-      ['grant', 'logs', '--access-key', 'AKEXAMPLE', '--role', 'constructor'],
-      'INVALID_EOS_ROLE'
-    ],
-    [['revoke', 'logs', 'x'], 'INVALID_EOS_ACCESS_ID']
+    [['revoke', 'logs', '--access-key', 'NOPE'], 'EOS_ACCESS_NOT_FOUND']
   ])('refuses %o with %s', async (args, code) => {
     await expect(
       run(['myaccount', 'eos', 'access', ...args])
     ).rejects.toMatchObject({ code });
   });
 
-  it('revokes by access id', async () => {
+  it.each([['owner'], ['constructor']])(
+    'refuses --role %s as a usage error',
+    async (role) => {
+      const stderr = new MemoryWriter();
+      const store = new ConfigStore({
+        configPath: createTestConfigPath('eos-role')
+      });
+      const exitCode = await runCli(
+        [
+          'node',
+          'e2ectl',
+          'myaccount',
+          'eos',
+          'access',
+          'grant',
+          'logs',
+          '--access-key',
+          'AKEXAMPLE',
+          '--role',
+          role
+        ],
+        createTestRuntime({ createEosClient: () => eosMocks(), store }),
+        stderr
+      );
+
+      expect(exitCode).toBe(2);
+      expect(stderr.buffer).toContain(
+        'Allowed choices are admin, writer, reader'
+      );
+    }
+  );
+
+  it('revokes by access key, looking up its access entry', async () => {
     const mocks = eosMocks();
-    await run(['myaccount', 'eos', 'access', 'revoke', 'logs', '5'], mocks);
+    const output = await run(
+      [
+        'myaccount',
+        'eos',
+        'access',
+        'revoke',
+        'logs',
+        '--access-key',
+        'AKEXAMPLE'
+      ],
+      mocks
+    );
 
     expect(mocks.revokeAccess).toHaveBeenCalledWith('logs', 5);
+    expect(output).toContain(
+      'Access key AKEXAMPLE can no longer use bucket logs.'
+    );
   });
 });

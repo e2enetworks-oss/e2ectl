@@ -1,6 +1,6 @@
 import {
   resolveStoredTirCredentials,
-  type ConfigFile,
+  type CredentialResolutionStore,
   type ResolvedTirCredentials
 } from '../../config/index.js';
 import { AppError, CliError, EXIT_CODES } from '../../core/errors.js';
@@ -13,15 +13,11 @@ import type {
   TirPlanItem,
   TirPlanListCommandResult
 } from './types.js';
-
-interface TirPlanStore {
-  readonly configPath: string;
-  read(): Promise<ConfigFile>;
-}
+import { normalizeOptionalNumericId } from '../../core/normalize.js';
 
 export interface TirPlanServiceDependencies {
   createTirPlanClient(credentials: ResolvedTirCredentials): TirPlanClient;
-  store: TirPlanStore;
+  store: CredentialResolutionStore;
 }
 
 export class TirPlanService {
@@ -30,7 +26,12 @@ export class TirPlanService {
   async list(
     options: TirPlanContextOptions
   ): Promise<TirPlanListCommandResult> {
-    const imageVersionId = normalizeImageVersionId(options.imageVersionId);
+    const imageVersionId =
+      normalizeOptionalNumericId(
+        options.imageVersionId,
+        'Image version ID',
+        '--image-version-id'
+      ) ?? undefined;
     const credentials = await resolveStoredTirCredentials(
       this.dependencies.store,
       options,
@@ -74,25 +75,6 @@ async function listPlansOrExplain(
 
     throw error;
   }
-}
-
-function normalizeImageVersionId(
-  value: string | undefined
-): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (/^\d+$/.test(trimmed)) {
-    return Number(trimmed);
-  }
-
-  throw new CliError('Image version ID must be numeric.', {
-    code: 'INVALID_IMAGE_VERSION_ID',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a version id from \`${formatTirCommand('image list')}\` with --image-version-id.`
-  });
 }
 
 function flattenPlanGroups(groups: TirPlanApiGroups): TirPlanItem[] {

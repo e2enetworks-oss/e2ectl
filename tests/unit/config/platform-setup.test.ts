@@ -299,12 +299,12 @@ describe('configurePlatform', () => {
     ],
     [
       { ...ALL_FLAGS, account: 'x' },
-      'INVALID_ID',
+      'INVALID_NUMERIC_ID',
       'TIR account ID must be numeric.'
     ],
     [
       { ...ALL_FLAGS, project: 'x' },
-      'INVALID_ID',
+      'INVALID_NUMERIC_ID',
       'TIR project ID must be numeric.'
     ]
   ])('refuses %o with %s and saves nothing', async (flags, code, message) => {

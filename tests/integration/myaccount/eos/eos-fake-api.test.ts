@@ -84,7 +84,13 @@ describe('eos against a fake MyAccount API', () => {
       expect(await run(['access', 'list', 'e2ectl-test'])).not.toContain(
         'listed-secret'
       );
-      await run(['access', 'revoke', 'e2ectl-test', '5']);
+      await run([
+        'access',
+        'revoke',
+        'e2ectl-test',
+        '--access-key',
+        'AKEXAMPLE'
+      ]);
       await run(['key', 'delete', 'AKEXAMPLE', '--force']);
       await run(['bucket', 'delete', 'e2ectl-test', '--force']);
 

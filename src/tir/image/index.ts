@@ -4,7 +4,6 @@ export type {
   TirImageApiItem,
   TirImageApiVersion,
   TirImageCommandResult,
-  TirImageContextOptions,
   TirImageItem,
   TirImageListCommandResult
 } from './types.js';

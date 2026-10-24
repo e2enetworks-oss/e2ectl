@@ -177,7 +177,7 @@ describe('tir plan list', () => {
         '--image-version-id',
         'abc'
       ])
-    ).rejects.toMatchObject({ code: 'INVALID_IMAGE_VERSION_ID' });
+    ).rejects.toMatchObject({ code: 'INVALID_NUMERIC_ID' });
   });
 
   it('turns a 400 for an unknown image version into a next step', async () => {

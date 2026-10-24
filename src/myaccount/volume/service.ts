@@ -20,6 +20,7 @@ import type {
   VolumePlan,
   VolumeSummary
 } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 const VOLUME_LIST_PAGE_SIZE = 100;
 const VOLUME_LIST_MAX_PAGES = 500;
@@ -1181,23 +1182,6 @@ function normalizeOptionalString(
 
   const normalized = value.trim();
   return normalized.length === 0 ? undefined : normalized;
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function assertCanDelete(isInteractive: boolean, resourceName: string): void {

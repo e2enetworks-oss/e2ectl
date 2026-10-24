@@ -261,10 +261,10 @@ describe('TIR value order', () => {
   });
 
   it.each([
-    { context: { account_id: 'abc' }, code: 'INVALID_ID' },
+    { context: { account_id: 'abc' }, code: 'INVALID_NUMERIC_ID' },
     {
       context: { account_id: '9', project_id: 'abc', location: 'Delhi' },
-      code: 'INVALID_ID'
+      code: 'INVALID_NUMERIC_ID'
     },
     {
       context: { account_id: '9', project_id: '8', location: 'Mumbai' },

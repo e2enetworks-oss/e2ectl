@@ -7,6 +7,7 @@ import { CliError, EXIT_CODES } from '../../core/errors.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { ProjectClient } from './client.js';
 import type { ProjectSummary } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 export interface ProjectContextOptions {
   alias?: string;
@@ -196,23 +197,6 @@ async function findProjectById(
   }
 
   return match;
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function summarizeProject(

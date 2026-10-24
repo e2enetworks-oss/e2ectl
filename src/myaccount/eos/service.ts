@@ -1,15 +1,17 @@
 import {
   resolveStoredCredentials,
-  type ConfigFile,
+  type CredentialResolutionStore,
   type ResolvedCredentials
 } from '../../config/index.js';
 import { confirmUnlessForced } from '../../core/confirm.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { EosClient } from './client.js';
 import type {
   EosAccessApiItem,
   EosAccessGrantOptions,
+  EosAccessRevokeOptions,
   EosAccessItem,
   EosBucketApiItem,
   EosBucketItem,
@@ -29,16 +31,11 @@ const ROLE_NAMES: Record<EosRole, string> = {
   writer: 'Bucket Writer'
 };
 
-interface EosStore {
-  readonly configPath: string;
-  read(): Promise<ConfigFile>;
-}
-
 export interface EosServiceDependencies {
   confirm(message: string): Promise<boolean>;
   createEosClient(credentials: ResolvedCredentials): EosClient;
   isInteractive: boolean;
-  store: EosStore;
+  store: CredentialResolutionStore;
 }
 
 export class EosService {
@@ -127,7 +124,7 @@ export class EosService {
     accessKey: string,
     options: EosForceOptions
   ): Promise<EosCommandResult> {
-    const key = requireText(accessKey, 'Access key', 'the first argument');
+    const key = normalizeRequiredString(accessKey, 'Access key', '<accessKey>');
     const client = await this.createClient(options);
     // E2E reports success for a key that does not exist, so check first.
     await findKey(client, key);
@@ -169,8 +166,7 @@ export class EosService {
     options: EosAccessGrantOptions
   ): Promise<EosCommandResult> {
     const name = normalizeBucketName(bucket);
-    const role = normalizeRole(options.role);
-    const accessKey = requireText(
+    const accessKey = normalizeRequiredString(
       options.accessKey,
       'Access key',
       '--access-key'
@@ -179,7 +175,7 @@ export class EosService {
     const key = await findKey(client, accessKey);
 
     const items = await client.grantAccess(name, {
-      role_name: ROLE_NAMES[role],
+      role_name: ROLE_NAMES[options.role],
       users: [{ id: key.id }]
     });
 
@@ -190,29 +186,43 @@ export class EosService {
     };
   }
 
+  // Revokes by access key, like grant. revoke has no prompt: access can be
+  // granted again at any time.
   async revokeAccess(
     bucket: string,
-    accessId: string,
-    options: EosContextOptions
+    options: EosAccessRevokeOptions
   ): Promise<EosCommandResult> {
     const name = normalizeBucketName(bucket);
-    if (!/^\d+$/.test(accessId.trim())) {
-      throw new CliError('Access ID must be numeric.', {
-        code: 'INVALID_EOS_ACCESS_ID',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Pass the ID column from ${formatMyAccountCommand(`eos access list ${name}`)}.`
-      });
+    const accessKey = normalizeRequiredString(
+      options.accessKey,
+      'Access key',
+      '--access-key'
+    );
+    const client = await this.createClient(options);
+    const entries = (await client.listAccess(name)).filter(
+      (entry) => entry.user.access_key === accessKey
+    );
+    if (entries.length === 0) {
+      throw new CliError(
+        `Access key ${accessKey} has no access to bucket ${name}.`,
+        {
+          code: 'EOS_ACCESS_NOT_FOUND',
+          exitCode: EXIT_CODES.usage,
+          suggestion: `Run ${formatMyAccountCommand(`eos access list ${name}`)} to see which keys can use it.`
+        }
+      );
     }
 
-    const id = Number(accessId.trim());
-    const client = await this.createClient(options);
-    const result = await client.revokeAccess(name, id);
+    let message = '';
+    for (const entry of entries) {
+      message = (await client.revokeAccess(name, entry.id)).message;
+    }
 
     return {
-      access_id: id,
+      access_key: accessKey,
       action: 'access-revoke',
       bucket: name,
-      message: result.message
+      message
     };
   }
 
@@ -302,32 +312,5 @@ function normalizeBucketName(value: string): string {
     exitCode: EXIT_CODES.usage,
     suggestion:
       'Use 3 to 63 lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.'
-  });
-}
-
-function normalizeRole(value: string): EosRole {
-  const role = value.trim().toLowerCase();
-  // Own keys only: `in` also accepts names like "constructor".
-  if (Object.hasOwn(ROLE_NAMES, role)) {
-    return role as EosRole;
-  }
-
-  throw new CliError(`Unknown role "${value}".`, {
-    code: 'INVALID_EOS_ROLE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: 'Pass --role admin, --role writer or --role reader.'
-  });
-}
-
-function requireText(value: string, label: string, where: string): string {
-  const trimmed = value.trim();
-  if (trimmed.length > 0) {
-    return trimmed;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value as ${where}.`
   });
 }

@@ -46,7 +46,7 @@ function renderEosHuman(result: EosCommandResult): string {
     case 'access-grant':
       return formatAccess(result.bucket, result.items);
     case 'access-revoke':
-      return `Removed access ${result.access_id} from bucket ${result.bucket}.`;
+      return `Access key ${result.access_key} can no longer use bucket ${result.bucket}.`;
   }
 }
 

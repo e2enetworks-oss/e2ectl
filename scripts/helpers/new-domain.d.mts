@@ -4,7 +4,6 @@ export interface DomainNames {
   contextFields: string[];
   credentialsResolver: string;
   credentialsType: string;
-  displayName: string;
   optionsHelper: string;
   platform: string;
   platformName: string;
@@ -29,18 +28,9 @@ export function registerInPlatformIndex(
   source: string,
   names: DomainNames
 ): string;
-export function registerPlatformInProgram(
-  source: string,
-  names: DomainNames
-): string;
-export function registerInRuntime(
-  source: string,
-  names: DomainNames,
-  options: { addTransportImport: boolean }
-): string;
+export function registerInRuntime(source: string, names: DomainNames): string;
 export function registerInTestRuntime(
   source: string,
   names: DomainNames
 ): string;
-export function renderPlatformFiles(names: DomainNames): Record<string, string>;
 export function renderProductFiles(names: DomainNames): Record<string, string>;

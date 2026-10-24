@@ -56,9 +56,4 @@ export {
   type SetupPlatform,
   type SetupValues
 } from './platform-setup.js';
-export {
-  findLocation,
-  normalizeLocation,
-  parseNumericId,
-  type Location
-} from './checks.js';
+export { findLocation, normalizeLocation, type Location } from './checks.js';

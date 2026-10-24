@@ -4,6 +4,7 @@ import type { ApiAuthCredentials } from '../http/index.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
+import { normalizeRequiredString } from '../core/normalize.js';
 
 export interface ImportProfilesInput {
   default?: string;
@@ -488,23 +489,6 @@ function normalizeRequiredAlias(
   flag: string
 ): string {
   return normalizeRequiredString(value, label, flag);
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function validateOptionalContextDefaults(

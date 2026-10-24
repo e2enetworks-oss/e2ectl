@@ -15,7 +15,8 @@ import {
   REQUIRED_CONTEXT_FIELDS,
   TIR_CONTEXT_ENV_VAR_BY_FIELD
 } from './types.js';
-import { findLocation, normalizeLocation, parseNumericId } from './checks.js';
+import { normalizeRequiredNumericId } from '../core/normalize.js';
+import { findLocation, normalizeLocation } from './checks.js';
 import { findProfile } from './store.js';
 import { pickValue, type PickedValue } from './value-order.js';
 import { formatCliCommand } from '../app/metadata.js';
@@ -319,7 +320,11 @@ function assertTirContext(
       suggestion: `Run \`${formatCliCommand('tir account list')}\`, then pass --account-id <id>, set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.account_id}, or run \`${formatCliCommand('tir configure')}\`.`
     });
   }
-  parseNumericId(context.account_id, 'TIR account ID', '--account-id');
+  normalizeRequiredNumericId(
+    context.account_id,
+    'TIR account ID',
+    '--account-id'
+  );
 
   if (requirement === 'account') {
     return;
@@ -332,7 +337,11 @@ function assertTirContext(
       suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account-id <id> --project-id <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
     });
   }
-  parseNumericId(context.project_id, 'TIR project ID', '--project-id');
+  normalizeRequiredNumericId(
+    context.project_id,
+    'TIR project ID',
+    '--project-id'
+  );
   normalizeLocation(context.location);
 }
 
@@ -492,6 +501,6 @@ function describeContextFlags(options: ResolveCredentialsOptions): string[] {
 }
 
 function validateResolvedContext(projectId: string, location: string): void {
-  parseNumericId(projectId, 'Project ID', '--project-id');
+  normalizeRequiredNumericId(projectId, 'Project ID', '--project-id');
   normalizeLocation(location);
 }

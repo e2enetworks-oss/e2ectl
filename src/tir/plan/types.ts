@@ -1,3 +1,5 @@
+import type { TirContextOptions } from '../../app/context-options.js';
+
 export interface TirPlanApiPrice {
   committed_days?: number;
   currency?: string;
@@ -43,12 +45,8 @@ export interface TirPlanItem {
   vcpu: number | null;
 }
 
-export interface TirPlanContextOptions {
-  accountId?: string;
-  alias?: string;
+export interface TirPlanContextOptions extends TirContextOptions {
   imageVersionId?: string;
-  location?: string;
-  projectId?: string;
 }
 
 export interface TirPlanListCommandResult {

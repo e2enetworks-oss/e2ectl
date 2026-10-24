@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 import { addContextOptions } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/runtime.js';
@@ -7,6 +7,7 @@ import { renderEosResult } from './formatter.js';
 import { EosService } from './service.js';
 import type {
   EosAccessGrantOptions,
+  EosAccessRevokeOptions,
   EosCommandResult,
   EosContextOptions,
   EosForceOptions,
@@ -156,7 +157,11 @@ function buildAccessCommand(service: EosService, write: Writer): Command {
         '--access-key <accessKey>',
         'Access key from eos key list.'
       )
-      .requiredOption('--role <role>', 'admin, writer or reader.')
+      .addOption(
+        new Option('--role <role>', 'What the key may do.')
+          .choices(['admin', 'writer', 'reader'])
+          .makeOptionMandatory()
+      )
   ).action(
     async (
       bucket: string,
@@ -168,18 +173,19 @@ function buildAccessCommand(service: EosService, write: Writer): Command {
   );
   addContextOptions(
     command
-      .command('revoke <bucket> <accessId>')
-      .description(
-        'Stop an access key using a bucket (the ID from eos access list).'
+      .command('revoke <bucket>')
+      .description('Stop an access key using a bucket.')
+      .requiredOption(
+        '--access-key <accessKey>',
+        'Access key from eos access list.'
       )
   ).action(
     async (
       bucket: string,
-      accessId: string,
-      options: EosContextOptions,
+      options: EosAccessRevokeOptions,
       instance: Command
     ) => {
-      write(await service.revokeAccess(bucket, accessId, options), instance);
+      write(await service.revokeAccess(bucket, options), instance);
     }
   );
 

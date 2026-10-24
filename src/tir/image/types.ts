@@ -22,13 +22,6 @@ export interface TirImageItem {
   version_id: number;
 }
 
-export interface TirImageContextOptions {
-  accountId?: string;
-  alias?: string;
-  location?: string;
-  projectId?: string;
-}
-
 export interface TirImageListCommandResult {
   action: 'list';
   items: TirImageItem[];
