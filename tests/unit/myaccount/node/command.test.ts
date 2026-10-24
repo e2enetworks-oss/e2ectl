@@ -199,6 +199,10 @@ function createNodeClientStub() {
   );
 
   const stub: NodeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -215,6 +219,10 @@ function createNodeClientStub() {
   };
 
   return {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -340,6 +348,10 @@ function createVolumeClientStub() {
   const listVolumes = vi.fn();
 
   const stub: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
     attachVolumeToNode,
     createVolume,
     deleteVolume: vi.fn(),
@@ -350,6 +362,10 @@ function createVolumeClientStub() {
   };
 
   return {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
     attachVolumeToNode,
     createVolume,
     detachVolumeFromNode,

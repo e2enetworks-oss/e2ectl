@@ -1,6 +1,7 @@
 import Table from 'cli-table3';
 
 import { formatMyAccountCommand } from '../api.js';
+import { formatSnapshotTable } from '../snapshot/index.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import {
   CUSTOM_STORAGE_DEFAULT_DISK_GB,
@@ -26,8 +27,31 @@ import type {
   NodeProtectionCommandResult,
   NodeRebootCommandResult,
   NodeResolvedSshKeySummary,
+  NodeSnapshotCommandResult,
   NodeCatalogPlansSummary
 } from './service.js';
+
+export function renderNodeSnapshotResult(
+  result: NodeSnapshotCommandResult,
+  json: boolean
+): string {
+  if (json) {
+    return renderJson(result);
+  }
+
+  switch (result.action) {
+    case 'snapshot-list':
+      return `${formatSnapshotTable(result.items)}\n`;
+    case 'snapshot-create':
+      return `Requested snapshot "${result.name}" of node ${result.node_id}. ${result.message}\nCheck it with ${formatMyAccountCommand(`node snapshot list ${result.node_id}`)}.\n`;
+    case 'snapshot-delete':
+      return result.cancelled
+        ? 'Snapshot deletion cancelled.\n'
+        : `Deleted snapshot ${result.snapshot_id} of node ${result.node_id}.\n`;
+    case 'snapshot-save-image':
+      return `Saving snapshot ${result.snapshot_id} of node ${result.node_id} as image "${result.image_name}". The node is not changed.\nWhen it shows in ${formatMyAccountCommand('image list')}, create a node from it with ${formatMyAccountCommand('node create --image <catalog-image> --saved-image-template-id <template-id>')}.\n`;
+  }
+}
 
 export function renderNodeResult(
   result: NodeCommandResult,

@@ -48,6 +48,24 @@ e2ectl myaccount node action volume attach <node-id> --volume-id <volume-id>
 e2ectl myaccount node action volume detach <node-id> --volume-id <volume-id>
 ```
 
+### Snapshot A Volume
+
+```bash
+e2ectl myaccount volume snapshot create <volume-id> --name nightly
+e2ectl myaccount volume snapshot list <volume-id>
+e2ectl myaccount volume snapshot delete <volume-id> <snapshot-id>
+```
+
+The volume must be attached to a node; E2E takes the snapshot through that node. Snapshots
+work the same way as node snapshots: the same columns, checks, messages and `--json`.
+
+To restore, save a snapshot as a new volume. The volume it came from is never overwritten, and
+the new volume is billed like any other:
+
+```bash
+e2ectl myaccount volume snapshot save-volume <volume-id> <snapshot-id> --name restored
+```
+
 ### Delete A Volume
 
 ```bash

@@ -30,7 +30,9 @@ export async function configureTir(
       canPrompt,
       env: process.env,
       prompt: (message) => runtime.prompt(message),
-      write: (text) => runtime.stdout.write(text)
+      write: (text) => {
+        runtime.stdout.write(text);
+      }
     },
     store: runtime.store
   });

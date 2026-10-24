@@ -3,7 +3,7 @@ import { Command, Option } from 'commander';
 import { addContextOptions } from '../../app/context-options.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { CliRuntime } from '../../app/index.js';
-import { renderNodeResult } from './formatter.js';
+import { renderNodeResult, renderNodeSnapshotResult } from './formatter.js';
 import {
   NodeService,
   type NodeCatalogPlansOptions,
@@ -11,6 +11,7 @@ import {
   type NodeDeleteOptions,
   type NodePublicIpDetachOptions,
   type NodeSaveImageOptions,
+  type NodeSnapshotDeleteOptions,
   type NodeUpgradeOptions,
   type NodeVolumeActionOptions,
   type NodeVpcActionOptions
@@ -71,6 +72,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   command.helpCommand('help [command]', 'Show help for a node command');
   command.addCommand(buildNodeCatalogCommand(service, runtime));
   command.addCommand(buildNodeActionCommand(service, runtime));
+  command.addCommand(buildNodeSnapshotCommand(service, runtime));
 
   addContextOptions(
     command
@@ -250,6 +252,104 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
           result,
           commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
         )
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildNodeSnapshotCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('snapshot').description(
+    'Take, list and delete node snapshots, and save one as an image (the safe restore: the node is not changed).'
+  );
+  const write = (
+    result: Awaited<ReturnType<NodeService['listSnapshots']>>,
+    commandInstance: Command
+  ): void => {
+    runtime.stdout.write(
+      renderNodeSnapshotResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  };
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node snapshot command'
+  );
+
+  addContextOptions(
+    command
+      .command('list <nodeId>')
+      .description('List the snapshots of a node.')
+  ).action(
+    async (nodeId: string, options: NodeContextOptions, instance: Command) => {
+      write(await service.listSnapshots(nodeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('create <nodeId>')
+      .description(
+        'Take a snapshot of a running or powered-off node. It is ready when snapshot list shows it.'
+      )
+      .requiredOption('--name <name>', 'Snapshot name.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(await service.createSnapshot(nodeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('delete <nodeId> <snapshotId>')
+      .description('Delete a node snapshot.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      snapshotId: string,
+      options: NodeSnapshotDeleteOptions,
+      instance: Command
+    ) => {
+      write(
+        await service.deleteSnapshot(nodeId, snapshotId, options),
+        instance
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('save-image <nodeId> <snapshotId>')
+      .description(
+        'Save a snapshot as a new image. The node is not changed; create a new node from the image to restore.'
+      )
+      .requiredOption('--name <name>', 'Name for the new image.')
+  ).action(
+    async (
+      nodeId: string,
+      snapshotId: string,
+      options: NodeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(
+        await service.saveSnapshotAsImage(nodeId, snapshotId, options),
+        instance
       );
     }
   );

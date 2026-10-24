@@ -127,6 +127,27 @@ e2ectl myaccount node action unprotect <node-id>
 A protected node cannot be deleted until protection is turned off. `node get` shows
 `Deletion Protection: on` or `off`.
 
+### Take A Snapshot Before A Risky Change
+
+```bash
+e2ectl myaccount node snapshot create <node-id> --name before-upgrade
+e2ectl myaccount node snapshot list <node-id>
+e2ectl myaccount node snapshot delete <node-id> <snapshot-id>
+```
+
+The node must be running or powered off. A snapshot is ready when `snapshot list` shows it.
+`delete` asks first; `--force` skips the question.
+
+To restore, save the snapshot as a new image, then create a node from that image. The node the
+snapshot came from is never overwritten:
+
+```bash
+e2ectl myaccount node snapshot save-image <node-id> <snapshot-id> --name restored
+e2ectl myaccount image list
+e2ectl myaccount node create --name <name> --plan <plan> --image <catalog-image> \
+  --saved-image-template-id <template-id>
+```
+
 ### Save A Node As An Image
 
 ```bash

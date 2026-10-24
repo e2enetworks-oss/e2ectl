@@ -43,6 +43,10 @@ function createServiceFixture(options?: {
   let credentials: ResolvedCredentials | undefined;
 
   const client: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
     attachVolumeToNode: vi.fn(),
     createVolume,
     deleteVolume,

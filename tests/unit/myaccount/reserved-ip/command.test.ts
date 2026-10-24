@@ -135,6 +135,10 @@ describe('reserved-ip commands', () => {
     );
 
     const nodeClient: NodeClient = {
+      createSnapshot: vi.fn(),
+      deleteSnapshot: vi.fn(),
+      listSnapshots: vi.fn(),
+      saveSnapshotAsImage: vi.fn(),
       attachSshKeys: vi.fn(),
       createNode: vi.fn(),
       deleteNode: vi.fn(),

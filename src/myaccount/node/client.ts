@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   ApiTransport
 } from '../../http/index.js';
+import type { SnapshotApiItem } from '../snapshot/index.js';
 
 import type {
   NodeActionRequest,
@@ -36,7 +37,21 @@ const NODE_CATALOG_PLANS_PATH = '/images/';
 
 export type NodeDeleteQuery = Record<'reserve_ip_required', 'true'>;
 
+// Snapshot quirks: the list and create paths say "snapshots/", the paths
+// for one snapshot say "snapshot/<id>" with no trailing slash, and one
+// snapshot is addressed by its snapshot_uuid.
 export interface NodeClient {
+  createSnapshot(nodeId: string, name: string): Promise<{ message: string }>;
+  deleteSnapshot(
+    nodeId: string,
+    snapshotId: string
+  ): Promise<{ message: string }>;
+  listSnapshots(nodeId: string): Promise<SnapshotApiItem[]>;
+  saveSnapshotAsImage(
+    nodeId: string,
+    snapshotId: string,
+    name: string
+  ): Promise<{ message: string }>;
   attachSshKeys(
     nodeId: string,
     sshKeys: NodeActionSshKey[]
@@ -75,6 +90,52 @@ export class NodeApiClient implements NodeClient {
       ssh_keys: sshKeys,
       type: 'add_ssh_keys'
     });
+  }
+
+  async createSnapshot(
+    nodeId: string,
+    name: string
+  ): Promise<{ message: string }> {
+    const response = await this.transport.post(
+      `${buildNodePath(nodeId)}snapshots/`,
+      { body: { name } }
+    );
+
+    return { message: response.message };
+  }
+
+  async deleteSnapshot(
+    nodeId: string,
+    snapshotId: string
+  ): Promise<{ message: string }> {
+    const response = await this.transport.delete(
+      buildNodeSnapshotPath(nodeId, snapshotId)
+    );
+
+    return { message: response.message };
+  }
+
+  async listSnapshots(nodeId: string): Promise<SnapshotApiItem[]> {
+    const response = await this.transport.get<ApiEnvelope<SnapshotApiItem[]>>(
+      `${buildNodePath(nodeId)}snapshots/`
+    );
+
+    return response.data;
+  }
+
+  // Saves the snapshot as a new image; the node itself is not changed.
+  // disk_id 0 is the node's root disk.
+  async saveSnapshotAsImage(
+    nodeId: string,
+    snapshotId: string,
+    name: string
+  ): Promise<{ message: string }> {
+    const response = await this.transport.post(
+      buildNodeSnapshotPath(nodeId, snapshotId),
+      { body: { disk_id: 0, name } }
+    );
+
+    return { message: response.message };
   }
 
   async createNode(body: NodeCreateRequest): Promise<NodeCreateResult> {
@@ -206,6 +267,10 @@ export class NodeApiClient implements NodeClient {
 
 function buildNodePath(nodeId: string): string {
   return `${NODES_PATH}${nodeId}/`;
+}
+
+function buildNodeSnapshotPath(nodeId: string, snapshotId: string): string {
+  return `${buildNodePath(nodeId)}snapshot/${snapshotId}`;
 }
 
 function buildNodeActionPath(nodeId: string): string {

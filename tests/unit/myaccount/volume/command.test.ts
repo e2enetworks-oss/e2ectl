@@ -75,6 +75,10 @@ function createVolumeClientStub() {
   );
 
   const stub: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
     attachVolumeToNode: vi.fn(),
     createVolume,
     deleteVolume,

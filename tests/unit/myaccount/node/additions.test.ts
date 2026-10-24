@@ -71,6 +71,10 @@ function fakeClient(overrides: Partial<NodeClient> = {}): NodeClient {
   };
   return {
     attachSshKeys: unused,
+    createSnapshot: unused,
+    deleteSnapshot: unused,
+    listSnapshots: unused,
+    saveSnapshotAsImage: unused,
     createNode: () =>
       Promise.resolve({
         node_create_response: [node({ status: 'Creating' })],

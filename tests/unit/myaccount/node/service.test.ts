@@ -132,6 +132,10 @@ function createServiceFixture(options?: {
   );
   const listNodeCatalogPlans = vi.fn(() => Promise.resolve([]));
   const nodeClient: NodeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -219,6 +223,10 @@ function createServiceFixture(options?: {
     })
   );
   const volumeClient: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
     attachVolumeToNode,
     createVolume: vi.fn(),
     deleteVolume: vi.fn(),

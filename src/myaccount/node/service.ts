@@ -8,6 +8,12 @@ import { AppError, CliError, EXIT_CODES } from '../../core/errors.js';
 import { pollUntilFound, type PollOptions } from '../../core/waiter.js';
 import type { ReservedIpClient } from '../reserved-ip/index.js';
 import type { SecurityGroupClient } from '../security-group/index.js';
+import {
+  normalizeSnapshotId,
+  normalizeSnapshotName,
+  toSnapshotItem,
+  type SnapshotItem
+} from '../snapshot/index.js';
 import type { SshKeyClient, SshKeySummary } from '../ssh-key/index.js';
 import type { VolumeClient } from '../volume/index.js';
 import type { VpcClient } from '../vpc/index.js';
@@ -351,6 +357,33 @@ export interface NodePublicIpDetachCompletedCommandResult {
 export type NodePublicIpDetachCommandResult =
   | NodePublicIpDetachCancelledCommandResult
   | NodePublicIpDetachCompletedCommandResult;
+
+export interface NodeSnapshotDeleteOptions extends NodeContextOptions {
+  force?: boolean;
+}
+
+export type NodeSnapshotCommandResult =
+  | { action: 'snapshot-list'; items: SnapshotItem[]; node_id: number }
+  | {
+      action: 'snapshot-create';
+      message: string;
+      name: string;
+      node_id: number;
+    }
+  | {
+      action: 'snapshot-delete';
+      cancelled: boolean;
+      message?: string;
+      node_id: number;
+      snapshot_id: string;
+    }
+  | {
+      action: 'snapshot-save-image';
+      image_name: string;
+      message: string;
+      node_id: number;
+      snapshot_id: string;
+    };
 
 export type NodeCommandResult =
   | NodeCatalogOsCommandResult
@@ -871,6 +904,106 @@ export class NodeService {
       action: enabled ? 'protect' : 'unprotect',
       node_id: normalizedNodeId,
       result: summarizeNodeAction(result)
+    };
+  }
+
+  async listSnapshots(
+    nodeId: string,
+    options: NodeContextOptions
+  ): Promise<NodeSnapshotCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const client = await this.createNodeClient(options);
+    const items = await client.listSnapshots(String(normalizedNodeId));
+
+    return {
+      action: 'snapshot-list',
+      items: items.map((item) => toSnapshotItem(item, 'snapshot_uuid')),
+      node_id: normalizedNodeId
+    };
+  }
+
+  async createSnapshot(
+    nodeId: string,
+    options: NodeContextOptions & { name: string }
+  ): Promise<NodeSnapshotCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const name = normalizeSnapshotName(options.name, '--name');
+    const client = await this.createNodeClient(options);
+    const result = await client.createSnapshot(String(normalizedNodeId), name);
+
+    return {
+      action: 'snapshot-create',
+      message: result.message,
+      name,
+      node_id: normalizedNodeId
+    };
+  }
+
+  async deleteSnapshot(
+    nodeId: string,
+    snapshotId: string,
+    options: NodeSnapshotDeleteOptions
+  ): Promise<NodeSnapshotCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+
+    if (!(options.force ?? false)) {
+      assertConfirmationAllowed(
+        this.dependencies.isInteractive,
+        'Deleting a snapshot requires confirmation in an interactive terminal.'
+      );
+      if (
+        !(await this.dependencies.confirm(
+          `Delete snapshot ${normalizedSnapshotId} of node ${normalizedNodeId}? This cannot be undone.`
+        ))
+      ) {
+        return {
+          action: 'snapshot-delete',
+          cancelled: true,
+          node_id: normalizedNodeId,
+          snapshot_id: normalizedSnapshotId
+        };
+      }
+    }
+
+    const client = await this.createNodeClient(options);
+    const result = await client.deleteSnapshot(
+      String(normalizedNodeId),
+      normalizedSnapshotId
+    );
+
+    return {
+      action: 'snapshot-delete',
+      cancelled: false,
+      message: result.message,
+      node_id: normalizedNodeId,
+      snapshot_id: normalizedSnapshotId
+    };
+  }
+
+  // The safe restore: the snapshot becomes a new saved image and the node
+  // is left as it is. A node is then created from that image.
+  async saveSnapshotAsImage(
+    nodeId: string,
+    snapshotId: string,
+    options: NodeContextOptions & { name: string }
+  ): Promise<NodeSnapshotCommandResult> {
+    const normalizedNodeId = assertNodeId(nodeId);
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+    const name = normalizeSnapshotName(options.name, '--name');
+    const client = await this.createNodeClient(options);
+    const result = await client.saveSnapshotAsImage(
+      String(normalizedNodeId),
+      normalizedSnapshotId,
+      name
+    );
+
+    return {
+      action: 'snapshot-save-image',
+      image_name: name,
+      message: result.message,
+      node_id: normalizedNodeId,
+      snapshot_id: normalizedSnapshotId
     };
   }
 

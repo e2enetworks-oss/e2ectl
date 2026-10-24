@@ -61,6 +61,10 @@ const EXPECTED_COMMANDS = [
   'myaccount node action security-group attach',
   'myaccount node action security-group detach',
   'myaccount node action ssh-key attach',
+  'myaccount node snapshot list',
+  'myaccount node snapshot create',
+  'myaccount node snapshot delete',
+  'myaccount node snapshot save-image',
   'myaccount node list',
   'myaccount node create',
   'myaccount node get',
@@ -76,6 +80,10 @@ const EXPECTED_COMMANDS = [
   'myaccount reserved-ip attach node',
   'myaccount reserved-ip detach node',
   'myaccount reserved-ip delete',
+  'myaccount volume snapshot list',
+  'myaccount volume snapshot create',
+  'myaccount volume snapshot delete',
+  'myaccount volume snapshot save-volume',
   'myaccount volume list',
   'myaccount volume plans',
   'myaccount volume create',
@@ -140,7 +148,7 @@ describe('createProgram', () => {
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(104);
+    expect(EXPECTED_COMMANDS).toHaveLength(112);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });
