@@ -98,6 +98,14 @@ describe('runCli', () => {
       'Error: Unknown command "nod".\n\nNext step: Did you mean "e2ectl myaccount node"? Run e2ectl myaccount --help to see the commands.\n'
     ],
     [
+      ['myaccount', '--json', 'nod', 'list'],
+      'Error: Unknown command "nod".\n\nNext step: Did you mean "e2ectl myaccount node"? Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
+      ['nod', 'list', '--alias', 'prod'],
+      'Error: Unknown command "nod".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
+    ],
+    [
       ['help', 'node'],
       'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
     ],

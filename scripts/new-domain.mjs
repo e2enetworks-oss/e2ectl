@@ -1,6 +1,7 @@
 // Creates an empty product: `make new-domain tir/foo` or
-// `node scripts/new-domain.mjs tir/foo`. Works out every change first and
-// writes nothing if any step fails, then formats what it wrote.
+// `node scripts/new-domain.mjs tir/foo`. Works out every change before
+// writing, so a bad name or a missing place to edit writes nothing; then
+// writes the files and formats them.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

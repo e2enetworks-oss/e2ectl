@@ -9,6 +9,7 @@ import {
   registerInRuntime,
   registerInTestRuntime,
   registerPlatformInProgram,
+  renderPlatformFiles,
   renderProductFiles
 } from '../../../scripts/helpers/new-domain.mjs';
 
@@ -202,6 +203,14 @@ describe('renderProductFiles', () => {
       'src/tir/foo/types.ts',
       'tests/unit/tir/foo/command.test.ts'
     ]);
+  });
+
+  it('never lets a new platform borrow the MyAccount address', () => {
+    const api =
+      renderPlatformFiles(parseDomainName('tir/foo'))['src/tir/api.ts'] ?? '';
+
+    expect(api).toContain('const baseUrl = TIR_API_BASE_URL;');
+    expect(api).not.toContain('options.baseUrl ??');
   });
 
   it('keeps TIR products free of MyAccount project settings', () => {

@@ -101,7 +101,9 @@ function rejectUnknownCommand(program: Command, args: string[]): void {
       continue;
     }
 
-    const next = group.commands.find((command) => command.name() === word);
+    const next = group.commands.find(
+      (command) => command.name() === word || command.aliases().includes(word)
+    );
     if (next === undefined) {
       throw unknownCommandError(group, word, words.slice(index + 1));
     }
@@ -110,23 +112,28 @@ function rejectUnknownCommand(program: Command, args: string[]): void {
   }
 }
 
-// Top-level options such as --json take no value, so they can be skipped.
-// Anything else before the first word is left for Commander to report.
+// Top-level options such as --json take no value, so they are skipped
+// wherever they appear. Any other option ends the command words: what
+// follows belongs to that option or to the command itself.
 function readCommandWords(program: Command, args: string[]): string[] {
-  let start = 0;
-  while (
-    start < args.length &&
-    program.options.some(
-      (option) => option.long === args[start] || option.short === args[start]
-    )
-  ) {
-    start += 1;
+  const words: string[] = [];
+
+  for (const arg of args) {
+    const isTopLevelOption = program.options.some(
+      (option) => option.long === arg || option.short === arg
+    );
+    if (isTopLevelOption) {
+      continue;
+    }
+
+    if (arg.startsWith('-')) {
+      break;
+    }
+
+    words.push(arg);
   }
 
-  const rest = args.slice(start);
-  const end = rest.findIndex((arg) => arg.startsWith('-'));
-
-  return end === -1 ? rest : rest.slice(0, end);
+  return words;
 }
 
 function unknownCommandError(
@@ -135,13 +142,13 @@ function unknownCommandError(
   laterWords: string[]
 ): CliError {
   const groupPath = formatCommandPath(group);
-  const platform =
-    group.parent === null ? findPlatformWithProduct(group, word) : undefined;
   const closest = findClosestCommandName(group, word);
+  const moved =
+    group.parent === null ? findMovedProduct(group, word, closest) : undefined;
 
   let suggestion = `Run ${groupPath} --help to see the commands.`;
-  if (platform !== undefined) {
-    suggestion = `Commands now start with the platform name. Did you mean "${[formatCommandPath(platform), word, ...laterWords].join(' ')}"?`;
+  if (moved !== undefined) {
+    suggestion = `Commands now start with the platform name. Did you mean "${[formatCommandPath(moved.platform), moved.productName, ...laterWords].join(' ')}"?`;
   } else if (closest !== undefined) {
     suggestion = `Did you mean "${groupPath} ${closest}"? Run ${groupPath} --help to see the commands.`;
   }
@@ -151,6 +158,36 @@ function unknownCommandError(
     exitCode: EXIT_CODES.usage,
     suggestion
   });
+}
+
+// At the top level, a word may be a product that moved under a platform
+// (`node` is now `myaccount node`), or a near miss of one (`nod`). A near
+// miss of a top-level command (`confg`) wins over a near miss of a product.
+function findMovedProduct(
+  program: Command,
+  word: string,
+  closestTopLevelName: string | undefined
+): { platform: Command; productName: string } | undefined {
+  const exact = findPlatformWithProduct(program, word);
+  if (exact !== undefined) {
+    return { platform: exact, productName: word };
+  }
+
+  if (closestTopLevelName !== undefined) {
+    return undefined;
+  }
+
+  for (const platform of program.commands) {
+    const productName = findClosestCommandName(platform, word);
+    if (
+      productName !== undefined &&
+      findPlatformWithProduct(program, productName) === platform
+    ) {
+      return { platform, productName };
+    }
+  }
+
+  return undefined;
 }
 
 // A platform is a top-level group whose commands have commands of their own

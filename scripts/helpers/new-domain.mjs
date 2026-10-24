@@ -203,14 +203,15 @@ import {
 
 // Set this to the ${displayName} API address before adding real commands.
 // Until then every ${platform} command stops with a clear error instead of
-// sending requests somewhere else.
+// sending requests somewhere else. options.baseUrl is not used here: the
+// runtime fills it from the MyAccount address override.
 const ${addressConstant}: string | undefined = undefined;
 
 export function create${platformName}Transport(
   credentials: ApiClientCredentials,
   options: ApiClientOptions = {}
 ): ApiTransport {
-  const baseUrl = options.baseUrl ?? ${addressConstant};
+  const baseUrl = ${addressConstant};
   if (baseUrl === undefined) {
     throw new CliError('The ${displayName} API address is not set yet.', {
       code: 'PLATFORM_ADDRESS_MISSING',
