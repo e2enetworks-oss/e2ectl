@@ -103,7 +103,9 @@ const EXPECTED_COMMANDS = [
   'myaccount support-ticket reopen',
   'tir account list',
   'tir project list',
-  'tir configure'
+  'tir configure',
+  'tir image list',
+  'tir plan list'
 ];
 
 function listRunnableCommands(
@@ -134,7 +136,7 @@ describe('createProgram', () => {
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(98);
+    expect(EXPECTED_COMMANDS).toHaveLength(100);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });

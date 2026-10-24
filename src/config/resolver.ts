@@ -530,6 +530,6 @@ function assertValidLocation(location: string): void {
     details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
     exitCode: EXIT_CODES.usage,
     suggestion:
-      'Pass a supported location with --location or save a supported default location on the profile.'
+      'Pass Delhi or Chennai with --location, or save one with config set-context (MyAccount) or tir configure (TIR).'
   });
 }

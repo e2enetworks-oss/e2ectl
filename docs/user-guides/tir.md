@@ -39,6 +39,38 @@ saved with `e2ectl config list` (the TIR Context column, or `tir` in `--json`).
 Every `tir` command that works inside a project takes `--account-id`, `--project-id` and
 `--location`. They apply to that command only.
 
+### See Images And Plans
+
+```bash
+e2ectl tir image list
+e2ectl tir plan list --image-version-id <version-id>
+```
+
+- `tir image list` shows one row per image version. The version id is what a TIR instance
+  starts from.
+- `tir plan list` shows CPU, GPU and spot plans with their hourly price and the plan ids for
+  hourly and committed billing. Pass `--image-version-id` to see only the plans that fit that
+  image. Committed plan ids and prices are in `--json`.
+
+Each `tir plan list --json` item looks like this:
+
+```json
+{
+  "available": true,
+  "committed": [{ "days": 30, "plan_id": 2699, "price": 3422 }],
+  "currency": "INR",
+  "gpu": null,
+  "hourly": { "plan_id": 1565, "price": 4.7 },
+  "memory": "8GB",
+  "name": "C3.8GB",
+  "series": "CPU",
+  "vcpu": 4
+}
+```
+
+GPU plans have `"gpu": { "count": 1, "memory": "80GB", "type": "H100" }`. `available` is
+`false` when that plan has no free capacity right now.
+
 ## Which Value Wins
 
 The same order as everywhere else in `e2ectl`: the flag, then the environment variable, then the
@@ -61,6 +93,8 @@ In CI, set the three `E2E_TIR_*` variables instead of running `tir configure`.
 e2ectl --json tir account list
 e2ectl --json tir project list --account-id <account-id>
 e2ectl --json tir configure --account-id <account-id> --project-id <project-id> --location Delhi
+e2ectl --json tir image list
+e2ectl --json tir plan list --image-version-id <version-id>
 ```
 
 `tir configure --json` returns:
@@ -85,6 +119,7 @@ e2ectl --json tir configure --account-id <account-id> --project-id <project-id> 
 | `TIR is not turned on for account <id>.`        | Pick another account, or ask its owner to turn TIR on.                          |
 | `Project <id> is not in TIR account <id>.`      | Pick an id from `e2ectl tir project list --account-id <id>`.                    |
 | `Unsupported TIR location`                      | Use Delhi or Chennai.                                                           |
+| `TIR does not know image version <id>.`         | Pick a version id from `e2ectl tir image list`.                                 |
 | `TIR API request failed: Forbidden`             | The key cannot use that account or project. Check them with the commands above. |
 
 ## Related Guides

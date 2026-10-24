@@ -6,6 +6,8 @@ import {
   buildTirConfigureCommand,
   buildTirProjectCommand
 } from './project/index.js';
+import { buildTirImageCommand } from './image/index.js';
+import { buildTirPlanCommand } from './plan/index.js';
 
 export function buildTirCommand(runtime: CliRuntime): Command {
   const command = new Command('tir').description(
@@ -17,6 +19,8 @@ export function buildTirCommand(runtime: CliRuntime): Command {
   command.addCommand(buildTirAccountCommand(runtime));
   command.addCommand(buildTirProjectCommand(runtime));
   command.addCommand(buildTirConfigureCommand(runtime));
+  command.addCommand(buildTirImageCommand(runtime));
+  command.addCommand(buildTirPlanCommand(runtime));
 
   command.action(() => {
     command.outputHelp();

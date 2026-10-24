@@ -52,6 +52,8 @@ import {
   TirProjectApiClient,
   type TirProjectClient
 } from '../tir/project/index.js';
+import { TirImageApiClient, type TirImageClient } from '../tir/image/index.js';
+import { TirPlanApiClient, type TirPlanClient } from '../tir/plan/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -79,6 +81,8 @@ export interface CliRuntime {
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
   createTirAccountClient(credentials: ResolvedTirCredentials): TirAccountClient;
   createTirProjectClient(credentials: ResolvedTirCredentials): TirProjectClient;
+  createTirImageClient(credentials: ResolvedTirCredentials): TirImageClient;
+  createTirPlanClient(credentials: ResolvedTirCredentials): TirPlanClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
@@ -147,6 +151,14 @@ export function createRuntime(): CliRuntime {
       ),
     createTirProjectClient: (credentials) =>
       new TirProjectApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirImageClient: (credentials) =>
+      new TirImageApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirPlanClient: (credentials) =>
+      new TirPlanApiClient(
         createTirTransport(credentials, tirApiClientOptions)
       ),
     credentialValidator: new ApiCredentialValidator((credentials) =>

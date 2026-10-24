@@ -38,6 +38,8 @@ export function createTestRuntime(
     createVpcClient: unexpectedClient('VPC'),
     createTirAccountClient: unexpectedClient('TirAccount'),
     createTirProjectClient: unexpectedClient('TirProject'),
+    createTirImageClient: unexpectedClient('TirImage'),
+    createTirPlanClient: unexpectedClient('TirPlan'),
     credentialValidator: { validate: vi.fn() },
     isInteractive: false,
     prompt: vi.fn(() => Promise.resolve('')),
