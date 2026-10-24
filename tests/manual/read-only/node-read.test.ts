@@ -146,7 +146,7 @@ describeManual('manual read-only built CLI checks', () => {
         );
 
         const nodeList = await runJsonCommand<NodeListJson>(
-          ['node', 'list'],
+          ['myaccount', 'node', 'list'],
           configBackedCliEnv
         );
 
@@ -154,7 +154,7 @@ describeManual('manual read-only built CLI checks', () => {
         expect(Array.isArray(nodeList.nodes)).toBe(true);
 
         const projectList = await runJsonCommand<ProjectListJson>(
-          ['project', 'list'],
+          ['myaccount', 'project', 'list'],
           configBackedCliEnv
         );
 
@@ -162,7 +162,7 @@ describeManual('manual read-only built CLI checks', () => {
         expect(Array.isArray(projectList.items)).toBe(true);
 
         const volumePlans = await runJsonCommand<VolumePlansJson>(
-          ['volume', 'plans'],
+          ['myaccount', 'volume', 'plans'],
           configBackedCliEnv
         );
 
@@ -179,6 +179,7 @@ describeManual('manual read-only built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const osCatalog = await runJsonCommand<NodeCatalogOsJson>([
+        'myaccount',
         'node',
         'catalog',
         'os'
@@ -192,6 +193,7 @@ describeManual('manual read-only built CLI checks', () => {
       expect(entry).toBeDefined();
 
       const plans = await runJsonCommand<NodeCatalogPlansJson>([
+        'myaccount',
         'node',
         'catalog',
         'plans',
@@ -208,7 +210,11 @@ describeManual('manual read-only built CLI checks', () => {
       expect(plans.action).toBe('catalog-plans');
       expect(Array.isArray(plans.items)).toBe(true);
 
-      const nodeList = await runJsonCommand<NodeListJson>(['node', 'list']);
+      const nodeList = await runJsonCommand<NodeListJson>([
+        'myaccount',
+        'node',
+        'list'
+      ]);
 
       expect(nodeList.action).toBe('list');
       expect(Array.isArray(nodeList.nodes)).toBe(true);
@@ -220,6 +226,7 @@ describeManual('manual read-only built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const reservedIpList = await runJsonCommand<ReservedIpListJson>([
+        'myaccount',
         'reserved-ip',
         'list'
       ]);
@@ -234,6 +241,7 @@ describeManual('manual read-only built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const volumePlans = await runJsonCommand<VolumePlansJson>([
+        'myaccount',
         'volume',
         'plans'
       ]);
@@ -242,6 +250,7 @@ describeManual('manual read-only built CLI checks', () => {
       expect(Array.isArray(volumePlans.items)).toBe(true);
 
       const volumeList = await runJsonCommand<VolumeListJson>([
+        'myaccount',
         'volume',
         'list'
       ]);
@@ -249,13 +258,21 @@ describeManual('manual read-only built CLI checks', () => {
       expect(volumeList.action).toBe('list');
       expect(Array.isArray(volumeList.items)).toBe(true);
 
-      const vpcPlans = await runJsonCommand<VpcPlansJson>(['vpc', 'plans']);
+      const vpcPlans = await runJsonCommand<VpcPlansJson>([
+        'myaccount',
+        'vpc',
+        'plans'
+      ]);
 
       expect(vpcPlans.action).toBe('plans');
       expect(Array.isArray(vpcPlans.hourly.items)).toBe(true);
       expect(Array.isArray(vpcPlans.committed.items)).toBe(true);
 
-      const vpcList = await runJsonCommand<VpcListJson>(['vpc', 'list']);
+      const vpcList = await runJsonCommand<VpcListJson>([
+        'myaccount',
+        'vpc',
+        'list'
+      ]);
 
       expect(vpcList.action).toBe('list');
       expect(Array.isArray(vpcList.items)).toBe(true);
@@ -267,6 +284,7 @@ describeManual('manual read-only built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const securityGroupList = await runJsonCommand<SecurityGroupListJson>([
+        'myaccount',
         'security-group',
         'list'
       ]);
@@ -275,6 +293,7 @@ describeManual('manual read-only built CLI checks', () => {
       expect(Array.isArray(securityGroupList.items)).toBe(true);
 
       const sshKeyList = await runJsonCommand<SshKeyListJson>([
+        'myaccount',
         'ssh-key',
         'list'
       ]);
@@ -290,6 +309,7 @@ describeManual('manual read-only built CLI checks', () => {
     async () => {
       const nodeId = readOnlyEnv.fixtures.nodeId!;
       const response = await runJsonCommand<NodeGetJson>([
+        'myaccount',
         'node',
         'get',
         nodeId
@@ -306,6 +326,7 @@ describeManual('manual read-only built CLI checks', () => {
     async () => {
       const reservedIp = readOnlyEnv.fixtures.reservedIp!;
       const response = await runJsonCommand<ReservedIpGetJson>([
+        'myaccount',
         'reserved-ip',
         'get',
         reservedIp
@@ -322,6 +343,7 @@ describeManual('manual read-only built CLI checks', () => {
     async () => {
       const volumeId = readOnlyEnv.fixtures.volumeId!;
       const response = await runJsonCommand<VolumeGetJson>([
+        'myaccount',
         'volume',
         'get',
         volumeId
@@ -337,7 +359,12 @@ describeManual('manual read-only built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const vpcId = readOnlyEnv.fixtures.vpcId!;
-      const response = await runJsonCommand<VpcGetJson>(['vpc', 'get', vpcId]);
+      const response = await runJsonCommand<VpcGetJson>([
+        'myaccount',
+        'vpc',
+        'get',
+        vpcId
+      ]);
 
       expect(response.action).toBe('get');
       expect(String(response.vpc.id)).toBe(vpcId);
@@ -350,6 +377,7 @@ describeManual('manual read-only built CLI checks', () => {
     async () => {
       const securityGroupId = readOnlyEnv.fixtures.securityGroupId!;
       const response = await runJsonCommand<SecurityGroupGetJson>([
+        'myaccount',
         'security-group',
         'get',
         securityGroupId
@@ -367,6 +395,7 @@ describeManual('manual read-only built CLI checks', () => {
     async () => {
       const sshKeyId = readOnlyEnv.fixtures.sshKeyId!;
       const response = await runJsonCommand<SshKeyGetJson>([
+        'myaccount',
         'ssh-key',
         'get',
         sshKeyId

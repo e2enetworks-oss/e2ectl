@@ -2,7 +2,13 @@ import { runBuiltCli } from '../../helpers/process.js';
 
 describe('built CLI errors', () => {
   it('formats missing required options through the CLI contract', async () => {
-    const result = await runBuiltCli(['node', 'create', '--plan', 'plan-123']);
+    const result = await runBuiltCli([
+      'myaccount',
+      'node',
+      'create',
+      '--plan',
+      'plan-123'
+    ]);
 
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
@@ -12,7 +18,7 @@ describe('built CLI errors', () => {
   });
 
   it('formats invalid node ids through the CLI contract', async () => {
-    const result = await runBuiltCli(['node', 'get', 'node-abc']);
+    const result = await runBuiltCli(['myaccount', 'node', 'get', 'node-abc']);
 
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');
@@ -22,7 +28,7 @@ describe('built CLI errors', () => {
   });
 
   it('formats non-interactive delete confirmation failures through the CLI contract', async () => {
-    const result = await runBuiltCli(['node', 'delete', '101']);
+    const result = await runBuiltCli(['myaccount', 'node', 'delete', '101']);
 
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe('');

@@ -1,3 +1,9 @@
+export {
+  ApiCredentialValidator,
+  type ApiCredentialValidatorOptions,
+  type CredentialValidationResult,
+  type CredentialValidator
+} from './credential-validator.js';
 export { buildConfigCommand } from './command.js';
 export {
   resolveAccountCredentials,

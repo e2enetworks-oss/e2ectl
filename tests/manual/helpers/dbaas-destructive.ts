@@ -48,6 +48,7 @@ export function buildDbaasCreatePasswordCommand(options: {
 }): DbaasPasswordCommand {
   return {
     args: [
+      'myaccount',
       'dbaas',
       'create',
       '--name',
@@ -77,6 +78,7 @@ export function buildDbaasResetPasswordCommand(options: {
 }): DbaasPasswordCommand {
   return {
     args: [
+      'myaccount',
       'dbaas',
       'reset-password',
       String(options.dbaasId),
@@ -146,6 +148,7 @@ export async function runDbaasDestructiveCleanup(
         runJsonCommand,
         context.dbaasEnv,
         [
+          'myaccount',
           'dbaas',
           'network',
           'vpc',
@@ -160,7 +163,7 @@ export async function runDbaasDestructiveCleanup(
 
     try {
       await runJsonCommand(
-        ['dbaas', 'delete', String(dbaasToDelete), '--force'],
+        ['myaccount', 'dbaas', 'delete', String(dbaasToDelete), '--force'],
         context.dbaasEnv
       );
       if (manifest !== undefined) {
@@ -178,7 +181,7 @@ export async function runDbaasDestructiveCleanup(
   if (vpcToDelete && !manifest?.vpc_deleted) {
     try {
       await runJsonCommand(
-        ['vpc', 'delete', String(vpcToDelete), '--force'],
+        ['myaccount', 'vpc', 'delete', String(vpcToDelete), '--force'],
         context.dbaasEnv
       );
       if (manifest !== undefined) {

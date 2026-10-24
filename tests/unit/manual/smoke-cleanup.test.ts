@@ -26,17 +26,17 @@ describe('manual smoke cleanup orchestration', () => {
 
     expect(result.hadFailures).toBe(false);
     expect(events).toEqual([
-      'cli:reserved-ip detach node 203.0.113.20 --node-id 101',
-      'cli:node action volume detach 101 --volume-id 8801',
-      'cli:node action vpc detach 101 --vpc-id 23082',
-      'cli:node delete 101 --force',
-      'cli:reserved-ip delete 203.0.113.20 --force',
-      'cli:reserved-ip delete 203.0.113.21 --force',
-      'cli:volume delete 8801 --force',
-      'cli:vpc delete 23082 --force',
+      'cli:myaccount reserved-ip detach node 203.0.113.20 --node-id 101',
+      'cli:myaccount node action volume detach 101 --volume-id 8801',
+      'cli:myaccount node action vpc detach 101 --vpc-id 23082',
+      'cli:myaccount node delete 101 --force',
+      'cli:myaccount reserved-ip delete 203.0.113.20 --force',
+      'cli:myaccount reserved-ip delete 203.0.113.21 --force',
+      'cli:myaccount volume delete 8801 --force',
+      'cli:myaccount vpc delete 23082 --force',
       'image:img-455',
-      'cli:ssh-key delete 12 --force',
-      'cli:security-group delete 88 --force',
+      'cli:myaccount ssh-key delete 12 --force',
+      'cli:myaccount security-group delete 88 --force',
       'file:/tmp/release-smoke-rules.json'
     ]);
     expect(manifest.addon_reserved_ip_attached_node_id).toBeNull();

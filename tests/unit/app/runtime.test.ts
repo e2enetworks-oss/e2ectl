@@ -22,22 +22,20 @@ import {
   createRuntime,
   MYACCOUNT_BASE_URL_ENV_VAR
 } from '../../../src/app/runtime.js';
-import type {
-  ResolvedAccountCredentials,
-  ResolvedCredentials
-} from '../../../src/config/index.js';
 import {
   ApiCredentialValidator,
-  MyAccountApiTransport
-} from '../../../src/myaccount/index.js';
-import { ImageApiClient } from '../../../src/image/index.js';
-import { NodeApiClient } from '../../../src/node/index.js';
-import { ProjectApiClient } from '../../../src/project/index.js';
-import { ReservedIpApiClient } from '../../../src/reserved-ip/index.js';
-import { SecurityGroupApiClient } from '../../../src/security-group/index.js';
-import { SshKeyApiClient } from '../../../src/ssh-key/index.js';
-import { VolumeApiClient } from '../../../src/volume/index.js';
-import { VpcApiClient } from '../../../src/vpc/index.js';
+  type ResolvedAccountCredentials,
+  type ResolvedCredentials
+} from '../../../src/config/index.js';
+import { HttpTransport } from '../../../src/http/index.js';
+import { ImageApiClient } from '../../../src/myaccount/image/index.js';
+import { NodeApiClient } from '../../../src/myaccount/node/index.js';
+import { ProjectApiClient } from '../../../src/myaccount/project/index.js';
+import { ReservedIpApiClient } from '../../../src/myaccount/reserved-ip/index.js';
+import { SecurityGroupApiClient } from '../../../src/myaccount/security-group/index.js';
+import { SshKeyApiClient } from '../../../src/myaccount/ssh-key/index.js';
+import { VolumeApiClient } from '../../../src/myaccount/volume/index.js';
+import { VpcApiClient } from '../../../src/myaccount/vpc/index.js';
 
 describe('createRuntime', () => {
   const stdinTtyDescriptor = Object.getOwnPropertyDescriptor(
@@ -117,10 +115,10 @@ describe('createRuntime', () => {
     expect(vpcClient).toBeInstanceOf(VpcApiClient);
 
     const imageTransport = (
-      imageClient as unknown as { transport: MyAccountApiTransport }
+      imageClient as unknown as { transport: HttpTransport }
     ).transport as unknown as { baseUrl: string };
 
-    expect(imageTransport).toBeInstanceOf(MyAccountApiTransport);
+    expect(imageTransport).toBeInstanceOf(HttpTransport);
     expect(imageTransport.baseUrl).toBe('https://example.com/custom-base/');
   });
 

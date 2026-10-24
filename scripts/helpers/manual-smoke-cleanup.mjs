@@ -90,6 +90,7 @@ async function cleanupAddonReservedIpAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'reserved-ip',
     'detach',
     'node',
@@ -171,6 +172,7 @@ async function cleanupVolumeAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'action',
     'volume',
@@ -233,6 +235,7 @@ async function cleanupVpcAttachment(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'action',
     'vpc',
@@ -286,6 +289,7 @@ async function cleanupNode(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'node',
     'delete',
     String(manifest.node_id),
@@ -325,6 +329,7 @@ async function cleanupReservedIp(context, fail, ipField, deletedField) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'reserved-ip',
     'delete',
     ipAddress,
@@ -380,6 +385,7 @@ async function cleanupVolume(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'volume',
     'delete',
     String(volumeId),
@@ -437,6 +443,7 @@ async function cleanupVpc(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'vpc',
     'delete',
     String(vpcId),
@@ -640,6 +647,7 @@ async function cleanupSshKey(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'ssh-key',
     'delete',
     String(sshKeyId),
@@ -687,6 +695,7 @@ async function cleanupSecurityGroup(context, fail) {
   }
 
   const cliResult = await context.runCliCleanup([
+    'myaccount',
     'security-group',
     'delete',
     String(manifest.security_group_id),

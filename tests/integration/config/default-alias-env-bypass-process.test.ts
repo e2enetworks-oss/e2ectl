@@ -26,16 +26,19 @@ describe('stale default alias env bypass process flow', () => {
         profiles: {}
       });
 
-      const result = await runBuiltCli(['--json', 'node', 'list'], {
-        env: {
-          E2E_API_KEY: 'env-api-key',
-          E2E_AUTH_TOKEN: 'env-auth-token',
-          E2E_LOCATION: 'Delhi',
-          E2E_PROJECT_ID: '46429',
-          HOME: tempHome.path,
-          [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+      const result = await runBuiltCli(
+        ['--json', 'myaccount', 'node', 'list'],
+        {
+          env: {
+            E2E_API_KEY: 'env-api-key',
+            E2E_AUTH_TOKEN: 'env-auth-token',
+            E2E_LOCATION: 'Delhi',
+            E2E_PROJECT_ID: '46429',
+            HOME: tempHome.path,
+            [MYACCOUNT_BASE_URL_ENV_VAR]: `${server.baseUrl}/myaccount/api/v1`
+          }
         }
-      });
+      );
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');

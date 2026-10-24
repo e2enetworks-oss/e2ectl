@@ -64,7 +64,7 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
         );
 
         const lbList = await runJsonCommand<LbListJson>(
-          ['lb', 'list'],
+          ['myaccount', 'lb', 'list'],
           configBackedCliEnv
         );
 
@@ -72,7 +72,7 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
         expect(Array.isArray(lbList.items)).toBe(true);
 
         const lbPlans = await runJsonCommand<LbPlansJson>(
-          ['lb', 'plans'],
+          ['myaccount', 'lb', 'plans'],
           configBackedCliEnv
         );
 
@@ -81,7 +81,7 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
         expect(lbPlans.items.length).toBeGreaterThan(0);
 
         const sslList = await runJsonCommand<SslListJson>(
-          ['ssl', 'list'],
+          ['myaccount', 'ssl', 'list'],
           configBackedCliEnv
         );
 
@@ -97,12 +97,20 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
     'covers lb list and lb plans via the built CLI',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const lbList = await runJsonCommand<LbListJson>(['lb', 'list']);
+      const lbList = await runJsonCommand<LbListJson>([
+        'myaccount',
+        'lb',
+        'list'
+      ]);
 
       expect(lbList.action).toBe('list');
       expect(Array.isArray(lbList.items)).toBe(true);
 
-      const lbPlans = await runJsonCommand<LbPlansJson>(['lb', 'plans']);
+      const lbPlans = await runJsonCommand<LbPlansJson>([
+        'myaccount',
+        'lb',
+        'plans'
+      ]);
 
       expect(lbPlans.action).toBe('plans');
       expect(Array.isArray(lbPlans.items)).toBe(true);
@@ -116,7 +124,11 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
     'covers ssl list via the built CLI',
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
-      const sslList = await runJsonCommand<SslListJson>(['ssl', 'list']);
+      const sslList = await runJsonCommand<SslListJson>([
+        'myaccount',
+        'ssl',
+        'list'
+      ]);
 
       expect(sslList.action).toBe('list');
       expect(Array.isArray(sslList.items)).toBe(true);
@@ -128,7 +140,12 @@ describeManual('manual read-only load-balancer built CLI checks', () => {
     { timeout: MANUAL_READ_ONLY_TEST_TIMEOUT_MS },
     async () => {
       const lbId = process.env.E2ECTL_MANUAL_LB_ID!;
-      const response = await runJsonCommand<LbGetJson>(['lb', 'get', lbId]);
+      const response = await runJsonCommand<LbGetJson>([
+        'myaccount',
+        'lb',
+        'get',
+        lbId
+      ]);
 
       expect(response.action).toBe('get');
       expect(String(response.item.id)).toBe(lbId);

@@ -1,6 +1,6 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { formatCliCommand } from '../app/metadata.js';
-import type { ApiAuthCredentials } from '../myaccount/index.js';
+import type { ApiAuthCredentials } from '../http/index.js';
 import { readImportedProfiles } from './import-file.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';

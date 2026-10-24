@@ -92,7 +92,15 @@ describe('runCli', () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'create', '--plan', 'plan-123'],
+      [
+        'node',
+        CLI_COMMAND_NAME,
+        'myaccount',
+        'node',
+        'create',
+        '--plan',
+        'plan-123'
+      ],
       runtime,
       stderr
     );
@@ -108,7 +116,7 @@ describe('runCli', () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'get', 'node-abc'],
+      ['node', CLI_COMMAND_NAME, 'myaccount', 'node', 'get', 'node-abc'],
       runtime,
       stderr
     );
@@ -126,7 +134,7 @@ describe('runCli', () => {
     });
 
     const exitCode = await runCli(
-      ['node', CLI_COMMAND_NAME, 'node', 'delete', '101'],
+      ['node', CLI_COMMAND_NAME, 'myaccount', 'node', 'delete', '101'],
       runtime,
       stderr
     );

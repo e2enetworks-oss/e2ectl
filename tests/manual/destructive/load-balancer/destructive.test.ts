@@ -371,7 +371,7 @@ async function findAvailableVpc(
   context: LbTestContext
 ): Promise<string | undefined> {
   const vpcList = await runJsonCommand<VpcListJson>(
-    ['vpc', 'list'],
+    ['myaccount', 'vpc', 'list'],
     context.lbEnv
   );
 
@@ -394,6 +394,7 @@ async function createLbStep(
 ): Promise<{ lbId: number }> {
   const lbCreate = await runJsonCommand<LbCreateJson>(
     [
+      'myaccount',
       'lb',
       'create',
       '--name',
@@ -436,7 +437,7 @@ async function waitForLbRunningStep(
   while (Date.now() <= deadline) {
     try {
       const lbGet = await runJsonCommand<LbGetJson>(
-        ['lb', 'get', String(lbId)],
+        ['myaccount', 'lb', 'get', String(lbId)],
         context.lbEnv
       );
 
@@ -458,7 +459,7 @@ async function waitForLbRunningStep(
 
 async function getLbStep(context: LbTestContext, lbId: number): Promise<void> {
   const lbGet = await runJsonCommand<LbGetJson>(
-    ['lb', 'get', String(lbId)],
+    ['myaccount', 'lb', 'get', String(lbId)],
     context.lbEnv
   );
 
@@ -475,7 +476,7 @@ async function updateLbStep(
   }
 ): Promise<void> {
   const lbUpdate = await runJsonCommand<LbUpdateJson>(
-    ['lb', 'update', String(lbId), '--name', options.name],
+    ['myaccount', 'lb', 'update', String(lbId), '--name', options.name],
     context.lbEnv
   );
 
@@ -494,7 +495,16 @@ async function attachVpcStep(
   vpcId: string
 ): Promise<void> {
   const result = await runJsonCommand<LbAttachVpcJson>(
-    ['lb', 'network', 'vpc', 'attach', String(lbId), '--vpc-id', vpcId],
+    [
+      'myaccount',
+      'lb',
+      'network',
+      'vpc',
+      'attach',
+      String(lbId),
+      '--vpc-id',
+      vpcId
+    ],
     context.lbEnv
   );
 
@@ -509,7 +519,7 @@ async function getLbVerifyVpcAttachedStep(
   vpcId: string
 ): Promise<void> {
   const lbGet = await runJsonCommand<LbGetJson>(
-    ['lb', 'get', String(lbId)],
+    ['myaccount', 'lb', 'get', String(lbId)],
     context.lbEnv
   );
 
@@ -527,7 +537,16 @@ async function detachVpcStep(
   vpcId: string
 ): Promise<void> {
   const result = await runJsonCommand<LbDetachVpcJson>(
-    ['lb', 'network', 'vpc', 'detach', String(lbId), '--vpc-id', vpcId],
+    [
+      'myaccount',
+      'lb',
+      'network',
+      'vpc',
+      'detach',
+      String(lbId),
+      '--vpc-id',
+      vpcId
+    ],
     context.lbEnv
   );
 
@@ -546,6 +565,7 @@ async function addBackendGroupStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupAddJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'group',
@@ -569,7 +589,7 @@ async function listBackendGroupsStep(
   lbId: number
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupListJson>(
-    ['lb', 'backend', 'group', 'list', String(lbId)],
+    ['myaccount', 'lb', 'backend', 'group', 'list', String(lbId)],
     context.lbEnv
   );
 
@@ -590,6 +610,7 @@ async function updateBackendGroupStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupUpdateJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'group',
@@ -617,6 +638,7 @@ async function addBackendServerStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendServerAddJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'server',
@@ -645,6 +667,7 @@ async function removeBackendServerStep(
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendServerRemoveJson>(
     [
+      'myaccount',
       'lb',
       'backend',
       'server',
@@ -669,7 +692,7 @@ async function removeBackendGroupStep(
   groupName: string
 ): Promise<void> {
   const result = await runJsonCommand<LbBackendGroupRemoveJson>(
-    ['lb', 'backend', 'group', 'remove', String(lbId), groupName],
+    ['myaccount', 'lb', 'backend', 'group', 'remove', String(lbId), groupName],
     context.lbEnv
   );
 
@@ -683,7 +706,7 @@ async function reserveIpStep(
   lbId: number
 ): Promise<void> {
   const result = await runJsonCommand<LbReserveIpJson>(
-    ['lb', 'network', 'reserve-ip', 'reserve', String(lbId)],
+    ['myaccount', 'lb', 'network', 'reserve-ip', 'reserve', String(lbId)],
     context.lbEnv
   );
 
@@ -697,7 +720,7 @@ async function deleteLbStep(
   lbId: number
 ): Promise<void> {
   const result = await runJsonCommand<LbDeleteJson>(
-    ['lb', 'delete', String(lbId), '--force'],
+    ['myaccount', 'lb', 'delete', String(lbId), '--force'],
     context.lbEnv
   );
 
@@ -721,7 +744,7 @@ async function runLbCleanup(
 
   try {
     const result = await runBuiltCli(
-      ['lb', 'delete', String(lbId), '--force', '--json'],
+      ['myaccount', 'lb', 'delete', String(lbId), '--force', '--json'],
       {
         env: context.lbEnv.cliEnv,
         timeoutMs: 5 * 60 * 1000

@@ -85,6 +85,7 @@ describe('manual smoke step helpers', () => {
     });
     expect(runJsonCommandMock).toHaveBeenCalledWith(
       [
+        'myaccount',
         'node',
         'create',
         '--name',
@@ -151,6 +152,7 @@ describe('manual smoke step helpers', () => {
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       4,
       [
+        'myaccount',
         'node',
         'action',
         'security-group',
@@ -164,6 +166,7 @@ describe('manual smoke step helpers', () => {
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       5,
       [
+        'myaccount',
         'node',
         'action',
         'security-group',
@@ -208,12 +211,28 @@ describe('manual smoke step helpers', () => {
 
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       3,
-      ['reserved-ip', 'attach', 'node', '203.0.113.20', '--node-id', '101'],
+      [
+        'myaccount',
+        'reserved-ip',
+        'attach',
+        'node',
+        '203.0.113.20',
+        '--node-id',
+        '101'
+      ],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       4,
-      ['reserved-ip', 'detach', 'node', '203.0.113.20', '--node-id', '101'],
+      [
+        'myaccount',
+        'reserved-ip',
+        'detach',
+        'node',
+        '203.0.113.20',
+        '--node-id',
+        '101'
+      ],
       context.smokeEnv
     );
     expect(manifest.addon_reserved_ip).toBe('203.0.113.20');
@@ -302,6 +321,7 @@ describe('manual smoke step helpers', () => {
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       1,
       [
+        'myaccount',
         'volume',
         'create',
         '--name',
@@ -315,12 +335,30 @@ describe('manual smoke step helpers', () => {
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       3,
-      ['node', 'action', 'volume', 'attach', '101', '--volume-id', '8801'],
+      [
+        'myaccount',
+        'node',
+        'action',
+        'volume',
+        'attach',
+        '101',
+        '--volume-id',
+        '8801'
+      ],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       4,
-      ['node', 'action', 'volume', 'detach', '101', '--volume-id', '8801'],
+      [
+        'myaccount',
+        'node',
+        'action',
+        'volume',
+        'detach',
+        '101',
+        '--volume-id',
+        '8801'
+      ],
       context.smokeEnv
     );
     expect(waitForVolumeStatusMock).toHaveBeenNthCalledWith(
@@ -436,12 +474,30 @@ describe('manual smoke step helpers', () => {
     });
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       4,
-      ['node', 'action', 'vpc', 'attach', '101', '--vpc-id', '23082'],
+      [
+        'myaccount',
+        'node',
+        'action',
+        'vpc',
+        'attach',
+        '101',
+        '--vpc-id',
+        '23082'
+      ],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       6,
-      ['node', 'action', 'vpc', 'detach', '101', '--vpc-id', '23082'],
+      [
+        'myaccount',
+        'node',
+        'action',
+        'vpc',
+        'detach',
+        '101',
+        '--vpc-id',
+        '23082'
+      ],
       context.smokeEnv
     );
     expect(manifest.vpc_id).toBe(23082);
@@ -540,12 +596,12 @@ describe('manual smoke step helpers', () => {
 
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       7,
-      ['vpc', 'delete', '23082', '--force'],
+      ['myaccount', 'vpc', 'delete', '23082', '--force'],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       8,
-      ['vpc', 'delete', '23082', '--force'],
+      ['myaccount', 'vpc', 'delete', '23082', '--force'],
       context.smokeEnv
     );
     expect(manifest.vpc_deleted).toBe(true);
@@ -729,12 +785,21 @@ describe('manual smoke step helpers', () => {
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       3,
-      ['node', 'action', 'save-image', '101', '--name', 'release-smoke-image'],
+      [
+        'myaccount',
+        'node',
+        'action',
+        'save-image',
+        '101',
+        '--name',
+        'release-smoke-image'
+      ],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       4,
       [
+        'myaccount',
         'node',
         'upgrade',
         '101',
@@ -893,12 +958,12 @@ describe('manual smoke step helpers', () => {
 
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       1,
-      ['reserved-ip', 'reserve', 'node', '101'],
+      ['myaccount', 'reserved-ip', 'reserve', 'node', '101'],
       context.smokeEnv
     );
     expect(runJsonCommandMock).toHaveBeenNthCalledWith(
       2,
-      ['node', 'delete', '101', '--force'],
+      ['myaccount', 'node', 'delete', '101', '--force'],
       context.smokeEnv
     );
     expect(manifest.preserved_reserved_ip).toBe('203.0.113.21');
@@ -942,7 +1007,7 @@ describe('manual smoke step helpers', () => {
       publicIp: '203.0.113.33'
     });
     expect(runJsonCommandMock).toHaveBeenCalledWith(
-      ['node', 'action', 'public-ip', 'detach', '101', '--force'],
+      ['myaccount', 'node', 'action', 'public-ip', 'detach', '101', '--force'],
       context.smokeEnv
     );
     expect(waitForNodeStatusMock).toHaveBeenCalledWith(101, context.smokeEnv, {
@@ -971,7 +1036,7 @@ describe('manual smoke step helpers', () => {
     });
 
     expect(runJsonCommandMock).toHaveBeenCalledWith(
-      ['ssh-key', 'delete', '12', '--force'],
+      ['myaccount', 'ssh-key', 'delete', '12', '--force'],
       context.smokeEnv
     );
     expect(manifest.ssh_key_attached_node_id).toBeNull();
