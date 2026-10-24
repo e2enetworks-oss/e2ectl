@@ -158,7 +158,8 @@ describe('config commands', () => {
             auth_token: '****4321',
             default_location: 'Delhi',
             default_project_id: '12345',
-            isDefault: true
+            isDefault: true,
+            tir: null
           },
           {
             alias: 'staging',
@@ -166,7 +167,8 @@ describe('config commands', () => {
             auth_token: '****8888',
             default_location: '',
             default_project_id: '',
-            isDefault: false
+            isDefault: false,
+            tir: null
           }
         ]
       })
@@ -211,7 +213,8 @@ describe('config commands', () => {
             auth_token: '****4321',
             default_location: 'Delhi',
             default_project_id: '12345',
-            isDefault: false
+            isDefault: false,
+            tir: null
           },
           {
             alias: 'staging',
@@ -219,7 +222,8 @@ describe('config commands', () => {
             auth_token: '****8888',
             default_location: 'Chennai',
             default_project_id: '67890',
-            isDefault: true
+            isDefault: true,
+            tir: null
           }
         ]
       })
@@ -260,7 +264,8 @@ describe('config commands', () => {
             auth_token: '****4321',
             default_location: 'Delhi',
             default_project_id: '46429',
-            isDefault: true
+            isDefault: true,
+            tir: null
           }
         ]
       })
@@ -417,7 +422,8 @@ describe('config commands', () => {
             auth_token: '****prod',
             default_location: 'Delhi',
             default_project_id: '46429',
-            isDefault: true
+            isDefault: true,
+            tir: null
           }
         ],
         saved_default_location: 'Delhi',

@@ -87,6 +87,7 @@ Command guides:
 - [Security group](./docs/user-guides/security-group.md)
 - [SSH key](./docs/user-guides/ssh-key.md)
 - [Support ticket](./docs/user-guides/support-ticket.md)
+- [TIR](./docs/user-guides/tir.md)
 
 ## Contributors And Maintainers
 

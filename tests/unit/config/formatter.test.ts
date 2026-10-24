@@ -139,6 +139,41 @@ describe('config formatter', () => {
     expect(output).toContain('Delhi');
   });
 
+  it('shows the saved TIR context in the table and in JSON', () => {
+    const config: ConfigFile = {
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-key',
+          auth_token: 'auth-token',
+          tir: { account_id: '12', project_id: '34', location: 'Chennai' }
+        },
+        partial: {
+          api_key: 'api-key',
+          auth_token: 'auth-token',
+          tir: { account_id: '56' }
+        }
+      }
+    };
+
+    const human = renderConfigResult({ action: 'list', config }, false);
+    expect(human).toContain('account 12, project 34, Chennai');
+    expect(human).toContain('account 56');
+
+    const json = JSON.parse(
+      renderConfigResult({ action: 'list', config }, true)
+    ) as {
+      profiles: { alias: string; tir: unknown }[];
+    };
+    expect(
+      json.profiles.find((profile) => profile.alias === 'prod')?.tir
+    ).toEqual({
+      account_id: '12',
+      location: 'Chennai',
+      project_id: '34'
+    });
+  });
+
   it('renders human imported output with new default and saved defaults', () => {
     const output = renderConfigResult(
       {
@@ -337,7 +372,8 @@ describe('config formatter', () => {
         '      "auth_token": "****oken",\n' +
         '      "default_location": "",\n' +
         '      "default_project_id": "",\n' +
-        '      "isDefault": true\n' +
+        '      "isDefault": true,\n' +
+        '      "tir": null\n' +
         '    }\n' +
         '  ]\n' +
         '}\n'

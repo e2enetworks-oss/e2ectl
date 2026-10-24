@@ -6,7 +6,7 @@ import type {
   ConfigCommandResult,
   ConfigImportedCommandResult
 } from './service.js';
-import type { ConfigFile, ProfileSummary } from './types.js';
+import type { ConfigFile, ProfileSummary, TirContext } from './types.js';
 
 export function renderConfigResult(
   result: ConfigCommandResult,
@@ -24,7 +24,8 @@ export function summarizeProfiles(config: ConfigFile): ProfileSummary[] {
       api_key: maskSecret(profile.api_key),
       auth_token: maskSecret(profile.auth_token),
       default_project_id: profile.default_project_id ?? '',
-      default_location: profile.default_location ?? ''
+      default_location: profile.default_location ?? '',
+      tir: profile.tir ?? null
     }));
 }
 
@@ -36,7 +37,8 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       'API Key',
       'Auth Token',
       'Default Project ID',
-      'Default Location'
+      'Default Location',
+      'TIR Context'
     ]
   });
 
@@ -47,11 +49,26 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       profile.api_key,
       profile.auth_token,
       profile.default_project_id,
-      profile.default_location
+      profile.default_location,
+      formatTirContext(profile.tir)
     ]);
   }
 
   return table.toString();
+}
+
+function formatTirContext(tir: TirContext | null): string {
+  if (tir === null) {
+    return '';
+  }
+
+  return [
+    tir.account_id === undefined ? undefined : `account ${tir.account_id}`,
+    tir.project_id === undefined ? undefined : `project ${tir.project_id}`,
+    tir.location
+  ]
+    .filter((part) => part !== undefined)
+    .join(', ');
 }
 
 function renderConfigHuman(result: ConfigCommandResult): string {

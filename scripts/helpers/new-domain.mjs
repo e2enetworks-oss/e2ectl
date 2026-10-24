@@ -11,6 +11,42 @@ const MYACCOUNT_NAME = 'MyAccount';
 // Shared folders under src that must never become a platform.
 const RESERVED_PLATFORMS = new Set(['app', 'config', 'core', 'help', 'http']);
 
+// How a product finds its credentials, which context flags its commands
+// take, and which address override the runtime hands its transport.
+// MyAccount products need a project and location; TIR products need a TIR
+// account, project and location; products on a new platform only need a
+// key and token until that platform picks its own context.
+const PLATFORM_CONTEXT = {
+  myaccount: {
+    clientOptions: 'apiClientOptions',
+    contextFields: ['location', 'projectId'],
+    credentialsResolver: 'resolveStoredCredentials',
+    credentialsType: 'ResolvedCredentials',
+    optionsHelper: 'addContextOptions',
+    resolverRequirement: '',
+    testProfile: "default_location: 'Delhi',\n    default_project_id: '1'"
+  },
+  tir: {
+    clientOptions: 'tirApiClientOptions',
+    contextFields: ['accountId', 'location', 'projectId'],
+    credentialsResolver: 'resolveStoredTirCredentials',
+    credentialsType: 'ResolvedTirCredentials',
+    optionsHelper: 'addTirContextOptions',
+    resolverRequirement: ",\n      'project'",
+    testProfile: "tir: { account_id: '1', location: 'Delhi', project_id: '2' }"
+  }
+};
+
+const NEW_PLATFORM_CONTEXT = {
+  clientOptions: 'apiClientOptions',
+  contextFields: [],
+  credentialsResolver: 'resolveStoredAccountCredentials',
+  credentialsType: 'ResolvedAccountCredentials',
+  optionsHelper: 'addAliasOption',
+  resolverRequirement: '',
+  testProfile: "default_location: 'Delhi',\n    default_project_id: '1'"
+};
+
 export function parseDomainName(input) {
   const parts = (input ?? '').trim().split('/');
 
@@ -49,15 +85,7 @@ export function parseDomainName(input) {
     // How people write the platform name in messages, for example TIR.
     displayName: isMyAccount ? MYACCOUNT_NAME : platform.toUpperCase(),
     isMyAccount,
-    // MyAccount products need a project and location; products on other
-    // platforms only need a token and may pick their own context later.
-    credentialsType: isMyAccount
-      ? 'ResolvedCredentials'
-      : 'ResolvedAccountCredentials',
-    credentialsResolver: isMyAccount
-      ? 'resolveStoredCredentials'
-      : 'resolveStoredAccountCredentials',
-    optionsHelper: isMyAccount ? 'addContextOptions' : 'addAliasOption',
+    ...(PLATFORM_CONTEXT[platform] ?? NEW_PLATFORM_CONTEXT),
     platform,
     platformName,
     product
@@ -176,7 +204,7 @@ export function registerInRuntime(source, names, { addTransportImport }) {
   return insertBeforeLine(
     next,
     '    credentialValidator: new ApiCredentialValidator(',
-    `    create${names.baseName}Client: (credentials) =>\n      new ${names.baseName}ApiClient(\n        create${names.platformName}Transport(credentials, apiClientOptions)\n      ),`
+    `    create${names.baseName}Client: (credentials) =>\n      new ${names.baseName}ApiClient(\n        create${names.platformName}Transport(credentials, ${names.clientOptions})\n      ),`
   );
 }
 
@@ -261,11 +289,11 @@ export function build${platformName}Command(runtime: CliRuntime): Command {
 }
 
 export function renderProductFiles(names) {
-  const { baseName, isMyAccount, platform, product } = names;
+  const { baseName, contextFields, platform, product } = names;
   const directory = `src/${platform}/${product}`;
   const pathConstant = `${product.toUpperCase().replaceAll('-', '_')}_PATH`;
   const contextOptions = `export interface ${baseName}ContextOptions {
-  alias?: string;${isMyAccount ? '\n  location?: string;\n  projectId?: string;' : ''}
+  alias?: string;${contextFields.map((field) => `\n  ${field}?: string;`).join('')}
 }`;
 
   return {
@@ -390,7 +418,12 @@ export type {
 }
 
 function renderService(names) {
-  const { baseName, credentialsResolver: resolver, credentialsType } = names;
+  const {
+    baseName,
+    credentialsResolver: resolver,
+    credentialsType,
+    resolverRequirement
+  } = names;
 
   return `import {
   ${resolver},
@@ -421,7 +454,7 @@ export class ${baseName}Service {
   ): Promise<${baseName}ListCommandResult> {
     const credentials = await ${resolver}(
       this.dependencies.store,
-      options
+      options${resolverRequirement}
     );
     const client = this.dependencies.create${baseName}Client(credentials);
     const items = await client.listItems();
@@ -454,8 +487,7 @@ async function run${baseName}List(
   await store.upsertProfile('default', {
     api_key: 'key',
     auth_token: 'token',
-    default_location: 'Delhi',
-    default_project_id: '1'
+    ${names.testProfile}
   });
   const stdout = new MemoryWriter();
   const program = createProgram(

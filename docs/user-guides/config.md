@@ -63,11 +63,12 @@ e2ectl config remove --alias <profile-alias>
 Every value is picked in the same order: the command's flag, then its environment variable,
 then the saved profile. The first one that is set wins.
 
-| Value              | Flag                             | Environment variable            | Saved profile                       |
-| ------------------ | -------------------------------- | ------------------------------- | ----------------------------------- |
-| API key and token  | `--alias` (the profile it names) | `E2E_API_KEY`, `E2E_AUTH_TOKEN` | the default profile                 |
-| MyAccount project  | `--project-id`                   | `E2E_PROJECT_ID`                | `default_project_id` on the profile |
-| MyAccount location | `--location`                     | `E2E_LOCATION`                  | `default_location` on the profile   |
+| Value                          | Flag                                                           | Environment variable                                           | Saved profile                                  |
+| ------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------- |
+| API key and token              | `--alias` (the profile it names)                               | `E2E_API_KEY`, `E2E_AUTH_TOKEN`                                | the default profile                            |
+| MyAccount project              | `--project-id`                                                 | `E2E_PROJECT_ID`                                               | `default_project_id` on the profile            |
+| MyAccount location             | `--location`                                                   | `E2E_LOCATION`                                                 | `default_location` on the profile              |
+| TIR account, project, location | `--account-id`, `--project-id`, `--location` on `tir` commands | `E2E_TIR_ACCOUNT_ID`, `E2E_TIR_PROJECT_ID`, `E2E_TIR_LOCATION` | saved by `tir configure` (see [TIR](./tir.md)) |
 
 Two things follow from this:
 

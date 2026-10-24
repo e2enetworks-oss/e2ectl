@@ -44,7 +44,8 @@ describe('config list json process flow', () => {
               auth_token: '****2222',
               default_location: 'Chennai',
               default_project_id: '12345',
-              isDefault: false
+              isDefault: false,
+              tir: null
             },
             {
               alias: 'prod',
@@ -52,7 +53,8 @@ describe('config list json process flow', () => {
               auth_token: '****4444',
               default_location: 'Delhi',
               default_project_id: '46429',
-              isDefault: true
+              isDefault: true,
+              tir: null
             }
           ]
         })}\n`

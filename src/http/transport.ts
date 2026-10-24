@@ -20,6 +20,9 @@ const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 type HttpMethod = NonNullable<ApiRequestOptions['method']>;
 
 export interface TransportProjectContext {
+  // When set, requests also carry the credentials' account_id under this
+  // query name (TIR calls it active_iam).
+  accountParameter?: string;
   // Next step shown when a request needs a project and location but the
   // credentials have none.
   missingContextSuggestion: string;
@@ -31,6 +34,9 @@ export interface HttpTransportOptions extends ApiClientOptions {
   // Each platform passes its own address; there is no shared default, so a
   // platform can never send requests to another platform's API by mistake.
   baseUrl: string;
+  // Next step shown when the API answers 403. Defaults to checking the
+  // key and token.
+  forbiddenSuggestion?: string;
   // When set, every request sends the credentials' project_id and location
   // unless the call passes includeProjectContext: false.
   projectContext?: TransportProjectContext;
@@ -59,6 +65,7 @@ export class HttpTransport implements ApiTransport {
   private readonly baseUrl: string;
   private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
+  private readonly forbiddenSuggestion: string | undefined;
   private readonly projectContext: TransportProjectContext | undefined;
   private readonly timeoutMs: number;
 
@@ -70,6 +77,7 @@ export class HttpTransport implements ApiTransport {
     this.credentials = credentials;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.fetchFn = options.fetchFn ?? fetch;
+    this.forbiddenSuggestion = options.forbiddenSuggestion;
     this.projectContext = options.projectContext;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
@@ -179,6 +187,7 @@ export class HttpTransport implements ApiTransport {
     const { parseError, payload, preview } = await parseResponseBody(response);
     const parsedResponse: FallbackApiErrorInput = {
       apiName: this.apiName,
+      forbiddenSuggestion: this.forbiddenSuggestion,
       path: options.path,
       payload,
       request_url: sanitizeUrl(requestUrl),
@@ -300,9 +309,18 @@ export class HttpTransport implements ApiTransport {
     path: string,
     projectContext: TransportProjectContext
   ): void {
-    const { location, project_id: projectId } = this.credentials;
+    const {
+      account_id: accountId,
+      location,
+      project_id: projectId
+    } = this.credentials;
+    const needsAccount = projectContext.accountParameter !== undefined;
 
-    if (projectId === undefined || location === undefined) {
+    if (
+      projectId === undefined ||
+      location === undefined ||
+      (needsAccount && accountId === undefined)
+    ) {
       throw new AppError(
         `${this.apiName} project context is required for this request.`,
         {
@@ -314,6 +332,12 @@ export class HttpTransport implements ApiTransport {
       );
     }
 
+    if (
+      projectContext.accountParameter !== undefined &&
+      accountId !== undefined
+    ) {
+      url.searchParams.set(projectContext.accountParameter, accountId);
+    }
     url.searchParams.set('project_id', projectId);
     url.searchParams.set('location', location);
   }
@@ -355,6 +379,7 @@ interface ParsedResponseBody {
 
 interface FallbackApiErrorInput extends ParsedResponseBody {
   apiName: string;
+  forbiddenSuggestion: string | undefined;
   path: string;
   request_url: string;
   response: FetchLikeResponse;
@@ -465,11 +490,24 @@ function buildFallbackApiError(
       response.status === 401 || response.status === 403
         ? EXIT_CODES.auth
         : EXIT_CODES.network,
-    suggestion:
-      response.status === 401 || response.status === 403
-        ? 'Verify the saved token and API key, then run the command again.'
-        : 'Check the request inputs and try again.'
+    suggestion: chooseFailureSuggestion(
+      response.status,
+      input.forbiddenSuggestion
+    )
   });
+}
+
+function chooseFailureSuggestion(
+  status: number,
+  forbiddenSuggestion: string | undefined
+): string {
+  if (status === 403 && forbiddenSuggestion !== undefined) {
+    return forbiddenSuggestion;
+  }
+
+  return status === 401 || status === 403
+    ? 'Verify the saved token and API key, then run the command again.'
+    : 'Check the request inputs and try again.';
 }
 
 function buildInvalidResponseDetails(input: FallbackApiErrorInput): string[] {

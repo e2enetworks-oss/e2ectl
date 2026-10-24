@@ -67,6 +67,7 @@ export interface ProfileSummary {
   auth_token: string;
   default_project_id: string;
   default_location: string;
+  tir: TirContext | null;
 }
 
 export const REQUIRED_AUTH_FIELDS = ['api_key', 'auth_token'] as const;

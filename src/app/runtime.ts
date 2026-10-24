@@ -6,7 +6,8 @@ import {
   ConfigStore,
   type CredentialValidator,
   type ResolvedAccountCredentials,
-  type ResolvedCredentials
+  type ResolvedCredentials,
+  type ResolvedTirCredentials
 } from '../config/index.js';
 import { createMyAccountTransport } from '../myaccount/api.js';
 import { ImageApiClient, type ImageClient } from '../myaccount/image/index.js';
@@ -42,6 +43,15 @@ import {
   type VolumeClient
 } from '../myaccount/volume/index.js';
 import { VpcApiClient, type VpcClient } from '../myaccount/vpc/index.js';
+import {
+  TirAccountApiClient,
+  type TirAccountClient
+} from '../tir/account/index.js';
+import { createTirTransport } from '../tir/api.js';
+import {
+  TirProjectApiClient,
+  type TirProjectClient
+} from '../tir/project/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -67,6 +77,8 @@ export interface CliRuntime {
   ): SupportTicketClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
+  createTirAccountClient(credentials: ResolvedTirCredentials): TirAccountClient;
+  createTirProjectClient(credentials: ResolvedTirCredentials): TirProjectClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
@@ -75,11 +87,13 @@ export interface CliRuntime {
   store: ConfigStore;
 }
 
-// Internal test hook for pointing the compiled CLI at a fake API server.
+// Internal test hooks for pointing the compiled CLI at a fake API server.
 export const MYACCOUNT_BASE_URL_ENV_VAR = 'E2ECTL_MYACCOUNT_BASE_URL';
+export const TIR_BASE_URL_ENV_VAR = 'E2ECTL_TIR_BASE_URL';
 
 export function createRuntime(): CliRuntime {
-  const apiClientOptions = readApiClientOptions();
+  const apiClientOptions = readApiClientOptions(MYACCOUNT_BASE_URL_ENV_VAR);
+  const tirApiClientOptions = readApiClientOptions(TIR_BASE_URL_ENV_VAR);
 
   return {
     confirm: promptForConfirmation,
@@ -127,6 +141,14 @@ export function createRuntime(): CliRuntime {
       ),
     createVpcClient: (credentials) =>
       new VpcApiClient(createMyAccountTransport(credentials, apiClientOptions)),
+    createTirAccountClient: (credentials) =>
+      new TirAccountApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirProjectClient: (credentials) =>
+      new TirProjectApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
     credentialValidator: new ApiCredentialValidator((credentials) =>
       createMyAccountTransport(credentials, apiClientOptions)
     ),
@@ -139,9 +161,10 @@ export function createRuntime(): CliRuntime {
 }
 
 function readApiClientOptions(
+  envVarName: string,
   env: NodeJS.ProcessEnv = process.env
 ): ApiClientOptions {
-  const baseUrl = env[MYACCOUNT_BASE_URL_ENV_VAR]?.trim();
+  const baseUrl = env[envVarName]?.trim();
 
   return baseUrl === undefined || baseUrl.length === 0 ? {} : { baseUrl };
 }

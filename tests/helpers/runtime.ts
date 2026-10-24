@@ -36,6 +36,8 @@ export function createTestRuntime(
     createSupportTicketClient: unexpectedClient('Support ticket'),
     createVolumeClient: unexpectedClient('Volume'),
     createVpcClient: unexpectedClient('VPC'),
+    createTirAccountClient: unexpectedClient('TirAccount'),
+    createTirProjectClient: unexpectedClient('TirProject'),
     credentialValidator: { validate: vi.fn() },
     isInteractive: false,
     prompt: vi.fn(() => Promise.resolve('')),

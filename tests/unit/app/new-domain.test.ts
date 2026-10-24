@@ -34,7 +34,7 @@ export function createRuntime(): CliRuntime {
 
 describe('parseDomainName', () => {
   it('keeps short names for MyAccount products', () => {
-    expect(parseDomainName('myaccount/ssh-key')).toEqual({
+    expect(parseDomainName('myaccount/ssh-key')).toMatchObject({
       baseName: 'SshKey',
       credentialsResolver: 'resolveStoredCredentials',
       credentialsType: 'ResolvedCredentials',
@@ -118,10 +118,10 @@ describe('registering a product', () => {
       "import { createTirTransport } from '../tir/api.js';"
     );
     expect(result).toContain(
-      '  createTirFooClient(credentials: ResolvedAccountCredentials): TirFooClient;\n  credentialValidator: CredentialValidator;'
+      '  createTirFooClient(credentials: ResolvedTirCredentials): TirFooClient;\n  credentialValidator: CredentialValidator;'
     );
     expect(result).toContain(
-      '    createTirFooClient: (credentials) =>\n      new TirFooApiClient(\n        createTirTransport(credentials, apiClientOptions)\n      ),\n    credentialValidator: new ApiCredentialValidator('
+      '    createTirFooClient: (credentials) =>\n      new TirFooApiClient(\n        createTirTransport(credentials, tirApiClientOptions)\n      ),\n    credentialValidator: new ApiCredentialValidator('
     );
   });
 
@@ -217,13 +217,26 @@ describe('renderProductFiles', () => {
     expect(api).not.toContain('options.baseUrl ??');
   });
 
-  it('keeps TIR products free of MyAccount project settings', () => {
+  it('gives TIR products the TIR context and never the MyAccount one', () => {
     const files = renderProductFiles(parseDomainName('tir/foo'));
 
     expect(files['src/tir/foo/service.ts']).toContain(
-      'resolveStoredAccountCredentials'
+      "resolveStoredTirCredentials(\n      this.dependencies.store,\n      options,\n      'project'\n    );"
     );
-    expect(files['src/tir/foo/command.ts']).toContain('addAliasOption');
+    expect(files['src/tir/foo/command.ts']).toContain('addTirContextOptions');
+    expect(files['src/tir/foo/types.ts']).toContain('accountId?: string;');
+    expect(files['tests/unit/tir/foo/command.test.ts']).toContain(
+      "tir: { account_id: '1', location: 'Delhi', project_id: '2' }"
+    );
+  });
+
+  it('gives a brand-new platform only a key and token', () => {
+    const files = renderProductFiles(parseDomainName('newplatform/foo'));
+
+    expect(files['src/newplatform/foo/service.ts']).toContain(
+      'resolveStoredAccountCredentials(\n      this.dependencies.store,\n      options\n    );'
+    );
+    expect(files['src/newplatform/foo/command.ts']).toContain('addAliasOption');
   });
 });
 

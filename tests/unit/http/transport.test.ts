@@ -131,6 +131,67 @@ describe('HttpTransport', () => {
     ).rejects.toThrow(/project context is required/i);
   });
 
+  it('sends the account under its own query name when the platform asks for it', async () => {
+    let seenInput = '';
+    const transport = new HttpTransport(
+      { ...credentials, account_id: '77' },
+      {
+        apiName: 'TIR',
+        baseUrl: 'https://example.test/gpu',
+        projectContext: { ...projectContext, accountParameter: 'active_iam' },
+        fetchFn: (input: string) => {
+          seenInput = input;
+          return Promise.resolve(createFetchResponse(envelope({ ok: true })));
+        }
+      }
+    );
+
+    await transport.get<ApiEnvelope<{ ok: boolean }>>('/plans/');
+
+    expect(seenInput).toBe(
+      'https://example.test/gpu/plans/?apikey=api-key&active_iam=77&project_id=123&location=Delhi'
+    );
+  });
+
+  it('fails early when the platform needs an account and the credentials have none', async () => {
+    const transport = new HttpTransport(credentials, {
+      apiName: 'TIR',
+      baseUrl: 'https://example.test/gpu',
+      projectContext: { ...projectContext, accountParameter: 'active_iam' },
+      fetchFn: vi.fn()
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<{ ok: boolean }>>('/plans/')
+    ).rejects.toThrow(/project context is required/i);
+  });
+
+  it('gives the platform next step for a 403 and the key check for a 401', async () => {
+    const failWith = (status: number): HttpTransport =>
+      new HttpTransport(credentials, {
+        apiName: 'TIR',
+        baseUrl: 'https://example.test/gpu',
+        forbiddenSuggestion: 'Check the TIR account and project.',
+        fetchFn: () =>
+          Promise.resolve(
+            createFetchResponse(undefined, {
+              ok: false,
+              status,
+              statusText: 'Refused',
+              json: () => Promise.resolve({ message: 'Forbidden' })
+            })
+          )
+      });
+
+    await expect(failWith(403).get('/plans/')).rejects.toMatchObject({
+      suggestion: 'Check the TIR account and project.'
+    });
+    await expect(failWith(401).get('/plans/')).rejects.toMatchObject({
+      suggestion:
+        'Verify the saved token and API key, then run the command again.'
+    });
+  });
+
   it('serializes JSON bodies for POST requests', async () => {
     let seenInput = '';
     let seenInit: RequestInit | undefined;

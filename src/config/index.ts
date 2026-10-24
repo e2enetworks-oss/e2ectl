@@ -4,7 +4,7 @@ export {
   type CredentialValidationResult,
   type CredentialValidator
 } from './credential-validator.js';
-export { buildConfigCommand } from './command.js';
+export { buildConfigCommand, formatConfigCommand } from './command.js';
 export {
   resolveAccountCredentials,
   resolveCredentials,
@@ -28,3 +28,4 @@ export type {
   TirContextField
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';
+export { VALID_LOCATIONS } from './types.js';
