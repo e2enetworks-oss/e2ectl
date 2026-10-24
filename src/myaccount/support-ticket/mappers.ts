@@ -44,20 +44,20 @@ export function normalizeSupportTicketItem(
   item: SupportTicketSummary
 ): SupportTicketItem {
   return {
-    assignee_id: normalizeOptionalString(item.assignee_id) ?? null,
+    assignee_id: normalizeNullableString(item.assignee_id),
     attachment_count: normalizeOptionalInteger(item.attachment_count),
-    category: normalizeOptionalString(item.category) ?? null,
-    channel: normalizeOptionalString(item.channel) ?? null,
+    category: normalizeNullableString(item.category),
+    channel: normalizeNullableString(item.channel),
     comment_count: normalizeOptionalInteger(item.comment_count),
-    contact_id: normalizeOptionalString(item.contact_id) ?? null,
-    created_at: normalizeOptionalString(item.created_at) ?? null,
-    creator_email: normalizeOptionalString(item.creator_email) ?? null,
+    contact_id: normalizeNullableString(item.contact_id),
+    created_at: normalizeNullableString(item.created_at),
+    creator_email: normalizeNullableString(item.creator_email),
     customer_id: normalizeOptionalInteger(item.customer_id),
-    department: normalizeOptionalString(item.department) ?? null,
-    department_id: normalizeOptionalString(item.department_id) ?? null,
+    department: normalizeNullableString(item.department),
+    department_id: normalizeNullableString(item.department_id),
     description: normalizeDescription(item.description),
-    due_date: normalizeOptionalString(item.due_date) ?? null,
-    email: normalizeOptionalString(item.email) ?? null,
+    due_date: normalizeNullableString(item.due_date),
+    email: normalizeNullableString(item.email),
     emails_cc_on_ticket: Array.isArray(item.emails_cc_on_ticket)
       ? item.emails_cc_on_ticket.filter(
           (email): email is string =>
@@ -66,17 +66,17 @@ export function normalizeSupportTicketItem(
       : [],
     id: item.id,
     is_priority_ticket: item.is_priority_ticket === true,
-    priority: normalizeOptionalString(item.priority) ?? null,
+    priority: normalizeNullableString(item.priority),
     reply_option:
       typeof item.reply_option === 'boolean' ? item.reply_option : null,
-    status: normalizeOptionalString(item.status) ?? null,
-    sub_category: normalizeOptionalString(item.sub_category) ?? null,
-    subject: normalizeOptionalString(item.subject) ?? null,
+    status: normalizeNullableString(item.status),
+    sub_category: normalizeNullableString(item.sub_category),
+    subject: normalizeNullableString(item.subject),
     task_count: normalizeOptionalInteger(item.task_count),
-    ticket_category: normalizeOptionalString(item.ticket_category) ?? null,
-    ticket_id: normalizeOptionalString(item.ticket_id) ?? null,
-    ticket_number: normalizeOptionalString(item.ticket_number) ?? null,
-    updated_at: normalizeOptionalString(item.updated_at) ?? null
+    ticket_category: normalizeNullableString(item.ticket_category),
+    ticket_id: normalizeNullableString(item.ticket_id),
+    ticket_number: normalizeNullableString(item.ticket_number),
+    updated_at: normalizeNullableString(item.updated_at)
   };
 }
 
@@ -123,31 +123,35 @@ export function normalizeSupportTicketThread(
   thread: SupportTicketThread,
   isSummaryComplete = true
 ): SupportTicketThreadItem {
-  const attachments = (thread.attachment_list?.data ?? []).map((att) => ({
-    download_url: normalizeOptionalString(att.download_url) ?? null,
-    file_name: normalizeOptionalString(att.file_name) ?? ''
-  }));
-
   return {
-    attachments,
-    author_email: normalizeOptionalString(thread.author?.email) ?? null,
-    author_name: normalizeOptionalString(thread.author?.name) ?? null,
-    author_type: normalizeOptionalString(thread.author?.type) ?? null,
+    attachments: normalizeThreadAttachments(thread),
+    author_email: normalizeNullableString(thread.author?.email),
+    author_name: normalizeNullableString(thread.author?.name),
+    author_type: normalizeNullableString(thread.author?.type),
     can_reply: thread.canReply === true,
-    cc: normalizeOptionalString(thread.cc) ?? null,
-    channel: normalizeOptionalString(thread.channel) ?? null,
-    content_type: normalizeOptionalString(thread.contentType) ?? null,
-    created_time: normalizeOptionalString(thread.createdTime) ?? null,
+    cc: normalizeNullableString(thread.cc),
+    channel: normalizeNullableString(thread.channel),
+    content_type: normalizeNullableString(thread.contentType),
+    created_time: normalizeNullableString(thread.createdTime),
     // Preserve the raw value so unrecognized directions/visibilities surface to
     // the caller instead of being silently coerced to null.
-    direction: normalizeOptionalString(thread.direction) ?? null,
+    direction: normalizeNullableString(thread.direction),
     id: thread.id,
     is_description_thread: thread.isDescriptionThread === true,
     is_summary_complete: isSummaryComplete,
-    summary: normalizeOptionalString(thread.summary) ?? null,
-    to: normalizeOptionalString(thread.to) ?? null,
-    visibility: normalizeOptionalString(thread.visibility) ?? null
+    summary: normalizeNullableString(thread.summary),
+    to: normalizeNullableString(thread.to),
+    visibility: normalizeNullableString(thread.visibility)
   };
+}
+
+function normalizeThreadAttachments(
+  thread: SupportTicketThread
+): SupportTicketThreadItem['attachments'] {
+  return (thread.attachment_list?.data ?? []).map((att) => ({
+    download_url: normalizeOptionalString(att.download_url) ?? null,
+    file_name: normalizeOptionalString(att.file_name) ?? ''
+  }));
 }
 
 export function normalizeSupportTicketTimelineEvent(
@@ -197,6 +201,13 @@ export function extractThreadText(
   const fromPlain =
     typeof detail.plainText === 'string' ? detail.plainText.trim() : '';
   return fromPlain.length > 0 ? fromPlain : undefined;
+}
+
+// Trimmed string, or null when the value is missing or blank.
+function normalizeNullableString(
+  value: string | number | null | undefined
+): string | null {
+  return normalizeOptionalString(value) ?? null;
 }
 
 function normalizeDescription(value: unknown): string | null {

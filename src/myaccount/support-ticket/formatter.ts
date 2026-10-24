@@ -3,11 +3,20 @@ import Table from 'cli-table3';
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type {
+  SupportTicketCloseCommandResult,
   SupportTicketCommandResult,
+  SupportTicketCreateCommandResult,
   SupportTicketDepartmentItem,
+  SupportTicketDepartmentsCommandResult,
   SupportTicketDetailItem,
+  SupportTicketGetCommandResult,
   SupportTicketItem,
+  SupportTicketListCommandResult,
+  SupportTicketRepliesCommandResult,
+  SupportTicketReopenCommandResult,
+  SupportTicketReplyCommandResult,
   SupportTicketThreadItem,
+  SupportTicketTimelineCommandResult,
   SupportTicketTimelineEventItem
 } from './types/index.js';
 
@@ -22,89 +31,143 @@ export function renderSupportTicketResult(
 
 function renderSupportTicketHuman(result: SupportTicketCommandResult): string {
   switch (result.action) {
-    case 'create': {
-      const reference = result.ticket.ticket_number ?? String(result.ticket.id);
-      const heading = `Created support ticket ${reference}.\n`;
-      const next = `\nNext: run ${formatMyAccountCommand('support-ticket get ' + String(result.ticket.id))} to inspect the ticket.\n`;
-
-      // When the full detail loaded, show it (real values, no nulls). When it
-      // didn't, show only what the create response actually returned so we never
-      // present fabricated "--" fields as if they were the ticket's real state.
-      if (result.detail_loaded) {
-        return `${heading}\n${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n${next}`;
-      }
-
-      return (
-        heading +
-        `ID: ${result.ticket.id}\n` +
-        `Ticket Number: ${result.ticket.ticket_number ?? '--'}\n` +
-        next
-      );
-    }
-    case 'get': {
-      const id = String(result.ticket.id);
-      return (
-        `${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n` +
-        formatHint(
-          `read the conversation with ${formatMyAccountCommand('support-ticket get-replies ' + id)}, ` +
-            `or respond with ${formatMyAccountCommand('support-ticket reply ' + id)}.`
-        )
-      );
-    }
+    case 'create':
+      return renderCreateHuman(result);
+    case 'get':
+      return renderGetHuman(result);
     case 'departments':
-      return result.departments.length === 0
-        ? 'No support ticket departments found.\n'
-        : `${formatSupportTicketDepartmentsTable(result.departments)}\n` +
-            formatHint(
-              `pass an id from the ID column as ${formatMyAccountCommand('support-ticket create --department <department-id>')} to route a new ticket.`
-            );
+      return renderDepartmentsHuman(result);
     case 'list':
-      return result.items.length === 0
-        ? 'No support tickets found.\n'
-        : `${formatSupportTicketListTable(result.items)}\n${formatListFooter(result)}` +
-            formatHint(
-              `use a ticket id from the ID column with ${formatMyAccountCommand('support-ticket get <ticket-id>')} to view full details.`
-            );
+      return renderListHuman(result);
     case 'reply':
-      return (
-        `Replied to support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n` +
-        formatHint(
-          `view the full conversation with ${formatMyAccountCommand('support-ticket get-replies ' + String(result.ticket_id))}.`
-        )
-      );
+      return renderReplyHuman(result);
     case 'close':
-      return (
-        `Closed support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n` +
-        formatHint(
-          `reopen this ticket if needed with ${formatMyAccountCommand('support-ticket reopen ' + String(result.ticket_id))}.`
-        )
-      );
+      return renderCloseHuman(result);
     case 'reopen':
-      return (
-        `Reopened support ticket ${result.ticket_id}.\n` +
-        `Message: ${result.message || '--'}\n` +
-        formatHint(
-          `add a reply with ${formatMyAccountCommand('support-ticket reply ' + String(result.ticket_id))}, ` +
-            `or close it again with ${formatMyAccountCommand('support-ticket close ' + String(result.ticket_id))}.`
-        )
-      );
+      return renderReopenHuman(result);
     case 'timeline':
-      return result.events.length === 0
-        ? `No timeline events on support ticket ${result.ticket_id}.\n`
-        : `Timeline for support ticket ${result.ticket_id}:\n${formatSupportTicketTimelineTable(result.events)}\n` +
-            formatHint(
-              `view the ticket's current details with ${formatMyAccountCommand('support-ticket get ' + String(result.ticket_id))}.`
-            );
+      return renderTimelineHuman(result);
     case 'get-replies':
-      return result.threads.length === 0
-        ? `No replies on support ticket ${result.ticket_id}.\n`
-        : `Replies on support ticket ${result.ticket_id}:\n${formatSupportTicketRepliesTable(result.threads)}\n` +
-            formatHint(
-              `respond to this ticket with ${formatMyAccountCommand('support-ticket reply ' + String(result.ticket_id))}.`
-            );
+      return renderRepliesHuman(result);
   }
+}
+
+function renderCreateHuman(result: SupportTicketCreateCommandResult): string {
+  const reference = result.ticket.ticket_number ?? String(result.ticket.id);
+  const heading = `Created support ticket ${reference}.\n`;
+  const next = `\nNext: run ${formatMyAccountCommand('support-ticket get ' + String(result.ticket.id))} to inspect the ticket.\n`;
+
+  // When the full detail loaded, show it (real values, no nulls). When it
+  // didn't, show only what the create response actually returned so we never
+  // present fabricated "--" fields as if they were the ticket's real state.
+  if (result.detail_loaded) {
+    return `${heading}\n${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n${next}`;
+  }
+
+  return (
+    heading +
+    `ID: ${result.ticket.id}\n` +
+    `Ticket Number: ${result.ticket.ticket_number ?? '--'}\n` +
+    next
+  );
+}
+
+function renderGetHuman(result: SupportTicketGetCommandResult): string {
+  const id = String(result.ticket.id);
+  return (
+    `${formatSupportTicketDetailTable(result.ticket, result.account_manager)}\n` +
+    formatHint(
+      `read the conversation with ${formatMyAccountCommand('support-ticket get-replies ' + id)}, ` +
+        `or respond with ${formatMyAccountCommand('support-ticket reply ' + id)}.`
+    )
+  );
+}
+
+function renderDepartmentsHuman(
+  result: SupportTicketDepartmentsCommandResult
+): string {
+  if (result.departments.length === 0) {
+    return 'No support ticket departments found.\n';
+  }
+
+  return (
+    `${formatSupportTicketDepartmentsTable(result.departments)}\n` +
+    formatHint(
+      `pass an id from the ID column as ${formatMyAccountCommand('support-ticket create --department <department-id>')} to route a new ticket.`
+    )
+  );
+}
+
+function renderListHuman(result: SupportTicketListCommandResult): string {
+  if (result.items.length === 0) {
+    return 'No support tickets found.\n';
+  }
+
+  return (
+    `${formatSupportTicketListTable(result.items)}\n${formatListFooter(result)}` +
+    formatHint(
+      `use a ticket id from the ID column with ${formatMyAccountCommand('support-ticket get <ticket-id>')} to view full details.`
+    )
+  );
+}
+
+function renderReplyHuman(result: SupportTicketReplyCommandResult): string {
+  return (
+    `Replied to support ticket ${result.ticket_id}.\n` +
+    `Message: ${result.message || '--'}\n` +
+    formatHint(
+      `view the full conversation with ${formatMyAccountCommand('support-ticket get-replies ' + String(result.ticket_id))}.`
+    )
+  );
+}
+
+function renderCloseHuman(result: SupportTicketCloseCommandResult): string {
+  return (
+    `Closed support ticket ${result.ticket_id}.\n` +
+    `Message: ${result.message || '--'}\n` +
+    formatHint(
+      `reopen this ticket if needed with ${formatMyAccountCommand('support-ticket reopen ' + String(result.ticket_id))}.`
+    )
+  );
+}
+
+function renderReopenHuman(result: SupportTicketReopenCommandResult): string {
+  return (
+    `Reopened support ticket ${result.ticket_id}.\n` +
+    `Message: ${result.message || '--'}\n` +
+    formatHint(
+      `add a reply with ${formatMyAccountCommand('support-ticket reply ' + String(result.ticket_id))}, ` +
+        `or close it again with ${formatMyAccountCommand('support-ticket close ' + String(result.ticket_id))}.`
+    )
+  );
+}
+
+function renderTimelineHuman(
+  result: SupportTicketTimelineCommandResult
+): string {
+  if (result.events.length === 0) {
+    return `No timeline events on support ticket ${result.ticket_id}.\n`;
+  }
+
+  return (
+    `Timeline for support ticket ${result.ticket_id}:\n${formatSupportTicketTimelineTable(result.events)}\n` +
+    formatHint(
+      `view the ticket's current details with ${formatMyAccountCommand('support-ticket get ' + String(result.ticket_id))}.`
+    )
+  );
+}
+
+function renderRepliesHuman(result: SupportTicketRepliesCommandResult): string {
+  if (result.threads.length === 0) {
+    return `No replies on support ticket ${result.ticket_id}.\n`;
+  }
+
+  return (
+    `Replies on support ticket ${result.ticket_id}:\n${formatSupportTicketRepliesTable(result.threads)}\n` +
+    formatHint(
+      `respond to this ticket with ${formatMyAccountCommand('support-ticket reply ' + String(result.ticket_id))}.`
+    )
+  );
 }
 
 /**

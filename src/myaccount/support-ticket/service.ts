@@ -36,14 +36,19 @@ import {
   parseResources,
   parseStatusFilter,
   parseTicketTypeFlags,
-  readAndEncodeAttachments
+  readAndEncodeAttachments,
+  type AttachmentPayload,
+  type SupportTicketContactContext
 } from './normalizers.js';
 import type {
+  SupportTicketCategory,
   SupportTicketCloseCommandResult,
   SupportTicketCloseOptions,
   SupportTicketContextOptions,
   SupportTicketCreateCommandResult,
   SupportTicketCreateOptions,
+  SupportTicketCreateRequest,
+  SupportTicketCreateResult,
   SupportTicketDepartmentsCommandResult,
   SupportTicketGetCommandResult,
   SupportTicketGetOptions,
@@ -71,138 +76,18 @@ export class SupportTicketService {
   async createTicket(
     options: SupportTicketCreateOptions
   ): Promise<SupportTicketCreateCommandResult> {
-    const subject = assertNonEmptyTrimmed(
-      options.subject,
-      '--subject',
-      SUBJECT_MAX_LENGTH,
-      { asciiPrintableOnly: true }
-    );
-    const description = assertNonEmptyTrimmed(
-      options.description,
-      '--description',
-      DESCRIPTION_MAX_LENGTH
-    );
-    const department = assertPositiveInteger(
-      options.department,
-      '--department'
-    );
-    const ticketCategory = assertEnum(
-      options.ticketCategory,
-      VALID_TICKET_CATEGORIES,
-      '--ticket-category'
-    );
-    const priority =
-      options.priority === undefined
-        ? undefined
-        : assertEnum(options.priority, VALID_PRIORITIES, '--priority');
-    const { contactEmail, contactType } = parseContactContext(options);
-    const ccEmails = normalizeCcEmails(options.cc);
-    const component = normalizeOptionalString(options.component);
-    const channel = normalizeOptionalString(options.channel) ?? DEFAULT_CHANNEL;
-    const resources = parseResources(options.resource);
-
-    const isSales = ticketCategory === 'Sales';
-    if (CATEGORIES_REQUIRING_COMPONENT.has(ticketCategory) && !component) {
-      throw new CliError(
-        `--component is required when --ticket-category is ${ticketCategory}.`,
-        {
-          code: 'MISSING_REQUIRED_INPUT',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Pass --component for ${ticketCategory} tickets.`
-        }
-      );
-    }
-    if (
-      CATEGORIES_REQUIRING_PRIORITY.has(ticketCategory) &&
-      priority === undefined
-    ) {
-      throw new CliError(
-        `--priority is required when --ticket-category is ${ticketCategory}.`,
-        {
-          code: 'MISSING_REQUIRED_INPUT',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Pass --priority (High, Medium, or Low) for ${ticketCategory} tickets.`
-        }
-      );
-    }
-    if (
-      ticketCategory !== 'Cloud' &&
-      options.resource !== undefined &&
-      options.resource.length > 0
-    ) {
-      throw new CliError(
-        `--resource is only supported for Cloud tickets, not ${ticketCategory}.`,
-        {
-          code: 'INVALID_INPUT_COMBINATION',
-          exitCode: EXIT_CODES.usage,
-          suggestion: `Drop --resource when --ticket-category is ${ticketCategory}.`
-        }
-      );
-    }
-
-    const componentField = isSales ? '' : component;
-    const resourceField: SupportTicketResource[] | null =
-      ticketCategory === 'Cloud' && resources.length > 0 ? resources : null;
-    const priorityField: SupportTicketPriority | null | undefined = isSales
-      ? null
-      : priority;
+    const input = parseCreateTicketInput(options);
     const attachments = await readAndEncodeAttachments(
       options.attachment,
       (path) => this.dependencies.readAttachmentFile(path)
     );
 
     const client = await this.createClient(options);
-    const created = await client.createTicket({
-      cc_email_list: ccEmails ?? [],
-      channel,
-      ...(componentField === undefined ? {} : { component: componentField }),
-      contact_person_email: contactEmail ?? '',
-      contact_person_type: contactType ?? '',
-      department,
-      description,
-      file_name: attachments?.fileNames ?? [],
-      imagedata: attachments?.imagedata ?? [],
-      ...(options.isPriorityTicket === undefined
-        ? {}
-        : { is_priority_ticket: options.isPriorityTicket }),
-      ...(priorityField === undefined ? {} : { priority: priorityField }),
-      resource: resourceField,
-      subject,
-      ticket_category: ticketCategory
-    });
+    const created = await client.createTicket(
+      buildCreateTicketRequest(input, attachments, options.isPriorityTicket)
+    );
 
-    // The create endpoint returns only the identifiers, so fetch the full detail
-    // in a follow-up request. If that fetch fails the ticket was still created,
-    // so fall back to the identifiers we have and surface a warning rather than
-    // failing the whole command.
-    try {
-      const { account_manager, ticket } = await client.getTicket(created.id, {
-        ...(contactEmail === undefined
-          ? {}
-          : { contact_person_email: contactEmail }),
-        ...(contactType === undefined
-          ? {}
-          : { contact_person_type: contactType })
-      });
-
-      return {
-        account_manager,
-        action: 'create',
-        detail_loaded: true,
-        ticket: normalizeSupportTicketDetail(ticket),
-        warnings: []
-      };
-    } catch (cause) {
-      return {
-        account_manager: null,
-        action: 'create',
-        detail_loaded: false,
-        ticket: buildDetailFromCreateResult(created),
-        warnings: [
-          `Ticket ${created.ticket_number ?? created.id} was created, but its full detail could not be loaded${formatCause(cause)}. Run ${formatMyAccountCommand(`support-ticket get ${created.id}`)} to view it.`
-        ]
-      };
-    }
+    return loadCreatedTicket(client, created, input);
   }
 
   async listDepartments(
@@ -466,6 +351,202 @@ export class SupportTicketService {
     return this.dependencies.createSupportTicketClient(
       await resolveStoredCredentials(this.dependencies.store, options)
     );
+  }
+}
+
+interface CreateTicketInput extends SupportTicketContactContext {
+  ccEmails: string[] | undefined;
+  channel: string;
+  component: string | undefined;
+  department: number;
+  description: string;
+  priority: SupportTicketPriority | undefined;
+  resources: SupportTicketResource[];
+  subject: string;
+  ticketCategory: SupportTicketCategory;
+}
+
+function parseCreateTicketInput(
+  options: SupportTicketCreateOptions
+): CreateTicketInput {
+  const subject = assertNonEmptyTrimmed(
+    options.subject,
+    '--subject',
+    SUBJECT_MAX_LENGTH,
+    { asciiPrintableOnly: true }
+  );
+  const description = assertNonEmptyTrimmed(
+    options.description,
+    '--description',
+    DESCRIPTION_MAX_LENGTH
+  );
+  const department = assertPositiveInteger(options.department, '--department');
+  const ticketCategory = assertEnum(
+    options.ticketCategory,
+    VALID_TICKET_CATEGORIES,
+    '--ticket-category'
+  );
+  const priority =
+    options.priority === undefined
+      ? undefined
+      : assertEnum(options.priority, VALID_PRIORITIES, '--priority');
+  const { contactEmail, contactType } = parseContactContext(options);
+  const ccEmails = normalizeCcEmails(options.cc);
+  const component = normalizeOptionalString(options.component);
+  const channel = normalizeOptionalString(options.channel) ?? DEFAULT_CHANNEL;
+  const resources = parseResources(options.resource);
+
+  assertCreateTicketCategoryRules(
+    ticketCategory,
+    component,
+    priority,
+    options.resource
+  );
+
+  return {
+    ccEmails,
+    channel,
+    component,
+    contactEmail,
+    contactType,
+    department,
+    description,
+    priority,
+    resources,
+    subject,
+    ticketCategory
+  };
+}
+
+// Some flags are required, or not allowed, depending on the ticket category.
+function assertCreateTicketCategoryRules(
+  ticketCategory: SupportTicketCategory,
+  component: string | undefined,
+  priority: SupportTicketPriority | undefined,
+  rawResources: string[] | undefined
+): void {
+  if (CATEGORIES_REQUIRING_COMPONENT.has(ticketCategory) && !component) {
+    throw new CliError(
+      `--component is required when --ticket-category is ${ticketCategory}.`,
+      {
+        code: 'MISSING_REQUIRED_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass --component for ${ticketCategory} tickets.`
+      }
+    );
+  }
+  if (
+    CATEGORIES_REQUIRING_PRIORITY.has(ticketCategory) &&
+    priority === undefined
+  ) {
+    throw new CliError(
+      `--priority is required when --ticket-category is ${ticketCategory}.`,
+      {
+        code: 'MISSING_REQUIRED_INPUT',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pass --priority (High, Medium, or Low) for ${ticketCategory} tickets.`
+      }
+    );
+  }
+  if (
+    ticketCategory !== 'Cloud' &&
+    rawResources !== undefined &&
+    rawResources.length > 0
+  ) {
+    throw new CliError(
+      `--resource is only supported for Cloud tickets, not ${ticketCategory}.`,
+      {
+        code: 'INVALID_INPUT_COMBINATION',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Drop --resource when --ticket-category is ${ticketCategory}.`
+      }
+    );
+  }
+}
+
+// Sales tickets send an empty component and a null priority. Only Cloud
+// tickets send resources; every other category sends null.
+function resolveCategoryFields(input: CreateTicketInput): {
+  component: string | undefined;
+  priority: SupportTicketPriority | null | undefined;
+  resource: SupportTicketResource[] | null;
+} {
+  const isSales = input.ticketCategory === 'Sales';
+  return {
+    component: isSales ? '' : input.component,
+    priority: isSales ? null : input.priority,
+    resource:
+      input.ticketCategory === 'Cloud' && input.resources.length > 0
+        ? input.resources
+        : null
+  };
+}
+
+function buildCreateTicketRequest(
+  input: CreateTicketInput,
+  attachments: AttachmentPayload | undefined,
+  isPriorityTicket: boolean | undefined
+): SupportTicketCreateRequest {
+  const categoryFields = resolveCategoryFields(input);
+  return {
+    cc_email_list: input.ccEmails ?? [],
+    channel: input.channel,
+    ...(categoryFields.component === undefined
+      ? {}
+      : { component: categoryFields.component }),
+    contact_person_email: input.contactEmail ?? '',
+    contact_person_type: input.contactType ?? '',
+    department: input.department,
+    description: input.description,
+    file_name: attachments?.fileNames ?? [],
+    imagedata: attachments?.imagedata ?? [],
+    ...(isPriorityTicket === undefined
+      ? {}
+      : { is_priority_ticket: isPriorityTicket }),
+    ...(categoryFields.priority === undefined
+      ? {}
+      : { priority: categoryFields.priority }),
+    resource: categoryFields.resource,
+    subject: input.subject,
+    ticket_category: input.ticketCategory
+  };
+}
+
+// The create endpoint returns only the identifiers, so fetch the full detail
+// in a follow-up request. If that fetch fails the ticket was still created,
+// so fall back to the identifiers we have and surface a warning rather than
+// failing the whole command.
+async function loadCreatedTicket(
+  client: SupportTicketClient,
+  created: SupportTicketCreateResult,
+  contact: SupportTicketContactContext
+): Promise<SupportTicketCreateCommandResult> {
+  const { contactEmail, contactType } = contact;
+  try {
+    const { account_manager, ticket } = await client.getTicket(created.id, {
+      ...(contactEmail === undefined
+        ? {}
+        : { contact_person_email: contactEmail }),
+      ...(contactType === undefined ? {} : { contact_person_type: contactType })
+    });
+
+    return {
+      account_manager,
+      action: 'create',
+      detail_loaded: true,
+      ticket: normalizeSupportTicketDetail(ticket),
+      warnings: []
+    };
+  } catch (cause) {
+    return {
+      account_manager: null,
+      action: 'create',
+      detail_loaded: false,
+      ticket: buildDetailFromCreateResult(created),
+      warnings: [
+        `Ticket ${created.ticket_number ?? created.id} was created, but its full detail could not be loaded${formatCause(cause)}. Run ${formatMyAccountCommand(`support-ticket get ${created.id}`)} to view it.`
+      ]
+    };
   }
 }
 
