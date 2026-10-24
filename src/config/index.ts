@@ -11,9 +11,14 @@ export {
   resolveStoredAccountCredentials,
   resolveStoredCredentials,
   resolveStoredTirCredentials,
+  pickKeyAndToken,
   resolveTirCredentials
 } from './resolver.js';
-export { pickValue, type ValueSources } from './value-order.js';
+export {
+  pickValue,
+  type PickedValue,
+  type ValueSources
+} from './value-order.js';
 export {
   ConfigStore,
   createEmptyConfig,
@@ -39,15 +44,21 @@ export {
 } from './types.js';
 export {
   configurePlatform,
-  createSetupIo,
   describePlatformSetup,
-  findSetupProfile,
+  platformName,
   renderPlatformSetupResult,
-  type PlatformConfigureCommandResult,
-  type PlatformConfigureInput,
+  type CreateSetupSteps,
+  type PlatformConfigureOutcome,
+  type PlatformConfigureRequest,
   type PlatformSetupResult,
   type PlatformSetupSteps,
-  type SetupIo,
+  type PlatformSetupTerminal,
   type SetupPlatform,
   type SetupValues
 } from './platform-setup.js';
+export {
+  findLocation,
+  normalizeLocation,
+  parseNumericId,
+  type Location
+} from './checks.js';

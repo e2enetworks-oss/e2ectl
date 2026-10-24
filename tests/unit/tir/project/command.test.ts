@@ -96,7 +96,7 @@ describe('tir project list', () => {
 
     expect(listProjects).toHaveBeenCalledWith('11');
     expect(output).toContain('research');
-    expect(output).toContain('tir configure --account 11 --project <id>');
+    expect(output).toContain('tir configure --account-id 11 --project-id <id>');
   });
 
   it('uses the saved TIR account and emits JSON', async () => {
@@ -120,7 +120,14 @@ describe('tir project list', () => {
 });
 
 describe('tir configure', () => {
-  const flags = ['--account', '11', '--project', '33', '--location', 'Chennai'];
+  const flags = [
+    '--account-id',
+    '11',
+    '--project-id',
+    '33',
+    '--location',
+    'Chennai'
+  ];
 
   it('checks the values against TIR and saves them in the default profile', async () => {
     const { output, store } = await runTir(['tir', 'configure', ...flags], {
@@ -161,19 +168,24 @@ describe('tir configure', () => {
   });
 
   it('names the flag to add without a terminal', async () => {
-    const error = await captureError(['tir', 'configure', '--account', '11']);
+    const error = await captureError([
+      'tir',
+      'configure',
+      '--account-id',
+      '11'
+    ]);
 
-    expect(error.message).toBe('No TIR project given.');
-    expect(error.suggestion).toContain('--project <id>');
+    expect(error.message).toBe('No TIR project and location given.');
+    expect(error.suggestion).toContain('--project-id <id>');
   });
 
   it('refuses a project outside the account', async () => {
     const error = await captureError([
       'tir',
       'configure',
-      '--account',
+      '--account-id',
       '11',
-      '--project',
+      '--project-id',
       '44',
       '--location',
       'Delhi'

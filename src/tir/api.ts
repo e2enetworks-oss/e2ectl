@@ -15,7 +15,7 @@ const TIR_API_BASE_URL = 'https://api.e2enetworks.com/myaccount/api/v1/gpu';
 // Project calls carry the account (active_iam), project and location.
 const TIR_PROJECT_CONTEXT: TransportProjectContext = {
   accountParameter: 'active_iam',
-  missingContextSuggestion: `Run \`${formatTirCommand('project list')}\`, then \`${formatTirCommand('configure --account <id> --project <id> --location <Delhi|Chennai>')}\`.`
+  missingContextSuggestion: `Run \`${formatTirCommand('project list')}\`, then \`${formatTirCommand('configure --account-id <id> --project-id <id> --location <Delhi|Chennai>')}\`.`
 };
 
 // TIR answers 403 for an account or project the key cannot use, not only

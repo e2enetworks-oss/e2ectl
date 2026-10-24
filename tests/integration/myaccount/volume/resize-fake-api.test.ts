@@ -46,7 +46,16 @@ describe('volume resize against a fake MyAccount API', () => {
       await seedDefaultProfile(tempHome);
 
       const result = await runBuiltCli(
-        ['--json', 'myaccount', 'volume', 'resize', '5', '--size', '200'],
+        [
+          '--json',
+          'myaccount',
+          'volume',
+          'resize',
+          '5',
+          '--size',
+          '200',
+          '--force'
+        ],
         {
           env: {
             HOME: tempHome.path,

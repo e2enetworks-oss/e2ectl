@@ -30,8 +30,7 @@ describe('resolveCredentials', () => {
       auth_token: 'auth-prod',
       project_id: '123',
       location: 'Delhi',
-      alias: 'prod',
-      source: 'profile'
+      alias: 'prod'
     });
   });
 
@@ -48,7 +47,6 @@ describe('resolveCredentials', () => {
     expect(result.project_id).toBe('456');
     expect(result.location).toBe('Chennai');
     expect(result.api_key).toBe('api-prod');
-    expect(result.source).toBe('profile');
   });
 
   it('uses environment auth and context without a saved profile', () => {
@@ -66,8 +64,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '789',
-      location: 'Chennai',
-      source: 'env'
+      location: 'Chennai'
     });
     expect(result.alias).toBeUndefined();
   });
@@ -87,8 +84,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       location: 'Delhi',
-      project_id: '790',
-      source: 'env'
+      project_id: '790'
     });
   });
 
@@ -204,8 +200,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '456',
-      location: 'Chennai',
-      source: 'env'
+      location: 'Chennai'
     });
   });
 
@@ -217,7 +212,6 @@ describe('resolveCredentials', () => {
 
     expect(result.api_key).toBe('api-env');
     expect(result.auth_token).toBe('auth-prod');
-    expect(result.source).toBe('mixed');
   });
 
   it('ignores a stale default alias when env auth and env context are complete', () => {
@@ -239,8 +233,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '46429',
-      location: 'Delhi',
-      source: 'env'
+      location: 'Delhi'
     });
   });
 
@@ -263,8 +256,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '789',
-      location: 'Chennai',
-      source: 'env'
+      location: 'Chennai'
     });
   });
 
@@ -407,7 +399,7 @@ describe('resolveCredentials', () => {
       })
     );
 
-    expect(projectError.code).toBe('INVALID_PROJECT_ID');
+    expect(projectError.code).toBe('INVALID_ID');
     expect(locationError.code).toBe('INVALID_LOCATION');
   });
 });
@@ -430,8 +422,7 @@ describe('resolveAccountCredentials', () => {
     expect(result).toEqual({
       alias: 'prod',
       api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      source: 'profile'
+      auth_token: 'auth-prod'
     });
   });
 
@@ -452,8 +443,7 @@ describe('resolveAccountCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       location: 'Chennai',
-      project_id: '123',
-      source: 'env'
+      project_id: '123'
     });
   });
 
@@ -478,8 +468,7 @@ describe('resolveAccountCredentials', () => {
       api_key: 'api-prod',
       auth_token: 'auth-prod',
       project_id: '123',
-      location: 'Delhi',
-      source: 'profile'
+      location: 'Delhi'
     });
   });
 
@@ -498,8 +487,7 @@ describe('resolveAccountCredentials', () => {
 
     expect(result).toEqual({
       api_key: 'api-env',
-      auth_token: 'auth-env',
-      source: 'env'
+      auth_token: 'auth-env'
     });
   });
 
@@ -537,16 +525,14 @@ describe('resolveAccountCredentials', () => {
       alias: 'prod',
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      project_id: '123',
-      source: 'profile'
+      project_id: '123'
     });
     expect(resultWithFullContext).toEqual({
       alias: 'prod',
       api_key: 'api-prod',
       auth_token: 'auth-prod',
       project_id: '123',
-      location: 'Delhi',
-      source: 'profile'
+      location: 'Delhi'
     });
   });
 
@@ -584,7 +570,7 @@ describe('resolveAccountCredentials', () => {
       })
     );
 
-    expect(invalidProject.code).toBe('INVALID_PROJECT_ID');
+    expect(invalidProject.code).toBe('INVALID_ID');
     expect(invalidLocation.code).toBe('INVALID_LOCATION');
   });
 });

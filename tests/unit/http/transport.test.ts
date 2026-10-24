@@ -13,8 +13,7 @@ describe('HttpTransport', () => {
     api_key: 'api-key',
     auth_token: 'auth-token',
     project_id: '123',
-    location: 'Delhi',
-    source: 'profile' as const
+    location: 'Delhi'
   };
 
   it('injects bearer auth and required query params', async () => {
@@ -91,8 +90,7 @@ describe('HttpTransport', () => {
     const transport = new HttpTransport(
       {
         api_key: 'api-key',
-        auth_token: 'auth-token',
-        source: 'profile'
+        auth_token: 'auth-token'
       },
       {
         apiName: 'MyAccount',
@@ -115,8 +113,7 @@ describe('HttpTransport', () => {
     const transport = new HttpTransport(
       {
         api_key: 'api-key',
-        auth_token: 'auth-token',
-        source: 'profile'
+        auth_token: 'auth-token'
       },
       {
         apiName: 'MyAccount',

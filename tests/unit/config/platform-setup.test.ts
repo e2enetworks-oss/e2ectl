@@ -1,10 +1,9 @@
 import {
   configurePlatform,
   describePlatformSetup,
-  findSetupProfile,
+  type PlatformSetupResult,
   type PlatformSetupSteps,
   type ProfileConfig,
-  type SetupIo,
   type SetupValues
 } from '../../../src/config/index.js';
 import { ConfigStore } from '../../../src/config/store.js';
@@ -70,18 +69,52 @@ async function storeWith(
   return store;
 }
 
-function io(overrides: Partial<SetupIo> = {}): SetupIo & { written: string[] } {
-  const written: string[] = [];
-  return {
-    canPrompt: false,
-    env: {},
-    prompt: vi.fn(() => Promise.resolve('')),
-    write: (text) => {
-      written.push(text);
+interface SetupOptions {
+  alias?: string;
+  answers?: string[];
+  flagPrefix?: string;
+  store?: ConfigStore;
+}
+
+// Runs the shared setup with fake steps; with answers it runs as in a
+// terminal, without them as in a script.
+async function setup(
+  platformSteps: PlatformSetupSteps,
+  flags: SetupValues,
+  options: SetupOptions = {}
+): Promise<{
+  prompt: ReturnType<typeof vi.fn>;
+  result: PlatformSetupResult;
+  store: ConfigStore;
+  written: string;
+}> {
+  const store = options.store ?? (await storeWith());
+  const answers = [...(options.answers ?? [])];
+  const prompt = vi.fn((message: string) => {
+    void message;
+    return Promise.resolve(answers.shift() ?? '');
+  });
+  let written = '';
+  const outcome = await configurePlatform(
+    {
+      alias: options.alias ?? 'work',
+      canPrompt: options.answers !== undefined,
+      flagPrefix: options.flagPrefix ?? '',
+      values: flags
     },
-    written,
-    ...overrides
-  };
+    {
+      prompt,
+      stdout: {
+        write: (text: string) => {
+          written += text;
+        }
+      },
+      store
+    },
+    () => Promise.resolve(platformSteps)
+  );
+
+  return { prompt, result: outcome.setup, store, written };
 }
 
 const ALL_FLAGS: SetupValues = {
@@ -98,12 +131,7 @@ async function capture(promise: Promise<unknown>): Promise<CliError> {
 
 describe('configurePlatform', () => {
   it('checks flag values and saves them', async () => {
-    const store = await storeWith();
-
-    const result = await configurePlatform(steps(true), 'work', ALL_FLAGS, {
-      io: io(),
-      store
-    });
+    const { result, store } = await setup(steps(true), ALL_FLAGS);
 
     expect(result).toEqual({
       account: { email: 'owner@example.com', id: 11, name: 'Owner' },
@@ -118,13 +146,20 @@ describe('configurePlatform', () => {
     });
   });
 
+  it('accepts a location in any case and saves it as written by E2E', async () => {
+    const { result } = await setup(steps(true), {
+      ...ALL_FLAGS,
+      location: 'chennai'
+    });
+
+    expect(result.location).toBe('Chennai');
+  });
+
   it('skips the account step for platforms without accounts', async () => {
-    const result = await configurePlatform(
-      steps(false),
-      'work',
-      { location: 'Delhi', project: '33' },
-      { io: io(), store: await storeWith() }
-    );
+    const { result } = await setup(steps(false), {
+      location: 'Delhi',
+      project: '33'
+    });
 
     expect(result.account).toBeNull();
   });
@@ -133,40 +168,23 @@ describe('configurePlatform', () => {
     const store = await storeWith({
       tir: { account_id: '11', location: 'Delhi', project_id: '33' }
     });
-    const env = { FAKE_LOCATION: 'Chennai' };
+    vi.stubEnv('FAKE_LOCATION', 'Chennai');
 
+    expect((await setup(steps(true), {}, { store })).result.location).toBe(
+      'Chennai'
+    );
     expect(
-      (
-        await configurePlatform(
-          steps(true),
-          'work',
-          {},
-          { io: io({ env }), store }
-        )
-      ).location
-    ).toBe('Chennai');
-    expect(
-      (
-        await configurePlatform(
-          steps(true),
-          'work',
-          { location: 'Delhi' },
-          {
-            io: io({ env }),
-            store
-          }
-        )
-      ).location
+      (await setup(steps(true), { location: 'Delhi' }, { store })).result
+        .location
     ).toBe('Delhi');
   });
 
   it('stops before asking when there are no projects', async () => {
     const error = await capture(
-      configurePlatform(
+      setup(
         { ...steps(false), listProjects: () => Promise.resolve([]) },
-        'work',
         { location: 'Delhi' },
-        { io: io({ canPrompt: true }), store: await storeWith() }
+        { answers: [] }
       )
     );
 
@@ -180,12 +198,7 @@ describe('configurePlatform', () => {
     });
 
     const error = await capture(
-      configurePlatform(
-        steps(true),
-        'work',
-        { account: '11' },
-        { io: io(), store }
-      )
+      setup(steps(true), { account: '11' }, { store })
     );
 
     expect(error.code).toBe('MISSING_SETUP_VALUE');
@@ -193,19 +206,11 @@ describe('configurePlatform', () => {
   });
 
   it('asks in a terminal, offering the saved value as the default', async () => {
-    const prompt = vi
-      .fn<SetupIo['prompt']>()
-      .mockResolvedValueOnce('')
-      .mockResolvedValueOnce('33')
-      .mockResolvedValueOnce('Delhi');
-    const terminal = io({ canPrompt: true, prompt });
-
-    const result = await configurePlatform(
+    const { prompt, result, written } = await setup(
       steps(true),
-      'work',
       {},
       {
-        io: terminal,
+        answers: ['', '33', 'Delhi'],
         store: await storeWith({ tir: { account_id: '11' } })
       }
     );
@@ -213,22 +218,16 @@ describe('configurePlatform', () => {
     expect(prompt).toHaveBeenNthCalledWith(1, 'TIR account [11]: ');
     expect(prompt).toHaveBeenNthCalledWith(2, 'TIR project [33]: ');
     expect(prompt).toHaveBeenNthCalledWith(3, 'TIR location: ');
-    expect(terminal.written.join('')).toContain('owner@example.com');
-    expect(terminal.written.join('')).toContain('22  Off  (TIR is off)');
+    expect(written).toContain('owner@example.com');
+    expect(written).toContain('22  Off  (TIR is off)');
     expect(result).toMatchObject({ location: 'Delhi', project: { id: 33 } });
   });
 
   it('does not ask for a value given as a flag', async () => {
-    const prompt = vi.fn(() => Promise.resolve('Delhi'));
-
-    await configurePlatform(
+    const { prompt } = await setup(
       steps(true),
-      'work',
       { account: '11', project: '33' },
-      {
-        io: io({ canPrompt: true, prompt }),
-        store: await storeWith()
-      }
+      { answers: ['Delhi'] }
     );
 
     expect(prompt).toHaveBeenCalledTimes(1);
@@ -237,45 +236,41 @@ describe('configurePlatform', () => {
   it.each([
     [
       {},
-      'No TIR account given.',
-      'Add --account <id> (see `e2ectl fake account list`).'
+      'No TIR account, project and location given.',
+      'Add --account-id <id> (see `e2ectl fake account list`), --project-id <id> (see `e2ectl fake project list`), --location Delhi|Chennai.'
     ],
     [
       { account: '11' },
-      'No TIR project given.',
-      'Add --project <id> (see `e2ectl fake project list`).'
+      'No TIR project and location given.',
+      'Add --project-id <id> (see `e2ectl fake project list`), --location Delhi|Chennai.'
     ],
     [
       { account: '11', project: '33' },
       'No TIR location given.',
-      'Add --location Delhi or --location Chennai.'
+      'Add --location Delhi|Chennai.'
     ]
   ])(
-    'without a terminal, names the flag to add when %o is given',
+    'without a terminal, lists every flag to add when %o is given',
     async (flags, message, suggestion) => {
-      const error = await capture(
-        configurePlatform(steps(true), 'work', flags, {
-          io: io(),
-          store: await storeWith()
-        })
-      );
+      const error = await capture(setup(steps(true), flags));
 
       expect(error.message).toBe(message);
       expect(error.suggestion).toBe(suggestion);
     }
   );
 
+  it('names the flags as e2ectl configure spells them', async () => {
+    const error = await capture(
+      setup(steps(true), { account: '11' }, { flagPrefix: 'tir-' })
+    );
+
+    expect(error.suggestion).toContain('--tir-project-id <id>');
+    expect(error.suggestion).toContain('--tir-location Delhi|Chennai');
+  });
+
   it('treats an empty answer with no default as missing', async () => {
     const error = await capture(
-      configurePlatform(
-        steps(false),
-        'work',
-        { project: '33' },
-        {
-          io: io({ canPrompt: true }),
-          store: await storeWith()
-        }
-      )
+      setup(steps(false), { project: '33' }, { answers: [] })
     );
 
     expect(error.code).toBe('MISSING_SETUP_VALUE');
@@ -300,40 +295,44 @@ describe('configurePlatform', () => {
     [
       { ...ALL_FLAGS, location: 'Mumbai' },
       'INVALID_LOCATION',
-      'Unsupported TIR location "Mumbai".'
+      'Unsupported location "Mumbai".'
     ],
     [
       { ...ALL_FLAGS, account: 'x' },
-      'INVALID_SETUP_ID',
+      'INVALID_ID',
       'TIR account ID must be numeric.'
     ],
     [
       { ...ALL_FLAGS, project: 'x' },
-      'INVALID_SETUP_ID',
+      'INVALID_ID',
       'TIR project ID must be numeric.'
     ]
   ])('refuses %o with %s and saves nothing', async (flags, code, message) => {
     const store = await storeWith();
-    const error = await capture(
-      configurePlatform(steps(true), 'work', flags, { io: io(), store })
-    );
+    const error = await capture(setup(steps(true), flags, { store }));
 
     expect(error).toMatchObject({ code, message });
     expect(error.suggestion).toBeDefined();
     expect((await store.read()).profiles.work?.tir).toBeUndefined();
   });
 
+  it('checks ids and the location before calling the API', async () => {
+    const listAccounts = vi.fn(() => Promise.resolve([]));
+
+    const error = await capture(
+      setup(
+        { ...steps(true), listAccounts },
+        { ...ALL_FLAGS, location: 'Mumbai' }
+      )
+    );
+
+    expect(error.code).toBe('INVALID_LOCATION');
+    expect(listAccounts).not.toHaveBeenCalled();
+  });
+
   it('words a missing project without an account for platforms without accounts', async () => {
     const error = await capture(
-      configurePlatform(
-        steps(false),
-        'work',
-        { location: 'Delhi', project: '44' },
-        {
-          io: io(),
-          store: await storeWith()
-        }
-      )
+      setup(steps(false), { location: 'Delhi', project: '44' })
     );
 
     expect(error.message).toBe('MyAccount project 44 was not found.');
@@ -341,30 +340,26 @@ describe('configurePlatform', () => {
 
   it('refuses a profile that does not exist', async () => {
     const error = await capture(
-      configurePlatform(steps(true), 'missing', ALL_FLAGS, {
-        io: io(),
-        store: await storeWith()
-      })
+      setup(steps(true), ALL_FLAGS, { alias: 'missing' })
     );
 
     expect(error.code).toBe('PROFILE_NOT_FOUND');
   });
-});
 
-describe('findSetupProfile', () => {
-  it('uses --alias, then the default profile', async () => {
-    const store = await storeWith();
-
-    expect(await findSetupProfile(store, 'work')).toBe('work');
-    expect(await findSetupProfile(store, undefined)).toBe('work');
-  });
-
-  it('says to run e2ectl configure when there is no profile', async () => {
+  it('says to run e2ectl configure when there is no profile at all', async () => {
     const store = new ConfigStore({
       configPath: createTestConfigPath('no-profile')
     });
 
-    await expect(findSetupProfile(store, undefined)).rejects.toMatchObject({
+    const error = await capture(
+      configurePlatform(
+        { canPrompt: false, flagPrefix: '', values: ALL_FLAGS },
+        { prompt: vi.fn(), stdout: { write: vi.fn() }, store },
+        () => Promise.resolve(steps(true))
+      )
+    );
+
+    expect(error).toMatchObject({
       message: 'There is no saved profile to keep this setting in.',
       suggestion: expect.stringContaining('e2ectl configure') as string
     });

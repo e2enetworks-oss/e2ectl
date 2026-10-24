@@ -27,16 +27,12 @@ export interface ConfigFile {
   default?: string;
 }
 
-// Where the key and token came from.
-export type CredentialSource = 'env' | 'profile' | 'mixed';
-
 export interface ResolvedCredentials {
   api_key: string;
   auth_token: string;
   alias?: string;
   location: string;
   project_id: string;
-  source: CredentialSource;
 }
 
 export interface ResolvedAccountCredentials {
@@ -45,11 +41,9 @@ export interface ResolvedAccountCredentials {
   alias?: string;
   location?: string;
   project_id?: string;
-  source: CredentialSource;
 }
 
-// TIR credentials carry only TIR context, never the MyAccount project and
-// location, so one platform's values cannot leak into the other's requests.
+// TIR context only: the account, project and location chosen for TIR.
 export interface ResolvedTirCredentials {
   api_key: string;
   auth_token: string;
@@ -57,7 +51,6 @@ export interface ResolvedTirCredentials {
   alias?: string;
   location?: string;
   project_id?: string;
-  source: CredentialSource;
 }
 
 export interface ProfileSummary {

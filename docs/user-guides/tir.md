@@ -23,7 +23,7 @@ Three commands, in order:
 ```bash
 e2ectl tir account list
 e2ectl tir project list --account-id <account-id>
-e2ectl tir configure --account <account-id> --project <project-id> --location Chennai
+e2ectl tir configure --account-id <account-id> --project-id <project-id> --location Chennai
 ```
 
 - `tir account list` shows every account your key can work in: your own and any you were invited
@@ -34,7 +34,7 @@ e2ectl tir configure --account <account-id> --project <project-id> --location Ch
   `myaccount configure` works the same way for the MyAccount project and location.
 
 `e2ectl configure` runs the same steps when you choose TIR there. `tir configure` asks for each
-value in a terminal (offering what is saved as the default) and takes `--account`, `--project`
+value in a terminal (offering what is saved as the default) and takes `--account-id`, `--project-id`
 and `--location` in scripts; a missing value fails with a message naming the flag. It saves into
 the default profile, or the profile named with `--alias`. See what is
 saved with `e2ectl config list` (the TIR Context column, or `tir` in `--json`).
@@ -97,7 +97,7 @@ In CI, set the three `E2E_TIR_*` variables instead of running `tir configure`.
 ```bash
 e2ectl --json tir account list
 e2ectl --json tir project list --account-id <account-id>
-e2ectl --json tir configure --account <account-id> --project <project-id> --location Delhi
+e2ectl --json tir configure --account-id <account-id> --project-id <project-id> --location Delhi
 e2ectl --json tir image list
 e2ectl --json tir plan list --image-version-id <version-id>
 ```
@@ -117,17 +117,17 @@ e2ectl --json tir plan list --image-version-id <version-id>
 
 ## Errors And What To Do
 
-| Message                                         | What to do                                                                      |
-| ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| `No TIR account chosen.`                        | Run `e2ectl tir account list`, then pass `--account-id` or run `tir configure`. |
-| `No TIR project and location chosen.`           | Run `e2ectl tir project list`, then `e2ectl tir configure`.                     |
-| `No TIR <value> given.`                         | Add the flag the message names, or run the command in a terminal.               |
-| `TIR account <id> is not one your key can use.` | Pick an id from `e2ectl tir account list`.                                      |
-| `TIR is not turned on for account <id>.`        | Pick another account, or ask its owner to turn TIR on.                          |
-| `Project <id> is not in TIR account <id>.`      | Pick an id from `e2ectl tir project list --account-id <id>`.                    |
-| `Unsupported TIR location`                      | Use Delhi or Chennai.                                                           |
-| `TIR does not know image version <id>.`         | Pick a version id from `e2ectl tir image list`.                                 |
-| `TIR API request failed: Forbidden`             | The key cannot use that account or project. Check them with the commands above. |
+| Message                                           | What to do                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `No TIR account chosen.`                          | Run `e2ectl tir account list`, then pass `--account-id` or run `tir configure`. |
+| `No TIR project and location chosen.`             | Run `e2ectl tir project list`, then `e2ectl tir configure`.                     |
+| `No TIR <values> given.`                          | Add every flag the message names, or run the command in a terminal.             |
+| `TIR account <id> is not one your key can use.`   | Pick an id from `e2ectl tir account list`.                                      |
+| `TIR is not turned on for account <id>.`          | Pick another account, or ask its owner to turn TIR on.                          |
+| `TIR project <id> was not found in account <id>.` | Pick an id from `e2ectl tir project list --account-id <id>`.                    |
+| `Unsupported location`                            | Use Delhi or Chennai (any case).                                                |
+| `TIR does not know image version <id>.`           | Pick a version id from `e2ectl tir image list`.                                 |
+| `TIR API request failed: Forbidden`               | The key cannot use that account or project. Check them with the commands above. |
 
 ## Related Guides
 

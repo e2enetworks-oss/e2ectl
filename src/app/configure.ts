@@ -1,14 +1,16 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 import {
   describePlatformSetup,
   findProfile,
-  pickValue,
-  type PlatformConfigureCommandResult,
+  pickKeyAndToken,
+  type PickedValue,
+  type PlatformConfigureOutcome,
+  type PlatformConfigureRequest,
   type PlatformSetupResult,
   type ProfileConfig,
   type SetupPlatform,
-  type ValueSources
+  type SetupValues
 } from '../config/index.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
@@ -22,11 +24,13 @@ interface GlobalOptions {
 }
 
 interface ConfigureOptions {
-  account?: string;
   alias?: string;
-  location?: string;
-  platform?: string[];
-  project?: string;
+  myaccountLocation?: string;
+  myaccountProjectId?: string;
+  platform?: SetupPlatform[];
+  tirAccountId?: string;
+  tirLocation?: string;
+  tirProjectId?: string;
 }
 
 export interface ConfigureCommandResult {
@@ -35,22 +39,24 @@ export interface ConfigureCommandResult {
   platforms: PlatformSetupResult[];
 }
 
-const PLATFORM_BY_NAME: Record<string, SetupPlatform> = {
+// TIR first: it is the recommended platform and the menu's default.
+const PLATFORMS: readonly SetupPlatform[] = ['tir', 'myaccount'];
+
+const MENU_ANSWERS: Record<string, SetupPlatform> = {
+  '1': 'tir',
+  '2': 'myaccount',
   myaccount: 'myaccount',
   tir: 'tir'
 };
 
-// The interactive menu also takes its numbers.
-const PLATFORM_BY_MENU_ANSWER: Record<string, SetupPlatform> = {
-  ...PLATFORM_BY_NAME,
-  '1': 'tir',
-  '2': 'myaccount'
-};
-
-const NO_PLATFORM_MESSAGE = 'Choose at least one platform. TIR is recommended.';
-
 // Each platform's own configure; e2ectl configure only chains them.
-const CONFIGURE_BY_PLATFORM: Record<SetupPlatform, typeof configureTir> = {
+const CONFIGURE_BY_PLATFORM: Record<
+  SetupPlatform,
+  (
+    runtime: CliRuntime,
+    request: PlatformConfigureRequest
+  ) => Promise<PlatformConfigureOutcome>
+> = {
   myaccount: configureMyAccount,
   tir: configureTir
 };
@@ -58,20 +64,30 @@ const CONFIGURE_BY_PLATFORM: Record<SetupPlatform, typeof configureTir> = {
 export function buildConfigureCommand(runtime: CliRuntime): Command {
   return new Command('configure')
     .description(
-      'Set up e2ectl: save your API key and token in a profile, then choose the TIR and/or MyAccount account, project and location. Asks in a terminal; in scripts give --platform and the values as flags, and the key and token in E2E_API_KEY and E2E_AUTH_TOKEN.'
+      'Set up e2ectl: save your API key and token in a profile, then choose the account, project and location for TIR, MyAccount or both. Asks in a terminal. In scripts, give the key and token in E2E_API_KEY and E2E_AUTH_TOKEN and the values as flags; giving the flags of a platform chooses it.'
     )
     .option(
       '--alias <alias>',
       'Profile to save into (default: the default profile, or "default").'
     )
-    .option(
-      '--platform <platform>',
-      'tir or myaccount. Repeat for both. TIR is recommended.',
-      (value: string, previous: string[] = []) => [...previous, value]
+    .addOption(
+      new Option(
+        '--platform <platform...>',
+        'Platforms to set up. TIR is recommended.'
+      ).choices(PLATFORMS)
     )
-    .option('--account <accountId>', 'TIR account id (one platform only).')
-    .option('--project <projectId>', 'Project id (one platform only).')
-    .option('--location <location>', 'Delhi or Chennai (one platform only).')
+    .option('--tir-account-id <id>', 'TIR account id.')
+    .option('--tir-project-id <id>', 'TIR project id.')
+    .option('--tir-location <location>', 'TIR location: Delhi or Chennai.')
+    .option('--myaccount-project-id <id>', 'MyAccount project id.')
+    .option(
+      '--myaccount-location <location>',
+      'MyAccount location: Delhi or Chennai.'
+    )
+    .addHelpText(
+      'after',
+      `\nExamples:\n  ${formatCliCommand('configure')}\n  E2E_API_KEY=... E2E_AUTH_TOKEN=... ${formatCliCommand('configure --tir-account-id 12 --tir-project-id 34 --tir-location Delhi --myaccount-project-id 46 --myaccount-location Chennai')}\n`
+    )
     .action(async (options: ConfigureOptions, commandInstance: Command) => {
       const json =
         commandInstance.optsWithGlobals<GlobalOptions>().json ?? false;
@@ -89,36 +105,46 @@ export async function runConfigure(
   options: ConfigureOptions,
   canPrompt: boolean
 ): Promise<ConfigureCommandResult> {
-  // Flag mistakes fail before anything is saved.
-  const requested = parsePlatforms(options.platform ?? []);
+  const valuesByPlatform: Record<SetupPlatform, SetupValues> = {
+    myaccount: {
+      location: options.myaccountLocation,
+      project: options.myaccountProjectId
+    },
+    tir: {
+      account: options.tirAccountId,
+      location: options.tirLocation,
+      project: options.tirProjectId
+    }
+  };
+  const requested = PLATFORMS.filter(
+    (platform) =>
+      (options.platform ?? []).includes(platform) ||
+      Object.values(valuesByPlatform[platform]).some(
+        (value) => value !== undefined
+      )
+  );
   if (requested.length === 0 && !canPrompt) {
-    throw new CliError(
-      'Choose at least one platform with --platform tir or --platform myaccount (TIR is recommended).',
-      { code: 'MISSING_PLATFORM', exitCode: EXIT_CODES.usage }
-    );
-  }
-  if (requested.length > 0) {
-    assertValuesFitPlatforms(options, requested);
+    throw new CliError('Choose at least one platform.', {
+      code: 'MISSING_PLATFORM',
+      exitCode: EXIT_CODES.usage,
+      suggestion:
+        'Add --platform tir or --platform myaccount (TIR is recommended), or give the values of a platform, such as --tir-project-id.'
+    });
   }
 
   const alias = await saveKeyAndToken(runtime, options.alias, canPrompt);
   const platforms =
     requested.length > 0 ? requested : await askPlatforms(runtime);
-  assertValuesFitPlatforms(options, platforms);
 
   const results: PlatformSetupResult[] = [];
   for (const platform of platforms) {
-    const configured = await CONFIGURE_BY_PLATFORM[platform](
-      runtime,
-      {
-        alias,
-        account: options.account,
-        location: options.location,
-        project: options.project
-      },
-      canPrompt
-    );
-    results.push(withoutCommandFields(configured));
+    const outcome = await CONFIGURE_BY_PLATFORM[platform](runtime, {
+      alias,
+      canPrompt,
+      flagPrefix: `${platform}-`,
+      values: valuesByPlatform[platform]
+    });
+    results.push(outcome.setup);
   }
 
   return { action: 'configure', alias, platforms: results };
@@ -142,9 +168,9 @@ function renderConfigureResult(
 
 // Key and token: in a terminal they are asked for (hidden); otherwise they
 // come from E2E_API_KEY and E2E_AUTH_TOKEN or the saved profile, in the
-// usual value order (a profile named with --alias beats the environment).
-// They are never taken as flags, so they stay out of shell history. The
-// token is checked against the API before anything is saved.
+// same order as every command (a profile named with --alias beats the
+// environment). They are never taken as flags, so they stay out of shell
+// history. The token is checked against the API before anything is saved.
 async function saveKeyAndToken(
   runtime: CliRuntime,
   requestedAlias: string | undefined,
@@ -154,19 +180,18 @@ async function saveKeyAndToken(
   const chosenAlias = normalizeAlias(requestedAlias);
   const alias = chosenAlias ?? config.default ?? 'default';
   const saved = findProfile(config, alias);
-  // --alias picks the saved key over the environment, as on every command.
-  const chosenByFlag = chosenAlias !== undefined;
-  const fromSaved = (field: 'api_key' | 'auth_token'): ValueSources => ({
-    flag: chosenByFlag ? saved?.[field] : undefined,
-    profile: chosenByFlag ? undefined : saved?.[field]
-  });
+  const fallback = pickKeyAndToken(
+    saved,
+    chosenAlias !== undefined,
+    process.env
+  );
   const apiKey = await readSecret(runtime, canPrompt, 'API key', {
-    env: process.env.E2E_API_KEY,
-    ...fromSaved('api_key')
+    envVar: 'E2E_API_KEY',
+    picked: fallback.api_key
   });
   const authToken = await readSecret(runtime, canPrompt, 'Auth token', {
-    env: process.env.E2E_AUTH_TOKEN,
-    ...fromSaved('auth_token')
+    envVar: 'E2E_AUTH_TOKEN',
+    picked: fallback.auth_token
   });
 
   const check = await runtime.credentialValidator.validate({
@@ -209,27 +234,31 @@ function normalizeAlias(value: string | undefined): string | undefined {
   });
 }
 
+// In a terminal, pressing Enter keeps the value the prompt names: the one
+// from the environment variable or the saved one.
 async function readSecret(
   runtime: CliRuntime,
   canPrompt: boolean,
   label: 'API key' | 'Auth token',
-  sources: ValueSources
+  fallback: { envVar: string; picked: PickedValue | undefined }
 ): Promise<string> {
-  const fallback = pickValue(sources)?.value;
+  const { envVar, picked } = fallback;
 
   if (canPrompt) {
-    const answer = (
-      await runtime.promptSecret(
-        `${label}${fallback === undefined ? '' : ' (press Enter to keep the current one)'}: `
-      )
-    ).trim();
+    const keep =
+      picked === undefined
+        ? ''
+        : picked.origin === 'env'
+          ? ` (press Enter to use ${envVar})`
+          : ' (press Enter to keep the saved one)';
+    const answer = (await runtime.promptSecret(`${label}${keep}: `)).trim();
     if (answer.length > 0) {
       return answer;
     }
   }
 
-  if (fallback !== undefined) {
-    return fallback;
+  if (picked !== undefined) {
+    return picked.value;
   }
 
   throw new CliError(`No ${label.toLowerCase()} given.`, {
@@ -240,103 +269,31 @@ async function readSecret(
   });
 }
 
-function parsePlatforms(values: string[]): SetupPlatform[] {
-  const platforms = new Set<SetupPlatform>();
-
-  for (const value of values) {
-    const platform = lookupPlatform(PLATFORM_BY_NAME, value);
-    if (platform === undefined) {
-      throw new CliError(`Unknown platform "${value}".`, {
-        code: 'INVALID_PLATFORM',
-        exitCode: EXIT_CODES.usage,
-        // The menu's numbers only work in the interactive menu.
-        suggestion:
-          '--platform takes a name: --platform tir or --platform myaccount (TIR is recommended).'
-      });
-    }
-    platforms.add(platform);
-  }
-
-  return [...platforms];
-}
-
-// A numbered choice with TIR picked by default; choosing none asks again.
+// A numbered choice with TIR picked by default. Choosing none, or typing
+// something the menu does not offer, asks again.
 async function askPlatforms(runtime: CliRuntime): Promise<SetupPlatform[]> {
   for (;;) {
     runtime.stdout.write(
       'Which platforms do you use?\n  1) TIR (recommended)\n  2) MyAccount\n'
     );
     const answer = await runtime.prompt('Platforms, separated by commas [1]: ');
-    const platforms =
-      answer.trim().length === 0
-        ? ['tir' as const]
-        : readPlatformAnswer(answer);
-
-    if (platforms.length > 0) {
-      return platforms;
+    const parts = answer
+      .split(',')
+      .map((part) => part.trim().toLowerCase())
+      .filter((part) => part.length > 0);
+    if (parts.length === 0) {
+      return ['tir'];
     }
 
-    runtime.stdout.write(`${NO_PLATFORM_MESSAGE}\n`);
-  }
-}
+    const unknown = parts.filter((part) => !Object.hasOwn(MENU_ANSWERS, part));
+    if (unknown.length === 0) {
+      return PLATFORMS.filter((platform) =>
+        parts.some((part) => MENU_ANSWERS[part] === platform)
+      );
+    }
 
-function readPlatformAnswer(answer: string): SetupPlatform[] {
-  return [
-    ...new Set(
-      answer
-        .split(',')
-        .map((part) => lookupPlatform(PLATFORM_BY_MENU_ANSWER, part))
-        .filter((platform): platform is SetupPlatform => platform !== undefined)
-    )
-  ];
-}
-
-// Own keys only, so a typed "constructor" or "toString" is not a platform.
-function lookupPlatform(
-  table: Record<string, SetupPlatform>,
-  text: string
-): SetupPlatform | undefined {
-  const key = text.trim().toLowerCase();
-  return Object.hasOwn(table, key) ? table[key] : undefined;
-}
-
-// --account, --project and --location hold one platform's values; TIR and
-// MyAccount project ids are different things.
-function assertValuesFitPlatforms(
-  options: ConfigureOptions,
-  platforms: SetupPlatform[]
-): void {
-  const given = (['account', 'project', 'location'] as const).filter(
-    (field) => options[field] !== undefined
-  );
-
-  if (given.length > 0 && platforms.length > 1) {
-    throw new CliError(
-      `--${given.join(', --')} can only be used with one platform.`,
-      {
-        code: 'AMBIGUOUS_SETUP_VALUES',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run \`${formatCliCommand('tir configure')}\` and \`${formatCliCommand('myaccount configure')}\` separately, or set E2E_TIR_PROJECT_ID/E2E_TIR_LOCATION and E2E_PROJECT_ID/E2E_LOCATION.`
-      }
+    runtime.stdout.write(
+      `Not a choice: ${unknown.join(', ')}. Choose at least one platform. TIR is recommended.\n`
     );
   }
-
-  if (options.account !== undefined && !platforms.includes('tir')) {
-    throw new CliError('--account is only for TIR.', {
-      code: 'AMBIGUOUS_SETUP_VALUES',
-      exitCode: EXIT_CODES.usage,
-      suggestion: 'Remove --account, or add --platform tir.'
-    });
-  }
-}
-
-function withoutCommandFields(
-  result: PlatformConfigureCommandResult
-): PlatformSetupResult {
-  return {
-    account: result.account,
-    location: result.location,
-    platform: result.platform,
-    project: result.project
-  };
 }

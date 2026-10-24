@@ -35,11 +35,16 @@ e2ectl configure
 ```
 
 Change one platform later with `e2ectl tir configure` or `e2ectl myaccount configure`. In scripts,
-pass everything as flags and the key and token in `E2E_API_KEY` and `E2E_AUTH_TOKEN`:
+put the key and token in `E2E_API_KEY` and `E2E_AUTH_TOKEN` and the values in flags; giving a
+platform's flags sets that platform up. One command can set up both:
 
 ```bash
-e2ectl configure --platform myaccount --project <project-id> --location Chennai
+e2ectl configure \
+  --tir-account-id <account-id> --tir-project-id <project-id> --tir-location Chennai \
+  --myaccount-project-id <project-id> --myaccount-location Chennai
 ```
+
+Steps 3 and 4 use MyAccount, so choose it during setup too.
 
 3. Discover an exact node plan and image:
 

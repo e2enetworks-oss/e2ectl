@@ -90,9 +90,9 @@ describe('tir account, project and configure against a fake TIR API', () => {
         [
           'tir',
           'configure',
-          '--account',
+          '--account-id',
           '1234',
-          '--project',
+          '--project-id',
           '91011',
           '--location',
           'Delhi'
@@ -146,9 +146,9 @@ describe('tir account, project and configure against a fake TIR API', () => {
         [
           'tir',
           'configure',
-          '--account',
+          '--account-id',
           '1234',
-          '--project',
+          '--project-id',
           '5',
           '--location',
           'Delhi'

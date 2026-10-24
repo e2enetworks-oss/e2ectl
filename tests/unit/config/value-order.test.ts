@@ -112,8 +112,7 @@ describe('key and token order', () => {
     expect(result).toMatchObject({
       alias: 'work',
       api_key: 'key-work',
-      auth_token: 'token-work',
-      source: 'profile'
+      auth_token: 'token-work'
     });
   });
 
@@ -135,8 +134,7 @@ describe('key and token order', () => {
       alias: 'home',
       api_key: 'key-env',
       auth_token: 'token-env',
-      project_id: '300',
-      source: 'env'
+      project_id: '300'
     });
   });
 
@@ -145,8 +143,7 @@ describe('key and token order', () => {
 
     expect(result).toMatchObject({
       api_key: 'key-home',
-      auth_token: 'token-home',
-      source: 'profile'
+      auth_token: 'token-home'
     });
   });
 
@@ -264,10 +261,10 @@ describe('TIR value order', () => {
   });
 
   it.each([
-    { context: { account_id: 'abc' }, code: 'INVALID_TIR_ACCOUNT_ID' },
+    { context: { account_id: 'abc' }, code: 'INVALID_ID' },
     {
       context: { account_id: '9', project_id: 'abc', location: 'Delhi' },
-      code: 'INVALID_TIR_PROJECT_ID'
+      code: 'INVALID_ID'
     },
     {
       context: { account_id: '9', project_id: '8', location: 'Mumbai' },
@@ -294,8 +291,7 @@ describe('TIR value order', () => {
     expect(result).toEqual({
       alias: 'home',
       api_key: 'key-home',
-      auth_token: 'token-home',
-      source: 'profile'
+      auth_token: 'token-home'
     });
   });
 });

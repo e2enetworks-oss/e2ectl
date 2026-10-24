@@ -2,14 +2,19 @@ import { Command } from 'commander';
 
 import { addAliasOption } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/runtime.js';
-import {
-  renderPlatformSetupResult,
-  type PlatformConfigureInput
-} from '../../config/index.js';
+import { renderPlatformSetupResult } from '../../config/index.js';
 import { renderTirProjectResult } from './formatter.js';
 import { TirProjectService } from './service.js';
+import { formatTirCommand } from '../api.js';
 import { configureTir } from './configure.js';
 import type { TirProjectContextOptions } from './types.js';
+
+interface TirConfigureOptions {
+  accountId?: string;
+  alias?: string;
+  location?: string;
+  projectId?: string;
+}
 
 interface GlobalOptions {
   json?: boolean;
@@ -59,26 +64,32 @@ export function buildTirConfigureCommand(runtime: CliRuntime): Command {
         'Choose the TIR account, project and location and save them in the profile. Every later tir command uses them unless a flag or E2E_TIR_* variable says otherwise. Asks in a terminal; give the flags in scripts.'
       )
       .option(
-        '--account <accountId>',
+        '--account-id <accountId>',
         'TIR account id (from tir account list).'
       )
       .option(
-        '--project <projectId>',
+        '--project-id <projectId>',
         'TIR project id (from tir project list).'
       )
       .option('--location <location>', 'Delhi or Chennai.')
-  ).action(
-    async (options: PlatformConfigureInput, commandInstance: Command) => {
-      const json =
-        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false;
-      const result = await configureTir(
-        runtime,
-        options,
-        runtime.isInteractive && !json
-      );
-      runtime.stdout.write(renderPlatformSetupResult(result, json));
-    }
-  );
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatTirCommand('configure --account-id 12 --project-id 34 --location Delhi')}\n`
+      )
+  ).action(async (options: TirConfigureOptions, commandInstance: Command) => {
+    const json = commandInstance.optsWithGlobals<GlobalOptions>().json ?? false;
+    const result = await configureTir(runtime, {
+      alias: options.alias,
+      canPrompt: runtime.isInteractive && !json,
+      flagPrefix: '',
+      values: {
+        account: options.accountId,
+        location: options.location,
+        project: options.projectId
+      }
+    });
+    runtime.stdout.write(renderPlatformSetupResult(result, json));
+  });
 }
 
 function createService(runtime: CliRuntime): TirProjectService {

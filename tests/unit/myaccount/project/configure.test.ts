@@ -53,7 +53,7 @@ async function run(
 describe('myaccount configure', () => {
   it('saves the MyAccount project and location from flags', async () => {
     const { output, store } = await run(
-      ['myaccount', 'configure', '--project', '46', '--location', 'Chennai'],
+      ['myaccount', 'configure', '--project-id', '46', '--location', 'Chennai'],
       { tir: { account_id: '1' } }
     );
 
@@ -73,7 +73,7 @@ describe('myaccount configure', () => {
       '--json',
       'myaccount',
       'configure',
-      '--project',
+      '--project-id',
       '46',
       '--location',
       'Delhi'
@@ -104,12 +104,12 @@ describe('myaccount configure', () => {
   it.each([
     [['--location', 'Delhi'], 'No MyAccount project given.'],
     [
-      ['--project', '99', '--location', 'Delhi'],
+      ['--project-id', '99', '--location', 'Delhi'],
       'MyAccount project 99 was not found.'
     ],
     [
-      ['--project', '46', '--location', 'Mumbai'],
-      'Unsupported MyAccount location "Mumbai".'
+      ['--project-id', '46', '--location', 'Mumbai'],
+      'Unsupported location "Mumbai".'
     ]
   ])('refuses %o with a next step', async (flags, message) => {
     const error = await run(['myaccount', 'configure', ...flags]).catch(

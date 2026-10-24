@@ -162,8 +162,7 @@ describe('project commands', () => {
       api_key: 'api-key',
       auth_token: 'auth-token',
       location: 'Delhi',
-      project_id: '12345',
-      source: 'profile'
+      project_id: '12345'
     });
     expect(stdout.buffer).toBe(
       `${stableStringify({
@@ -201,8 +200,7 @@ describe('project commands', () => {
       api_key: 'api-key',
       auth_token: 'auth-token',
       location: 'Delhi',
-      project_id: '12345',
-      source: 'profile'
+      project_id: '12345'
     });
     expect(stdout.buffer).toContain('ID');
     expect(stdout.buffer).toContain('default-project');

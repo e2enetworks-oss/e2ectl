@@ -2,11 +2,9 @@ import type { CliRuntime } from '../../app/runtime.js';
 import {
   CONTEXT_ENV_VAR_BY_FIELD,
   configurePlatform,
-  createSetupIo,
-  findSetupProfile,
   resolveStoredAccountCredentials,
-  type PlatformConfigureCommandResult,
-  type PlatformConfigureInput,
+  type PlatformConfigureOutcome,
+  type PlatformConfigureRequest,
   type PlatformSetupSteps
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
@@ -44,24 +42,13 @@ export function createMyAccountSetupSteps(
 // configure calls this too.
 export async function configureMyAccount(
   runtime: CliRuntime,
-  input: PlatformConfigureInput,
-  canPrompt: boolean
-): Promise<PlatformConfigureCommandResult> {
-  const alias = await findSetupProfile(runtime.store, input.alias);
-  // The key comes from the same place later commands take it from: the
-  // --alias profile, otherwise the environment, otherwise the default profile.
-  const keySource = input.alias === undefined ? {} : { alias: input.alias };
-  const credentials = await resolveStoredAccountCredentials(
-    runtime.store,
-    keySource
-  );
-  const steps = createMyAccountSetupSteps(
-    runtime.createProjectClient(credentials)
-  );
-  const result = await configurePlatform(steps, alias, input, {
-    io: createSetupIo(runtime, canPrompt),
-    store: runtime.store
+  request: PlatformConfigureRequest
+): Promise<PlatformConfigureOutcome> {
+  return await configurePlatform(request, runtime, async (keySource) => {
+    const credentials = await resolveStoredAccountCredentials(
+      runtime.store,
+      keySource
+    );
+    return createMyAccountSetupSteps(runtime.createProjectClient(credentials));
   });
-
-  return { action: 'configure', alias, ...result };
 }

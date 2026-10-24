@@ -54,5 +54,4 @@ export interface ApiClientCredentials extends ApiAuthCredentials {
   alias?: string;
   location?: string;
   project_id?: string;
-  source: 'env' | 'mixed' | 'profile';
 }

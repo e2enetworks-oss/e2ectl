@@ -99,8 +99,7 @@ describe('ProjectService', () => {
       api_key: 'api-key',
       auth_token: 'auth-token',
       location: 'Delhi',
-      project_id: '46429',
-      source: 'profile'
+      project_id: '46429'
     });
     expect(result).toEqual({
       action: 'list',
@@ -240,8 +239,7 @@ describe('ProjectService', () => {
     expect(receivedCredentials()).toEqual({
       alias: 'prod',
       api_key: 'api-key',
-      auth_token: 'auth-token',
-      source: 'profile'
+      auth_token: 'auth-token'
     });
     expect(result.items[0]?.is_cli_default_project).toBe(false);
   });

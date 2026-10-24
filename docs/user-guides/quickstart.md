@@ -25,7 +25,8 @@ e2ectl configure
 It asks for the key and token (they are not shown as you type), checks them, and saves them in a
 profile. Then it asks which platforms you use: TIR (recommended, picked by default) and MyAccount.
 For each one it asks for the project and location (and the account, for TIR), checks them, and
-saves them. Run it again at any time; it offers what is saved as the default answers.
+saves them. Run it again at any time: each question offers the saved value (or the value of its
+environment variable) as the default answer, and the prompt says which one Enter keeps.
 
 To change one platform later:
 
@@ -34,15 +35,17 @@ e2ectl tir configure
 e2ectl myaccount configure
 ```
 
-In scripts and agents there is no terminal to ask in. Pass `--platform` and the values as flags,
-and the key and token in `E2E_API_KEY` and `E2E_AUTH_TOKEN` (they are never taken as flags):
+In scripts and agents there is no terminal to ask in. Put the key and token in `E2E_API_KEY` and
+`E2E_AUTH_TOKEN` (they are never taken as flags) and the values in flags. Giving a platform's flags
+sets that platform up, so one command can set up both:
 
 ```bash
-e2ectl configure --platform tir --account <account-id> --project <project-id> --location Chennai
-e2ectl configure --platform myaccount --project <project-id> --location Delhi
+e2ectl configure --tir-account-id <account-id> --tir-project-id <project-id> --tir-location Chennai
+e2ectl configure --myaccount-project-id <project-id> --myaccount-location Delhi
 ```
 
-A missing value fails with a message naming the flag to add. If you already have a downloaded
+`--platform tir` or `--platform myaccount` sets a platform up from its environment variables or
+saved values instead. Missing values fail with one message that names every flag to add. If you already have a downloaded
 credential file, `e2ectl config import --file <path>` saves it as a profile instead.
 
 If setup fails, start with [Authentication and import problems](./troubleshooting.md#authentication-and-import-problems).

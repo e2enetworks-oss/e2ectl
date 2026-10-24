@@ -1,8 +1,9 @@
 import { CliError, EXIT_CODES } from '../core/errors.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
+import { findLocation, normalizeLocation, parseNumericId } from './checks.js';
+import { findProfile } from './store.js';
 import type { ConfigFile, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
-import { findProfile } from './store.js';
 import { pickValue } from './value-order.js';
 
 export type SetupPlatform = 'myaccount' | 'tir';
@@ -49,22 +50,38 @@ export interface PlatformSetupSteps {
   toProfilePatch(context: SetupContext): Partial<ProfileConfig>;
 }
 
-export interface SetupIo {
-  // False without a terminal or with --json: then every missing value is
-  // an error naming the flag to add.
+// One configure run: the profile named with --alias (or the default one),
+// the values given as flags, and whether questions can be asked.
+export interface PlatformConfigureRequest {
+  alias?: string | undefined;
+  // False without a terminal or with --json: then a missing value is an
+  // error naming the flag to add.
   canPrompt: boolean;
-  env: NodeJS.ProcessEnv;
-  prompt(message: string): Promise<string>;
-  write(text: string): void;
+  // How the flags are spelled where this runs: '' for tir configure and
+  // myaccount configure, 'tir-' or 'myaccount-' for e2ectl configure.
+  flagPrefix: string;
+  values: SetupValues;
 }
 
-interface SetupStore {
-  read(): Promise<ConfigFile>;
-  updateProfile(
-    alias: string,
-    patch: Partial<ProfileConfig>
-  ): Promise<ConfigFile>;
+// The parts of the CLI the setup uses.
+export interface PlatformSetupTerminal {
+  prompt(message: string): Promise<string>;
+  stdout: { write(text: string): unknown };
+  store: {
+    read(): Promise<ConfigFile>;
+    updateProfile(
+      alias: string,
+      patch: Partial<ProfileConfig>
+    ): Promise<ConfigFile>;
+  };
 }
+
+// Builds the platform's steps with the key later commands use: the --alias
+// profile, otherwise E2E_API_KEY/E2E_AUTH_TOKEN, otherwise the default
+// profile.
+export type CreateSetupSteps = (keySource: {
+  alias?: string;
+}) => Promise<PlatformSetupSteps>;
 
 export interface PlatformSetupResult {
   account: { email: string; id: number; name: string } | null;
@@ -73,82 +90,43 @@ export interface PlatformSetupResult {
   project: SetupProject;
 }
 
-// What tir configure and myaccount configure take from the command line.
-export interface PlatformConfigureInput extends SetupValues {
-  alias?: string;
+export interface PlatformConfigureOutcome {
+  alias: string;
+  setup: PlatformSetupResult;
 }
 
-// The --json shape of tir configure and myaccount configure.
-export interface PlatformConfigureCommandResult extends PlatformSetupResult {
-  action: 'configure';
-  alias: string;
+interface SetupRun {
+  canPrompt: boolean;
+  flagPrefix: string;
+  steps: PlatformSetupSteps;
+  terminal: PlatformSetupTerminal;
 }
+
+type SetupField = keyof SetupValues;
 
 const PLATFORM_NAMES: Record<SetupPlatform, string> = {
   myaccount: 'MyAccount',
   tir: 'TIR'
 };
 
-const FLAG_BY_VALUE: Record<keyof SetupValues, string> = {
-  account: '--account',
-  location: '--location',
-  project: '--project'
+const FLAG_NAMES: Record<SetupField, string> = {
+  account: 'account-id',
+  location: 'location',
+  project: 'project-id'
 };
 
-// The prompts and output of the shared setup, from the CLI's terminal.
-export function createSetupIo(
-  terminal: {
-    prompt(message: string): Promise<string>;
-    stdout: { write(text: string): unknown };
-  },
-  canPrompt: boolean
-): SetupIo {
-  return {
-    canPrompt,
-    env: process.env,
-    prompt: (message) => terminal.prompt(message),
-    write: (text) => {
-      terminal.stdout.write(text);
-    }
-  };
+export function platformName(platform: SetupPlatform): string {
+  return PLATFORM_NAMES[platform];
 }
 
-// The profile a configure command saves into: the --alias one, or the
-// default profile.
-export async function findSetupProfile(
-  store: Pick<SetupStore, 'read'>,
-  alias: string | undefined
-): Promise<string> {
-  const config = await store.read();
-  const chosen = alias ?? config.default;
-
-  if (chosen !== undefined && findProfile(config, chosen) !== undefined) {
-    return chosen;
-  }
-
-  throw profileNotFoundError(
-    chosen === undefined
-      ? 'There is no saved profile to keep this setting in.'
-      : `Profile "${chosen}" was not found.`
-  );
-}
-
-function profileNotFoundError(message: string): CliError {
-  return new CliError(message, {
-    code: 'PROFILE_NOT_FOUND',
-    exitCode: EXIT_CODES.config,
-    suggestion:
-      'Run `e2ectl configure` to save a key and token in a profile first.'
-  });
-}
-
+// The --json shape of tir configure and myaccount configure.
 export function renderPlatformSetupResult(
-  result: PlatformConfigureCommandResult,
+  outcome: PlatformConfigureOutcome,
   json: boolean
 ): string {
   return json
-    ? `${stableStringify(result as unknown as JsonValue)}\n`
-    : `${describePlatformSetup(result.alias, result)}\n`;
+    ? `${stableStringify({ action: 'configure', alias: outcome.alias, ...outcome.setup } as unknown as JsonValue)}\n`
+    : `${describePlatformSetup(outcome.alias, outcome.setup)}\n`;
 }
 
 // "TIR context saved for profile "work": account 12 (a@b.c), project 34
@@ -167,42 +145,51 @@ export function describePlatformSetup(
     result.location
   ];
 
-  return `${PLATFORM_NAMES[result.platform]} context saved for profile "${alias}": ${parts.join(', ')}.`;
+  return `${platformName(result.platform)} context saved for profile "${alias}": ${parts.join(', ')}.`;
 }
 
 // Asks for (or reads) the account, project and location, checks each one
-// against the platform, and saves them on the profile. Nothing is saved
-// unless every check passes.
+// against the platform, and saves them on the profile. Values that can be
+// checked without the API are checked first, and nothing is saved unless
+// every check passes.
 export async function configurePlatform(
-  steps: PlatformSetupSteps,
-  alias: string,
-  flags: SetupValues,
-  dependencies: { io: SetupIo; store: SetupStore }
-): Promise<PlatformSetupResult> {
-  const { io, store } = dependencies;
-  const profile = findProfile(await store.read(), alias);
-  if (profile === undefined) {
-    throw profileNotFoundError(`Profile "${alias}" was not found.`);
-  }
-
-  const saved = steps.readSaved(profile);
-  const account = await chooseAccount(steps, flags, saved, io);
-  // A saved project belongs to the saved account, so it is not offered
-  // after switching to another account.
-  const savedForAccount =
-    account !== undefined && saved.account !== String(account.id)
-      ? { ...saved, project: undefined }
-      : saved;
-  const project = await chooseProject(
+  request: PlatformConfigureRequest,
+  terminal: PlatformSetupTerminal,
+  createSteps: CreateSetupSteps
+): Promise<PlatformConfigureOutcome> {
+  const { alias, profile } = await findSetupProfile(
+    terminal.store,
+    request.alias
+  );
+  const steps = await createSteps(
+    request.alias === undefined ? {} : { alias: request.alias }
+  );
+  const run: SetupRun = {
+    canPrompt: request.canPrompt,
+    flagPrefix: request.flagPrefix,
     steps,
+    terminal
+  };
+  const saved = steps.readSaved(profile);
+  const flags = request.values;
+  const known = knownValues(steps, saved);
+  const flaggedAccount = pickValue({ flag: flags.account })?.value;
+  checkWithoutApi(
+    run,
+    flags,
+    withoutStaleProject(known, saved, flaggedAccount ?? known.account)
+  );
+
+  const account = await chooseAccount(run, flags, known);
+  const project = await chooseProject(
+    run,
     account?.id,
     flags,
-    savedForAccount,
-    io
+    withoutStaleProject(known, saved, account?.id.toString())
   );
-  const location = await chooseLocation(steps, flags, saved, io);
+  const location = await chooseLocation(run, flags, known);
 
-  await store.updateProfile(
+  await terminal.store.updateProfile(
     alias,
     steps.toProfilePatch({
       ...(account === undefined ? {} : { accountId: account.id }),
@@ -212,100 +199,202 @@ export async function configurePlatform(
   );
 
   return {
-    account:
-      account === undefined
-        ? null
-        : { email: account.email, id: account.id, name: account.name },
-    location,
-    platform: steps.platform,
-    project
+    alias,
+    setup: {
+      account:
+        account === undefined
+          ? null
+          : { email: account.email, id: account.id, name: account.name },
+      location,
+      platform: steps.platform,
+      project
+    }
   };
 }
 
-async function chooseAccount(
+// The profile a configure command saves into: the --alias one, or the
+// default profile.
+async function findSetupProfile(
+  store: PlatformSetupTerminal['store'],
+  requested: string | undefined
+): Promise<{ alias: string; profile: ProfileConfig }> {
+  const config = await store.read();
+  const alias = requested ?? config.default;
+  const profile = alias === undefined ? undefined : findProfile(config, alias);
+
+  if (alias !== undefined && profile !== undefined) {
+    return { alias, profile };
+  }
+
+  throw new CliError(
+    alias === undefined
+      ? 'There is no saved profile to keep this setting in.'
+      : `Profile "${alias}" was not found.`,
+    {
+      code: 'PROFILE_NOT_FOUND',
+      exitCode: EXIT_CODES.config,
+      suggestion:
+        'Run `e2ectl configure` to save a key and token in a profile first.'
+    }
+  );
+}
+
+// Each value from its environment variable, else the saved profile.
+function knownValues(
   steps: PlatformSetupSteps,
-  flags: SetupValues,
+  saved: SetupValues
+): SetupValues {
+  const fallback = (field: SetupField): string | undefined => {
+    const envVarName = steps.envVarNames[field];
+    return pickValue({
+      env: envVarName === undefined ? undefined : process.env[envVarName],
+      profile: saved[field]
+    })?.value;
+  };
+
+  return {
+    account: steps.listAccounts === undefined ? undefined : fallback('account'),
+    location: fallback('location'),
+    project: fallback('project')
+  };
+}
+
+// A saved project belongs to the saved account, so it is not offered once
+// another account is chosen.
+function withoutStaleProject(
+  known: SetupValues,
   saved: SetupValues,
-  io: SetupIo
+  accountId: string | undefined
+): SetupValues {
+  const stale =
+    accountId !== undefined &&
+    accountId !== saved.account &&
+    known.project === saved.project;
+
+  return stale ? { ...known, project: undefined } : known;
+}
+
+// Without a terminal, every missing value is reported at once. Ids and the
+// location are checked before any API call.
+function checkWithoutApi(
+  run: SetupRun,
+  flags: SetupValues,
+  known: SetupValues
+): void {
+  const fields: SetupField[] =
+    run.steps.listAccounts === undefined
+      ? ['project', 'location']
+      : ['account', 'project', 'location'];
+  const value = (field: SetupField): string | undefined =>
+    pickValue({ flag: flags[field] })?.value ?? known[field];
+
+  const missing = fields.filter((field) => value(field) === undefined);
+  if (!run.canPrompt && missing.length > 0) {
+    throw missingValuesError(run, missing);
+  }
+
+  for (const field of fields) {
+    const given = value(field);
+    if (given !== undefined) {
+      checkFormat(run, field, given);
+    }
+  }
+}
+
+function checkFormat(run: SetupRun, field: SetupField, value: string): void {
+  if (field === 'location') {
+    normalizeLocation(value);
+    return;
+  }
+
+  parseNumericId(
+    value,
+    `${platformName(run.steps.platform)} ${field} ID`,
+    flagName(run, field)
+  );
+}
+
+async function chooseAccount(
+  run: SetupRun,
+  flags: SetupValues,
+  known: SetupValues
 ): Promise<SetupAccount | undefined> {
+  const { steps } = run;
   if (steps.listAccounts === undefined) {
     return undefined;
   }
 
+  const name = platformName(steps.platform);
   const accounts = await steps.listAccounts();
   const usable = accounts.filter((account) => account.usable);
-  const raw = await readValue(steps, 'account', flags, saved, io, {
+  const raw = await readValue(run, 'account', flags, known, {
     choices: accounts.map(
       (account) =>
-        `${account.id}  ${account.email || account.name}${account.usable ? '' : `  (${PLATFORM_NAMES[steps.platform]} is off)`}`
+        `${account.id}  ${account.email || account.name}${account.usable ? '' : `  (${name} is off)`}`
     ),
     onlyChoice: usable.length === 1 ? String(usable[0]?.id) : undefined
   });
-  const id = parseId(steps, 'account', raw);
+  const id = parseNumericId(
+    raw,
+    `${name} account ID`,
+    flagName(run, 'account')
+  );
   const found = accounts.find((account) => account.id === id);
 
   if (found === undefined) {
-    throw new CliError(
-      `${PLATFORM_NAMES[steps.platform]} account ${id} is not one your key can use.`,
-      {
-        code: 'SETUP_ACCOUNT_NOT_FOUND',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run \`${steps.listCommands.account ?? ''}\` and pass a listed id with --account.`
-      }
-    );
+    throw new CliError(`${name} account ${id} is not one your key can use.`, {
+      code: 'SETUP_ACCOUNT_NOT_FOUND',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run \`${steps.listCommands.account ?? ''}\` and pass a listed id with ${flagName(run, 'account')}.`
+    });
   }
 
   if (!found.usable) {
-    throw new CliError(
-      `${PLATFORM_NAMES[steps.platform]} is not turned on for account ${id}.`,
-      {
-        code: 'SETUP_ACCOUNT_DISABLED',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Pick another account from \`${steps.listCommands.account ?? ''}\`, or ask its owner to turn ${PLATFORM_NAMES[steps.platform]} on.`
-      }
-    );
+    throw new CliError(`${name} is not turned on for account ${id}.`, {
+      code: 'SETUP_ACCOUNT_DISABLED',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pick another account from \`${steps.listCommands.account ?? ''}\`, or ask its owner to turn ${name} on.`
+    });
   }
 
   return found;
 }
 
 async function chooseProject(
-  steps: PlatformSetupSteps,
+  run: SetupRun,
   accountId: number | undefined,
   flags: SetupValues,
-  saved: SetupValues,
-  io: SetupIo
+  known: SetupValues
 ): Promise<SetupProject> {
+  const { steps } = run;
+  const name = platformName(steps.platform);
+  const where = accountId === undefined ? '' : ` in account ${accountId}`;
   const projects = await steps.listProjects(accountId);
   if (projects.length === 0) {
-    const where = accountId === undefined ? '' : ` in account ${accountId}`;
-    throw new CliError(
-      `There are no ${PLATFORM_NAMES[steps.platform]} projects${where}.`,
-      {
-        code: 'SETUP_NO_PROJECTS',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Create a project on ${PLATFORM_NAMES[steps.platform]} first, then run configure again.`
-      }
-    );
+    throw new CliError(`There are no ${name} projects${where}.`, {
+      code: 'SETUP_NO_PROJECTS',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Create a project on ${name} first, then run configure again.`
+    });
   }
 
-  const raw = await readValue(steps, 'project', flags, saved, io, {
+  const raw = await readValue(run, 'project', flags, known, {
     choices: projects.map((project) => `${project.id}  ${project.name}`),
     onlyChoice: projects.length === 1 ? String(projects[0]?.id) : undefined
   });
-  const id = parseId(steps, 'project', raw);
+  const id = parseNumericId(
+    raw,
+    `${name} project ID`,
+    flagName(run, 'project')
+  );
   const found = projects.find((project) => project.id === id);
 
   if (found === undefined) {
-    const where = accountId === undefined ? '' : ` in account ${accountId}`;
-    throw new CliError(
-      `${PLATFORM_NAMES[steps.platform]} project ${id} was not found${where}.`,
-      {
-        code: 'SETUP_PROJECT_NOT_FOUND',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Run \`${steps.listCommands.project}\` and pass a listed id with --project.`
-      }
-    );
+    throw new CliError(`${name} project ${id} was not found${where}.`, {
+      code: 'SETUP_PROJECT_NOT_FOUND',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run \`${steps.listCommands.project}\` and pass a listed id with ${flagName(run, 'project')}.`
+    });
   }
 
   // Only the id and name, so every platform reports the same shape.
@@ -313,111 +402,84 @@ async function chooseProject(
 }
 
 async function chooseLocation(
-  steps: PlatformSetupSteps,
+  run: SetupRun,
   flags: SetupValues,
-  saved: SetupValues,
-  io: SetupIo
+  known: SetupValues
 ): Promise<string> {
-  const raw = await readValue(steps, 'location', flags, saved, io, {
+  const raw = await readValue(run, 'location', flags, known, {
     choices: [...VALID_LOCATIONS],
     onlyChoice: undefined
   });
 
-  if (VALID_LOCATIONS.includes(raw as (typeof VALID_LOCATIONS)[number])) {
-    return raw;
-  }
-
-  throw new CliError(
-    `Unsupported ${PLATFORM_NAMES[steps.platform]} location "${raw}".`,
-    {
-      code: 'INVALID_LOCATION',
-      details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
-      exitCode: EXIT_CODES.usage,
-      suggestion: 'Pass --location Delhi or --location Chennai.'
-    }
-  );
+  return findLocation(raw) ?? normalizeLocation(raw);
 }
 
 // A flag is used as it is. Otherwise the environment variable or the saved
 // value is used; in a terminal it is offered as the default answer instead,
 // so running configure again can change it.
 async function readValue(
-  steps: PlatformSetupSteps,
-  field: keyof SetupValues,
+  run: SetupRun,
+  field: SetupField,
   flags: SetupValues,
-  saved: SetupValues,
-  io: SetupIo,
+  known: SetupValues,
   question: { choices: string[]; onlyChoice: string | undefined }
 ): Promise<string> {
-  const envVarName = steps.envVarNames[field];
-  const fromFlag = pickValue({ flag: flags[field] });
-  const fallback = pickValue({
-    env: envVarName === undefined ? undefined : io.env[envVarName],
-    profile: saved[field]
-  });
-
+  const fromFlag = pickValue({ flag: flags[field] })?.value;
   if (fromFlag !== undefined) {
-    return fromFlag.value;
+    return fromFlag;
   }
 
-  if (!io.canPrompt) {
-    if (fallback !== undefined) {
-      return fallback.value;
-    }
-
-    throw missingValueError(steps, field);
+  const fallback = known[field];
+  if (!run.canPrompt) {
+    // checkWithoutApi has already reported missing values.
+    return fallback ?? '';
   }
 
-  const defaultAnswer = fallback?.value ?? question.onlyChoice;
-  io.write(
-    `${PLATFORM_NAMES[steps.platform]} ${field}s:\n${question.choices.map((choice) => `  ${choice}`).join('\n')}\n`
+  const name = platformName(run.steps.platform);
+  const defaultAnswer = fallback ?? question.onlyChoice;
+  run.terminal.stdout.write(
+    `${name} ${field}s:\n${question.choices.map((choice) => `  ${choice}`).join('\n')}\n`
   );
   const answer = (
-    await io.prompt(
-      `${PLATFORM_NAMES[steps.platform]} ${field}${defaultAnswer === undefined ? '' : ` [${defaultAnswer}]`}: `
+    await run.terminal.prompt(
+      `${name} ${field}${defaultAnswer === undefined ? '' : ` [${defaultAnswer}]`}: `
     )
   ).trim();
   const value = answer.length > 0 ? answer : defaultAnswer;
 
   if (value === undefined) {
-    throw missingValueError(steps, field);
+    throw missingValuesError(run, [field]);
   }
 
   return value;
 }
 
-function missingValueError(
-  steps: PlatformSetupSteps,
-  field: keyof SetupValues
-): CliError {
-  const listCommand =
-    field === 'location' ? undefined : steps.listCommands[field];
+function missingValuesError(run: SetupRun, fields: SetupField[]): CliError {
+  const name = platformName(run.steps.platform);
+  const hints = fields.map((field) => {
+    const flag = flagName(run, field);
+    const listCommand =
+      field === 'location' ? undefined : run.steps.listCommands[field];
+    return listCommand === undefined
+      ? `${flag} Delhi|Chennai`
+      : `${flag} <id> (see \`${listCommand}\`)`;
+  });
 
-  return new CliError(`No ${PLATFORM_NAMES[steps.platform]} ${field} given.`, {
+  return new CliError(`No ${name} ${joinWords(fields)} given.`, {
     code: 'MISSING_SETUP_VALUE',
+    details: hints.map((hint) => `Add ${hint}`),
     exitCode: EXIT_CODES.usage,
-    suggestion:
-      listCommand === undefined
-        ? `Add ${FLAG_BY_VALUE[field]} Delhi or ${FLAG_BY_VALUE[field]} Chennai.`
-        : `Add ${FLAG_BY_VALUE[field]} <id> (see \`${listCommand}\`).`
+    suggestion: `Add ${hints.join(', ')}.`
   });
 }
 
-function parseId(
-  steps: PlatformSetupSteps,
-  field: 'account' | 'project',
-  raw: string
-): number {
-  if (/^\d+$/.test(raw)) {
-    return Number(raw);
-  }
+function flagName(run: SetupRun, field: SetupField): string {
+  return `--${run.flagPrefix}${FLAG_NAMES[field]}`;
+}
 
-  throw new CliError(
-    `${PLATFORM_NAMES[steps.platform]} ${field} ID must be numeric.`,
-    {
-      code: 'INVALID_SETUP_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Pass a numeric id from \`${steps.listCommands[field] ?? ''}\` with ${FLAG_BY_VALUE[field]}.`
-    }
-  );
+// ['a', 'b', 'c'] -> "a, b and c".
+function joinWords(words: string[]): string {
+  return words.length <= 1
+    ? words.join('')
+    : `${words.slice(0, -1).join(', ')} and ${words.at(-1) ?? ''}`;
 }

@@ -28,5 +28,5 @@ function renderProjectList(result: TirProjectListCommandResult): string {
     table.push([String(item.id), item.name, item.created_at]);
   }
 
-  return `${table.toString()}\nNext: ${formatTirCommand(`configure --account ${result.account_id} --project <id> --location <Delhi|Chennai>`)}\n`;
+  return `${table.toString()}\nNext: ${formatTirCommand(`configure --account-id ${result.account_id} --project-id <id> --location <Delhi|Chennai>`)}\n`;
 }

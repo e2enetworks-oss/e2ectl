@@ -2,10 +2,8 @@ import { Command } from 'commander';
 
 import { addAliasOption } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/index.js';
-import {
-  renderPlatformSetupResult,
-  type PlatformConfigureInput
-} from '../../config/index.js';
+import { renderPlatformSetupResult } from '../../config/index.js';
+import { formatMyAccountCommand } from '../api.js';
 import { configureMyAccount } from './configure.js';
 import { renderProjectResult } from './formatter.js';
 import {
@@ -14,6 +12,12 @@ import {
   type ProjectCreateOptions,
   type ProjectStarOptions
 } from './service.js';
+
+interface MyAccountConfigureOptions {
+  alias?: string;
+  location?: string;
+  projectId?: string;
+}
 
 interface GlobalOptions {
   json?: boolean;
@@ -116,19 +120,24 @@ export function buildMyAccountConfigureCommand(runtime: CliRuntime): Command {
         'Choose the MyAccount project and location and save them in the profile. Every later myaccount command uses them unless a flag or E2E_PROJECT_ID/E2E_LOCATION says otherwise. Asks in a terminal; give the flags in scripts.'
       )
       .option(
-        '--project <projectId>',
+        '--project-id <projectId>',
         'MyAccount project id (from myaccount project list).'
       )
       .option('--location <location>', 'Delhi or Chennai.')
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('configure --project-id 46 --location Chennai')}\n`
+      )
   ).action(
-    async (options: PlatformConfigureInput, commandInstance: Command) => {
+    async (options: MyAccountConfigureOptions, commandInstance: Command) => {
       const json =
         commandInstance.optsWithGlobals<GlobalOptions>().json ?? false;
-      const result = await configureMyAccount(
-        runtime,
-        options,
-        runtime.isInteractive && !json
-      );
+      const result = await configureMyAccount(runtime, {
+        alias: options.alias,
+        canPrompt: runtime.isInteractive && !json,
+        flagPrefix: '',
+        values: { location: options.location, project: options.projectId }
+      });
       runtime.stdout.write(renderPlatformSetupResult(result, json));
     }
   );

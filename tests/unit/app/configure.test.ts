@@ -1,3 +1,4 @@
+import { runCli } from '../../../src/app/index.js';
 import { createProgram } from '../../../src/app/program.js';
 import type { CliRuntime } from '../../../src/app/runtime.js';
 import type { ConfigFile } from '../../../src/config/index.js';
@@ -39,6 +40,7 @@ const MYACCOUNT_PROJECTS: ProjectClient = {
 interface Harness {
   config: ConfigFile;
   output: string;
+  secretPrompts: string[];
   validate: ReturnType<typeof vi.fn>;
 }
 
@@ -62,6 +64,7 @@ async function configure(
   }
   const answers = [...(setup.answers ?? [])];
   const secrets = [...(setup.secrets ?? [])];
+  const secretPrompts: string[] = [];
   const stdout = new MemoryWriter();
   const validate = vi.fn(() => Promise.resolve({ valid: setup.valid ?? true }));
   const runtime: CliRuntime = createTestRuntime({
@@ -71,14 +74,22 @@ async function configure(
     credentialValidator: { validate },
     isInteractive: setup.answers !== undefined || setup.secrets !== undefined,
     prompt: () => Promise.resolve(answers.shift() ?? ''),
-    promptSecret: () => Promise.resolve(secrets.shift() ?? ''),
+    promptSecret: (message) => {
+      secretPrompts.push(message);
+      return Promise.resolve(secrets.shift() ?? '');
+    },
     stdout,
     store
   });
 
   await createProgram(runtime).parseAsync(['node', 'e2ectl', ...args]);
 
-  return { config: await store.read(), output: stdout.buffer, validate };
+  return {
+    config: await store.read(),
+    output: stdout.buffer,
+    secretPrompts,
+    validate
+  };
 }
 
 async function configureError(
@@ -154,6 +165,16 @@ describe('e2ectl configure in a terminal', () => {
     expect(output).toContain('TIR context saved');
   });
 
+  it('asks again instead of dropping a mistyped platform', async () => {
+    const { config, output } = await configure(['configure'], {
+      answers: ['1,myacount', '2', '', 'Delhi'],
+      secrets: ['k', 't']
+    });
+
+    expect(output).toContain('Not a choice: myacount.');
+    expect(config.profiles.default?.default_project_id).toBe('46');
+  });
+
   it('keeps the saved key and token when Enter is pressed', async () => {
     const { config, validate } = await configure(
       ['configure', '--alias', 'work'],
@@ -169,6 +190,27 @@ describe('e2ectl configure in a terminal', () => {
       auth_token: 'saved-token'
     });
     expect(config.profiles.work?.default_project_id).toBe('46');
+  });
+
+  it('says whether Enter keeps the saved key or uses the environment', async () => {
+    const saved = await configure(['configure', '--alias', 'work'], {
+      answers: ['2', '', 'Delhi'],
+      savedProfile: true,
+      secrets: ['', '']
+    });
+    vi.stubEnv('E2E_API_KEY', 'env-key');
+    const fromEnv = await configure(['configure'], {
+      answers: ['2', '', 'Delhi'],
+      savedProfile: true,
+      secrets: ['', 't']
+    });
+
+    expect(saved.secretPrompts[0]).toBe(
+      'API key (press Enter to keep the saved one): '
+    );
+    expect(fromEnv.secretPrompts[0]).toBe(
+      'API key (press Enter to use E2E_API_KEY): '
+    );
   });
 
   it('saves nothing when the API refuses the key and token', async () => {
@@ -194,18 +236,20 @@ describe('e2ectl configure without a terminal', () => {
     vi.unstubAllEnvs();
   });
 
-  it('runs from flags alone, with the key and token from the environment', async () => {
+  it('sets up both platforms in one command from their flags', async () => {
     const { config, output } = await configure([
       '--json',
       'configure',
-      '--platform',
-      'tir',
-      '--account',
+      '--tir-account-id',
       '11',
-      '--project',
+      '--tir-project-id',
       '33',
-      '--location',
-      'Chennai'
+      '--tir-location',
+      'Chennai',
+      '--myaccount-project-id',
+      '46',
+      '--myaccount-location',
+      'delhi'
     ]);
 
     expect(JSON.parse(output)).toEqual({
@@ -217,36 +261,42 @@ describe('e2ectl configure without a terminal', () => {
           location: 'Chennai',
           platform: 'tir',
           project: { id: 33, name: 'research' }
+        },
+        {
+          account: null,
+          location: 'Delhi',
+          platform: 'myaccount',
+          project: { id: 46, name: 'main' }
         }
       ]
     });
     expect(config.profiles.default).toMatchObject({
       api_key: 'env-key',
-      auth_token: 'env-token'
+      auth_token: 'env-token',
+      default_location: 'Delhi',
+      default_project_id: '46',
+      tir: { account_id: '11', location: 'Chennai', project_id: '33' }
     });
   });
 
-  it('runs MyAccount only from flags', async () => {
+  it('sets up only the platform whose flags are given', async () => {
     const { config } = await configure([
       'configure',
-      '--platform',
-      'myaccount',
-      '--project',
+      '--myaccount-project-id',
       '46',
-      '--location',
+      '--myaccount-location',
       'Delhi'
     ]);
 
     expect(config.profiles.default?.default_project_id).toBe('46');
+    expect(config.profiles.default?.tir).toBeUndefined();
   });
 
   it('keeps the saved key of a profile named with --alias over the environment', async () => {
     const flags = [
-      '--platform',
-      'myaccount',
-      '--project',
+      '--myaccount-project-id',
       '46',
-      '--location',
+      '--myaccount-location',
       'Delhi'
     ];
 
@@ -276,44 +326,42 @@ describe('e2ectl configure without a terminal', () => {
     }
   );
 
-  it('asks for --platform with the exact message', async () => {
+  it('asks for a platform, naming both ways to choose one', async () => {
     const error = await configureError(['configure']);
 
-    expect(error.message).toBe(
-      'Choose at least one platform with --platform tir or --platform myaccount (TIR is recommended).'
-    );
+    expect(error.message).toBe('Choose at least one platform.');
+    expect(error.suggestion).toContain('--platform tir');
+    expect(error.suggestion).toContain('--tir-project-id');
   });
 
-  it('names the flag to add for a missing value', async () => {
-    const error = await configureError([
-      'configure',
-      '--platform',
-      'tir',
-      '--account',
-      '11'
-    ]);
+  it('lists every missing flag, spelled for e2ectl configure', async () => {
+    const error = await configureError(['configure', '--tir-account-id', '11']);
 
-    expect(error.message).toBe('No TIR project given.');
-    expect(error.suggestion).toContain('--project <id>');
+    expect(error.message).toBe('No TIR project and location given.');
+    expect(error.suggestion).toContain('--tir-project-id <id>');
+    expect(error.suggestion).toContain('--tir-location Delhi|Chennai');
   });
 
-  it.each([
-    [
-      ['--platform', 'tir', '--platform', 'myaccount', '--project', '1'],
-      '--project can only be used with one platform.'
-    ],
-    [
-      ['--platform', 'myaccount', '--account', '11'],
-      '--account is only for TIR.'
-    ],
-    [['--platform', 'gcp'], 'Unknown platform "gcp".'],
-    [['--platform', '1'], 'Unknown platform "1".'],
-    [['--platform', 'toString'], 'Unknown platform "toString".']
-  ])('refuses %o before saving anything', async (flags, message) => {
-    const error = await configureError(['configure', ...flags]);
+  it.each([['gcp'], ['1'], ['toString']])(
+    'refuses --platform %s as a usage error',
+    async (platform) => {
+      const stderr = new MemoryWriter();
+      const runtime = createTestRuntime({
+        store: new ConfigStore({
+          configPath: createTestConfigPath('configure-platform')
+        })
+      });
 
-    expect(error.message).toBe(message);
-  });
+      const exitCode = await runCli(
+        ['node', 'e2ectl', 'configure', '--platform', platform],
+        runtime,
+        stderr
+      );
+
+      expect(exitCode).toBe(2);
+      expect(stderr.buffer).toContain('Allowed choices are tir, myaccount');
+    }
+  );
 
   it('asks for the key and token by name when none is set', async () => {
     vi.unstubAllEnvs();
@@ -329,13 +377,11 @@ describe('e2ectl configure without a terminal', () => {
   it('checks every TIR value the same way as tir configure', async () => {
     const error = await configureError([
       'configure',
-      '--platform',
-      'tir',
-      '--account',
+      '--tir-account-id',
       '99',
-      '--project',
+      '--tir-project-id',
       '33',
-      '--location',
+      '--tir-location',
       'Delhi'
     ]);
 

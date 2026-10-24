@@ -32,10 +32,7 @@ export class ApiCredentialValidator implements CredentialValidator {
   ): Promise<CredentialValidationResult> {
     // One token works on MyAccount and TIR, so checking it against MyAccount
     // is enough for every platform.
-    const transport = this.createTransport({
-      ...credentials,
-      source: 'profile'
-    });
+    const transport = this.createTransport(credentials);
 
     try {
       await transport.get<ApiEnvelope<unknown>>('/iam/multi-crn/', {

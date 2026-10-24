@@ -35,13 +35,11 @@ describe('e2ectl configure against fake APIs', () => {
       const result = await runBuiltCli(
         [
           'configure',
-          '--platform',
-          'tir',
-          '--account',
+          '--tir-account-id',
           '11',
-          '--project',
+          '--tir-project-id',
           '33',
-          '--location',
+          '--tir-location',
           'Delhi'
         ],
         { env }
@@ -104,7 +102,14 @@ describe('e2ectl configure against fake APIs', () => {
       });
 
       const saved = await runBuiltCli(
-        ['myaccount', 'configure', '--project', '46', '--location', 'Chennai'],
+        [
+          'myaccount',
+          'configure',
+          '--project-id',
+          '46',
+          '--location',
+          'Chennai'
+        ],
         { env }
       );
       expect(saved.exitCode).toBe(0);
@@ -134,9 +139,7 @@ describe('e2ectl configure against fake APIs', () => {
       });
 
       expect(result.exitCode).toBe(2);
-      expect(result.stderr).toContain(
-        'Choose at least one platform with --platform tir or --platform myaccount (TIR is recommended).'
-      );
+      expect(result.stderr).toContain('Choose at least one platform.');
     } finally {
       await tempHome.cleanup();
     }

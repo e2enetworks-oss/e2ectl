@@ -2,7 +2,6 @@ import type {
   AuthField,
   ConfigFile,
   ContextField,
-  CredentialSource,
   ProfileConfig,
   ResolvedAccountCredentials,
   ResolvedCredentials,
@@ -14,9 +13,9 @@ import {
   CONTEXT_ENV_VAR_BY_FIELD,
   REQUIRED_AUTH_FIELDS,
   REQUIRED_CONTEXT_FIELDS,
-  TIR_CONTEXT_ENV_VAR_BY_FIELD,
-  VALID_LOCATIONS
+  TIR_CONTEXT_ENV_VAR_BY_FIELD
 } from './types.js';
+import { findLocation, normalizeLocation, parseNumericId } from './checks.js';
 import { findProfile } from './store.js';
 import { pickValue, type PickedValue } from './value-order.js';
 import { formatCliCommand } from '../app/metadata.js';
@@ -59,7 +58,6 @@ interface SelectedProfile {
 
 interface ResolvedAuth {
   missing: AuthField[];
-  source: CredentialSource;
   values: Partial<Record<AuthField, string>>;
 }
 
@@ -87,8 +85,7 @@ export function resolveCredentials(
       api_key: auth.values.api_key ?? '',
       auth_token: auth.values.auth_token ?? '',
       project_id: projectId,
-      location,
-      source: auth.source
+      location
     },
     selection.alias
   );
@@ -112,7 +109,6 @@ export function resolveAccountCredentials(
     {
       api_key: auth.values.api_key ?? '',
       auth_token: auth.values.auth_token ?? '',
-      source: auth.source,
       ...context
     },
     selection.alias
@@ -137,7 +133,6 @@ export function resolveTirCredentials(
     {
       api_key: auth.values.api_key ?? '',
       auth_token: auth.values.auth_token ?? '',
-      source: auth.source,
       ...context
     },
     selection.alias
@@ -217,40 +212,38 @@ function resolveAuth(
   selection: SelectedProfile,
   env: NodeJS.ProcessEnv
 ): ResolvedAuth {
+  const picked = pickKeyAndToken(
+    selection.profile,
+    selection.chosenByFlag,
+    env
+  );
   const values: Partial<Record<AuthField, string>> = {};
-  const origins: PickedValue['origin'][] = [];
-
   for (const field of REQUIRED_AUTH_FIELDS) {
-    const saved = selection.profile?.[field];
-    const picked = pickValue({
-      flag: selection.chosenByFlag ? saved : undefined,
-      env: env[AUTH_ENV_VAR_BY_FIELD[field]],
-      profile: selection.chosenByFlag ? undefined : saved
-    });
-
-    if (picked !== undefined) {
-      values[field] = picked.value;
-      origins.push(picked.origin);
+    const value = picked[field]?.value;
+    if (value !== undefined) {
+      values[field] = value;
     }
   }
 
-  return {
-    missing: getMissingFields(REQUIRED_AUTH_FIELDS, values),
-    source: describeAuthSource(origins),
-    values
-  };
+  return { missing: getMissingFields(REQUIRED_AUTH_FIELDS, values), values };
 }
 
-// 'env' when every value came from the environment, 'profile' when every
-// value came from the saved profile, 'mixed' otherwise.
-function describeAuthSource(
-  origins: PickedValue['origin'][]
-): CredentialSource {
-  if (origins.length > 0 && origins.every((origin) => origin === 'env')) {
-    return 'env';
-  }
+// The key and token in the shared value order. A profile named with --alias
+// counts as a flag, so it beats E2E_API_KEY and E2E_AUTH_TOKEN; the default
+// profile comes after them. e2ectl configure uses this too.
+export function pickKeyAndToken(
+  profile: ProfileConfig | undefined,
+  chosenByFlag: boolean,
+  env: NodeJS.ProcessEnv
+): Record<AuthField, PickedValue | undefined> {
+  const pick = (field: AuthField): PickedValue | undefined =>
+    pickValue({
+      env: env[AUTH_ENV_VAR_BY_FIELD[field]],
+      flag: chosenByFlag ? profile?.[field] : undefined,
+      profile: chosenByFlag ? undefined : profile?.[field]
+    });
 
-  return origins.some((origin) => origin === 'env') ? 'mixed' : 'profile';
+  return { api_key: pick('api_key'), auth_token: pick('auth_token') };
 }
 
 function resolveMyAccountContext(
@@ -269,10 +262,20 @@ function resolveMyAccountContext(
     profile: selection.profile?.default_location
   });
 
-  return {
+  return withCanonicalLocation({
     ...(projectId === undefined ? {} : { project_id: projectId.value }),
     ...(location === undefined ? {} : { location: location.value })
-  };
+  });
+}
+
+// "chennai" works like "Chennai"; anything else is checked later.
+function withCanonicalLocation<T extends { location?: string }>(context: T): T {
+  return context.location === undefined
+    ? context
+    : {
+        ...context,
+        location: findLocation(context.location) ?? context.location
+      };
 }
 
 function resolveTirContext(
@@ -298,7 +301,7 @@ function resolveTirContext(
     }
   }
 
-  return context;
+  return withCanonicalLocation(context);
 }
 
 function assertTirContext(
@@ -316,7 +319,7 @@ function assertTirContext(
       suggestion: `Run \`${formatCliCommand('tir account list')}\`, then pass --account-id <id>, set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.account_id}, or run \`${formatCliCommand('tir configure')}\`.`
     });
   }
-  assertNumericTirValue(context.account_id, 'account', '--account-id');
+  parseNumericId(context.account_id, 'TIR account ID', '--account-id');
 
   if (requirement === 'account') {
     return;
@@ -326,27 +329,11 @@ function assertTirContext(
     throw new CliError('No TIR project and location chosen.', {
       code: 'MISSING_TIR_PROJECT',
       exitCode: EXIT_CODES.config,
-      suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account <id> --project <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
+      suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account-id <id> --project-id <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
     });
   }
-  assertNumericTirValue(context.project_id, 'project', '--project-id');
-  assertValidLocation(context.location);
-}
-
-function assertNumericTirValue(
-  value: string,
-  label: 'account' | 'project',
-  flag: string
-): void {
-  if (/^\d+$/.test(value)) {
-    return;
-  }
-
-  throw new CliError(`TIR ${label} ID must be numeric.`, {
-    code: `INVALID_TIR_${label.toUpperCase()}_ID`,
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass the numeric id from \`${formatCliCommand(`tir ${label} list`)}\` with ${flag}.`
-  });
+  parseNumericId(context.project_id, 'TIR project ID', '--project-id');
+  normalizeLocation(context.location);
 }
 
 function getMissingFields<TField extends string>(
@@ -508,28 +495,6 @@ function describeContextFlags(options: ResolveCredentialsOptions): string[] {
 }
 
 function validateResolvedContext(projectId: string, location: string): void {
-  if (!/^\d+$/.test(projectId)) {
-    throw new CliError('Project ID must be numeric.', {
-      code: 'INVALID_PROJECT_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Pass a numeric project id with --project-id or save a numeric default project id on the profile.'
-    });
-  }
-
-  assertValidLocation(location);
-}
-
-function assertValidLocation(location: string): void {
-  if (VALID_LOCATIONS.includes(location as (typeof VALID_LOCATIONS)[number])) {
-    return;
-  }
-
-  throw new CliError(`Unsupported location "${location}".`, {
-    code: 'INVALID_LOCATION',
-    details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
-    exitCode: EXIT_CODES.usage,
-    suggestion:
-      'Pass Delhi or Chennai with --location, or save one with myaccount configure or tir configure.'
-  });
+  parseNumericId(projectId, 'Project ID', '--project-id');
+  normalizeLocation(location);
 }
