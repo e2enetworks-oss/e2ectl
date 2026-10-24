@@ -75,7 +75,7 @@ describe('runCli', () => {
     ],
     [
       ['node', 'get', '123', '--alias', 'prod', '--json'],
-      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node get 123"?\n'
+      'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node get"?\n'
     ],
     [
       ['--json', 'dbaas', 'create', '--password', 'secret-value'],
@@ -104,6 +104,10 @@ describe('runCli', () => {
     [
       ['nod', 'list', '--alias', 'prod'],
       'Error: Unknown command "nod".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node list"?\n'
+    ],
+    [
+      ['dbaas', 'create', 'hunter2'],
+      'Error: Unknown command "dbaas".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount dbaas create"?\n'
     ],
     [
       ['help', 'node'],

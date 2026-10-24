@@ -11,4 +11,4 @@ ifeq (new-domain,$(firstword $(MAKECMDGOALS)))
 endif
 
 new-domain:
-	node ./scripts/new-domain.mjs $(or $(NAME),$(NEW_DOMAIN_ARGS))
+	node ./scripts/new-domain.mjs '$(or $(NAME),$(NEW_DOMAIN_ARGS))'

@@ -148,7 +148,11 @@ function unknownCommandError(
 
   let suggestion = `Run ${groupPath} --help to see the commands.`;
   if (moved !== undefined) {
-    suggestion = `Commands now start with the platform name. Did you mean "${[formatCommandPath(moved.platform), moved.productName, ...laterWords].join(' ')}"?`;
+    const commandPath = followSubcommands(moved.platform, [
+      moved.productName,
+      ...laterWords
+    ]);
+    suggestion = `Commands now start with the platform name. Did you mean "${commandPath}"?`;
   } else if (closest !== undefined) {
     suggestion = `Did you mean "${groupPath} ${closest}"? Run ${groupPath} --help to see the commands.`;
   }
@@ -158,6 +162,26 @@ function unknownCommandError(
     exitCode: EXIT_CODES.usage,
     suggestion
   });
+}
+
+// Builds "e2ectl <platform> <product> <subcommand> ..." from the typed words,
+// stopping at the first word that is not a subcommand. Only command names
+// are repeated: a value typed in the wrong place (even a password) is not.
+function followSubcommands(platform: Command, words: string[]): string {
+  const path = [formatCommandPath(platform)];
+  let group = platform;
+
+  for (const word of words) {
+    const next = group.commands.find((command) => command.name() === word);
+    if (next === undefined) {
+      break;
+    }
+
+    path.push(word);
+    group = next;
+  }
+
+  return path.join(' ');
 }
 
 // At the top level, a word may be a product that moved under a platform

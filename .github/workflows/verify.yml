@@ -88,6 +88,8 @@ jobs:
     # jobs run on the development version in .nvmrc.
     name: verify (node 24 test build)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
