@@ -1,6 +1,8 @@
 import type { CliRuntime } from '../../app/runtime.js';
 import {
+  CONTEXT_ENV_VAR_BY_FIELD,
   configurePlatform,
+  createSetupIo,
   findSetupProfile,
   resolveStoredAccountCredentials,
   type PlatformConfigureCommandResult,
@@ -16,14 +18,16 @@ export function createMyAccountSetupSteps(
   projects: ProjectClient
 ): PlatformSetupSteps {
   return {
-    envVarNames: { location: 'E2E_LOCATION', project: 'E2E_PROJECT_ID' },
+    envVarNames: {
+      location: CONTEXT_ENV_VAR_BY_FIELD.location,
+      project: CONTEXT_ENV_VAR_BY_FIELD.project_id
+    },
     listCommands: { project: formatMyAccountCommand('project list') },
     listProjects: async () =>
       (await projects.listProjects()).map((project) => ({
         id: project.project_id,
         name: project.name
       })),
-    name: 'MyAccount',
     platform: 'myaccount',
     readSaved: (profile) => ({
       location: profile.default_location,
@@ -51,14 +55,7 @@ export async function configureMyAccount(
     runtime.createProjectClient(credentials)
   );
   const result = await configurePlatform(steps, alias, input, {
-    io: {
-      canPrompt,
-      env: process.env,
-      prompt: (message) => runtime.prompt(message),
-      write: (text) => {
-        runtime.stdout.write(text);
-      }
-    },
+    io: createSetupIo(runtime, canPrompt),
     store: runtime.store
   });
 

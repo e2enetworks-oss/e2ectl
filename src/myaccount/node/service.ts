@@ -10,7 +10,6 @@ import type { ReservedIpClient } from '../reserved-ip/index.js';
 import type { SecurityGroupClient } from '../security-group/index.js';
 import {
   normalizeSnapshotId,
-  normalizeSnapshotName,
   toSnapshotItem,
   type SnapshotItem
 } from '../snapshot/index.js';
@@ -822,12 +821,7 @@ export class NodeService {
       query: {
         billing_type: billingType,
         ...query,
-        ...(filters.family === undefined ? {} : { family: filters.family }),
-        ...(filters.gpuType === undefined ? {} : { gpu_type: filters.gpuType }),
-        ...(filters.minRamGb === undefined
-          ? {}
-          : { min_ram_gb: filters.minRamGb }),
-        ...(filters.minVcpu === undefined ? {} : { min_vcpu: filters.minVcpu })
+        ...filters
       },
       summary: summarizeNodeCatalogPlans(plans, items, billingType, filters)
     };
@@ -927,7 +921,7 @@ export class NodeService {
     options: NodeContextOptions & { name: string }
   ): Promise<NodeSnapshotCommandResult> {
     const normalizedNodeId = assertNodeId(nodeId);
-    const name = normalizeSnapshotName(options.name, '--name');
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
     const client = await this.createNodeClient(options);
     const result = await client.createSnapshot(String(normalizedNodeId), name);
 
@@ -945,7 +939,12 @@ export class NodeService {
     options: NodeSnapshotDeleteOptions
   ): Promise<NodeSnapshotCommandResult> {
     const normalizedNodeId = assertNodeId(nodeId);
-    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+    const normalizedSnapshotId = normalizeSnapshotId(
+      snapshotId,
+      'snapshot_uuid'
+    );
+    const client = await this.createNodeClient(options);
+    await assertSnapshotExists(client, normalizedNodeId, normalizedSnapshotId);
 
     if (!(options.force ?? false)) {
       assertConfirmationAllowed(
@@ -966,7 +965,6 @@ export class NodeService {
       }
     }
 
-    const client = await this.createNodeClient(options);
     const result = await client.deleteSnapshot(
       String(normalizedNodeId),
       normalizedSnapshotId
@@ -989,9 +987,13 @@ export class NodeService {
     options: NodeContextOptions & { name: string }
   ): Promise<NodeSnapshotCommandResult> {
     const normalizedNodeId = assertNodeId(nodeId);
-    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
-    const name = normalizeSnapshotName(options.name, '--name');
+    const normalizedSnapshotId = normalizeSnapshotId(
+      snapshotId,
+      'snapshot_uuid'
+    );
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
     const client = await this.createNodeClient(options);
+    await assertSnapshotExists(client, normalizedNodeId, normalizedSnapshotId);
     const result = await client.saveSnapshotAsImage(
       String(normalizedNodeId),
       normalizedSnapshotId,
@@ -1264,6 +1266,28 @@ function toNodeWaitError(error: unknown, nodeId: number): CliError {
   );
 }
 
+// E2E answers an unknown snapshot id with a web page instead of an error,
+// so check the id against the node's snapshots first.
+async function assertSnapshotExists(
+  client: NodeClient,
+  nodeId: number,
+  snapshotId: string
+): Promise<void> {
+  const snapshots = await client.listSnapshots(String(nodeId));
+  if (snapshots.some((snapshot) => snapshot.snapshot_uuid === snapshotId)) {
+    return;
+  }
+
+  throw new CliError(
+    `Snapshot ${snapshotId} was not found on node ${nodeId}.`,
+    {
+      code: 'SNAPSHOT_NOT_FOUND',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Run ${formatMyAccountCommand(`node snapshot list ${nodeId}`)} and pass an ID from it.`
+    }
+  );
+}
+
 // Upgrading needs an image. To keep the node's own image, find the one
 // catalog row that matches its OS exactly and that row's image for the new
 // plan. Anything less than an exact match fails rather than guessing.
@@ -1272,8 +1296,12 @@ async function findCurrentImage(
   nodeId: number,
   plan: string
 ): Promise<string> {
-  const os = (await client.getNode(String(nodeId))).os_info;
-  const rows = summarizeNodeCatalogOs(await client.listNodeCatalogOs()).filter(
+  const [node, catalog] = await Promise.all([
+    client.getNode(String(nodeId)),
+    client.listNodeCatalogOs()
+  ]);
+  const os = node.os_info;
+  const rows = summarizeNodeCatalogOs(catalog).filter(
     (row) =>
       row.display_category === os?.category &&
       row.os === os.name &&

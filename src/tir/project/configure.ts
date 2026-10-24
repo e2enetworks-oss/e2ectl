@@ -1,6 +1,7 @@
 import type { CliRuntime } from '../../app/runtime.js';
 import {
   configurePlatform,
+  createSetupIo,
   findSetupProfile,
   resolveStoredTirCredentials,
   type PlatformConfigureCommandResult,
@@ -26,14 +27,7 @@ export async function configureTir(
     projects: runtime.createTirProjectClient(credentials)
   });
   const result = await configurePlatform(steps, alias, input, {
-    io: {
-      canPrompt,
-      env: process.env,
-      prompt: (message) => runtime.prompt(message),
-      write: (text) => {
-        runtime.stdout.write(text);
-      }
-    },
+    io: createSetupIo(runtime, canPrompt),
     store: runtime.store
   });
 

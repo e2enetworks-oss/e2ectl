@@ -189,9 +189,9 @@ export function normalizeNodeCatalogPlanFilters(
 
   return {
     ...(family === undefined ? {} : { family }),
-    ...(gpuType === undefined ? {} : { gpuType }),
-    ...(minVcpu === undefined ? {} : { minVcpu }),
-    ...(minRamGb === undefined ? {} : { minRamGb })
+    ...(gpuType === undefined ? {} : { gpu_type: gpuType }),
+    ...(minVcpu === undefined ? {} : { min_vcpu: minVcpu }),
+    ...(minRamGb === undefined ? {} : { min_ram_gb: minRamGb })
   };
 }
 
@@ -244,12 +244,12 @@ function filterNodeCatalogPlans(
     (plan) =>
       (filters.family === undefined ||
         normalizeOptionalText(plan.specs?.family) === filters.family) &&
-      (filters.minVcpu === undefined ||
-        (plan.specs?.cpu ?? 0) >= filters.minVcpu) &&
-      (filters.minRamGb === undefined ||
-        (parseRamAsNumber(plan.specs?.ram) ?? 0) >= filters.minRamGb) &&
-      (filters.gpuType === undefined ||
-        matchesGpuType(summarizeGpu(plan), filters.gpuType))
+      (filters.min_vcpu === undefined ||
+        (plan.specs?.cpu ?? 0) >= filters.min_vcpu) &&
+      (filters.min_ram_gb === undefined ||
+        (parseRamAsNumber(plan.specs?.ram) ?? 0) >= filters.min_ram_gb) &&
+      (filters.gpu_type === undefined ||
+        matchesGpuType(summarizeGpu(plan), filters.gpu_type))
   );
 }
 

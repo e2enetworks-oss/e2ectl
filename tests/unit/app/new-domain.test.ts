@@ -39,7 +39,6 @@ describe('parseDomainName', () => {
       credentialsResolver: 'resolveStoredCredentials',
       credentialsType: 'ResolvedCredentials',
       displayName: 'MyAccount',
-      isMyAccount: true,
       optionsHelper: 'addContextOptions',
       platform: 'myaccount',
       platformName: 'MyAccount',

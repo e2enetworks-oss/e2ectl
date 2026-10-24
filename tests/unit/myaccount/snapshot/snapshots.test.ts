@@ -238,13 +238,32 @@ describe('node snapshots', () => {
     expect(output).toContain('--saved-image-template-id');
   });
 
-  it('refuses a non-numeric snapshot id', async () => {
+  it('refuses a snapshot id with other characters', async () => {
     await expect(
       run(
         ['myaccount', 'node', 'snapshot', 'delete', '101', '../x', '--force'],
         { node: nodeClient() }
       )
     ).rejects.toMatchObject({ code: 'INVALID_SNAPSHOT_ID' });
+  });
+
+  it.each([
+    ['delete', 'not-a-listed-id', '--force'],
+    ['save-image', 'not-a-listed-id', '--name', 'restored']
+  ])('says an unknown snapshot id is not found before %s', async (...args) => {
+    const mocks = nodeMocks();
+    const [subcommand, ...rest] = args;
+
+    await expect(
+      run(['myaccount', 'node', 'snapshot', subcommand, '101', ...rest], {
+        node: nodeClient(mocks)
+      })
+    ).rejects.toMatchObject({
+      code: 'SNAPSHOT_NOT_FOUND',
+      message: 'Snapshot not-a-listed-id was not found on node 101.'
+    });
+    expect(mocks.deleteSnapshot).not.toHaveBeenCalled();
+    expect(mocks.saveSnapshotAsImage).not.toHaveBeenCalled();
   });
 });
 

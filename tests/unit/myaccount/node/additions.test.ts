@@ -452,7 +452,9 @@ describe('node catalog GPU rows and filters', () => {
     ['A100', ['a100']],
     ['H100', []]
   ])('matches --gpu-type %s', (gpuType, expected) => {
-    const items = normalizeNodeCatalogPlanItems(gpuPlans, 'all', { gpuType });
+    const items = normalizeNodeCatalogPlanItems(gpuPlans, 'all', {
+      gpu_type: gpuType
+    });
 
     expect(items.map((item) => item.plan)).toEqual(expected);
   });
@@ -460,15 +462,15 @@ describe('node catalog GPU rows and filters', () => {
   it('keeps plans with at least --min-vcpu and --min-ram', () => {
     expect(
       normalizeNodeCatalogPlanItems(gpuPlans, 'all', {
-        minVcpu: 12,
-        minRamGb: 100
+        min_vcpu: 12,
+        min_ram_gb: 100
       }).map((item) => item.plan)
     ).toEqual(['a100']);
   });
 
   it('summarizes the GPU on each item', () => {
     const [t4] = normalizeNodeCatalogPlanItems(gpuPlans, 'all', {
-      gpuType: 'T4'
+      gpu_type: 'T4'
     });
 
     expect(t4?.config.gpu).toEqual({
@@ -479,7 +481,7 @@ describe('node catalog GPU rows and filters', () => {
   });
 
   it('explains an empty result caused by the filters', () => {
-    const filters = { minVcpu: 999 };
+    const filters = { min_vcpu: 999 };
     const items = normalizeNodeCatalogPlanItems(gpuPlans, 'all', filters);
 
     expect(
@@ -494,7 +496,7 @@ describe('node catalog GPU rows and filters', () => {
         minRam: '8',
         minVcpu: '4'
       })
-    ).toEqual({ gpuType: 'T4', minRamGb: 8, minVcpu: 4 });
+    ).toEqual({ gpu_type: 'T4', min_ram_gb: 8, min_vcpu: 4 });
     expect(() => normalizeNodeCatalogPlanFilters({ minVcpu: 'four' })).toThrow(
       'Minimum vCPU must be numeric.'
     );

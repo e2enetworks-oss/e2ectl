@@ -79,9 +79,9 @@ export interface NodeCatalogPlansQuery extends NodeCatalogQuery {
 // Optional filters on the catalog rows, applied by the CLI.
 export interface NodeCatalogPlanFilters {
   family?: string;
-  gpuType?: string;
-  minRamGb?: number;
-  minVcpu?: number;
+  gpu_type?: string;
+  min_ram_gb?: number;
+  min_vcpu?: number;
 }
 
 export interface NodeCatalogGpuCard {

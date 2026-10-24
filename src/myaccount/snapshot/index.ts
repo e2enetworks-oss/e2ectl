@@ -1,7 +1,6 @@
 export {
   formatSnapshotTable,
   normalizeSnapshotId,
-  normalizeSnapshotName,
   toSnapshotItem,
   type SnapshotApiItem,
   type SnapshotIdField,

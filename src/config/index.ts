@@ -4,16 +4,16 @@ export {
   type CredentialValidationResult,
   type CredentialValidator
 } from './credential-validator.js';
-export { buildConfigCommand, formatConfigCommand } from './command.js';
+export { buildConfigCommand } from './command.js';
 export {
   resolveAccountCredentials,
   resolveCredentials,
   resolveStoredAccountCredentials,
   resolveStoredCredentials,
   resolveStoredTirCredentials,
-  resolveTirCredentials,
-  type TirRequirement
+  resolveTirCredentials
 } from './resolver.js';
+export { pickValue } from './value-order.js';
 export { ConfigStore, createEmptyConfig, normalizeConfig } from './store.js';
 export type {
   AuthField,
@@ -28,9 +28,13 @@ export type {
   TirContextField
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';
-export { VALID_LOCATIONS } from './types.js';
+export {
+  CONTEXT_ENV_VAR_BY_FIELD,
+  TIR_CONTEXT_ENV_VAR_BY_FIELD
+} from './types.js';
 export {
   configurePlatform,
+  createSetupIo,
   describePlatformSetup,
   findSetupProfile,
   renderPlatformSetupResult,
@@ -38,10 +42,7 @@ export {
   type PlatformConfigureInput,
   type PlatformSetupResult,
   type PlatformSetupSteps,
-  type SetupAccount,
-  type SetupContext,
   type SetupIo,
   type SetupPlatform,
-  type SetupProject,
   type SetupValues
 } from './platform-setup.js';

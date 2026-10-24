@@ -7,7 +7,6 @@ import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES, isAppError } from '../../core/errors.js';
 import {
   normalizeSnapshotId,
-  normalizeSnapshotName,
   toSnapshotItem,
   type SnapshotItem
 } from '../snapshot/index.js';
@@ -418,15 +417,15 @@ export class VolumeService {
     const normalizedVolumeId = assertVolumeId(volumeId);
     const sizeGb = normalizePositiveInteger(options.size, 'Size', '--size');
     const client = await this.createClient(options);
-    const volume = await client.getVolume(normalizedVolumeId);
+    const [volume, plans] = await Promise.all([
+      client.getVolume(normalizedVolumeId),
+      client.listVolumePlans()
+    ]);
     const vmId = requireAttachedVmId(volume, normalizedVolumeId);
     const currentSizeGb = normalizeVolumeDetailItem(volume).size_gb;
 
     assertCanGrowTo(sizeGb, currentSizeGb, normalizedVolumeId);
-    assertListedSize(
-      sizeGb,
-      summarizeVolumePlans(await client.listVolumePlans())
-    );
+    assertListedSize(sizeGb, summarizeVolumePlans(plans));
 
     const result = await client.resizeVolume(normalizedVolumeId, {
       block_storage_size: sizeGb,
@@ -450,9 +449,11 @@ export class VolumeService {
     const normalizedVolumeId = assertVolumeId(volumeId);
     const client = await this.createClient(options);
     // The list answers empty for a volume that does not exist, so look the
-    // volume up first to report a wrong id.
-    await client.getVolume(normalizedVolumeId);
-    const items = await client.listSnapshots(normalizedVolumeId);
+    // volume up too, to report a wrong id.
+    const [, items] = await Promise.all([
+      client.getVolume(normalizedVolumeId),
+      client.listSnapshots(normalizedVolumeId)
+    ]);
 
     return {
       action: 'snapshot-list',
@@ -466,7 +467,7 @@ export class VolumeService {
     options: VolumeContextOptions & { name: string }
   ): Promise<VolumeSnapshotCommandResult> {
     const normalizedVolumeId = assertVolumeId(volumeId);
-    const name = normalizeSnapshotName(options.name, '--name');
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
     const client = await this.createClient(options);
     requireAttachedVmId(
       await client.getVolume(normalizedVolumeId),
@@ -488,7 +489,7 @@ export class VolumeService {
     options: VolumeSnapshotDeleteOptions
   ): Promise<VolumeSnapshotCommandResult> {
     const normalizedVolumeId = assertVolumeId(volumeId);
-    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId, 'snapshot_id');
 
     if (!(options.force ?? false)) {
       assertCanDelete(this.dependencies.isInteractive, 'snapshot');
@@ -529,15 +530,8 @@ export class VolumeService {
     options: VolumeContextOptions & { name: string }
   ): Promise<VolumeSnapshotCommandResult> {
     const normalizedVolumeId = assertVolumeId(volumeId);
-    const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
-    if (!/^\d+$/.test(normalizedSnapshotId)) {
-      throw new CliError('Volume snapshot IDs are numbers.', {
-        code: 'INVALID_SNAPSHOT_ID',
-        exitCode: EXIT_CODES.usage,
-        suggestion: `Pass the ID column from ${formatMyAccountCommand(`volume snapshot list ${normalizedVolumeId}`)}.`
-      });
-    }
-    const name = normalizeSnapshotName(options.name, '--name');
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId, 'snapshot_id');
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
     const client = await this.createClient(options);
     const vmId = requireAttachedVmId(
       await client.getVolume(normalizedVolumeId),

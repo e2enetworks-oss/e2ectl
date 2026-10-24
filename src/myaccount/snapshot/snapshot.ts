@@ -67,31 +67,25 @@ export function formatSnapshotTable(items: SnapshotItem[]): string {
   return table.toString();
 }
 
-export function normalizeSnapshotId(value: string): string {
+// Volume snapshots are addressed by a number, node snapshots by a UUID.
+export function normalizeSnapshotId(
+  value: string,
+  idField: SnapshotIdField
+): string {
   const trimmed = value.trim();
-  if (/^[\w-]+$/.test(trimmed)) {
+  const pattern = idField === 'snapshot_id' ? /^\d+$/ : /^[\w-]+$/;
+  if (pattern.test(trimmed)) {
     return trimmed;
   }
 
   throw new CliError(
-    'Snapshot ID can only contain letters, digits and dashes.',
+    idField === 'snapshot_id'
+      ? 'Volume snapshot IDs are numbers.'
+      : 'Snapshot ID can only contain letters, digits and dashes.',
     {
       code: 'INVALID_SNAPSHOT_ID',
       exitCode: EXIT_CODES.usage,
       suggestion: 'Pass the ID column from snapshot list.'
     }
   );
-}
-
-export function normalizeSnapshotName(value: string, flag: string): string {
-  const trimmed = value.trim();
-  if (trimmed.length > 0) {
-    return trimmed;
-  }
-
-  throw new CliError('Name cannot be empty.', {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }

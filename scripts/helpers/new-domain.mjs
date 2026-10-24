@@ -84,7 +84,6 @@ export function parseDomainName(input) {
     baseName,
     // How people write the platform name in messages, for example TIR.
     displayName: isMyAccount ? MYACCOUNT_NAME : platform.toUpperCase(),
-    isMyAccount,
     ...(PLATFORM_CONTEXT[platform] ?? NEW_PLATFORM_CONTEXT),
     platform,
     platformName,

@@ -40,7 +40,6 @@ function steps(withAccounts: boolean): PlatformSetupSteps {
       : {}),
     listProjects: (accountId) =>
       Promise.resolve(accountId === 22 ? [] : [{ id: 33, name: 'research' }]),
-    name: 'Fake',
     platform: withAccounts ? 'tir' : 'myaccount',
     readSaved: (profile) => ({
       account: profile.tir?.account_id,
@@ -179,11 +178,11 @@ describe('configurePlatform', () => {
       }
     );
 
-    expect(prompt).toHaveBeenNthCalledWith(1, 'Fake account [11]: ');
-    expect(prompt).toHaveBeenNthCalledWith(2, 'Fake project [33]: ');
-    expect(prompt).toHaveBeenNthCalledWith(3, 'Fake location: ');
+    expect(prompt).toHaveBeenNthCalledWith(1, 'TIR account [11]: ');
+    expect(prompt).toHaveBeenNthCalledWith(2, 'TIR project [33]: ');
+    expect(prompt).toHaveBeenNthCalledWith(3, 'TIR location: ');
     expect(terminal.written.join('')).toContain('owner@example.com');
-    expect(terminal.written.join('')).toContain('22  Off  (Fake is off)');
+    expect(terminal.written.join('')).toContain('22  Off  (TIR is off)');
     expect(result).toMatchObject({ location: 'Delhi', project: { id: 33 } });
   });
 
@@ -206,17 +205,17 @@ describe('configurePlatform', () => {
   it.each([
     [
       {},
-      'No Fake account given.',
+      'No TIR account given.',
       'Add --account <id> (see `e2ectl fake account list`).'
     ],
     [
       { account: '11' },
-      'No Fake project given.',
+      'No TIR project given.',
       'Add --project <id> (see `e2ectl fake project list`).'
     ],
     [
       { account: '11', project: '33' },
-      'No Fake location given.',
+      'No TIR location given.',
       'Add --location Delhi or --location Chennai.'
     ]
   ])(
@@ -254,32 +253,32 @@ describe('configurePlatform', () => {
     [
       { ...ALL_FLAGS, account: '99' },
       'SETUP_ACCOUNT_NOT_FOUND',
-      'Fake account 99 is not one your key can use.'
+      'TIR account 99 is not one your key can use.'
     ],
     [
       { ...ALL_FLAGS, account: '22' },
       'SETUP_ACCOUNT_DISABLED',
-      'Fake is not turned on for account 22.'
+      'TIR is not turned on for account 22.'
     ],
     [
       { ...ALL_FLAGS, project: '44' },
       'SETUP_PROJECT_NOT_FOUND',
-      'Fake project 44 was not found in account 11.'
+      'TIR project 44 was not found in account 11.'
     ],
     [
       { ...ALL_FLAGS, location: 'Mumbai' },
       'INVALID_LOCATION',
-      'Unsupported Fake location "Mumbai".'
+      'Unsupported TIR location "Mumbai".'
     ],
     [
       { ...ALL_FLAGS, account: 'x' },
       'INVALID_SETUP_ID',
-      'Fake account ID must be numeric.'
+      'TIR account ID must be numeric.'
     ],
     [
       { ...ALL_FLAGS, project: 'x' },
       'INVALID_SETUP_ID',
-      'Fake project ID must be numeric.'
+      'TIR project ID must be numeric.'
     ]
   ])('refuses %o with %s and saves nothing', async (flags, code, message) => {
     const store = await storeWith();
@@ -305,7 +304,7 @@ describe('configurePlatform', () => {
       )
     );
 
-    expect(error.message).toBe('Fake project 44 was not found.');
+    expect(error.message).toBe('MyAccount project 44 was not found.');
   });
 
   it('refuses a profile that does not exist', async () => {

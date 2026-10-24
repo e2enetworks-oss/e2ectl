@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 
-import { CLI_COMMAND_NAME, formatCliCommand } from '../app/metadata.js';
+import { CLI_COMMAND_NAME } from '../app/metadata.js';
 import type { CliRuntime } from '../app/index.js';
 import { renderConfigResult } from './formatter.js';
 import {
@@ -106,10 +106,4 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
   });
 
   return command;
-}
-
-// Builds a config command for hints in other parts of the CLI, for example
-// formatConfigCommand('list') gives "e2ectl config list".
-export function formatConfigCommand(argumentsText: string): string {
-  return formatCliCommand(`config ${argumentsText}`);
 }

@@ -43,8 +43,6 @@ export interface PlatformSetupSteps {
   // Only platforms with accounts (TIR) set this.
   listAccounts?: () => Promise<SetupAccount[]>;
   listProjects(accountId: number | undefined): Promise<SetupProject[]>;
-  // How people write the platform name, for example TIR.
-  name: string;
   platform: SetupPlatform;
   readSaved(profile: ProfileConfig): SetupValues;
   toProfilePatch(context: SetupContext): Partial<ProfileConfig>;
@@ -96,6 +94,24 @@ const FLAG_BY_VALUE: Record<keyof SetupValues, string> = {
   project: '--project'
 };
 
+// The prompts and output of the shared setup, from the CLI's terminal.
+export function createSetupIo(
+  terminal: {
+    prompt(message: string): Promise<string>;
+    stdout: { write(text: string): unknown };
+  },
+  canPrompt: boolean
+): SetupIo {
+  return {
+    canPrompt,
+    env: process.env,
+    prompt: (message) => terminal.prompt(message),
+    write: (text) => {
+      terminal.stdout.write(text);
+    }
+  };
+}
+
 // The profile a configure command saves into: the --alias one, or the
 // default profile.
 export async function findSetupProfile(
@@ -109,17 +125,20 @@ export async function findSetupProfile(
     return chosen;
   }
 
-  throw new CliError(
+  throw profileNotFoundError(
     chosen === undefined
       ? 'There is no saved profile to keep this setting in.'
-      : `Profile "${chosen}" was not found.`,
-    {
-      code: 'PROFILE_NOT_FOUND',
-      exitCode: EXIT_CODES.config,
-      suggestion:
-        'Run `e2ectl configure` to save a key and token in a profile first.'
-    }
+      : `Profile "${chosen}" was not found.`
   );
+}
+
+function profileNotFoundError(message: string): CliError {
+  return new CliError(message, {
+    code: 'PROFILE_NOT_FOUND',
+    exitCode: EXIT_CODES.config,
+    suggestion:
+      'Run `e2ectl configure` to save a key and token in a profile first.'
+  });
 }
 
 export function renderPlatformSetupResult(
@@ -162,12 +181,7 @@ export async function configurePlatform(
   const { io, store } = dependencies;
   const profile = (await store.read()).profiles[alias];
   if (profile === undefined) {
-    throw new CliError(`Profile "${alias}" was not found.`, {
-      code: 'PROFILE_NOT_FOUND',
-      exitCode: EXIT_CODES.config,
-      suggestion:
-        'Run `e2ectl configure` to save a key and token in a profile first.'
-    });
+    throw profileNotFoundError(`Profile "${alias}" was not found.`);
   }
 
   const saved = steps.readSaved(profile);
@@ -210,7 +224,7 @@ async function chooseAccount(
   const raw = await readValue(steps, 'account', flags, saved, io, {
     choices: accounts.map(
       (account) =>
-        `${account.id}  ${account.email || account.name}${account.usable ? '' : `  (${steps.name} is off)`}`
+        `${account.id}  ${account.email || account.name}${account.usable ? '' : `  (${PLATFORM_NAMES[steps.platform]} is off)`}`
     ),
     onlyChoice: usable.length === 1 ? String(usable[0]?.id) : undefined
   });
@@ -219,7 +233,7 @@ async function chooseAccount(
 
   if (found === undefined) {
     throw new CliError(
-      `${steps.name} account ${id} is not one your key can use.`,
+      `${PLATFORM_NAMES[steps.platform]} account ${id} is not one your key can use.`,
       {
         code: 'SETUP_ACCOUNT_NOT_FOUND',
         exitCode: EXIT_CODES.usage,
@@ -229,11 +243,14 @@ async function chooseAccount(
   }
 
   if (!found.usable) {
-    throw new CliError(`${steps.name} is not turned on for account ${id}.`, {
-      code: 'SETUP_ACCOUNT_DISABLED',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Pick another account from \`${steps.listCommands.account ?? ''}\`, or ask its owner to turn ${steps.name} on.`
-    });
+    throw new CliError(
+      `${PLATFORM_NAMES[steps.platform]} is not turned on for account ${id}.`,
+      {
+        code: 'SETUP_ACCOUNT_DISABLED',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Pick another account from \`${steps.listCommands.account ?? ''}\`, or ask its owner to turn ${PLATFORM_NAMES[steps.platform]} on.`
+      }
+    );
   }
 
   return found;
@@ -256,11 +273,14 @@ async function chooseProject(
 
   if (found === undefined) {
     const where = accountId === undefined ? '' : ` in account ${accountId}`;
-    throw new CliError(`${steps.name} project ${id} was not found${where}.`, {
-      code: 'SETUP_PROJECT_NOT_FOUND',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Run \`${steps.listCommands.project}\` and pass a listed id with --project.`
-    });
+    throw new CliError(
+      `${PLATFORM_NAMES[steps.platform]} project ${id} was not found${where}.`,
+      {
+        code: 'SETUP_PROJECT_NOT_FOUND',
+        exitCode: EXIT_CODES.usage,
+        suggestion: `Run \`${steps.listCommands.project}\` and pass a listed id with --project.`
+      }
+    );
   }
 
   // Only the id and name, so every platform reports the same shape.
@@ -282,12 +302,15 @@ async function chooseLocation(
     return raw;
   }
 
-  throw new CliError(`Unsupported ${steps.name} location "${raw}".`, {
-    code: 'INVALID_LOCATION',
-    details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
-    exitCode: EXIT_CODES.usage,
-    suggestion: 'Pass --location Delhi or --location Chennai.'
-  });
+  throw new CliError(
+    `Unsupported ${PLATFORM_NAMES[steps.platform]} location "${raw}".`,
+    {
+      code: 'INVALID_LOCATION',
+      details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Pass --location Delhi or --location Chennai.'
+    }
+  );
 }
 
 // A flag is used as it is. Otherwise the environment variable or the saved
@@ -322,11 +345,11 @@ async function readValue(
 
   const defaultAnswer = fallback?.value ?? question.onlyChoice;
   io.write(
-    `${steps.name} ${field}s:\n${question.choices.map((choice) => `  ${choice}`).join('\n')}\n`
+    `${PLATFORM_NAMES[steps.platform]} ${field}s:\n${question.choices.map((choice) => `  ${choice}`).join('\n')}\n`
   );
   const answer = (
     await io.prompt(
-      `${steps.name} ${field}${defaultAnswer === undefined ? '' : ` [${defaultAnswer}]`}: `
+      `${PLATFORM_NAMES[steps.platform]} ${field}${defaultAnswer === undefined ? '' : ` [${defaultAnswer}]`}: `
     )
   ).trim();
   const value = answer.length > 0 ? answer : defaultAnswer;
@@ -345,7 +368,7 @@ function missingValueError(
   const listCommand =
     field === 'location' ? undefined : steps.listCommands[field];
 
-  return new CliError(`No ${steps.name} ${field} given.`, {
+  return new CliError(`No ${PLATFORM_NAMES[steps.platform]} ${field} given.`, {
     code: 'MISSING_SETUP_VALUE',
     exitCode: EXIT_CODES.usage,
     suggestion:
@@ -364,9 +387,12 @@ function parseId(
     return Number(raw);
   }
 
-  throw new CliError(`${steps.name} ${field} ID must be numeric.`, {
-    code: 'INVALID_SETUP_ID',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a numeric id from \`${steps.listCommands[field] ?? ''}\` with ${FLAG_BY_VALUE[field]}.`
-  });
+  throw new CliError(
+    `${PLATFORM_NAMES[steps.platform]} ${field} ID must be numeric.`,
+    {
+      code: 'INVALID_SETUP_ID',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a numeric id from \`${steps.listCommands[field] ?? ''}\` with ${FLAG_BY_VALUE[field]}.`
+    }
+  );
 }

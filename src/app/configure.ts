@@ -2,6 +2,7 @@ import { Command } from 'commander';
 
 import {
   describePlatformSetup,
+  pickValue,
   type PlatformConfigureCommandResult,
   type PlatformSetupResult,
   type ProfileConfig,
@@ -32,11 +33,16 @@ export interface ConfigureCommandResult {
   platforms: PlatformSetupResult[];
 }
 
-const PLATFORM_CHOICES: Record<string, SetupPlatform> = {
-  '1': 'tir',
-  '2': 'myaccount',
+const PLATFORM_BY_NAME: Record<string, SetupPlatform> = {
   myaccount: 'myaccount',
   tir: 'tir'
+};
+
+// The interactive menu also takes its numbers.
+const PLATFORM_BY_MENU_ANSWER: Record<string, SetupPlatform> = {
+  ...PLATFORM_BY_NAME,
+  '1': 'tir',
+  '2': 'myaccount'
 };
 
 const NO_PLATFORM_MESSAGE = 'Choose at least one platform. TIR is recommended.';
@@ -190,9 +196,7 @@ async function readSecret(
   fromEnv: string | undefined,
   fromProfile: string | undefined
 ): Promise<string> {
-  const fallback = [fromEnv, fromProfile]
-    .map((value) => value?.trim())
-    .find((value): value is string => value !== undefined && value.length > 0);
+  const fallback = pickValue({ env: fromEnv, profile: fromProfile })?.value;
 
   if (canPrompt) {
     const answer = (
@@ -221,8 +225,8 @@ function parsePlatforms(values: string[]): SetupPlatform[] {
   const platforms = new Set<SetupPlatform>();
 
   for (const value of values) {
-    const platform = PLATFORM_CHOICES[value.trim().toLowerCase()];
-    if (platform === undefined || /^\d$/.test(value.trim())) {
+    const platform = PLATFORM_BY_NAME[value.trim().toLowerCase()];
+    if (platform === undefined) {
       throw new CliError(`Unknown platform "${value}".`, {
         code: 'INVALID_PLATFORM',
         exitCode: EXIT_CODES.usage,
@@ -261,7 +265,7 @@ function readPlatformAnswer(answer: string): SetupPlatform[] {
     ...new Set(
       answer
         .split(',')
-        .map((part) => PLATFORM_CHOICES[part.trim().toLowerCase()])
+        .map((part) => PLATFORM_BY_MENU_ANSWER[part.trim().toLowerCase()])
         .filter((platform): platform is SetupPlatform => platform !== undefined)
     )
   ];

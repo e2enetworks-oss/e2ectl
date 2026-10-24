@@ -103,8 +103,9 @@ export class SshKeyService {
     const input = normalizeSshKeyCreateInput(options);
     const publicKey = await this.loadPublicKey(input.publicKeyFile);
     const client = await this.createClient(options);
+    const material = keyMaterial(publicKey);
     const existing = (await client.listSshKeys()).find(
-      (key) => keyMaterial(key.ssh_key) === keyMaterial(publicKey)
+      (key) => keyMaterial(key.ssh_key) === material
     );
 
     if (existing !== undefined) {

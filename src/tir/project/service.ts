@@ -1,4 +1,5 @@
 import {
+  TIR_CONTEXT_ENV_VAR_BY_FIELD,
   resolveStoredTirCredentials,
   type ConfigFile,
   type PlatformSetupSteps,
@@ -55,9 +56,9 @@ export function createTirSetupSteps(clients: {
 }): PlatformSetupSteps {
   return {
     envVarNames: {
-      account: 'E2E_TIR_ACCOUNT_ID',
-      location: 'E2E_TIR_LOCATION',
-      project: 'E2E_TIR_PROJECT_ID'
+      account: TIR_CONTEXT_ENV_VAR_BY_FIELD.account_id,
+      location: TIR_CONTEXT_ENV_VAR_BY_FIELD.location,
+      project: TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id
     },
     listAccounts: async () =>
       (await clients.accounts.listAccounts()).map((account) => {
@@ -77,7 +78,6 @@ export function createTirSetupSteps(clients: {
       (await clients.projects.listProjects(String(accountId ?? ''))).map(
         toTirProjectItem
       ),
-    name: 'TIR',
     platform: 'tir',
     readSaved: (profile) => ({
       account: profile.tir?.account_id,
