@@ -105,6 +105,14 @@ describe('runCli', () => {
       'Error: Unknown command "dbaas".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount dbaas create"?\n'
     ],
     [
+      ['ls'],
+      'Error: Unknown command "ls".\n\nNext step: Run e2ectl --help to see the commands.\n'
+    ],
+    [
+      ['myaccount', 'rm'],
+      'Error: Unknown command "rm".\n\nNext step: Run e2ectl myaccount --help to see the commands.\n'
+    ],
+    [
       ['help', 'node'],
       'Error: Unknown command "node".\n\nNext step: Commands now start with the platform name. Did you mean "e2ectl myaccount node"?\n'
     ],

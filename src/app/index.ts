@@ -227,17 +227,21 @@ function findPlatformWithProduct(
   );
 }
 
-// The nearest command name within two edits (nod -> node, lst -> list).
+// The nearest command name close enough to be a typo: none for words of one
+// or two letters (one change would be half the word, so `ls` is not read as
+// `lb`), one change for three or four letters, two for longer words.
 function findClosestCommandName(
   group: Command,
   word: string
 ): string | undefined {
+  const maxDistance = word.length <= 2 ? 0 : word.length <= 4 ? 1 : 2;
   let closest: { distance: number; name: string } | undefined;
 
   for (const command of group.commands) {
     const distance = editDistance(word, command.name());
     if (
-      distance <= 2 &&
+      distance > 0 &&
+      distance <= maxDistance &&
       (closest === undefined || distance < closest.distance)
     ) {
       closest = { distance, name: command.name() };

@@ -41,6 +41,12 @@ ruleTester.run('product-imports', productImportsRule, {
       options
     },
     {
+      name: 'a subfolder of shared code is not a product',
+      code: "import { retry } from '../core/retry/backoff.js';",
+      filename: '/repo/src/app/runtime.ts',
+      options
+    },
+    {
       name: 'app code through a product index',
       code: "import { NodeApiClient } from '../myaccount/node/index.js';",
       filename: '/repo/src/app/runtime.ts',

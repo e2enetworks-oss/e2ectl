@@ -65,11 +65,14 @@ export const productImportsRule = {
   }
 };
 
+// Shared code under src, never a platform (matches the generator's list).
+const SHARED_FOLDERS = new Set(['app', 'config', 'core', 'http']);
+
 // Returns "platform/product" for a path inside a product folder.
 function findProduct(sourceRoot, filePath) {
   const parts = path.relative(sourceRoot, filePath).split(path.sep);
 
-  if (parts.length < 3 || parts[0] === '..') {
+  if (parts.length < 3 || parts[0] === '..' || SHARED_FOLDERS.has(parts[0])) {
     return undefined;
   }
 

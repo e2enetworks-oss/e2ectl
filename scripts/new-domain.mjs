@@ -31,6 +31,16 @@ const repoRoot = path.resolve(
 async function main() {
   const names = parseDomainName(process.argv[2]);
   const changes = planChanges(names);
+  const newFiles = Object.keys(changes).filter(
+    (file) =>
+      !file.startsWith('src/app/') &&
+      file !== 'tests/helpers/runtime.ts' &&
+      !file.endsWith(`src/${names.platform}/index.ts`)
+  );
+  const clash = newFiles.find((file) => existsSync(path.join(repoRoot, file)));
+  if (clash !== undefined) {
+    throw new Error(`${clash} already exists; remove it or pick another name.`);
+  }
 
   for (const [relativePath, contents] of Object.entries(changes)) {
     const fullPath = path.join(repoRoot, relativePath);
