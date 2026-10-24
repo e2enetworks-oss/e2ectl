@@ -39,6 +39,24 @@ describe('smoke env parsing', () => {
     expect(result.upgradePlan).toBe('C3.16GB');
   });
 
+  it('rejects a prefix that would make node names too long for E2E', () => {
+    expect(() => {
+      readSmokeEnv({
+        E2ECTL_SMOKE_NODE_IMAGE: 'ubuntu-24.04',
+        E2ECTL_SMOKE_NODE_PLAN: 'C3.8GB',
+        E2ECTL_SMOKE_PREFIX: 'e2ectl-test-202610242029-smoke',
+        E2ECTL_SMOKE_UPGRADE_IMAGE: 'ubuntu-24.04-v2',
+        E2ECTL_SMOKE_UPGRADE_PLAN: 'C3.8GB',
+        E2E_API_KEY: 'smoke-api-key',
+        E2E_AUTH_TOKEN: 'smoke-auth-token',
+        E2E_LOCATION: 'Delhi',
+        E2E_PROJECT_ID: '46429'
+      });
+    }).toThrow(
+      'E2ECTL_SMOKE_PREFIX "e2ectl-test-202610242029-smoke" is 30 characters; use 26 or fewer'
+    );
+  });
+
   it('rejects upgrade targets that do not change plan or image', () => {
     expect(() => {
       readSmokeEnv({

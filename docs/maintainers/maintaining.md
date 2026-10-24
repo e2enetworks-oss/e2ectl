@@ -143,8 +143,8 @@ For `E2ECTL_SMOKE_NODE_PLAN` and `E2ECTL_SMOKE_UPGRADE_PLAN`, use the full `item
 
 Optional smoke env vars:
 
-- `E2ECTL_SMOKE_PREFIX`
-- `E2ECTL_SMOKE_MANIFEST`
+- `E2ECTL_SMOKE_PREFIX` (26 characters or fewer, so node names stay within E2E's 50-character limit)
+- `E2ECTL_SMOKE_MANIFEST` (each smoke test adds its run prefix to this path, so the two tests never share a manifest)
 
 Validation rules:
 

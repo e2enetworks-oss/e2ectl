@@ -3,6 +3,7 @@ import { updateSmokeManifest } from './smoke-manifest.js';
 import {
   discoverAvailableVolumeSize,
   normalizeObservedPublicIp,
+  retryOnServerError,
   runJsonCommand,
   waitForNodeReadiness,
   waitForNodeStatus,
@@ -586,18 +587,22 @@ export async function runVolumeSteps(
     description: 'Attached'
   });
 
-  const volumeDetach = await runJsonCommand<VolumeAttachDetachJson>(
-    [
-      'myaccount',
-      'node',
-      'action',
-      'volume',
-      'detach',
-      String(options.nodeId),
-      '--volume-id',
-      String(volumeId)
-    ],
-    context.smokeEnv
+  const volumeDetach = await retryOnServerError(
+    () =>
+      runJsonCommand<VolumeAttachDetachJson>(
+        [
+          'myaccount',
+          'node',
+          'action',
+          'volume',
+          'detach',
+          String(options.nodeId),
+          '--volume-id',
+          String(volumeId)
+        ],
+        context.smokeEnv
+      ),
+    { attempts: 6, delayMs: 30_000 }
   );
 
   if (

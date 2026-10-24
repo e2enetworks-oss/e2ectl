@@ -60,6 +60,12 @@ export function isAlreadyGoneMessage(message) {
   return /\bnot found\b/i.test(message) || /\balready gone\b/i.test(message);
 }
 
+// E2E refuses to delete a node that is still busy (for example just after a
+// volume detach); the same delete works once the node settles.
+export function shouldRetryNodeDeleteError(message) {
+  return /invalid node state/i.test(message);
+}
+
 export function shouldRetryVpcDeleteError(message) {
   return (
     /you have running servers on this vpc/i.test(message) ||
@@ -305,7 +311,7 @@ async function cleanupNode(context, fail) {
   try {
     const clients = await context.getFallbackClients();
 
-    await clients.node.deleteNode(String(manifest.node_id));
+    await deleteNodeWithRetry(clients.node, String(manifest.node_id));
 
     await markNodeDeleted(context);
     context.logInfo(`Fallback-deleted node ${manifest.node_id}.`);
@@ -529,6 +535,26 @@ async function waitForVpcDeletionReady(vpcClient, vpcId) {
   throw new Error(
     `Timed out waiting for VPC ${vpcId} to become Active before cleanup delete. Last observed state: ${lastObservedState}`
   );
+}
+
+async function deleteNodeWithRetry(nodeClient, nodeId) {
+  const deadline = Date.now() + VOLUME_READY_TIMEOUT_MS;
+
+  for (;;) {
+    try {
+      await nodeClient.deleteNode(nodeId);
+      return;
+    } catch (error) {
+      if (
+        !shouldRetryNodeDeleteError(formatError(error)) ||
+        Date.now() > deadline
+      ) {
+        throw error;
+      }
+    }
+
+    await delay(VOLUME_READY_POLL_INTERVAL_MS);
+  }
 }
 
 async function deleteVpcWithRetry(vpcClient, vpcId) {

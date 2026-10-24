@@ -28,4 +28,6 @@ export function formatError(error: unknown): string;
 
 export function isAlreadyGoneMessage(message: string): boolean;
 
+export function shouldRetryNodeDeleteError(message: string): boolean;
+
 export function isMissingFileError(error: unknown): boolean;

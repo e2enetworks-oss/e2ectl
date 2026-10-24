@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { runBuiltCli } from '../../../helpers/process.js';
 import {
@@ -162,13 +163,18 @@ interface LbDeleteJson {
   cancelled: boolean;
 }
 
-interface VpcListJson {
+interface VpcCreateJson {
   action: string;
-  items: Array<{
+  vpc: {
     id: number;
-    name: string;
+  };
+}
+
+interface VpcGetJson {
+  action: string;
+  vpc: {
     state: string;
-  }>;
+  };
 }
 
 interface LbSmokeManifest {
@@ -250,12 +256,17 @@ describeManual('manual LB destructive built CLI checks', () => {
       const context = await prepareLbContext(runPrefix);
       let lbId: number | undefined;
       let vpcIdToUse: string | undefined;
+      let ownVpcId: string | undefined;
       let cleanupError: Error | undefined;
       let workflowError: unknown;
 
       try {
-        // 1. Resolve VPC ID
-        vpcIdToUse = lbConfig.vpcId ?? (await findAvailableVpc(context));
+        // 1. Use the given VPC, or create one for this run. Borrowing any
+        // VPC on the account can pick one another run is about to delete.
+        if (lbConfig.vpcId === undefined) {
+          ownVpcId = await createOwnVpc(context, `${runPrefix}-vpc`);
+        }
+        vpcIdToUse = lbConfig.vpcId ?? ownVpcId;
 
         // 2. Create load balancer
         const lbResult = await createLbStep(context, {
@@ -340,6 +351,14 @@ describeManual('manual LB destructive built CLI checks', () => {
             );
           }
         }
+
+        if (ownVpcId !== undefined) {
+          const vpcDeleteError = await deleteOwnVpc(context, ownVpcId);
+          if (vpcDeleteError !== undefined) {
+            console.error(`VPC ID for manual cleanup: ${ownVpcId}`);
+            cleanupError ??= vpcDeleteError;
+          }
+        }
       }
 
       if (workflowError !== undefined) {
@@ -367,20 +386,65 @@ async function prepareLbContext(runPrefix: string): Promise<LbTestContext> {
   };
 }
 
-async function findAvailableVpc(
-  context: LbTestContext
-): Promise<string | undefined> {
-  const vpcList = await runJsonCommand<VpcListJson>(
-    ['myaccount', 'vpc', 'list'],
+async function createOwnVpc(
+  context: LbTestContext,
+  name: string
+): Promise<string> {
+  const created = await runJsonCommand<VpcCreateJson>(
+    [
+      'myaccount',
+      'vpc',
+      'create',
+      '--name',
+      name,
+      '--billing-type',
+      'hourly',
+      '--cidr-source',
+      'e2e'
+    ],
     context.lbEnv
   );
+  const vpcId = String(created.vpc.id);
 
-  const activeVpc = vpcList.items.find((v) => v.state === 'Active');
-  if (activeVpc) {
-    return String(activeVpc.id);
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const vpcGet = await runJsonCommand<VpcGetJson>(
+      ['myaccount', 'vpc', 'get', vpcId],
+      context.lbEnv
+    );
+    if (vpcGet.vpc.state === 'Active') {
+      return vpcId;
+    }
+
+    await delay(10_000);
   }
 
-  return undefined;
+  throw new Error(`VPC ${vpcId} did not become Active in time.`);
+}
+
+// E2E refuses to delete a VPC for a while after a load balancer leaves it,
+// so this keeps trying. Returns an error instead of throwing so cleanup of
+// other resources still happens.
+async function deleteOwnVpc(
+  context: LbTestContext,
+  vpcId: string
+): Promise<Error | undefined> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      await runJsonCommand(
+        ['myaccount', 'vpc', 'delete', vpcId, '--force'],
+        context.lbEnv
+      );
+      return undefined;
+    } catch (error: unknown) {
+      lastError = toError(error);
+    }
+
+    await delay(20_000);
+  }
+
+  return lastError;
 }
 
 async function createLbStep(

@@ -264,3 +264,25 @@ function normalizeLifecycleStatus(status: string): string {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
+
+// Retries a command that E2E sometimes answers with a 500 while a resource
+// is still settling (for example a volume detach soon after attach); the
+// same request works a little later. Other failures are thrown at once.
+export async function retryOnServerError<T>(
+  run: () => Promise<T>,
+  options: { attempts: number; delayMs: number }
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error: unknown) {
+      const isServerError =
+        error instanceof Error && error.message.includes('HTTP status: 500');
+      if (!isServerError || attempt >= options.attempts) {
+        throw error;
+      }
+
+      await delay(options.delayMs);
+    }
+  }
+}

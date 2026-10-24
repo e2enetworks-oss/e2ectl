@@ -70,6 +70,10 @@ export function readSmokeEnv(env: NodeJS.ProcessEnv = process.env): SmokeEnv {
   };
 }
 
+// E2E rejects node names over 50 characters. The longest name the smoke run
+// builds is "<prefix>-public-ip-<8-character time>-node", which adds 24.
+export const MAX_SMOKE_PREFIX_LENGTH = 26;
+
 function normalizePrefix(value: string | undefined): string {
   const normalized = normalizeOptionalEnvValue(value) ?? 'release-smoke';
   const sanitized = normalized
@@ -78,7 +82,14 @@ function normalizePrefix(value: string | undefined): string {
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-');
 
-  return sanitized.length === 0 ? 'release-smoke' : sanitized;
+  const prefix = sanitized.length === 0 ? 'release-smoke' : sanitized;
+  if (prefix.length > MAX_SMOKE_PREFIX_LENGTH) {
+    throw new Error(
+      `E2ECTL_SMOKE_PREFIX "${prefix}" is ${prefix.length} characters; use ${MAX_SMOKE_PREFIX_LENGTH} or fewer so node names stay within E2E's 50-character limit.`
+    );
+  }
+
+  return prefix;
 }
 
 function validateUpgradeTarget(options: {

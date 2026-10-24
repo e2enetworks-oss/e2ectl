@@ -30,6 +30,7 @@ vi.mock('../../manual/helpers/smoke-commands.js', () => ({
     const normalized = value.trim();
     return normalized.length === 0 || normalized === '[]' ? null : normalized;
   }),
+  retryOnServerError: vi.fn((run: () => Promise<unknown>) => run()),
   runJsonCommand: vi.fn(),
   waitForNodeReadiness: vi.fn(),
   waitForNodeStatus: vi.fn(),
