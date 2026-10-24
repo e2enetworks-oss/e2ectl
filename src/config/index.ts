@@ -29,3 +29,19 @@ export type {
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';
 export { VALID_LOCATIONS } from './types.js';
+export {
+  configurePlatform,
+  describePlatformSetup,
+  findSetupProfile,
+  renderPlatformSetupResult,
+  type PlatformConfigureCommandResult,
+  type PlatformConfigureInput,
+  type PlatformSetupResult,
+  type PlatformSetupSteps,
+  type SetupAccount,
+  type SetupContext,
+  type SetupIo,
+  type SetupPlatform,
+  type SetupProject,
+  type SetupValues
+} from './platform-setup.js';

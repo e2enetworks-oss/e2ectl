@@ -37,7 +37,7 @@ Checks:
 
 Fixes:
 
-- save shared defaults with `config import` or `config set-context`
+- save the project and location with `e2ectl myaccount configure` (or `e2ectl tir configure` for TIR)
 - pass `--project-id <project-id> --location <location>` explicitly for one-off commands
 - verify that your default alias is the one you expect with `e2ectl config list`
 

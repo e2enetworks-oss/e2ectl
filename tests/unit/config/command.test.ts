@@ -230,48 +230,6 @@ describe('config commands', () => {
     );
   });
 
-  it('updates the default context for a saved alias', async () => {
-    const { runtime, stdout, store } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await store.upsertProfile('prod', {
-      api_key: 'api-123456',
-      auth_token: 'auth-654321'
-    });
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'config',
-      'set-context',
-      '--alias',
-      'prod',
-      '--default-project-id',
-      '46429',
-      '--default-location',
-      'Delhi'
-    ]);
-
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'set-context',
-        default: 'prod',
-        profiles: [
-          {
-            alias: 'prod',
-            api_key: '****3456',
-            auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '46429',
-            isDefault: true,
-            tir: null
-          }
-        ]
-      })
-    );
-  });
-
   it('removes a saved profile', async () => {
     const { runtime, stdout, store } = createRuntimeFixture();
     const program = createProgram(runtime);

@@ -325,7 +325,7 @@ function assertTirContext(
     throw new CliError('No TIR project chosen.', {
       code: 'MISSING_TIR_PROJECT',
       exitCode: EXIT_CODES.config,
-      suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account-id <id> --project-id <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
+      suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account <id> --project <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
     });
   }
   assertNumericTirValue(context.project_id, 'project', '--project-id');
@@ -530,6 +530,6 @@ function assertValidLocation(location: string): void {
     details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
     exitCode: EXIT_CODES.usage,
     suggestion:
-      'Pass Delhi or Chennai with --location, or save one with config set-context (MyAccount) or tir configure (TIR).'
+      'Pass Delhi or Chennai with --location, or save one with myaccount configure or tir configure.'
   });
 }

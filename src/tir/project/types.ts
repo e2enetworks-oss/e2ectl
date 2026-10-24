@@ -15,26 +15,10 @@ export interface TirProjectContextOptions {
   alias?: string;
 }
 
-export interface TirConfigureOptions {
-  accountId: string;
-  alias?: string;
-  location: string;
-  projectId: string;
-}
-
 export interface TirProjectListCommandResult {
   account_id: number;
   action: 'list';
   items: TirProjectItem[];
 }
 
-export interface TirConfigureCommandResult {
-  account: { email: string; id: number; name: string };
-  action: 'configure';
-  alias: string;
-  location: string;
-  project: { id: number; name: string };
-}
-
-export type TirProjectCommandResult =
-  TirConfigureCommandResult | TirProjectListCommandResult;
+export type TirProjectCommandResult = TirProjectListCommandResult;

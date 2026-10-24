@@ -18,24 +18,12 @@ export interface RemoveProfileInput {
   alias: string;
 }
 
-export interface SetContextInput {
-  alias: string;
-  defaultLocation?: string;
-  defaultProjectId?: string;
-}
-
 export interface SetDefaultInput {
   alias: string;
 }
 
 export interface ConfigListCommandResult {
   action: 'list';
-  config: ConfigFile;
-}
-
-export interface ConfigSetContextCommandResult {
-  action: 'set-context';
-  alias: string;
   config: ConfigFile;
 }
 
@@ -66,7 +54,6 @@ export type ConfigCommandResult =
   | ConfigImportedCommandResult
   | ConfigListCommandResult
   | ConfigRemovedCommandResult
-  | ConfigSetContextCommandResult
   | ConfigSetDefaultCommandResult;
 
 interface ProfileValidator {
@@ -82,10 +69,6 @@ interface ConfigStoreLike {
   read(): Promise<ConfigFile>;
   removeProfile(alias: string): Promise<ConfigFile>;
   setDefault(alias: string): Promise<ConfigFile>;
-  updateProfile(
-    alias: string,
-    patch: Partial<ProfileConfig>
-  ): Promise<ConfigFile>;
   write(config: ConfigFile): Promise<void>;
 }
 
@@ -229,35 +212,6 @@ export class ConfigService {
       action: 'removed',
       alias,
       config: await this.dependencies.store.removeProfile(alias)
-    };
-  }
-
-  async setContext(
-    options: SetContextInput
-  ): Promise<ConfigSetContextCommandResult> {
-    const alias = normalizeRequiredAlias(
-      options.alias,
-      'Profile alias',
-      '--alias'
-    );
-    const defaultProjectId = normalizeOptionalString(options.defaultProjectId);
-    const defaultLocation = normalizeOptionalString(options.defaultLocation);
-
-    await this.assertProfileExists(alias);
-    assertHasAtLeastOneContextValue(options);
-    validateOptionalContextDefaults(defaultProjectId, defaultLocation);
-
-    return {
-      action: 'set-context',
-      alias,
-      config: await this.dependencies.store.updateProfile(alias, {
-        ...(defaultProjectId === undefined
-          ? {}
-          : { default_project_id: defaultProjectId }),
-        ...(defaultLocation === undefined
-          ? {}
-          : { default_location: defaultLocation })
-      })
     };
   }
 
@@ -508,21 +462,6 @@ function preserveExistingProfileContext(
         }),
     ...(profile.tir === undefined ? {} : { tir: profile.tir })
   };
-}
-
-function assertHasAtLeastOneContextValue(options: SetContextInput): void {
-  if (
-    normalizeOptionalString(options.defaultProjectId) !== undefined ||
-    normalizeOptionalString(options.defaultLocation) !== undefined
-  ) {
-    return;
-  }
-
-  throw new CliError('At least one default context value must be provided.', {
-    code: 'MISSING_DEFAULT_CONTEXT',
-    exitCode: EXIT_CODES.usage,
-    suggestion: 'Pass --default-project-id, --default-location, or both.'
-  });
 }
 
 function getProfile(

@@ -2,6 +2,11 @@ import { Command } from 'commander';
 
 import { addAliasOption } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/index.js';
+import {
+  renderPlatformSetupResult,
+  type PlatformConfigureInput
+} from '../../config/index.js';
+import { configureMyAccount } from './configure.js';
 import { renderProjectResult } from './formatter.js';
 import {
   ProjectService,
@@ -102,4 +107,29 @@ export function buildProjectCommand(runtime: CliRuntime): Command {
   });
 
   return command;
+}
+
+export function buildMyAccountConfigureCommand(runtime: CliRuntime): Command {
+  return addAliasOption(
+    new Command('configure')
+      .description(
+        'Choose the MyAccount project and location and save them in the profile. Every later myaccount command uses them unless a flag or E2E_PROJECT_ID/E2E_LOCATION says otherwise. Asks in a terminal; give the flags in scripts.'
+      )
+      .option(
+        '--project <projectId>',
+        'MyAccount project id (from myaccount project list).'
+      )
+      .option('--location <location>', 'Delhi or Chennai.')
+  ).action(
+    async (options: PlatformConfigureInput, commandInstance: Command) => {
+      const json =
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false;
+      const result = await configureMyAccount(
+        runtime,
+        options,
+        runtime.isInteractive && !json
+      );
+      runtime.stdout.write(renderPlatformSetupResult(result, json));
+    }
+  );
 }

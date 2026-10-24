@@ -2,7 +2,10 @@
 
 ## What This Command Group Does
 
-`e2ectl config` manages saved profiles in `~/.e2e/config.json`, including imported credentials, the default alias, and shared default project/location context.
+`e2ectl config` manages saved profiles in `~/.e2e/config.json`: importing a downloaded credential
+file, listing profiles, choosing the default, and removing one. To set up from scratch, use
+`e2ectl configure`; to change where a platform runs, use `e2ectl tir configure` or
+`e2ectl myaccount configure` (see [Quickstart](./quickstart.md)).
 
 ## Before You Start
 
@@ -35,15 +38,6 @@ e2ectl config import \
 
 ```bash
 e2ectl config list
-```
-
-### Update Shared Default Context
-
-```bash
-e2ectl config set-context \
-  --alias <profile-alias> \
-  --default-project-id <project-id> \
-  --default-location <location>
 ```
 
 ### Choose The Default Saved Profile

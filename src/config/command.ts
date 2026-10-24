@@ -7,7 +7,6 @@ import {
   ConfigService,
   type ImportProfilesInput,
   type RemoveProfileInput,
-  type SetContextInput,
   type SetDefaultInput
 } from './service.js';
 
@@ -73,30 +72,6 @@ export function buildConfigCommand(runtime: CliRuntime): Command {
         );
       }
     );
-
-  command
-    .command('set-context')
-    .description(
-      'Set or update the default project id/location for a saved profile.'
-    )
-    .requiredOption('--alias <alias>', 'Profile alias to update.')
-    .option(
-      '--default-project-id <projectId>',
-      'Default project id to save for this profile.'
-    )
-    .option(
-      '--default-location <location>',
-      'Default location (Delhi or Chennai) to save for this profile.'
-    )
-    .action(async (options: SetContextInput, commandInstance: Command) => {
-      const result = await service.setContext(options);
-      runtime.stdout.write(
-        renderConfigResult(
-          result,
-          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
-        )
-      );
-    });
 
   command
     .command('set-default')

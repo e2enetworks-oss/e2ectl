@@ -3,7 +3,6 @@ import Table from 'cli-table3';
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatTirCommand } from '../api.js';
 import type {
-  TirConfigureCommandResult,
   TirProjectCommandResult,
   TirProjectListCommandResult
 } from './types.js';
@@ -16,9 +15,7 @@ export function renderTirProjectResult(
     return `${stableStringify(result as unknown as JsonValue)}\n`;
   }
 
-  return result.action === 'list'
-    ? renderProjectList(result)
-    : renderConfigure(result);
+  return renderProjectList(result);
 }
 
 function renderProjectList(result: TirProjectListCommandResult): string {
@@ -31,14 +28,5 @@ function renderProjectList(result: TirProjectListCommandResult): string {
     table.push([String(item.id), item.name, item.created_at]);
   }
 
-  return `${table.toString()}\nNext: ${formatTirCommand(`configure --account-id ${result.account_id} --project-id <id> --location <Delhi|Chennai>`)}\n`;
-}
-
-function renderConfigure(result: TirConfigureCommandResult): string {
-  const accountLabel =
-    result.account.email.length > 0
-      ? `${result.account.id} (${result.account.email})`
-      : String(result.account.id);
-
-  return `TIR context saved for profile "${result.alias}": account ${accountLabel}, project ${result.project.id} (${result.project.name}), ${result.location}.\n`;
+  return `${table.toString()}\nNext: ${formatTirCommand(`configure --account ${result.account_id} --project <id> --location <Delhi|Chennai>`)}\n`;
 }

@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 
 import type { ApiClientOptions } from '../http/index.js';
 import {
@@ -86,6 +87,8 @@ export interface CliRuntime {
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
+  // Like prompt, but what is typed is not shown (for keys and tokens).
+  promptSecret(message: string): Promise<string>;
   stderr: OutputWriter;
   stdout: OutputWriter;
   store: ConfigStore;
@@ -166,6 +169,7 @@ export function createRuntime(): CliRuntime {
     ),
     isInteractive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     prompt: promptForInput,
+    promptSecret: promptForSecret,
     stderr: process.stderr,
     stdout: process.stdout,
     store: new ConfigStore()
@@ -197,5 +201,32 @@ async function promptForInput(message: string): Promise<string> {
     return await readline.question(message);
   } finally {
     readline.close();
+  }
+}
+
+// Shows the question, then hides the answer while it is typed.
+async function promptForSecret(message: string): Promise<string> {
+  let muted = false;
+  const output = new Writable({
+    write(chunk: Buffer | string, _encoding, callback) {
+      if (!muted) {
+        process.stdout.write(chunk);
+      }
+      callback();
+    }
+  });
+  const readline = createInterface({
+    input: process.stdin,
+    output,
+    terminal: true
+  });
+
+  try {
+    const answer = readline.question(message);
+    muted = true;
+    return await answer;
+  } finally {
+    readline.close();
+    process.stdout.write('\n');
   }
 }

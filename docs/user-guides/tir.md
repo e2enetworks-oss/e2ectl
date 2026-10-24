@@ -22,7 +22,7 @@ Three commands, in order:
 ```bash
 e2ectl tir account list
 e2ectl tir project list --account-id <account-id>
-e2ectl tir configure --account-id <account-id> --project-id <project-id> --location Chennai
+e2ectl tir configure --account <account-id> --project <project-id> --location Chennai
 ```
 
 - `tir account list` shows every account your key can work in: your own and any you were invited
@@ -30,8 +30,12 @@ e2ectl tir configure --account-id <account-id> --project-id <project-id> --locat
 - `tir project list` shows the projects in one account.
 - `tir configure` checks that the account exists for your key and has TIR, that the project is in
   that account, and that the location is Delhi or Chennai. It saves nothing if a check fails.
+  `myaccount configure` works the same way for the MyAccount project and location.
 
-`tir configure` saves into the default profile, or the profile named with `--alias`. See what is
+`e2ectl configure` runs the same steps when you choose TIR there. `tir configure` asks for each
+value in a terminal (offering what is saved as the default) and takes `--account`, `--project`
+and `--location` in scripts; a missing value fails with a message naming the flag. It saves into
+the default profile, or the profile named with `--alias`. See what is
 saved with `e2ectl config list` (the TIR Context column, or `tir` in `--json`).
 
 ### Run One Command Somewhere Else
@@ -92,7 +96,7 @@ In CI, set the three `E2E_TIR_*` variables instead of running `tir configure`.
 ```bash
 e2ectl --json tir account list
 e2ectl --json tir project list --account-id <account-id>
-e2ectl --json tir configure --account-id <account-id> --project-id <project-id> --location Delhi
+e2ectl --json tir configure --account <account-id> --project <project-id> --location Delhi
 e2ectl --json tir image list
 e2ectl --json tir plan list --image-version-id <version-id>
 ```
@@ -105,6 +109,7 @@ e2ectl --json tir plan list --image-version-id <version-id>
   "action": "configure",
   "alias": "work",
   "location": "Delhi",
+  "platform": "tir",
   "project": { "id": 91011, "name": "research" }
 }
 ```
@@ -115,6 +120,7 @@ e2ectl --json tir plan list --image-version-id <version-id>
 | ----------------------------------------------- | ------------------------------------------------------------------------------- |
 | `No TIR account chosen.`                        | Run `e2ectl tir account list`, then pass `--account-id` or run `tir configure`. |
 | `No TIR project chosen.`                        | Run `e2ectl tir project list`, then `e2ectl tir configure`.                     |
+| `No TIR <value> given.`                         | Add the flag the message names, or run the command in a terminal.               |
 | `TIR account <id> is not one your key can use.` | Pick an id from `e2ectl tir account list`.                                      |
 | `TIR is not turned on for account <id>.`        | Pick another account, or ask its owner to turn TIR on.                          |
 | `Project <id> is not in TIR account <id>.`      | Pick an id from `e2ectl tir project list --account-id <id>`.                    |

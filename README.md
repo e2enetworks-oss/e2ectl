@@ -26,11 +26,19 @@ npm install -g @e2enetworks-oss/e2ectl@next
 
 ## Quickstart
 
-1. Create an API token in [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam) and download the generated config JSON file.
-2. Import the file into a saved profile:
+1. Create an API key and token in [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam).
+2. Set up `e2ectl`. It asks for the key and token, then which platforms you use (TIR is
+   recommended) and where each should run:
 
 ```bash
-e2ectl config import --file ~/Downloads/myaccount-config.json
+e2ectl configure
+```
+
+Change one platform later with `e2ectl tir configure` or `e2ectl myaccount configure`. In scripts,
+pass everything as flags and the key and token in `E2E_API_KEY` and `E2E_AUTH_TOKEN`:
+
+```bash
+e2ectl configure --platform myaccount --project <project-id> --location Chennai
 ```
 
 3. Discover an exact node plan and image:

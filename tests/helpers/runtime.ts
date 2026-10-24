@@ -43,6 +43,7 @@ export function createTestRuntime(
     credentialValidator: { validate: vi.fn() },
     isInteractive: false,
     prompt: vi.fn(() => Promise.resolve('')),
+    promptSecret: vi.fn(() => Promise.resolve('')),
     stderr: new MemoryWriter(),
     stdout: new MemoryWriter(),
     store: new ConfigStore({

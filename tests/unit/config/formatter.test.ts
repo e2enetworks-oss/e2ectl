@@ -89,24 +89,6 @@ describe('config formatter', () => {
     expect(output).toBe('Removed profile "staging".\n');
   });
 
-  it('renders human set-context output', () => {
-    const output = renderConfigResult(
-      {
-        action: 'set-context',
-        alias: 'prod',
-        config: {
-          profiles: {
-            prod: { api_key: 'api-key', auth_token: 'auth-token' }
-          },
-          default: 'prod'
-        }
-      },
-      false
-    );
-
-    expect(output).toBe('Updated default context for "prod".\n');
-  });
-
   it('renders empty list message when no profiles are saved', () => {
     const output = renderConfigResult(
       { action: 'list', config: { profiles: {} } },

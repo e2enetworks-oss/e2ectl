@@ -35,7 +35,6 @@ function createServiceFixture(
     read: ReturnType<typeof vi.fn>;
     removeProfile: ReturnType<typeof vi.fn>;
     setDefault: ReturnType<typeof vi.fn>;
-    updateProfile: ReturnType<typeof vi.fn>;
     write: ReturnType<typeof vi.fn>;
   };
   validator: ReturnType<typeof vi.fn>;
@@ -66,19 +65,6 @@ function createServiceFixture(
       config = {
         default: alias,
         profiles: { ...config.profiles }
-      };
-      return Promise.resolve(structuredClone(config));
-    }),
-    updateProfile: vi.fn((alias: string, patch: Partial<ProfileConfig>) => {
-      config = {
-        ...(config.default === undefined ? {} : { default: config.default }),
-        profiles: {
-          ...config.profiles,
-          [alias]: {
-            ...config.profiles[alias],
-            ...patch
-          } as ProfileConfig
-        }
       };
       return Promise.resolve(structuredClone(config));
     }),
@@ -363,38 +349,6 @@ describe('ConfigService', () => {
     });
   });
 
-  it('updates profile context with project-only and location-only patches', async () => {
-    const fixture = createServiceFixture(
-      createConfig({
-        prod: {
-          api_key: 'api-prod',
-          auth_token: 'auth-prod'
-        }
-      })
-    );
-
-    const projectOnly = await fixture.service.setContext({
-      alias: 'prod',
-      defaultProjectId: '123'
-    });
-    const locationOnly = await fixture.service.setContext({
-      alias: 'prod',
-      defaultLocation: 'Chennai'
-    });
-
-    expect(projectOnly.config.profiles.prod).toEqual({
-      api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      default_project_id: '123'
-    });
-    expect(locationOnly.config.profiles.prod).toEqual({
-      api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      default_location: 'Chennai',
-      default_project_id: '123'
-    });
-  });
-
   it('preserves existing partial context when imported defaults are not supplied', async () => {
     const file = await createImportFile({
       prod: {
@@ -547,54 +501,5 @@ describe('ConfigService', () => {
     });
 
     expect(blankAliasResult.config.default).toBeUndefined();
-  });
-
-  it('rejects invalid context updates and missing aliases', async () => {
-    const fixture = createServiceFixture(
-      createConfig({
-        prod: {
-          api_key: 'api-prod',
-          auth_token: 'auth-prod'
-        }
-      })
-    );
-
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod'
-      })
-    ).rejects.toMatchObject({
-      code: 'MISSING_DEFAULT_CONTEXT'
-    });
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod',
-        defaultProjectId: 'abc'
-      })
-    ).rejects.toMatchObject({
-      code: 'INVALID_PROJECT_ID'
-    });
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod',
-        defaultLocation: 'Atlantis'
-      })
-    ).rejects.toMatchObject({
-      code: 'INVALID_LOCATION'
-    });
-    await expect(
-      fixture.service.removeProfile({
-        alias: 'missing'
-      })
-    ).rejects.toMatchObject({
-      code: 'PROFILE_NOT_FOUND'
-    });
-    await expect(
-      fixture.service.setDefault({
-        alias: 'missing'
-      })
-    ).rejects.toMatchObject({
-      code: 'PROFILE_NOT_FOUND'
-    });
   });
 });

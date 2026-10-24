@@ -43,7 +43,7 @@ describe('built CLI help', () => {
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('import');
     expect(result.stdout).toContain('list');
-    expect(result.stdout).toContain('set-context');
+    expect(result.stdout).not.toContain('set-context');
     expect(result.stdout).toContain('set-default');
     expect(result.stdout).toContain('remove');
     expect(result.stdout).not.toMatch(/^\s+add\b/m);

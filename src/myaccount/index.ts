@@ -5,7 +5,10 @@ import { buildDbaasCommand } from './dbaas/index.js';
 import { buildImageCommand } from './image/index.js';
 import { buildLoadBalancerCommand } from './load-balancer/index.js';
 import { buildNodeCommand } from './node/index.js';
-import { buildProjectCommand } from './project/index.js';
+import {
+  buildMyAccountConfigureCommand,
+  buildProjectCommand
+} from './project/index.js';
 import { buildReservedIpCommand } from './reserved-ip/index.js';
 import { buildSecurityGroupCommand } from './security-group/index.js';
 import { buildSshKeyCommand } from './ssh-key/index.js';
@@ -21,6 +24,7 @@ export function buildMyAccountCommand(runtime: CliRuntime): Command {
 
   command.helpCommand('help [command]', 'Show help for a myaccount command');
 
+  command.addCommand(buildMyAccountConfigureCommand(runtime));
   command.addCommand(buildProjectCommand(runtime));
   command.addCommand(buildDbaasCommand(runtime));
   command.addCommand(buildLoadBalancerCommand(runtime));

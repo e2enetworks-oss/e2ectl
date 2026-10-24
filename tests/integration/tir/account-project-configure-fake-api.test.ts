@@ -90,9 +90,9 @@ describe('tir account, project and configure against a fake TIR API', () => {
         [
           'tir',
           'configure',
-          '--account-id',
+          '--account',
           '1234',
-          '--project-id',
+          '--project',
           '91011',
           '--location',
           'Delhi'
@@ -146,9 +146,9 @@ describe('tir account, project and configure against a fake TIR API', () => {
         [
           'tir',
           'configure',
-          '--account-id',
+          '--account',
           '1234',
-          '--project-id',
+          '--project',
           '5',
           '--location',
           'Delhi'
@@ -162,9 +162,11 @@ describe('tir account, project and configure against a fake TIR API', () => {
       );
 
       expect(result.exitCode).toBe(2);
-      expect(result.stderr).toContain('Project 5 is not in TIR account 1234.');
       expect(result.stderr).toContain(
-        'e2ectl tir project list --account-id 1234'
+        'TIR project 5 was not found in account 1234.'
+      );
+      expect(result.stderr).toContain(
+        'e2ectl tir project list --account-id <id>'
       );
       expect((await tempHome.readConfig()).profiles.work?.tir).toBeUndefined();
     } finally {

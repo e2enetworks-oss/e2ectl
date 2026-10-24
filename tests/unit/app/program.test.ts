@@ -6,11 +6,12 @@ import { createProgram } from '../../../src/app/program.js';
 // Every runnable command today, written as typed after `e2ectl`. A command
 // lost or renamed by mistake fails here; new products may add more.
 const EXPECTED_COMMANDS = [
+  'configure',
   'config import',
   'config list',
-  'config set-context',
   'config set-default',
   'config remove',
+  'myaccount configure',
   'myaccount project list',
   'myaccount project create',
   'myaccount project star',
@@ -132,14 +133,14 @@ describe('createProgram', () => {
 
     expect(program.name()).toBe(CLI_COMMAND_NAME);
     expect(
-      program.commands.slice(0, 2).map((command) => command.name())
-    ).toEqual(['config', 'myaccount']);
+      program.commands.slice(0, 3).map((command) => command.name())
+    ).toEqual(['configure', 'config', 'myaccount']);
   });
 
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(103);
+    expect(EXPECTED_COMMANDS).toHaveLength(104);
     expect([...commands].sort()).toEqual([...EXPECTED_COMMANDS].sort());
   });
 });
