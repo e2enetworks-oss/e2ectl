@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatTirCommand } from '../api.js';
@@ -16,7 +16,7 @@ export function renderTirAccountResult(
     return 'No TIR accounts found for this key.\n';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Account', 'Name', 'Role', 'TIR Access']
   });
   for (const item of result.items) {

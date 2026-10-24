@@ -2,6 +2,7 @@ import { Command } from 'commander';
 
 import { addContextOptions } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/runtime.js';
+import { formatMyAccountCommand } from '../api.js';
 import { renderEosResult } from './formatter.js';
 import { EosService } from './service.js';
 import type {
@@ -62,7 +63,15 @@ function buildBucketCommand(service: EosService, write: Writer): Command {
     write(await service.listBuckets(options), instance);
   });
   addContextOptions(
-    command.command('create <name>').description('Create a bucket.')
+    command
+      .command('create <name>')
+      .description(
+        'Create a bucket. Names are 3 to 63 lowercase letters, digits, dots and dashes.'
+      )
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('eos bucket create backups-2026')}\n`
+      )
   ).action(
     async (name: string, options: EosContextOptions, instance: Command) => {
       write(await service.createBucket(name, options), instance);

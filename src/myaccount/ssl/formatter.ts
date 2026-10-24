@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { SslCertificateSummary } from './types/index.js';
@@ -16,7 +16,7 @@ function renderHuman(result: SslCommandResult): string {
     return 'No SSL certificates found.\n';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Type', 'State', 'Domain', 'Expires']
   });
 

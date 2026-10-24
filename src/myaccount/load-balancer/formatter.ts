@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatMyAccountCommand } from '../api.js';
@@ -480,7 +480,7 @@ function formatPublicIp(
 function formatLoadBalancerListTable(
   items: LoadBalancerListCommandResult['items']
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Mode', 'Type', 'Public IP', 'Private IP']
   });
 
@@ -513,7 +513,7 @@ function renderBackendGroupListHuman(
     );
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Backend Group',
       'Routing Policy',
@@ -658,7 +658,7 @@ function renderGetBackendSection(
     return '';
   }
 
-  const bgTable = new Table({
+  const bgTable = buildTable({
     head: ['Group', 'Protocol', 'Algorithm', 'Servers']
   });
   for (const bg of backends) {
@@ -747,7 +747,7 @@ function formatLoadBalancerPlans(
 function formatLoadBalancerBasePlansTable(
   items: LoadBalancerPlansCommandResult['items']
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan', 'vCPU', 'RAM (GB)', 'Disk (GB)', 'Price/Hour', 'Price/Month']
   });
 
@@ -779,7 +779,7 @@ function formatLoadBalancerCommittedPlansSection(
     return 'Committed Options\nNo committed plans found.\n';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: ['Base Plan', 'Plan ID', 'Name', 'Term (Days)', 'Total Price']
   });
 
@@ -805,7 +805,7 @@ function formatPlanValue(value: number | undefined): string {
 }
 
 function formatFieldTable(rows: Array<[string, string]>): string {
-  const table = new Table({ head: ['Field', 'Value'] });
+  const table = buildTable({ head: ['Field', 'Value'] });
 
   for (const [field, value] of rows) {
     table.push([field, value]);

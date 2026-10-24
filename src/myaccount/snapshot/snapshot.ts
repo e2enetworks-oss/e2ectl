@@ -1,6 +1,6 @@
 // Shared by node snapshots and volume snapshots: E2E returns both in the
 // same shape, so they are shown, checked and worded the same way.
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 
@@ -50,7 +50,7 @@ export function formatSnapshotTable(items: SnapshotItem[]): string {
     return 'No snapshots found.';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Size (GB)', 'Created', 'Locked']
   });
   for (const item of items) {

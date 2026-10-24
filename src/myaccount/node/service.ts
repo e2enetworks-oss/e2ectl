@@ -425,6 +425,9 @@ export interface NodeServiceDependencies {
   isInteractive: boolean;
   // How long create --wait keeps checking; tests shorten it.
   nodeReadyPoll?: PollOptions;
+  // Progress lines while create --wait checks (stderr, so --json output on
+  // stdout stays clean).
+  progress?: (line: string) => void;
   store: NodeStore;
 }
 
@@ -1141,10 +1144,8 @@ export class NodeService {
     }
 
     const poll = this.dependencies.nodeReadyPoll ?? NODE_READY_POLL;
-    const ready = await pollUntilFound(
-      () => checkNodeReady(client, nodeId),
-      poll
-    ).catch((error: unknown) => {
+    const check = createReadyCheck(client, nodeId, this.dependencies.progress);
+    const ready = await pollUntilFound(check, poll).catch((error: unknown) => {
       throw toNodeWaitError(error, nodeId);
     });
 
@@ -1228,10 +1229,51 @@ function explainProtectedDelete(error: unknown, nodeId: number): unknown {
   });
 }
 
+// One status check per call. A status change is reported once, and a check
+// that fails for a reason worth retrying (a timeout, a server error) is
+// tried again on the next round, up to MAX_FAILED_CHECKS in a row.
+function createReadyCheck(
+  client: NodeClient,
+  nodeId: number,
+  progress: ((line: string) => void) | undefined
+): () => Promise<NodeDetails | undefined> {
+  let lastStatus: string | undefined;
+  let failedChecks = 0;
+
+  return async () => {
+    try {
+      const node = await checkNodeReady(client, nodeId);
+      failedChecks = 0;
+      if (node.status !== lastStatus) {
+        lastStatus = node.status;
+        progress?.(`Node ${nodeId}: ${node.status}\n`);
+      }
+
+      return node.status === NODE_READY_STATUS ? node : undefined;
+    } catch (error: unknown) {
+      failedChecks += 1;
+      if (
+        error instanceof AppError &&
+        error.exitCode === EXIT_CODES.network &&
+        failedChecks < MAX_FAILED_CHECKS
+      ) {
+        progress?.(
+          `Node ${nodeId}: check failed (${error.message}), trying again\n`
+        );
+        return undefined;
+      }
+
+      throw error;
+    }
+  };
+}
+
+const MAX_FAILED_CHECKS = 3;
+
 async function checkNodeReady(
   client: NodeClient,
   nodeId: number
-): Promise<NodeDetails | undefined> {
+): Promise<NodeDetails> {
   const node = await client.getNode(String(nodeId));
 
   if (/fail|error/i.test(node.status)) {
@@ -1245,7 +1287,7 @@ async function checkNodeReady(
     );
   }
 
-  return node.status === NODE_READY_STATUS ? node : undefined;
+  return node;
 }
 
 function toNodeWaitError(error: unknown, nodeId: number): CliError {

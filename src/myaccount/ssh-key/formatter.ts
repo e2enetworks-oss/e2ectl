@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { SshKeyCommandResult, SshKeyItem } from './service.js';
@@ -11,7 +11,7 @@ export function renderSshKeyResult(
 }
 
 export function formatSshKeyTable(items: SshKeyItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Label', 'Type', 'Attached Nodes', 'Created']
   });
 

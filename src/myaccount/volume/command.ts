@@ -114,6 +114,10 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
       )
       .requiredOption('--size <size>', 'New size in GB, from volume plans.')
       .option('--force', 'Skip the confirmation prompt.')
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('volume resize 5 --size 250 --force')}\nSizes come from ${formatMyAccountCommand('volume plans')}.\n`
+      )
   ).action(
     async (
       volumeId: string,

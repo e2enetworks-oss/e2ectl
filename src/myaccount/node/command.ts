@@ -68,6 +68,9 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     get isInteractive() {
       return runtime.isInteractive;
     },
+    progress: (line) => {
+      runtime.stderr.write(line);
+    },
     store: runtime.store
   });
   const command = new Command('node').description('Manage MyAccount nodes.');
@@ -101,6 +104,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('node create --name web-1 --plan <plan> --image <image> --wait')}\nFind <plan> and <image> with ${formatMyAccountCommand('node catalog plans')}.\n`
+      )
       .option(
         '--image <image>',
         'Catalog image identifier returned by node catalog plans.'

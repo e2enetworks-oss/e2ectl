@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatMyAccountCommand } from '../api.js';
@@ -55,7 +55,9 @@ function formatBuckets(items: EosBucketItem[]): string {
     return 'No buckets found.';
   }
 
-  const table = new Table({ head: ['Name', 'Status', 'Used (MB)', 'Created'] });
+  const table = buildTable({
+    head: ['Name', 'Status', 'Used (MB)', 'Created']
+  });
   for (const item of items) {
     table.push([
       item.name,
@@ -72,7 +74,7 @@ function formatKeys(items: EosKeyItem[]): string {
     return 'No access keys found.';
   }
 
-  const table = new Table({ head: ['ID', 'Name', 'Access Key', 'Disabled'] });
+  const table = buildTable({ head: ['ID', 'Name', 'Access Key', 'Disabled'] });
   for (const item of items) {
     table.push([
       String(item.id),
@@ -89,7 +91,7 @@ function formatAccess(bucket: string, items: EosAccessItem[]): string {
     return `No keys have access to bucket ${bucket}.`;
   }
 
-  const table = new Table({ head: ['ID', 'Key Name', 'Access Key', 'Role'] });
+  const table = buildTable({ head: ['ID', 'Key Name', 'Access Key', 'Role'] });
   for (const item of items) {
     table.push([String(item.id), item.key_name, item.access_key, item.role]);
   }

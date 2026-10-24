@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { formatSnapshotTable } from '../snapshot/index.js';
@@ -61,7 +61,7 @@ export function renderNodeResult(
 }
 
 export function formatNodesTable(nodes: NodeSummary[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Plan', 'Public IP', 'Private IP']
   });
 
@@ -85,7 +85,7 @@ export function formatNodeCatalogOsTable(
   const showSoftwareVersion = entries.some((entry) =>
     hasVisibleValue(entry.software_version)
   );
-  const table = new Table({
+  const table = buildTable({
     head: showSoftwareVersion
       ? ['Display Category', 'Category', 'OS', 'OS Version', 'Software Version']
       : ['Display Category', 'Category', 'OS', 'OS Version']
@@ -111,7 +111,7 @@ export function formatNodeCatalogOsTable(
 export function formatNodeCatalogPlansTable(
   items: NodeCatalogPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       '#',
       'SKU',
@@ -147,7 +147,7 @@ export function formatNodeCatalogPlansTable(
 export function formatNodeCatalogCommittedOptionsTable(
   items: NodeCatalogPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Config #',
       'SKU',
@@ -549,7 +549,7 @@ function renderNodeJson(result: NodeCommandResult): string {
     case 'list':
       return renderJson({
         action: 'list',
-        nodes: sortNodeSummariesById(result.nodes),
+        items: sortNodeSummariesById(result.nodes),
         total_count: result.total_count ?? null,
         total_page_number: result.total_page_number ?? null
       });

@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -26,7 +26,7 @@ export function renderDbaasResult(
 }
 
 export function formatDbaasListTable(items: DbaasListItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'ID',
       'Name',
@@ -58,7 +58,7 @@ export function formatDbaasListTable(items: DbaasListItem[]): string {
 }
 
 export function formatDbaasListTypesTable(items: DbaasListTypeItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Type', 'Version']
   });
 
@@ -72,7 +72,7 @@ export function formatDbaasListTypesTable(items: DbaasListTypeItem[]): string {
 export function formatDbaasTemplatePlansTable(
   items: DbaasPlansTemplateItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Plan',
       'Template ID',
@@ -102,7 +102,7 @@ export function formatDbaasTemplatePlansTable(
 export function formatDbaasCommittedSkusTable(
   items: DbaasCommittedSkuItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan', 'Template ID', 'SKU ID', 'Term', 'Price']
   });
 
@@ -194,7 +194,7 @@ function renderDbaasNetworkHuman(result: DbaasNetworkCommandResult): string {
 }
 
 function renderCreateHuman(result: DbaasCreateCommandResult): string {
-  const createTable = new Table({ head: ['Created DBaaS', ''] });
+  const createTable = buildTable({ head: ['Created DBaaS', ''] });
   createTable.push(
     ['Name', result.dbaas.name || '--'],
     ['ID', String(result.dbaas.id)],
@@ -220,7 +220,7 @@ function renderCreateHuman(result: DbaasCreateCommandResult): string {
 function renderResetPasswordHuman(
   result: DbaasResetPasswordCommandResult
 ): string {
-  const resetTable = new Table({ head: ['Password Reset', ''] });
+  const resetTable = buildTable({ head: ['Password Reset', ''] });
   resetTable.push(
     ['Name', result.dbaas.name || '--'],
     ['ID', result.dbaas.id === null ? '--' : String(result.dbaas.id)],
@@ -244,7 +244,7 @@ function renderGetHuman(item: DbaasDetailItem): string {
       ? 'Whitelisted IPs: none\n'
       : `Whitelisted IPs:\n${formatWhitelistedIpsTable(item.whitelisted_ips)}\n`;
 
-  const detailsTable = new Table({ head: ['Details', ''] });
+  const detailsTable = buildTable({ head: ['Details', ''] });
   detailsTable.push(
     ['Name', item.name || '--'],
     ['ID', item.id === null ? '--' : String(item.id)],
@@ -336,7 +336,7 @@ function renderVpcDetachHuman(result: DbaasVpcDetachCommandResult): string {
 function formatVpcConnectionsTable(
   items: DbaasDetailItem['vpc_connections']
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['VPC ID', 'VPC Name', 'CIDR', 'Private IP', 'Subnet ID']
   });
 
@@ -354,7 +354,7 @@ function formatVpcConnectionsTable(
 }
 
 function formatWhitelistedIpsTable(items: DbaasWhitelistedIpItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Whitelisted IPs']
   });
 

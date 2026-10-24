@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatTirCommand } from '../api.js';
@@ -23,7 +23,7 @@ function renderProjectList(result: TirProjectListCommandResult): string {
     return `No projects found in TIR account ${result.account_id}.\n`;
   }
 
-  const table = new Table({ head: ['ID', 'Name', 'Created'] });
+  const table = buildTable({ head: ['ID', 'Name', 'Created'] });
   for (const item of result.items) {
     table.push([String(item.id), item.name, item.created_at]);
   }

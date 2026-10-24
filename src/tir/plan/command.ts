@@ -2,6 +2,7 @@ import { Command } from 'commander';
 
 import { addTirContextOptions } from '../../app/context-options.js';
 import type { CliRuntime } from '../../app/runtime.js';
+import { formatTirCommand } from '../api.js';
 import { renderTirPlanResult } from './formatter.js';
 import { TirPlanService } from './service.js';
 import type { TirPlanContextOptions } from './types.js';
@@ -31,6 +32,10 @@ export function buildTirPlanCommand(runtime: CliRuntime): Command {
       .option(
         '--image-version-id <imageVersionId>',
         'Image version id from tir image list.'
+      )
+      .addHelpText(
+        'after',
+        `\nExamples:\n  ${formatTirCommand('plan list')}\n  ${formatTirCommand('plan list --image-version-id 12 --json')}\n`
       )
   ).action(async (options: TirPlanContextOptions, commandInstance: Command) => {
     const result = await service.list(options);

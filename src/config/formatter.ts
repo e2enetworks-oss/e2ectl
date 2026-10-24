@@ -1,5 +1,5 @@
 import { formatCliCommand } from '../app/metadata.js';
-import Table from 'cli-table3';
+import { buildTable } from '../core/table.js';
 
 import { stableStringify, type JsonValue } from '../core/json.js';
 import { maskSecret } from '../core/mask.js';
@@ -31,7 +31,7 @@ export function summarizeProfiles(config: ConfigFile): ProfileSummary[] {
 }
 
 export function formatProfilesTable(profiles: ProfileSummary[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Alias',
       'Default',

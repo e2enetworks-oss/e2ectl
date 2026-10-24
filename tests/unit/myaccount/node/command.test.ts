@@ -515,7 +515,7 @@ describe('node commands', () => {
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'list',
-        nodes: [
+        items: [
           {
             id: 101,
             is_locked: false,

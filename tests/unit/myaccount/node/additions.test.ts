@@ -97,7 +97,11 @@ function fakeClient(overrides: Partial<NodeClient> = {}): NodeClient {
   };
 }
 
-function service(client: NodeClient, interactive = false): NodeService {
+function service(
+  client: NodeClient,
+  interactive = false,
+  progress?: (line: string) => void
+): NodeService {
   const unused = (): never => {
     throw new Error('not used');
   };
@@ -111,6 +115,7 @@ function service(client: NodeClient, interactive = false): NodeService {
     createVpcClient: unused,
     isInteractive: interactive,
     nodeReadyPoll: { attempts: 3, intervalMs: 0 },
+    ...(progress === undefined ? {} : { progress }),
     store: {
       configPath: '/tmp/config.json',
       read: () =>
@@ -236,6 +241,40 @@ describe('node create --wait', () => {
     });
 
     expect(getNode).toHaveBeenCalledTimes(2);
+    expect(result.node?.status).toBe('Running');
+  });
+
+  it('reports each status change once while it waits', async () => {
+    const lines: string[] = [];
+    const getNode = vi
+      .fn<NodeClient['getNode']>()
+      .mockResolvedValueOnce(node({ status: 'Creating' }))
+      .mockResolvedValueOnce(node({ status: 'Creating' }))
+      .mockResolvedValueOnce(node({ status: 'Running' }));
+
+    await service(fakeClient({ getNode }), false, (line) => {
+      lines.push(line);
+    }).createNode({ ...CREATE, wait: true });
+
+    expect(lines).toEqual(['Node 101: Creating\n', 'Node 101: Running\n']);
+  });
+
+  it('keeps waiting after a check that failed for a network reason', async () => {
+    const getNode = vi
+      .fn<NodeClient['getNode']>()
+      .mockRejectedValueOnce(
+        new AppError('MyAccount API request failed: Bad Gateway', {
+          code: 'API_REQUEST_FAILED',
+          exitCode: EXIT_CODES.network
+        })
+      )
+      .mockResolvedValueOnce(node({ status: 'Running' }));
+
+    const result = await service(fakeClient({ getNode })).createNode({
+      ...CREATE,
+      wait: true
+    });
+
     expect(result.node?.status).toBe('Running');
   });
 

@@ -101,7 +101,7 @@ describe('node formatter', () => {
     expect(output).toBe(
       `${stableStringify({
         action: 'list',
-        nodes: [
+        items: [
           {
             id: 101,
             is_locked: false,
@@ -1699,7 +1699,7 @@ describe('node formatter', () => {
     expect(listJsonOutput).toBe(
       `${stableStringify({
         action: 'list',
-        nodes: [],
+        items: [],
         total_count: null,
         total_page_number: null
       })}\n`

@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { TirPlanCommandResult, TirPlanItem } from './types.js';
@@ -15,7 +15,7 @@ export function renderTirPlanResult(
     return 'No TIR plans found.\n';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Name',
       'Series',

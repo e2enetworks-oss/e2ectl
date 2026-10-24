@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { ImageCommandResult, ImageItem } from './service.js';
@@ -11,7 +11,7 @@ export function renderImageResult(
 }
 
 export function formatImageTable(items: ImageItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'ID',
       'Template ID',

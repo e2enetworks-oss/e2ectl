@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -44,7 +44,7 @@ export function renderVolumeResult(
 }
 
 export function formatVolumeListTable(items: VolumeListItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Size', 'Attached To']
   });
 
@@ -62,7 +62,7 @@ export function formatVolumeListTable(items: VolumeListItem[]): string {
 }
 
 export function formatVolumePlansTable(items: VolumePlanItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Size (GB)', 'IOPS', 'Price/Hour', 'Available']
   });
 
@@ -81,7 +81,7 @@ export function formatVolumePlansTable(items: VolumePlanItem[]): string {
 export function formatVolumeCommittedPlansTable(
   items: VolumeCommittedPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan ID', 'Name', 'Term (Days)', 'Total Price', 'Savings %']
   });
 
@@ -101,7 +101,7 @@ export function formatVolumeCommittedPlansTable(
 function formatVolumeCommittedPlanReferenceTable(
   items: VolumeCommittedPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan ID', 'Name', 'Term (Days)']
   });
 

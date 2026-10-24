@@ -14,7 +14,8 @@ import type {
   FetchLike
 } from './types.js';
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+// Some E2E calls (TIR image lists, volume lists) take several seconds.
+const DEFAULT_TIMEOUT_MS = 30_000;
 const GET_RETRY_BACKOFF_MS = 250;
 const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 
@@ -253,7 +254,7 @@ export class HttpTransport implements ApiTransport {
           details: [`Timed out after ${this.timeoutMs}ms`, location],
           exitCode: EXIT_CODES.network,
           suggestion:
-            'Retry the command. If the timeout persists, check network connectivity or raise the timeout in a future revision.'
+            'E2E did not answer in time. Retry the command; if it keeps timing out, check your network or try again later.'
         })
       );
     }

@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import { formatTirCommand } from '../api.js';
@@ -16,7 +16,7 @@ export function renderTirImageResult(
     return 'No TIR images found.\n';
   }
 
-  const table = new Table({
+  const table = buildTable({
     head: ['Version ID', 'Image', 'Version', 'App']
   });
   for (const item of result.items) {

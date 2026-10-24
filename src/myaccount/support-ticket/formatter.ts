@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -304,7 +304,7 @@ function formatSupportTicketDetailTable(
 
   rows.push(['Description', ticket.description ?? '--']);
 
-  const table = new Table({ head: ['Field', 'Value'] });
+  const table = buildTable({ head: ['Field', 'Value'] });
   rows.forEach((row) => table.push(row));
 
   return table.toString();
@@ -313,7 +313,7 @@ function formatSupportTicketDetailTable(
 function formatSupportTicketRepliesTable(
   threads: SupportTicketThreadItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Time', 'Author', 'Summary', 'Attachments']
   });
 
@@ -345,7 +345,7 @@ function formatSupportTicketRepliesTable(
 function formatSupportTicketTimelineTable(
   events: SupportTicketTimelineEventItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Time', 'Event', 'Actor', 'Status', 'Description']
   });
 
@@ -365,7 +365,7 @@ function formatSupportTicketTimelineTable(
 function formatSupportTicketDepartmentsTable(
   departments: SupportTicketDepartmentItem[]
 ): string {
-  const table = new Table({ head: ['ID', 'Name', 'Description', 'Default'] });
+  const table = buildTable({ head: ['ID', 'Name', 'Description', 'Default'] });
 
   [...departments]
     .sort((left, right) => left.id - right.id)
@@ -408,7 +408,7 @@ function normalizeSupportTicketThreadJson(
 }
 
 function formatSupportTicketListTable(items: SupportTicketItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Number', 'Subject', 'Status', 'Priority', 'Category']
   });
 
