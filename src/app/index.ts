@@ -19,6 +19,15 @@ import {
 } from './runtime.js';
 
 async function main(): Promise<void> {
+  // A reader that stops early (| head, | grep -q) closes the pipe; that is
+  // a normal end, not a crash.
+  process.stdout.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EPIPE') {
+      throw error;
+    }
+
+    process.exit(0);
+  });
   process.exitCode = await runCli(process.argv);
 }
 
