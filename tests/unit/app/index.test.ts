@@ -171,7 +171,8 @@ describe('runCli', () => {
   it.each([
     [['help', 'myaccount']],
     [['myaccount', 'help', 'node']],
-    [['myaccount', 'node', 'help', 'list']]
+    [['myaccount', 'node', 'help', 'list']],
+    [['help', 'myaccount', 'node', 'snapshot']]
   ])('exits 0 after showing help through %j', async (args) => {
     const { runtime, stderr } = createRuntimeFixture();
     const writeSpy = vi
@@ -188,6 +189,12 @@ describe('runCli', () => {
       expect(exitCode).toBe(0);
       expect(stderr.buffer).toBe('');
       expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
+      // help follows every word, down to the last command named.
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Usage: e2ectl ${args.filter((arg) => arg !== 'help').join(' ')}`
+        )
+      );
     } finally {
       writeSpy.mockRestore();
     }

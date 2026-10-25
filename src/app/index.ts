@@ -33,10 +33,11 @@ export async function runCli(
 ): Promise<number> {
   const program = createProgram(runtime);
   prepareProgramForCli(program);
+  const args = withHelpAtAnyDepth(argv.slice(2));
 
   try {
-    rejectUnknownCommand(program, argv.slice(2));
-    await program.parseAsync(argv);
+    rejectUnknownCommand(program, args);
+    await program.parseAsync([...argv.slice(0, 2), ...args]);
     return EXIT_CODES.success;
   } catch (error: unknown) {
     if (isCommanderSuccessExit(error)) {
@@ -85,6 +86,15 @@ function prepareProgramForCli(program: Command): void {
   for (const command of program.commands) {
     prepareProgramForCli(command);
   }
+}
+
+// "help myaccount node snapshot" shows the same page as
+// "myaccount node snapshot --help"; Commander's own help command only
+// follows one word.
+function withHelpAtAnyDepth(args: string[]): string[] {
+  return args[0] === 'help' && args.length > 2
+    ? [...args.slice(1), '--help']
+    : args;
 }
 
 // Checks the command words typed (before any option) against the command

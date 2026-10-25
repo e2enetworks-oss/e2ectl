@@ -2,7 +2,7 @@ import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
-import { formatSnapshotTable } from '../snapshot/index.js';
+import { formatSnapshotResult } from '../snapshot/index.js';
 import type {
   VolumeCommandResult,
   VolumeCommittedPlanItem,
@@ -22,18 +22,11 @@ export function renderVolumeSnapshotResult(
     return `${stableStringify(result as unknown as JsonValue)}\n`;
   }
 
-  switch (result.action) {
-    case 'snapshot-list':
-      return `${formatSnapshotTable(result.items)}\n`;
-    case 'snapshot-create':
-      return `Requested snapshot "${result.name}" of volume ${result.volume_id}. ${result.message}\nCheck it with ${formatMyAccountCommand(`volume snapshot list ${result.volume_id}`)}.\n`;
-    case 'snapshot-delete':
-      return result.cancelled
-        ? 'Snapshot deletion cancelled.\n'
-        : `Deleted snapshot ${result.snapshot_id} of volume ${result.volume_id}.\n`;
-    case 'snapshot-save-volume':
-      return `Saving snapshot ${result.snapshot_id} of volume ${result.volume_id} as a new volume "${result.volume_name}". The volume itself is not changed.\nFind the new volume with ${formatMyAccountCommand('volume list')}.\n`;
+  if (result.action !== 'snapshot-save-volume') {
+    return formatSnapshotResult('volume', result.volume_id, result);
   }
+
+  return `Saving snapshot ${result.snapshot_id} of volume ${result.volume_id} as a new volume "${result.volume_name}". The volume itself is not changed.\nFind the new volume with ${formatMyAccountCommand('volume list')}.\n`;
 }
 
 export function renderVolumeResult(

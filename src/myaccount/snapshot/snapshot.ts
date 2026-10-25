@@ -1,8 +1,8 @@
 // Shared by node snapshots and volume snapshots: E2E returns both in the
 // same shape, so they are shown, checked and worded the same way.
-import { buildTable } from '../../core/table.js';
-
 import { CliError, EXIT_CODES } from '../../core/errors.js';
+import { buildTable } from '../../core/table.js';
+import { formatMyAccountCommand } from '../api.js';
 
 export interface SnapshotApiItem {
   date?: string;
@@ -88,4 +88,28 @@ export function normalizeSnapshotId(
       suggestion: 'Pass the ID column from snapshot list.'
     }
   );
+}
+
+// The snapshot results nodes and volumes have in common.
+export type SharedSnapshotResult =
+  | { action: 'snapshot-list'; items: SnapshotItem[] }
+  | { action: 'snapshot-create'; message: string; name: string }
+  | { action: 'snapshot-delete'; cancelled: boolean; snapshot_id: string };
+
+// Text output for those results, worded the same for nodes and volumes.
+export function formatSnapshotResult(
+  resource: 'node' | 'volume',
+  resourceId: number,
+  result: SharedSnapshotResult
+): string {
+  switch (result.action) {
+    case 'snapshot-list':
+      return `${formatSnapshotTable(result.items)}\n`;
+    case 'snapshot-create':
+      return `Requested snapshot "${result.name}" of ${resource} ${resourceId}. ${result.message}\nCheck it with ${formatMyAccountCommand(`${resource} snapshot list ${resourceId}`)}.\n`;
+    case 'snapshot-delete':
+      return result.cancelled
+        ? 'Snapshot deletion cancelled.\n'
+        : `Deleted snapshot ${result.snapshot_id} of ${resource} ${resourceId}.\n`;
+  }
 }
