@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { ProjectCommandResult, ProjectItem } from './service.js';
@@ -13,7 +13,7 @@ export function renderProjectResult(
 }
 
 export function formatProjectListTable(items: ProjectItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'CLI Default', 'Default', 'Starred']
   });
 

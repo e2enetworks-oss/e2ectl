@@ -35,7 +35,6 @@ function createServiceFixture(
     read: ReturnType<typeof vi.fn>;
     removeProfile: ReturnType<typeof vi.fn>;
     setDefault: ReturnType<typeof vi.fn>;
-    updateProfile: ReturnType<typeof vi.fn>;
     write: ReturnType<typeof vi.fn>;
   };
   validator: ReturnType<typeof vi.fn>;
@@ -66,19 +65,6 @@ function createServiceFixture(
       config = {
         default: alias,
         profiles: { ...config.profiles }
-      };
-      return Promise.resolve(structuredClone(config));
-    }),
-    updateProfile: vi.fn((alias: string, patch: Partial<ProfileConfig>) => {
-      config = {
-        ...(config.default === undefined ? {} : { default: config.default }),
-        profiles: {
-          ...config.profiles,
-          [alias]: {
-            ...config.profiles[alias],
-            ...patch
-          } as ProfileConfig
-        }
       };
       return Promise.resolve(structuredClone(config));
     }),
@@ -144,8 +130,7 @@ describe('ConfigService', () => {
           prod: {
             api_key: 'api-old-prod',
             auth_token: 'auth-old-prod',
-            default_location: 'Mumbai',
-            default_project_id: '99'
+            myaccount: { location: 'Mumbai', project_id: '99' }
           }
         }),
         {
@@ -181,8 +166,8 @@ describe('ConfigService', () => {
     );
     expect(result.importedAliases).toEqual(['prod', 'staging']);
     expect(result.importedDefaults).toEqual({
-      default_location: 'Delhi',
-      default_project_id: '123'
+      location: 'Delhi',
+      project_id: '123'
     });
     expect(getConfig()).toEqual({
       default: 'staging',
@@ -190,14 +175,12 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-new-prod',
           auth_token: 'auth-new-prod',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         },
         staging: {
           api_key: 'api-staging',
           auth_token: 'auth-staging',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         }
       }
     });
@@ -286,6 +269,7 @@ describe('ConfigService', () => {
       }
     });
     const { service } = createServiceFixture(createConfig(), {
+      isInteractive: false,
       validateResults: [
         {
           message: 'Token expired.',
@@ -296,8 +280,7 @@ describe('ConfigService', () => {
 
     await expect(
       service.importProfiles({
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORTED_CREDENTIALS',
@@ -313,13 +296,13 @@ describe('ConfigService', () => {
       }
     });
     const { service } = createServiceFixture(createConfig(), {
+      isInteractive: false,
       validateResults: [{ valid: false }]
     });
 
     await expect(
       service.importProfiles({
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORTED_CREDENTIALS',
@@ -339,12 +322,13 @@ describe('ConfigService', () => {
       }
     });
 
-    const explicitFixture = createServiceFixture(createConfig());
+    const explicitFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await expect(
       explicitFixture.service.importProfiles({
         default: 'missing',
-        file,
-        input: false
+        file
       })
     ).rejects.toMatchObject({
       code: 'INVALID_IMPORT_DEFAULT_ALIAS'
@@ -363,38 +347,6 @@ describe('ConfigService', () => {
     });
   });
 
-  it('updates profile context with project-only and location-only patches', async () => {
-    const fixture = createServiceFixture(
-      createConfig({
-        prod: {
-          api_key: 'api-prod',
-          auth_token: 'auth-prod'
-        }
-      })
-    );
-
-    const projectOnly = await fixture.service.setContext({
-      alias: 'prod',
-      defaultProjectId: '123'
-    });
-    const locationOnly = await fixture.service.setContext({
-      alias: 'prod',
-      defaultLocation: 'Chennai'
-    });
-
-    expect(projectOnly.config.profiles.prod).toEqual({
-      api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      default_project_id: '123'
-    });
-    expect(locationOnly.config.profiles.prod).toEqual({
-      api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      default_location: 'Chennai',
-      default_project_id: '123'
-    });
-  });
-
   it('preserves existing partial context when imported defaults are not supplied', async () => {
     const file = await createImportFile({
       prod: {
@@ -407,23 +359,21 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-old',
           auth_token: 'auth-old',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         }
-      })
+      }),
+      { isInteractive: false }
     );
 
     await service.importProfiles({
       file,
-      force: true,
-      input: false
+      force: true
     });
 
     expect(getConfig().profiles.prod).toEqual({
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_location: 'Delhi',
-      default_project_id: '123'
+      myaccount: { location: 'Delhi', project_id: '123' }
     });
   });
 
@@ -441,13 +391,13 @@ describe('ConfigService', () => {
           auth_token: 'auth-old',
           tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
         }
-      })
+      }),
+      { isInteractive: false }
     );
 
     await service.importProfiles({
       file,
-      force: true,
-      input: false
+      force: true
     });
 
     expect(getConfig().profiles.prod).toEqual({
@@ -465,34 +415,36 @@ describe('ConfigService', () => {
       }
     });
 
-    const projectOnlyFixture = createServiceFixture(createConfig());
+    const projectOnlyFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await projectOnlyFixture.service.importProfiles({
       defaultProjectId: '555',
-      file,
-      input: false
+      file
     });
     expect(projectOnlyFixture.getConfig()).toEqual({
       profiles: {
         prod: {
           api_key: 'api-prod',
           auth_token: 'auth-prod',
-          default_project_id: '555'
+          myaccount: { project_id: '555' }
         }
       }
     });
 
-    const locationOnlyFixture = createServiceFixture(createConfig());
+    const locationOnlyFixture = createServiceFixture(createConfig(), {
+      isInteractive: false
+    });
     await locationOnlyFixture.service.importProfiles({
       defaultLocation: 'Chennai',
-      file,
-      input: false
+      file
     });
     expect(locationOnlyFixture.getConfig()).toEqual({
       profiles: {
         prod: {
           api_key: 'api-prod',
           auth_token: 'auth-prod',
-          default_location: 'Chennai'
+          myaccount: { location: 'Chennai' }
         }
       }
     });
@@ -547,54 +499,5 @@ describe('ConfigService', () => {
     });
 
     expect(blankAliasResult.config.default).toBeUndefined();
-  });
-
-  it('rejects invalid context updates and missing aliases', async () => {
-    const fixture = createServiceFixture(
-      createConfig({
-        prod: {
-          api_key: 'api-prod',
-          auth_token: 'auth-prod'
-        }
-      })
-    );
-
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod'
-      })
-    ).rejects.toMatchObject({
-      code: 'MISSING_DEFAULT_CONTEXT'
-    });
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod',
-        defaultProjectId: 'abc'
-      })
-    ).rejects.toMatchObject({
-      code: 'INVALID_PROJECT_ID'
-    });
-    await expect(
-      fixture.service.setContext({
-        alias: 'prod',
-        defaultLocation: 'Atlantis'
-      })
-    ).rejects.toMatchObject({
-      code: 'INVALID_LOCATION'
-    });
-    await expect(
-      fixture.service.removeProfile({
-        alias: 'missing'
-      })
-    ).rejects.toMatchObject({
-      code: 'PROFILE_NOT_FOUND'
-    });
-    await expect(
-      fixture.service.setDefault({
-        alias: 'missing'
-      })
-    ).rejects.toMatchObject({
-      code: 'PROFILE_NOT_FOUND'
-    });
   });
 });

@@ -214,7 +214,7 @@ describe('dbaas validation through the built CLI', () => {
     {
       args: ['myaccount', 'dbaas', 'get', 'not-a-number'],
       stderr:
-        'Error: DBaaS ID must be numeric.\n\nNext step: Pass the numeric dbaas id as the first argument.\n'
+        'Error: DBaaS ID must be numeric.\n\nNext step: Pass the numeric dbaas id with <dbaasId>.\n'
     },
     {
       args: [
@@ -228,7 +228,7 @@ describe('dbaas validation through the built CLI', () => {
         ' '
       ],
       stderr:
-        'Error: VPC ID cannot be empty.\n\nNext step: Pass the numeric vpc id as the VPC ID argument.\n'
+        'Error: VPC ID cannot be empty.\n\nNext step: Pass a non-empty value with --vpc-id.\n'
     },
     {
       args: [

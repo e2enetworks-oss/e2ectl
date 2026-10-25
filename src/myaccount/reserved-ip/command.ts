@@ -21,7 +21,10 @@ export function buildReservedIpCommand(runtime: CliRuntime): Command {
     createNodeClient: (credentials) => runtime.createNodeClient(credentials),
     createReservedIpClient: (credentials) =>
       runtime.createReservedIpClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('reserved-ip').description(

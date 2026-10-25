@@ -135,6 +135,10 @@ describe('reserved-ip commands', () => {
     );
 
     const nodeClient: NodeClient = {
+      createSnapshot: vi.fn(),
+      deleteSnapshot: vi.fn(),
+      listSnapshots: vi.fn(),
+      saveSnapshotAsImage: vi.fn(),
       attachSshKeys: vi.fn(),
       createNode: vi.fn(),
       deleteNode: vi.fn(),
@@ -144,6 +148,8 @@ describe('reserved-ip commands', () => {
       listNodes: vi.fn(),
       powerOffNode: vi.fn(),
       powerOnNode: vi.fn(),
+      rebootNode: vi.fn(),
+      setDeletionProtection: vi.fn(),
       saveNodeImage: vi.fn(),
       upgradeNode: vi.fn()
     };
@@ -178,8 +184,7 @@ describe('reserved-ip commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
   }
 

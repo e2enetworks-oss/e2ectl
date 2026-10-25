@@ -12,8 +12,7 @@ describe('config formatter', () => {
         prod: {
           api_key: '12345678',
           auth_token: 'abcdefgh',
-          default_project_id: '42',
-          default_location: 'Delhi'
+          myaccount: { location: 'Delhi', project_id: '42' }
         }
       },
       default: 'prod'
@@ -25,12 +24,10 @@ describe('config formatter', () => {
     expect(summary[0]).toMatchObject({
       api_key: '****5678',
       auth_token: '****efgh',
-      default_project_id: '42',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '42' }
     });
     expect(table).toContain('****5678');
-    expect(table).toContain('Default Project ID');
-    expect(table).toContain('Default Location');
+    expect(table).toContain('MyAccount Context');
     expect(table).toContain('Delhi');
   });
 
@@ -40,8 +37,7 @@ describe('config formatter', () => {
         prod: {
           api_key: '1234567890abcdef',
           auth_token: 'x'.repeat(2048) + 'hUpk',
-          default_project_id: '46429',
-          default_location: 'Delhi'
+          myaccount: { location: 'Delhi', project_id: '46429' }
         }
       },
       default: 'prod'
@@ -89,31 +85,15 @@ describe('config formatter', () => {
     expect(output).toBe('Removed profile "staging".\n');
   });
 
-  it('renders human set-context output', () => {
-    const output = renderConfigResult(
-      {
-        action: 'set-context',
-        alias: 'prod',
-        config: {
-          profiles: {
-            prod: { api_key: 'api-key', auth_token: 'auth-token' }
-          },
-          default: 'prod'
-        }
-      },
-      false
-    );
-
-    expect(output).toBe('Updated default context for "prod".\n');
-  });
-
   it('renders empty list message when no profiles are saved', () => {
     const output = renderConfigResult(
       { action: 'list', config: { profiles: {} } },
       false
     );
 
-    expect(output).toBe('No profiles saved.\n');
+    expect(output).toBe(
+      'No profiles saved. Run e2ectl configure to save one.\n'
+    );
   });
 
   it('renders human list output with profile table when profiles exist', () => {
@@ -126,8 +106,7 @@ describe('config formatter', () => {
             prod: {
               api_key: 'api-key',
               auth_token: 'auth-token',
-              default_location: 'Delhi',
-              default_project_id: '42'
+              myaccount: { location: 'Delhi', project_id: '42' }
             }
           }
         }
@@ -137,6 +116,41 @@ describe('config formatter', () => {
 
     expect(output).toContain('prod');
     expect(output).toContain('Delhi');
+  });
+
+  it('shows the saved TIR context in the table and in JSON', () => {
+    const config: ConfigFile = {
+      default: 'prod',
+      profiles: {
+        prod: {
+          api_key: 'api-key',
+          auth_token: 'auth-token',
+          tir: { account_id: '12', project_id: '34', location: 'Chennai' }
+        },
+        partial: {
+          api_key: 'api-key',
+          auth_token: 'auth-token',
+          tir: { account_id: '56' }
+        }
+      }
+    };
+
+    const human = renderConfigResult({ action: 'list', config }, false);
+    expect(human).toContain('account 12, project 34, Chennai');
+    expect(human).toContain('account 56');
+
+    const json = JSON.parse(
+      renderConfigResult({ action: 'list', config }, true)
+    ) as {
+      profiles: { alias: string; tir: unknown }[];
+    };
+    expect(
+      json.profiles.find((profile) => profile.alias === 'prod')?.tir
+    ).toEqual({
+      account_id: '12',
+      location: 'Chennai',
+      project_id: '34'
+    });
   });
 
   it('renders human imported output with new default and saved defaults', () => {
@@ -151,10 +165,7 @@ describe('config formatter', () => {
         },
         filePath: '/tmp/creds.json',
         importedAliases: ['prod'],
-        importedDefaults: {
-          default_location: 'Delhi',
-          default_project_id: '42'
-        },
+        importedDefaults: { location: 'Delhi', project_id: '42' },
         previousDefault: undefined
       },
       false
@@ -163,8 +174,8 @@ describe('config formatter', () => {
     expect(output).toContain('Imported 1 profile from "/tmp/creds.json".');
     expect(output).toContain('Saved aliases: prod.');
     expect(output).toContain('Set "prod" as the default profile.');
-    expect(output).toContain('Saved default project ID "42"');
-    expect(output).toContain('Saved default location "Delhi"');
+    expect(output).toContain('Saved MyAccount project ID "42"');
+    expect(output).toContain('Saved MyAccount location "Delhi"');
   });
 
   it('renders human imported output with same-default message', () => {
@@ -241,10 +252,7 @@ describe('config formatter', () => {
         },
         filePath: '/tmp/creds.json',
         importedAliases: ['prod'],
-        importedDefaults: {
-          default_location: 'Delhi',
-          default_project_id: '42'
-        },
+        importedDefaults: { location: 'Delhi', project_id: '42' },
         previousDefault: undefined
       },
       true
@@ -335,9 +343,9 @@ describe('config formatter', () => {
         '      "alias": "prod",\n' +
         '      "api_key": "****-key",\n' +
         '      "auth_token": "****oken",\n' +
-        '      "default_location": "",\n' +
-        '      "default_project_id": "",\n' +
-        '      "isDefault": true\n' +
+        '      "isDefault": true,\n' +
+        '      "myaccount": null,\n' +
+        '      "tir": null\n' +
         '    }\n' +
         '  ]\n' +
         '}\n'

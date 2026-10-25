@@ -1,5 +1,6 @@
-import { AppError, EXIT_CODES } from '../core/errors.js';
+import { AppError, EXIT_CODES, type ExitCode } from '../core/errors.js';
 import { isNonEmptyString, isRecord } from '../core/guards.js';
+import { maskSecret } from '../core/mask.js';
 import { sanitizeUrl } from '../core/url.js';
 import { sleep } from '../core/waiter.js';
 
@@ -13,13 +14,17 @@ import type {
   FetchLike
 } from './types.js';
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+// Some E2E calls (TIR image lists, volume lists) take several seconds.
+const DEFAULT_TIMEOUT_MS = 30_000;
 const GET_RETRY_BACKOFF_MS = 250;
 const RETRYABLE_GET_STATUS_CODES = new Set([500, 502, 503, 504]);
 
 type HttpMethod = NonNullable<ApiRequestOptions['method']>;
 
 export interface TransportProjectContext {
+  // When set, requests also carry the credentials' account_id under this
+  // query name (TIR calls it active_iam).
+  accountParameter?: string;
   // Next step shown when a request needs a project and location but the
   // credentials have none.
   missingContextSuggestion: string;
@@ -31,6 +36,9 @@ export interface HttpTransportOptions extends ApiClientOptions {
   // Each platform passes its own address; there is no shared default, so a
   // platform can never send requests to another platform's API by mistake.
   baseUrl: string;
+  // Next step shown when the API answers 403. Defaults to checking the
+  // key and token.
+  forbiddenSuggestion?: string;
   // When set, every request sends the credentials' project_id and location
   // unless the call passes includeProjectContext: false.
   projectContext?: TransportProjectContext;
@@ -59,6 +67,7 @@ export class HttpTransport implements ApiTransport {
   private readonly baseUrl: string;
   private readonly credentials: ApiClientCredentials;
   private readonly fetchFn: FetchLike;
+  private readonly forbiddenSuggestion: string | undefined;
   private readonly projectContext: TransportProjectContext | undefined;
   private readonly timeoutMs: number;
 
@@ -70,6 +79,7 @@ export class HttpTransport implements ApiTransport {
     this.credentials = credentials;
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.fetchFn = options.fetchFn ?? fetch;
+    this.forbiddenSuggestion = options.forbiddenSuggestion;
     this.projectContext = options.projectContext;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
@@ -179,10 +189,12 @@ export class HttpTransport implements ApiTransport {
     const { parseError, payload, preview } = await parseResponseBody(response);
     const parsedResponse: FallbackApiErrorInput = {
       apiName: this.apiName,
+      forbiddenSuggestion: this.forbiddenSuggestion,
       path: options.path,
       payload,
       request_url: sanitizeUrl(requestUrl),
       response,
+      secrets: [this.credentials.api_key, this.credentials.auth_token],
       ...(parseError === undefined ? {} : { parseError }),
       ...(preview === undefined ? {} : { preview })
     };
@@ -242,7 +254,7 @@ export class HttpTransport implements ApiTransport {
           details: [`Timed out after ${this.timeoutMs}ms`, location],
           exitCode: EXIT_CODES.network,
           suggestion:
-            'Retry the command. If the timeout persists, check network connectivity or raise the timeout in a future revision.'
+            'E2E did not answer in time. Retry the command; if it keeps timing out, check your network or try again later.'
         })
       );
     }
@@ -300,9 +312,18 @@ export class HttpTransport implements ApiTransport {
     path: string,
     projectContext: TransportProjectContext
   ): void {
-    const { location, project_id: projectId } = this.credentials;
+    const {
+      account_id: accountId,
+      location,
+      project_id: projectId
+    } = this.credentials;
+    const needsAccount = projectContext.accountParameter !== undefined;
 
-    if (projectId === undefined || location === undefined) {
+    if (
+      projectId === undefined ||
+      location === undefined ||
+      (needsAccount && accountId === undefined)
+    ) {
       throw new AppError(
         `${this.apiName} project context is required for this request.`,
         {
@@ -314,6 +335,12 @@ export class HttpTransport implements ApiTransport {
       );
     }
 
+    if (
+      projectContext.accountParameter !== undefined &&
+      accountId !== undefined
+    ) {
+      url.searchParams.set(projectContext.accountParameter, accountId);
+    }
     url.searchParams.set('project_id', projectId);
     url.searchParams.set('location', location);
   }
@@ -355,9 +382,12 @@ interface ParsedResponseBody {
 
 interface FallbackApiErrorInput extends ParsedResponseBody {
   apiName: string;
+  forbiddenSuggestion: string | undefined;
   path: string;
   request_url: string;
   response: FetchLikeResponse;
+  // The key and token: never repeated in an error, even when the API does.
+  secrets: string[];
 }
 
 function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
@@ -447,7 +477,11 @@ function buildFallbackApiError(
     return undefined;
   }
 
-  const message = extractFallbackApiMessage(payload) ?? 'Unexpected API error';
+  const hide = (text: string): string => hideSecrets(text, input.secrets);
+  const message = hide(
+    chooseFallbackApiMessage(payload, response.statusText) ??
+      'Unexpected API error'
+  );
   const details = [
     `HTTP status: ${response.status} ${response.statusText}`,
     `Path: ${path}`,
@@ -456,20 +490,73 @@ function buildFallbackApiError(
     ...(preview === undefined || isRecord(payload)
       ? []
       : [`Response preview: ${preview}`])
-  ];
+  ].map(hide);
 
   return new AppError(`${input.apiName} API request failed: ${message}`, {
     code: 'API_REQUEST_FAILED',
     details,
-    exitCode:
-      response.status === 401 || response.status === 403
-        ? EXIT_CODES.auth
-        : EXIT_CODES.network,
-    suggestion:
-      response.status === 401 || response.status === 403
-        ? 'Verify the saved token and API key, then run the command again.'
-        : 'Check the request inputs and try again.'
+    exitCode: chooseFailureExitCode(response.status, message),
+    httpStatus: response.status,
+    suggestion: chooseFailureSuggestion(
+      response.status,
+      input.forbiddenSuggestion
+    )
   });
+}
+
+// 3 for a key or token E2E refuses (it answers an unknown key with 404),
+// 5 for failures worth retrying (timeouts, rate limits, server errors), and
+// 1 for anything else E2E refused, such as a bad id: retrying will not help.
+function chooseFailureExitCode(status: number, message: string): ExitCode {
+  if (status === 401 || status === 403 || /no client found/i.test(message)) {
+    return EXIT_CODES.auth;
+  }
+
+  if (status === 408 || status === 429 || status >= 500) {
+    return EXIT_CODES.network;
+  }
+
+  return EXIT_CODES.general;
+}
+
+// The API's message, unless it only repeats the HTTP status text and a
+// string in errors says what actually went wrong.
+function chooseFallbackApiMessage(
+  payload: unknown,
+  statusText: string
+): string | undefined {
+  const message = extractFallbackApiMessage(payload);
+  const isOnlyStatusText =
+    message !== undefined &&
+    message.toLowerCase() === statusText.trim().toLowerCase();
+
+  return isOnlyStatusText &&
+    isRecord(payload) &&
+    isNonEmptyString(payload.errors)
+    ? payload.errors.trim()
+    : message;
+}
+
+function hideSecrets(text: string, secrets: string[]): string {
+  return secrets
+    .filter((secret) => secret.length > 0)
+    .reduce(
+      (masked, secret) => masked.split(secret).join(maskSecret(secret)),
+      text
+    );
+}
+
+function chooseFailureSuggestion(
+  status: number,
+  forbiddenSuggestion: string | undefined
+): string {
+  if (status === 403 && forbiddenSuggestion !== undefined) {
+    return forbiddenSuggestion;
+  }
+
+  return status === 401 || status === 403
+    ? 'Verify the saved token and API key, then run the command again.'
+    : 'Check the request inputs and try again.';
 }
 
 function buildInvalidResponseDetails(input: FallbackApiErrorInput): string[] {
@@ -549,7 +636,11 @@ function hasStatusCodeFailure(payload: Record<string, unknown>): boolean {
 }
 
 function summarizeResponseBody(value: string): string | undefined {
-  const normalized = value.replace(/\s+/g, ' ').trim();
+  // Some replies (EOS key and access lists) carry secret keys; never show them.
+  const normalized = value
+    .replace(/("secret_key"\s*:\s*")[^"]*"/g, '$1[REDACTED]"')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (normalized.length === 0) {
     return undefined;
   }

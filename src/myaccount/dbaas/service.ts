@@ -34,8 +34,6 @@ import {
   normalizeOptionalString,
   normalizePassword,
   normalizePasswordSource,
-  normalizeRequiredNumericId,
-  normalizeRequiredString,
   wrapPasswordReadError
 } from './normalizers.js';
 import type {
@@ -73,6 +71,10 @@ import type {
   DbaasWhitelistUpdateOptions,
   SupportedDatabaseType
 } from './types/index.js';
+import {
+  normalizeRequiredNumericId,
+  normalizeRequiredString
+} from '../../core/normalize.js';
 
 export class DbaasService {
   constructor(private readonly dependencies: DbaasServiceDependencies) {}
@@ -475,7 +477,7 @@ export class DbaasService {
     const vpcId = normalizeRequiredNumericId(
       options.vpcId,
       'VPC ID',
-      'the VPC ID argument'
+      '--vpc-id'
     );
     const subnetId =
       options.subnetId === undefined

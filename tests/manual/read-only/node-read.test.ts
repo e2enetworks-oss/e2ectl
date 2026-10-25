@@ -47,7 +47,7 @@ interface NodeCatalogPlansJson extends JsonCommandResult {
 }
 
 interface NodeListJson extends JsonCommandResult {
-  nodes: unknown[];
+  items: unknown[];
 }
 
 interface ProjectListJson extends JsonCommandResult {
@@ -151,7 +151,7 @@ describeManual('manual read-only built CLI checks', () => {
         );
 
         expect(nodeList.action).toBe('list');
-        expect(Array.isArray(nodeList.nodes)).toBe(true);
+        expect(Array.isArray(nodeList.items)).toBe(true);
 
         const projectList = await runJsonCommand<ProjectListJson>(
           ['myaccount', 'project', 'list'],
@@ -217,7 +217,7 @@ describeManual('manual read-only built CLI checks', () => {
       ]);
 
       expect(nodeList.action).toBe('list');
-      expect(Array.isArray(nodeList.nodes)).toBe(true);
+      expect(Array.isArray(nodeList.items)).toBe(true);
     }
   );
 

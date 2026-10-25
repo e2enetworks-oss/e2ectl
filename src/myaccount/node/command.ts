@@ -3,7 +3,7 @@ import { Command, Option } from 'commander';
 import { addContextOptions } from '../../app/context-options.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { CliRuntime } from '../../app/index.js';
-import { renderNodeResult } from './formatter.js';
+import { renderNodeResult, renderNodeSnapshotResult } from './formatter.js';
 import {
   NodeService,
   type NodeCatalogPlansOptions,
@@ -11,6 +11,7 @@ import {
   type NodeDeleteOptions,
   type NodePublicIpDetachOptions,
   type NodeSaveImageOptions,
+  type NodeSnapshotDeleteOptions,
   type NodeUpgradeOptions,
   type NodeVolumeActionOptions,
   type NodeVpcActionOptions
@@ -37,6 +38,7 @@ interface NodeCreateCommandOptions extends NodeContextOptions {
   plan: string;
   savedImageTemplateId?: string;
   sshKeyId?: string[] | string;
+  wait?: boolean;
 }
 
 type NodeUpgradeCommandOptions = NodeUpgradeOptions;
@@ -62,7 +64,13 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
     createVolumeClient: (credentials) =>
       runtime.createVolumeClient(credentials),
     createVpcClient: (credentials) => runtime.createVpcClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
+    progress: (line) => {
+      runtime.stderr.write(line);
+    },
     store: runtime.store
   });
   const command = new Command('node').description('Manage MyAccount nodes.');
@@ -70,6 +78,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   command.helpCommand('help [command]', 'Show help for a node command');
   command.addCommand(buildNodeCatalogCommand(service, runtime));
   command.addCommand(buildNodeActionCommand(service, runtime));
+  command.addCommand(buildNodeSnapshotCommand(service, runtime));
 
   addContextOptions(
     command
@@ -95,6 +104,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       )
       .requiredOption('--name <name>', 'Node name.')
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('node create --name web-1 --plan <plan> --image <image> --wait')}\nFind <plan> and <image> with ${formatMyAccountCommand('node catalog plans')}.\n`
+      )
       .option(
         '--image <image>',
         'Catalog image identifier returned by node catalog plans.'
@@ -124,6 +137,10 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         'Saved SSH key id to attach during node creation. Repeat to attach multiple keys.',
         collectOptionValue
       )
+      .option(
+        '--wait',
+        'Return only when the node is running (checks every 10 seconds, up to 20 minutes).'
+      )
   ).action(
     async (options: NodeCreateCommandOptions, commandInstance: Command) => {
       const result = await service.createNode({
@@ -151,7 +168,8 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
         ...(options.savedImageTemplateId === undefined
           ? {}
           : { savedImageTemplateId: options.savedImageTemplateId }),
-        sshKeyIds: toOptionArray(options.sshKeyId)
+        sshKeyIds: toOptionArray(options.sshKeyId),
+        ...(options.wait === undefined ? {} : { wait: options.wait })
       });
       runtime.stdout.write(
         renderNodeResult(
@@ -183,9 +201,14 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   addContextOptions(
     command
       .command('upgrade <nodeId>')
-      .description('Request a node plan and image change.')
+      .description(
+        'Move a node to another plan. Keeps the image the node runs unless --image is given.'
+      )
       .requiredOption('--plan <plan>', 'MyAccount node plan identifier.')
-      .requiredOption('--image <image>', 'MyAccount image identifier.')
+      .option(
+        '--image <image>',
+        'Image to switch to. Leave out to keep the current image.'
+      )
       .option('--force', 'Skip the interactive confirmation prompt.')
   ).action(
     async (
@@ -196,7 +219,7 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
       const result = await service.upgradeNode(nodeId, {
         ...(options.alias === undefined ? {} : { alias: options.alias }),
         ...(options.force === undefined ? {} : { force: options.force }),
-        image: options.image,
+        ...(options.image === undefined ? {} : { image: options.image }),
         ...(options.location === undefined
           ? {}
           : {
@@ -250,12 +273,110 @@ export function buildNodeCommand(runtime: CliRuntime): Command {
   return command;
 }
 
+function buildNodeSnapshotCommand(
+  service: NodeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('snapshot').description(
+    'Take, list and delete node snapshots, and save one as an image (the safe restore: the node is not changed).'
+  );
+  const write = (
+    result: Awaited<ReturnType<NodeService['listSnapshots']>>,
+    commandInstance: Command
+  ): void => {
+    runtime.stdout.write(
+      renderNodeSnapshotResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  };
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a node snapshot command'
+  );
+
+  addContextOptions(
+    command
+      .command('list <nodeId>')
+      .description('List the snapshots of a node.')
+  ).action(
+    async (nodeId: string, options: NodeContextOptions, instance: Command) => {
+      write(await service.listSnapshots(nodeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('create <nodeId>')
+      .description(
+        'Take a snapshot of a running or powered-off node. It is ready when snapshot list shows it.'
+      )
+      .requiredOption('--name <name>', 'Snapshot name.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(await service.createSnapshot(nodeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('delete <nodeId> <snapshotId>')
+      .description('Delete a node snapshot.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      nodeId: string,
+      snapshotId: string,
+      options: NodeSnapshotDeleteOptions,
+      instance: Command
+    ) => {
+      write(
+        await service.deleteSnapshot(nodeId, snapshotId, options),
+        instance
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('save-image <nodeId> <snapshotId>')
+      .description(
+        'Save a snapshot as a new image. The node is not changed; create a new node from the image to restore.'
+      )
+      .requiredOption('--name <name>', 'Name for the new image.')
+  ).action(
+    async (
+      nodeId: string,
+      snapshotId: string,
+      options: NodeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(
+        await service.saveSnapshotAsImage(nodeId, snapshotId, options),
+        instance
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
 function buildNodeActionCommand(
   service: NodeService,
   runtime: CliRuntime
 ): Command {
   const command = new Command('action').description(
-    'Run power, image, public-IP, and attachment actions on a node.'
+    'Run power, reboot, protection, image, public-IP, and attachment actions on a node.'
   );
 
   command.helpCommand('help [command]', 'Show help for a node action command');
@@ -295,6 +416,59 @@ function buildNodeActionCommand(
       );
     }
   );
+
+  addContextOptions(
+    command.command('reboot <nodeId>').description('Reboot a node.')
+  ).action(
+    async (
+      nodeId: string,
+      options: NodeContextOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.rebootNode(nodeId, options);
+      runtime.stdout.write(
+        renderNodeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  for (const [name, enabled, description] of [
+    [
+      'protect',
+      true,
+      'Turn on deletion protection: the node cannot be deleted until it is turned off.'
+    ],
+    [
+      'unprotect',
+      false,
+      'Turn off deletion protection so the node can be deleted.'
+    ]
+  ] as const) {
+    addContextOptions(
+      command.command(`${name} <nodeId>`).description(description)
+    ).action(
+      async (
+        nodeId: string,
+        options: NodeContextOptions,
+        commandInstance: Command
+      ) => {
+        const result = await service.setDeletionProtection(
+          nodeId,
+          enabled,
+          options
+        );
+        runtime.stdout.write(
+          renderNodeResult(
+            result,
+            commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+          )
+        );
+      }
+    );
+  }
 
   addContextOptions(
     command
@@ -718,6 +892,12 @@ function buildNodeCatalogCommand(
         '--family <family>',
         'Optional family label returned by the catalog, for example "CPU Intensive 3rd Generation".'
       )
+      .option(
+        '--gpu-type <gpuType>',
+        'Only plans with this GPU card, for example A100 or Nvidia-T4. GPU rows use --display-category GPU --category Gpu.'
+      )
+      .option('--min-vcpu <count>', 'Only plans with at least this many vCPUs.')
+      .option('--min-ram <gb>', 'Only plans with at least this much RAM in GB.')
   ).action(
     async (options: NodeCatalogPlansOptions, commandInstance: Command) => {
       const result = await service.listCatalogPlans(options);

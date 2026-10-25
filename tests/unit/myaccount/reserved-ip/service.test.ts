@@ -13,8 +13,7 @@ function createConfig(): ConfigFile {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        default_location: 'Delhi',
-        default_project_id: '46429'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   };
@@ -81,6 +80,10 @@ function createServiceFixture(options?: {
     reserveNodePublicIp
   };
   const nodeClient: NodeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys: vi.fn(),
     createNode: vi.fn(),
     deleteNode: vi.fn(),
@@ -90,6 +93,8 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode: vi.fn(),
     powerOnNode: vi.fn(),
+    rebootNode: vi.fn(),
+    setDeletionProtection: vi.fn(),
     saveNodeImage: vi.fn(),
     upgradeNode: vi.fn()
   };

@@ -1,4 +1,7 @@
-export { buildProjectCommand } from './command.js';
+export {
+  buildMyAccountConfigureCommand,
+  buildProjectCommand
+} from './command.js';
 export { ProjectApiClient, type ProjectClient } from './client.js';
 export type {
   ProjectCreateResult,
@@ -6,3 +9,4 @@ export type {
   ProjectStarUnstarResult,
   ProjectSummary
 } from './types.js';
+export { configureMyAccount } from './configure.js';

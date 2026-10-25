@@ -23,6 +23,7 @@ The guides are split into two paths:
 - [Config](./config.md)
 - [Project](./project.md)
 - [DBaaS](./dbaas.md)
+- [EOS](./eos.md)
 - [Load Balancer](./load-balancer.md)
 - [SSL](./ssl.md)
 - [Node](./node.md)
@@ -33,5 +34,6 @@ The guides are split into two paths:
 - [Security group](./security-group.md)
 - [SSH key](./ssh-key.md)
 - [Support ticket](./support-ticket.md)
+- [TIR](./tir.md)
 
 Command-guide filenames match the CLI command families so you can jump from `e2ectl <command> --help` directly into the matching page.

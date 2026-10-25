@@ -4,6 +4,7 @@ import type {
   ApiTransport
 } from '../../http/index.js';
 
+import type { SnapshotApiItem } from '../snapshot/index.js';
 import type {
   VolumeCreateRequest,
   VolumeCreateResult,
@@ -26,7 +27,26 @@ type VolumeListApiResponse = ApiResponse<
 const BLOCK_STORAGE_PATH = '/block_storage/';
 const BLOCK_STORAGE_PLANS_PATH = '/block_storage/plans/';
 
+// Snapshot quirks: the volume must be attached to a node; one snapshot is
+// addressed by its snapshot_id (not snapshot_uuid as for nodes), on a path
+// with no trailing slash; restore is a PUT that saves it as a new volume.
 export interface VolumeClient {
+  createSnapshot(volumeId: number, name: string): Promise<{ message: string }>;
+  deleteSnapshot(
+    volumeId: number,
+    snapshotId: string
+  ): Promise<{ message: string }>;
+  listSnapshots(volumeId: number): Promise<SnapshotApiItem[]>;
+  // E2E resizes through the attached node and renames the volume to
+  // `name`, so the current name must be sent to keep it.
+  resizeVolume(
+    volumeId: number,
+    body: { block_storage_size: number; name: string; vm_id: number }
+  ): Promise<{ message: string }>;
+  saveSnapshotAsVolume(
+    volumeId: number,
+    body: { name: string; snapshot_id: number; vm_id: number }
+  ): Promise<{ message: string }>;
   attachVolumeToNode(
     volumeId: number,
     body: VolumeNodeActionRequest
@@ -58,6 +78,63 @@ export class VolumeApiClient implements VolumeClient {
     });
 
     return mapVolumeNodeActionResponse(response);
+  }
+
+  async createSnapshot(
+    volumeId: number,
+    name: string
+  ): Promise<{ message: string }> {
+    const response = await this.transport.post(
+      `${buildVolumePath(volumeId)}snapshot/`,
+      { body: { name } }
+    );
+
+    return { message: response.message };
+  }
+
+  async deleteSnapshot(
+    volumeId: number,
+    snapshotId: string
+  ): Promise<{ message: string }> {
+    const response = await this.transport.delete(
+      `${buildVolumePath(volumeId)}snapshot/${snapshotId}`
+    );
+
+    return { message: response.message };
+  }
+
+  async listSnapshots(volumeId: number): Promise<SnapshotApiItem[]> {
+    const response = await this.transport.get<ApiEnvelope<SnapshotApiItem[]>>(
+      `${buildVolumePath(volumeId)}snapshot/`
+    );
+
+    return response.data;
+  }
+
+  async resizeVolume(
+    volumeId: number,
+    body: { block_storage_size: number; name: string; vm_id: number }
+  ): Promise<{ message: string }> {
+    const response = await this.transport.request({
+      body,
+      method: 'PUT',
+      path: `${buildVolumePath(volumeId)}vm/upgrade/`
+    });
+
+    return { message: response.message };
+  }
+
+  async saveSnapshotAsVolume(
+    volumeId: number,
+    body: { name: string; snapshot_id: number; vm_id: number }
+  ): Promise<{ message: string }> {
+    const response = await this.transport.request({
+      body,
+      method: 'PUT',
+      path: `${buildVolumePath(volumeId)}restore/`
+    });
+
+    return { message: response.message };
   }
 
   async createVolume(body: VolumeCreateRequest): Promise<VolumeCreateResult> {

@@ -22,7 +22,10 @@ export function buildSecurityGroupCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createSecurityGroupClient: (credentials) =>
       runtime.createSecurityGroupClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     readRulesFile: async (path) => await readFile(path, 'utf8'),
     readRulesFromStdin: readAllFromStdin,
     store: runtime.store

@@ -5,7 +5,10 @@ import { buildDbaasCommand } from './dbaas/index.js';
 import { buildImageCommand } from './image/index.js';
 import { buildLoadBalancerCommand } from './load-balancer/index.js';
 import { buildNodeCommand } from './node/index.js';
-import { buildProjectCommand } from './project/index.js';
+import {
+  buildMyAccountConfigureCommand,
+  buildProjectCommand
+} from './project/index.js';
 import { buildReservedIpCommand } from './reserved-ip/index.js';
 import { buildSecurityGroupCommand } from './security-group/index.js';
 import { buildSshKeyCommand } from './ssh-key/index.js';
@@ -13,14 +16,16 @@ import { buildSslCommand } from './ssl/index.js';
 import { buildSupportTicketCommand } from './support-ticket/index.js';
 import { buildVolumeCommand } from './volume/index.js';
 import { buildVpcCommand } from './vpc/index.js';
+import { buildEosCommand } from './eos/index.js';
 
 export function buildMyAccountCommand(runtime: CliRuntime): Command {
   const command = new Command('myaccount').description(
-    'Manage E2E MyAccount resources: nodes, storage, networking, databases, load balancers, projects and support tickets.'
+    'Manage E2E MyAccount resources: nodes, storage, object storage (EOS), networking, databases, load balancers, projects and support tickets.'
   );
 
   command.helpCommand('help [command]', 'Show help for a myaccount command');
 
+  command.addCommand(buildMyAccountConfigureCommand(runtime));
   command.addCommand(buildProjectCommand(runtime));
   command.addCommand(buildDbaasCommand(runtime));
   command.addCommand(buildLoadBalancerCommand(runtime));
@@ -33,6 +38,7 @@ export function buildMyAccountCommand(runtime: CliRuntime): Command {
   command.addCommand(buildSshKeyCommand(runtime));
   command.addCommand(buildSslCommand(runtime));
   command.addCommand(buildSupportTicketCommand(runtime));
+  command.addCommand(buildEosCommand(runtime));
 
   command.action(() => {
     command.outputHelp();

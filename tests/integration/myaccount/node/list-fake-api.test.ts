@@ -58,7 +58,7 @@ describe('node list against a fake MyAccount API', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'list',
-          nodes: [
+          items: [
             {
               id: 101,
               is_locked: false,

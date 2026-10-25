@@ -26,12 +26,25 @@ npm install -g @e2enetworks-oss/e2ectl@next
 
 ## Quickstart
 
-1. Create an API token in [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam) and download the generated config JSON file.
-2. Import the file into a saved profile:
+1. Create an API key and token in [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam).
+2. Set up `e2ectl`. It asks for the key and token, then which platforms you use (TIR is
+   recommended) and where each should run:
 
 ```bash
-e2ectl config import --file ~/Downloads/myaccount-config.json
+e2ectl configure
 ```
+
+Change one platform later with `e2ectl tir configure` or `e2ectl myaccount configure`. In scripts,
+put the key and token in `E2E_API_KEY` and `E2E_AUTH_TOKEN` and the values in flags; giving a
+platform's flags sets that platform up. One command can set up both:
+
+```bash
+e2ectl configure \
+  --tir-account-id <account-id> --tir-project-id <project-id> --tir-location Chennai \
+  --myaccount-project-id <project-id> --myaccount-location Chennai
+```
+
+Steps 3 and 4 use MyAccount, so choose it during setup too.
 
 3. Discover an exact node plan and image:
 
@@ -77,6 +90,7 @@ Command guides:
 - [Config](./docs/user-guides/config.md)
 - [Project](./docs/user-guides/project.md)
 - [DBaaS](./docs/user-guides/dbaas.md)
+- [EOS](./docs/user-guides/eos.md)
 - [Load Balancer](./docs/user-guides/load-balancer.md)
 - [SSL](./docs/user-guides/ssl.md)
 - [Node](./docs/user-guides/node.md)
@@ -87,6 +101,7 @@ Command guides:
 - [Security group](./docs/user-guides/security-group.md)
 - [SSH key](./docs/user-guides/ssh-key.md)
 - [Support ticket](./docs/user-guides/support-ticket.md)
+- [TIR](./docs/user-guides/tir.md)
 
 ## Contributors And Maintainers
 

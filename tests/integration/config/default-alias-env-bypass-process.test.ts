@@ -46,7 +46,7 @@ describe('stale default alias env bypass process flow', () => {
       expect(result.stdout).toBe(
         `${stableStringify({
           action: 'list',
-          nodes: [],
+          items: [],
           total_count: 0,
           total_page_number: 0
         })}\n`

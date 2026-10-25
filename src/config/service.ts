@@ -2,8 +2,9 @@ import { CliError, EXIT_CODES } from '../core/errors.js';
 import { formatCliCommand } from '../app/metadata.js';
 import type { ApiAuthCredentials } from '../http/index.js';
 import { readImportedProfiles } from './import-file.js';
-import type { ConfigFile, ProfileConfig } from './types.js';
+import type { ConfigFile, MyAccountContext, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
+import { normalizeRequiredString } from '../core/normalize.js';
 
 export interface ImportProfilesInput {
   default?: string;
@@ -11,17 +12,10 @@ export interface ImportProfilesInput {
   defaultProjectId?: string;
   file: string;
   force?: boolean;
-  input?: boolean;
 }
 
 export interface RemoveProfileInput {
   alias: string;
-}
-
-export interface SetContextInput {
-  alias: string;
-  defaultLocation?: string;
-  defaultProjectId?: string;
 }
 
 export interface SetDefaultInput {
@@ -30,12 +24,6 @@ export interface SetDefaultInput {
 
 export interface ConfigListCommandResult {
   action: 'list';
-  config: ConfigFile;
-}
-
-export interface ConfigSetContextCommandResult {
-  action: 'set-context';
-  alias: string;
   config: ConfigFile;
 }
 
@@ -56,9 +44,7 @@ export interface ConfigImportedCommandResult {
   config: ConfigFile;
   filePath: string;
   importedAliases: string[];
-  importedDefaults: Partial<
-    Pick<ProfileConfig, 'default_project_id' | 'default_location'>
-  >;
+  importedDefaults: MyAccountContext;
   previousDefault: string | undefined;
 }
 
@@ -66,7 +52,6 @@ export type ConfigCommandResult =
   | ConfigImportedCommandResult
   | ConfigListCommandResult
   | ConfigRemovedCommandResult
-  | ConfigSetContextCommandResult
   | ConfigSetDefaultCommandResult;
 
 interface ProfileValidator {
@@ -82,10 +67,6 @@ interface ConfigStoreLike {
   read(): Promise<ConfigFile>;
   removeProfile(alias: string): Promise<ConfigFile>;
   setDefault(alias: string): Promise<ConfigFile>;
-  updateProfile(
-    alias: string,
-    patch: Partial<ProfileConfig>
-  ): Promise<ConfigFile>;
   write(config: ConfigFile): Promise<void>;
 }
 
@@ -112,7 +93,7 @@ export class ConfigService {
     const importedAliases = Object.keys(importedSecrets).sort((left, right) =>
       left.localeCompare(right)
     );
-    const canPrompt = this.canPromptForInput(options);
+    const canPrompt = this.dependencies.isInteractive;
     const currentConfig = await this.dependencies.store.read();
 
     await this.confirmOverwriteIfNeeded(
@@ -232,35 +213,6 @@ export class ConfigService {
     };
   }
 
-  async setContext(
-    options: SetContextInput
-  ): Promise<ConfigSetContextCommandResult> {
-    const alias = normalizeRequiredAlias(
-      options.alias,
-      'Profile alias',
-      '--alias'
-    );
-    const defaultProjectId = normalizeOptionalString(options.defaultProjectId);
-    const defaultLocation = normalizeOptionalString(options.defaultLocation);
-
-    await this.assertProfileExists(alias);
-    assertHasAtLeastOneContextValue(options);
-    validateOptionalContextDefaults(defaultProjectId, defaultLocation);
-
-    return {
-      action: 'set-context',
-      alias,
-      config: await this.dependencies.store.updateProfile(alias, {
-        ...(defaultProjectId === undefined
-          ? {}
-          : { default_project_id: defaultProjectId }),
-        ...(defaultLocation === undefined
-          ? {}
-          : { default_location: defaultLocation })
-      })
-    };
-  }
-
   async setDefault(
     options: SetDefaultInput
   ): Promise<ConfigSetDefaultCommandResult> {
@@ -288,12 +240,6 @@ export class ConfigService {
         suggestion: `Run \`${formatCliCommand('config list')}\` to inspect the saved aliases.`
       });
     }
-  }
-
-  private canPromptForInput(
-    options: Pick<ImportProfilesInput, 'input'>
-  ): boolean {
-    return this.dependencies.isInteractive && (options.input ?? true);
   }
 
   private async confirmOverwriteIfNeeded(
@@ -414,9 +360,7 @@ export class ConfigService {
   private async resolveImportedDefaults(
     options: ImportProfilesInput,
     canPrompt: boolean
-  ): Promise<
-    Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>>
-  > {
+  ): Promise<MyAccountContext> {
     const defaultProjectId =
       normalizeOptionalString(options.defaultProjectId) ??
       (canPrompt
@@ -441,88 +385,37 @@ export class ConfigService {
     return {
       ...(defaultProjectId === undefined
         ? {}
-        : {
-            default_project_id: defaultProjectId
-          }),
-      ...(defaultLocation === undefined
-        ? {}
-        : {
-            default_location: defaultLocation
-          })
+        : { project_id: defaultProjectId }),
+      ...(defaultLocation === undefined ? {} : { location: defaultLocation })
     };
   }
 }
 
 function applyImportedDefaults(
   profiles: Record<string, ProfileConfig>,
-  defaults: Partial<
-    Pick<ProfileConfig, 'default_project_id' | 'default_location'>
-  >
+  defaults: MyAccountContext
 ): Record<string, ProfileConfig> {
-  if (
-    defaults.default_project_id === undefined &&
-    defaults.default_location === undefined
-  ) {
+  if (defaults.project_id === undefined && defaults.location === undefined) {
     return profiles;
   }
 
   return Object.fromEntries(
     Object.entries(profiles).map(([alias, profile]) => [
       alias,
-      {
-        ...profile,
-        ...(defaults.default_project_id === undefined
-          ? {}
-          : {
-              default_project_id: defaults.default_project_id
-            }),
-        ...(defaults.default_location === undefined
-          ? {}
-          : {
-              default_location: defaults.default_location
-            })
-      }
+      { ...profile, myaccount: { ...profile.myaccount, ...defaults } }
     ])
   );
 }
 
 function preserveExistingProfileContext(
   profile: ProfileConfig | undefined
-): Partial<
-  Pick<ProfileConfig, 'default_project_id' | 'default_location' | 'tir'>
-> {
-  if (profile === undefined) {
-    return {};
-  }
-
+): Pick<ProfileConfig, 'myaccount' | 'tir'> {
   return {
-    ...(profile.default_project_id === undefined
+    ...(profile?.myaccount === undefined
       ? {}
-      : {
-          default_project_id: profile.default_project_id
-        }),
-    ...(profile.default_location === undefined
-      ? {}
-      : {
-          default_location: profile.default_location
-        }),
-    ...(profile.tir === undefined ? {} : { tir: profile.tir })
+      : { myaccount: profile.myaccount }),
+    ...(profile?.tir === undefined ? {} : { tir: profile.tir })
   };
-}
-
-function assertHasAtLeastOneContextValue(options: SetContextInput): void {
-  if (
-    normalizeOptionalString(options.defaultProjectId) !== undefined ||
-    normalizeOptionalString(options.defaultLocation) !== undefined
-  ) {
-    return;
-  }
-
-  throw new CliError('At least one default context value must be provided.', {
-    code: 'MISSING_DEFAULT_CONTEXT',
-    exitCode: EXIT_CODES.usage,
-    suggestion: 'Pass --default-project-id, --default-location, or both.'
-  });
 }
 
 function getProfile(
@@ -556,23 +449,6 @@ function normalizeRequiredAlias(
   flag: string
 ): string {
   return normalizeRequiredString(value, label, flag);
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function validateOptionalContextDefaults(

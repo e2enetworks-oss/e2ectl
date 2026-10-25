@@ -94,8 +94,7 @@ describe('ssh-key commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
   }
 
@@ -208,6 +207,7 @@ describe('ssh-key commands', () => {
 
   it('creates SSH keys from files in deterministic json mode', async () => {
     const { runtime, stdout, stub } = createRuntimeFixture();
+    stub.listSshKeys.mockResolvedValueOnce([]);
     await seedProfile(runtime);
     const program = createProgram(runtime);
     const publicKeyPath = createTestConfigPath('ssh-key-public');
@@ -239,6 +239,7 @@ describe('ssh-key commands', () => {
     expect(stdout.buffer).toBe(
       `${stableStringify({
         action: 'create',
+        created: true,
         item: {
           attached_nodes: 0,
           created_at: '19-Feb-2025',
@@ -254,7 +255,8 @@ describe('ssh-key commands', () => {
   });
 
   it('renders human create output when json mode is off', async () => {
-    const { runtime, stdout } = createRuntimeFixture();
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    stub.listSshKeys.mockResolvedValueOnce([]);
     await seedProfile(runtime);
     const program = createProgram(runtime);
     const publicKeyPath = createTestConfigPath('ssh-key-public-human');
@@ -281,6 +283,36 @@ describe('ssh-key commands', () => {
     expect(stdout.buffer).toContain('Added SSH key: demo');
     expect(stdout.buffer).toContain('ID: 15398');
     expect(stdout.buffer).toContain('Type: ED25519');
+  });
+
+  it('says in text mode that the same key is already saved', async () => {
+    const { runtime, stdout, stub } = createRuntimeFixture();
+    await seedProfile(runtime);
+    const publicKeyPath = createTestConfigPath('ssh-key-public-same');
+    await writeFile(
+      publicKeyPath,
+      'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA other-comment\n',
+      'utf8'
+    );
+
+    await createProgram(runtime).parseAsync([
+      'node',
+      CLI_COMMAND_NAME,
+      'myaccount',
+      'ssh-key',
+      'create',
+      '--alias',
+      'prod',
+      '--label',
+      'other',
+      '--public-key-file',
+      publicKeyPath
+    ]);
+
+    expect(stdout.buffer).toContain(
+      'This key is already saved as "demo"; returning it instead of adding a copy.'
+    );
+    expect(stub.createSshKey).not.toHaveBeenCalled();
   });
 
   it('gets one SSH key in deterministic json mode', async () => {

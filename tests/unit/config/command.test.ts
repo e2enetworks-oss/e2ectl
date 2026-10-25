@@ -111,8 +111,7 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
 
     await program.parseAsync(['node', CLI_COMMAND_NAME, 'config', 'list']);
@@ -131,8 +130,7 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
     await store.upsertProfile('staging', {
       api_key: 'api-999999',
@@ -156,17 +154,17 @@ describe('config commands', () => {
             alias: 'prod',
             api_key: '****3456',
             auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '12345',
-            isDefault: true
+            isDefault: true,
+            myaccount: { location: 'Delhi', project_id: '12345' },
+            tir: null
           },
           {
             alias: 'staging',
             api_key: '****9999',
             auth_token: '****8888',
-            default_location: '',
-            default_project_id: '',
-            isDefault: false
+            isDefault: false,
+            myaccount: null,
+            tir: null
           }
         ]
       })
@@ -180,14 +178,12 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
     await store.upsertProfile('staging', {
       api_key: 'api-999999',
       auth_token: 'auth-888888',
-      default_project_id: '67890',
-      default_location: 'Chennai'
+      myaccount: { location: 'Chennai', project_id: '67890' }
     });
 
     await program.parseAsync([
@@ -209,58 +205,17 @@ describe('config commands', () => {
             alias: 'prod',
             api_key: '****3456',
             auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '12345',
-            isDefault: false
+            isDefault: false,
+            myaccount: { location: 'Delhi', project_id: '12345' },
+            tir: null
           },
           {
             alias: 'staging',
             api_key: '****9999',
             auth_token: '****8888',
-            default_location: 'Chennai',
-            default_project_id: '67890',
-            isDefault: true
-          }
-        ]
-      })
-    );
-  });
-
-  it('updates the default context for a saved alias', async () => {
-    const { runtime, stdout, store } = createRuntimeFixture();
-    const program = createProgram(runtime);
-
-    await store.upsertProfile('prod', {
-      api_key: 'api-123456',
-      auth_token: 'auth-654321'
-    });
-
-    await program.parseAsync([
-      'node',
-      CLI_COMMAND_NAME,
-      '--json',
-      'config',
-      'set-context',
-      '--alias',
-      'prod',
-      '--default-project-id',
-      '46429',
-      '--default-location',
-      'Delhi'
-    ]);
-
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'set-context',
-        default: 'prod',
-        profiles: [
-          {
-            alias: 'prod',
-            api_key: '****3456',
-            auth_token: '****4321',
-            default_location: 'Delhi',
-            default_project_id: '46429',
-            isDefault: true
+            isDefault: true,
+            myaccount: { location: 'Chennai', project_id: '67890' },
+            tir: null
           }
         ]
       })
@@ -274,8 +229,7 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-123456',
       auth_token: 'auth-654321',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
 
     await program.parseAsync([
@@ -343,19 +297,17 @@ describe('config commands', () => {
     expect(config.profiles.prod).toMatchObject({
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
     expect(config.profiles.staging).toMatchObject({
       api_key: 'api-staging',
       auth_token: 'auth-staging',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
     expect(stdout.buffer).toContain('Imported 2 profiles');
     expect(stdout.buffer).toContain('Saved aliases: prod, staging.');
-    expect(stdout.buffer).toContain('Saved default project ID "46429"');
-    expect(stdout.buffer).toContain('Saved default location "Delhi"');
+    expect(stdout.buffer).toContain('Saved MyAccount project ID "46429"');
+    expect(stdout.buffer).toContain('Saved MyAccount location "Delhi"');
     expect(stdout.buffer).toContain('Set "prod" as the default profile.');
   });
 
@@ -401,8 +353,7 @@ describe('config commands', () => {
     expect(config.profiles.prod).toMatchObject({
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
     expect(stdout.buffer).toBe(
       toJsonOutput({
@@ -415,9 +366,9 @@ describe('config commands', () => {
             alias: 'prod',
             api_key: '****prod',
             auth_token: '****prod',
-            default_location: 'Delhi',
-            default_project_id: '46429',
-            isDefault: true
+            isDefault: true,
+            myaccount: { location: 'Delhi', project_id: '46429' },
+            tir: null
           }
         ],
         saved_default_location: 'Delhi',
@@ -479,8 +430,7 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-existing',
       auth_token: 'auth-existing',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
 
     await program.parseAsync([
@@ -508,8 +458,7 @@ describe('config commands', () => {
         prod: {
           api_key: 'api-imported',
           auth_token: 'auth-imported',
-          default_project_id: '46429',
-          default_location: 'Delhi'
+          myaccount: { location: 'Delhi', project_id: '46429' }
         }
       }
     });
@@ -531,8 +480,7 @@ describe('config commands', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-existing',
       auth_token: 'auth-existing',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
 
     await program.parseAsync([
@@ -562,8 +510,7 @@ describe('config commands', () => {
         prod: {
           api_key: 'api-imported',
           auth_token: 'auth-imported',
-          default_project_id: '99999',
-          default_location: 'Chennai'
+          myaccount: { location: 'Chennai', project_id: '99999' }
         }
       }
     });
@@ -582,8 +529,7 @@ describe('config commands', () => {
     await store.upsertProfile('existing', {
       api_key: 'api-existing',
       auth_token: 'auth-existing',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
     const initialConfig = await store.read();
 
@@ -621,8 +567,7 @@ describe('config commands', () => {
     await store.upsertProfile('existing', {
       api_key: 'api-existing',
       auth_token: 'auth-existing',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
     const initialConfig = await store.read();
 

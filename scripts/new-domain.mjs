@@ -18,8 +18,6 @@ import {
   registerInPlatformIndex,
   registerInRuntime,
   registerInTestRuntime,
-  registerPlatformInProgram,
-  renderPlatformFiles,
   renderProductFiles
 } from './helpers/new-domain.mjs';
 
@@ -35,7 +33,7 @@ async function main() {
     (file) =>
       !file.startsWith('src/app/') &&
       file !== 'tests/helpers/runtime.ts' &&
-      !file.endsWith(`src/${names.platform}/index.ts`)
+      file !== `src/${names.platform}/index.ts`
   );
   const clash = newFiles.find((file) => existsSync(path.join(repoRoot, file)));
   if (clash !== undefined) {
@@ -93,30 +91,16 @@ function planChanges(names) {
     );
   }
 
-  const isNewPlatform = !existsSync(
-    path.join(repoRoot, 'src', names.platform, 'index.ts')
-  );
+  const indexPath = `src/${names.platform}/index.ts`;
   const changes = {
     ...renderProductFiles(names),
-    'src/app/runtime.ts': registerInRuntime(runtimeSource, names, {
-      addTransportImport: isNewPlatform
-    }),
+    'src/app/runtime.ts': registerInRuntime(runtimeSource, names),
     'tests/helpers/runtime.ts': registerInTestRuntime(
       read('tests/helpers/runtime.ts'),
       names
-    )
+    ),
+    [indexPath]: registerInPlatformIndex(read(indexPath), names)
   };
-
-  if (isNewPlatform) {
-    Object.assign(changes, renderPlatformFiles(names));
-    changes['src/app/program.ts'] = registerPlatformInProgram(
-      read('src/app/program.ts'),
-      names
-    );
-  } else {
-    const indexPath = `src/${names.platform}/index.ts`;
-    changes[indexPath] = registerInPlatformIndex(read(indexPath), names);
-  }
 
   return changes;
 }

@@ -79,13 +79,11 @@ describe('createRuntime', () => {
       api_key: 'api-key',
       auth_token: 'auth-token',
       location: 'Delhi',
-      project_id: '12345',
-      source: 'profile'
+      project_id: '12345'
     };
     const resolvedAccountCredentials: ResolvedAccountCredentials = {
       api_key: 'api-key',
-      auth_token: 'auth-token',
-      source: 'env'
+      auth_token: 'auth-token'
     };
 
     expect(runtime.credentialValidator).toBeInstanceOf(ApiCredentialValidator);

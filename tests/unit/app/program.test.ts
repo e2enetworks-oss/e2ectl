@@ -6,11 +6,12 @@ import { createProgram } from '../../../src/app/program.js';
 // Every runnable command today, written as typed after `e2ectl`. A command
 // lost or renamed by mistake fails here; new products may add more.
 const EXPECTED_COMMANDS = [
+  'configure',
   'config import',
   'config list',
-  'config set-context',
   'config set-default',
   'config remove',
+  'myaccount configure',
   'myaccount project list',
   'myaccount project create',
   'myaccount project star',
@@ -49,6 +50,9 @@ const EXPECTED_COMMANDS = [
   'myaccount node action power-on',
   'myaccount node action power-off',
   'myaccount node action save-image',
+  'myaccount node action reboot',
+  'myaccount node action protect',
+  'myaccount node action unprotect',
   'myaccount node action public-ip detach',
   'myaccount node action vpc attach',
   'myaccount node action vpc detach',
@@ -57,6 +61,19 @@ const EXPECTED_COMMANDS = [
   'myaccount node action security-group attach',
   'myaccount node action security-group detach',
   'myaccount node action ssh-key attach',
+  'myaccount node snapshot list',
+  'myaccount node snapshot create',
+  'myaccount node snapshot delete',
+  'myaccount node snapshot save-image',
+  'myaccount eos bucket list',
+  'myaccount eos bucket create',
+  'myaccount eos bucket delete',
+  'myaccount eos key list',
+  'myaccount eos key create',
+  'myaccount eos key delete',
+  'myaccount eos access list',
+  'myaccount eos access grant',
+  'myaccount eos access revoke',
   'myaccount node list',
   'myaccount node create',
   'myaccount node get',
@@ -72,7 +89,12 @@ const EXPECTED_COMMANDS = [
   'myaccount reserved-ip attach node',
   'myaccount reserved-ip detach node',
   'myaccount reserved-ip delete',
+  'myaccount volume snapshot list',
+  'myaccount volume snapshot create',
+  'myaccount volume snapshot delete',
+  'myaccount volume snapshot save-volume',
   'myaccount volume list',
+  'myaccount volume resize',
   'myaccount volume plans',
   'myaccount volume create',
   'myaccount volume get',
@@ -100,7 +122,12 @@ const EXPECTED_COMMANDS = [
   'myaccount support-ticket create',
   'myaccount support-ticket reply',
   'myaccount support-ticket close',
-  'myaccount support-ticket reopen'
+  'myaccount support-ticket reopen',
+  'tir account list',
+  'tir project list',
+  'tir configure',
+  'tir image list',
+  'tir plan list'
 ];
 
 function listRunnableCommands(
@@ -124,14 +151,16 @@ describe('createProgram', () => {
 
     expect(program.name()).toBe(CLI_COMMAND_NAME);
     expect(
-      program.commands.slice(0, 2).map((command) => command.name())
-    ).toEqual(['config', 'myaccount']);
+      program.commands.slice(0, 3).map((command) => command.name())
+    ).toEqual(['configure', 'config', 'myaccount']);
   });
 
   it('registers every command under its expected name', () => {
     const commands = listRunnableCommands(createProgram());
 
-    expect(EXPECTED_COMMANDS).toHaveLength(95);
+    expect(EXPECTED_COMMANDS).toHaveLength(122);
+    // Contains rather than equals, so the generator check in CI can add a
+    // sample product without failing this test.
     expect(commands).toEqual(expect.arrayContaining(EXPECTED_COMMANDS));
   });
 });

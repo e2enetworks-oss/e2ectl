@@ -4,15 +4,23 @@ import {
   type ResolvedCredentials
 } from '../../config/index.js';
 import { formatMyAccountCommand } from '../api.js';
+import { confirmUnlessForced } from '../../core/confirm.js';
 import { CliError, EXIT_CODES, isAppError } from '../../core/errors.js';
+import {
+  normalizeSnapshotId,
+  toSnapshotItem,
+  type SnapshotItem
+} from '../snapshot/index.js';
 import type { VolumeClient } from './client.js';
 import type {
   VolumeCommittedPlan,
   VolumeCreateRequest,
   VolumeCreateResult,
+  VolumeDetails,
   VolumePlan,
   VolumeSummary
 } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 const VOLUME_LIST_PAGE_SIZE = 100;
 const VOLUME_LIST_MAX_PAGES = 500;
@@ -135,7 +143,49 @@ export interface VolumeGetCommandResult {
   volume: VolumeDetailItem;
 }
 
+export interface VolumeResizeOptions extends VolumeContextOptions {
+  force?: boolean;
+  size: string;
+}
+
+export interface VolumeResizeCommandResult {
+  action: 'resize';
+  cancelled: boolean;
+  message: string | null;
+  previous_size_gb: number | null;
+  size_gb: number;
+  volume_id: number;
+}
+
+export interface VolumeSnapshotDeleteOptions extends VolumeContextOptions {
+  force?: boolean;
+}
+
+export type VolumeSnapshotCommandResult =
+  | { action: 'snapshot-list'; items: SnapshotItem[]; volume_id: number }
+  | {
+      action: 'snapshot-create';
+      message: string;
+      name: string;
+      volume_id: number;
+    }
+  | {
+      action: 'snapshot-delete';
+      cancelled: boolean;
+      message?: string;
+      snapshot_id: string;
+      volume_id: number;
+    }
+  | {
+      action: 'snapshot-save-volume';
+      message: string;
+      snapshot_id: string;
+      volume_id: number;
+      volume_name: string;
+    };
+
 export type VolumeCommandResult =
+  | VolumeResizeCommandResult
   | VolumeCreateCommandResult
   | VolumeDeleteCommandResult
   | VolumeGetCommandResult
@@ -361,6 +411,160 @@ export class VolumeService {
       items: items.map((item) => normalizeVolumeListItem(item)),
       total_count: totalCount,
       total_page_number: totalPageNumber
+    };
+  }
+
+  async resizeVolume(
+    volumeId: string,
+    options: VolumeResizeOptions
+  ): Promise<VolumeResizeCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const sizeGb = normalizePositiveInteger(options.size, 'Size', '--size');
+    const client = await this.createClient(options);
+    const [volume, plans] = await Promise.all([
+      client.getVolume(normalizedVolumeId),
+      client.listVolumePlans()
+    ]);
+    const vmId = requireAttachedVmId(volume, normalizedVolumeId);
+    const currentSizeGb = normalizeVolumeDetailItem(volume).size_gb;
+
+    assertCanGrowTo(sizeGb, currentSizeGb, normalizedVolumeId);
+    assertListedSize(sizeGb, summarizeVolumePlans(plans));
+
+    const outcome = {
+      action: 'resize' as const,
+      previous_size_gb: currentSizeGb,
+      size_gb: sizeGb,
+      volume_id: normalizedVolumeId
+    };
+    // Volumes only grow, and the bigger size is billed, so ask first.
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
+      `Grow volume ${normalizedVolumeId} to ${sizeGb} GB? A volume cannot be shrunk again.`
+    );
+    if (!confirmed) {
+      return { ...outcome, cancelled: true, message: null };
+    }
+
+    const result = await client.resizeVolume(normalizedVolumeId, {
+      block_storage_size: sizeGb,
+      name: volume.name,
+      vm_id: vmId
+    });
+
+    return {
+      ...outcome,
+      cancelled: false,
+      message: result.message
+    };
+  }
+
+  async listSnapshots(
+    volumeId: string,
+    options: VolumeContextOptions
+  ): Promise<VolumeSnapshotCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const client = await this.createClient(options);
+    // The list answers empty for a volume that does not exist, so look the
+    // volume up too, to report a wrong id.
+    const [, items] = await Promise.all([
+      client.getVolume(normalizedVolumeId),
+      client.listSnapshots(normalizedVolumeId)
+    ]);
+
+    return {
+      action: 'snapshot-list',
+      items: items.map((item) => toSnapshotItem(item, 'snapshot_id')),
+      volume_id: normalizedVolumeId
+    };
+  }
+
+  async createSnapshot(
+    volumeId: string,
+    options: VolumeContextOptions & { name: string }
+  ): Promise<VolumeSnapshotCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
+    const client = await this.createClient(options);
+    requireAttachedVmId(
+      await client.getVolume(normalizedVolumeId),
+      normalizedVolumeId
+    );
+    const result = await client.createSnapshot(normalizedVolumeId, name);
+
+    return {
+      action: 'snapshot-create',
+      message: result.message,
+      name,
+      volume_id: normalizedVolumeId
+    };
+  }
+
+  async deleteSnapshot(
+    volumeId: string,
+    snapshotId: string,
+    options: VolumeSnapshotDeleteOptions
+  ): Promise<VolumeSnapshotCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId, 'snapshot_id');
+
+    const confirmed = await confirmUnlessForced(
+      this.dependencies,
+      options.force,
+      `Delete snapshot ${normalizedSnapshotId} of volume ${normalizedVolumeId}? This cannot be undone.`
+    );
+    if (!confirmed) {
+      return {
+        action: 'snapshot-delete',
+        cancelled: true,
+        snapshot_id: normalizedSnapshotId,
+        volume_id: normalizedVolumeId
+      };
+    }
+
+    const client = await this.createClient(options);
+    const result = await client.deleteSnapshot(
+      normalizedVolumeId,
+      normalizedSnapshotId
+    );
+
+    return {
+      action: 'snapshot-delete',
+      cancelled: false,
+      message: result.message,
+      snapshot_id: normalizedSnapshotId,
+      volume_id: normalizedVolumeId
+    };
+  }
+
+  // The safe restore: E2E saves the snapshot as a new volume; the existing
+  // volume is not changed.
+  async saveSnapshotAsVolume(
+    volumeId: string,
+    snapshotId: string,
+    options: VolumeContextOptions & { name: string }
+  ): Promise<VolumeSnapshotCommandResult> {
+    const normalizedVolumeId = assertVolumeId(volumeId);
+    const normalizedSnapshotId = normalizeSnapshotId(snapshotId, 'snapshot_id');
+    const name = normalizeRequiredString(options.name, 'Name', '--name');
+    const client = await this.createClient(options);
+    const vmId = requireAttachedVmId(
+      await client.getVolume(normalizedVolumeId),
+      normalizedVolumeId
+    );
+    const result = await client.saveSnapshotAsVolume(normalizedVolumeId, {
+      name,
+      snapshot_id: Number(normalizedSnapshotId),
+      vm_id: vmId
+    });
+
+    return {
+      action: 'snapshot-save-volume',
+      message: result.message,
+      snapshot_id: normalizedSnapshotId,
+      volume_id: normalizedVolumeId,
+      volume_name: name
     };
   }
 
@@ -980,23 +1184,6 @@ function normalizeOptionalString(
   return normalized.length === 0 ? undefined : normalized;
 }
 
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
-}
-
 function assertCanDelete(isInteractive: boolean, resourceName: string): void {
   if (isInteractive) {
     return;
@@ -1010,6 +1197,53 @@ function assertCanDelete(isInteractive: boolean, resourceName: string): void {
       suggestion: 'Re-run the command with --force to skip the prompt.'
     }
   );
+}
+
+// E2E only grows volumes.
+function assertCanGrowTo(
+  sizeGb: number,
+  currentSizeGb: number | null,
+  volumeId: number
+): void {
+  if (currentSizeGb === null || sizeGb > currentSizeGb) {
+    return;
+  }
+
+  throw new CliError(
+    `Volume ${volumeId} is already ${currentSizeGb} GB; it can only grow.`,
+    {
+      code: 'VOLUME_SIZE_NOT_LARGER',
+      exitCode: EXIT_CODES.usage,
+      suggestion: `Pass a size above ${currentSizeGb} GB from ${formatMyAccountCommand('volume plans')}.`
+    }
+  );
+}
+
+function assertListedSize(sizeGb: number, plans: VolumePlanItem[]): void {
+  if (plans.some((plan) => plan.size_gb === sizeGb)) {
+    return;
+  }
+
+  throw new CliError(`${sizeGb} GB is not a volume size E2E offers.`, {
+    code: 'INVALID_VOLUME_SIZE',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Pick a size from ${formatMyAccountCommand('volume plans')}.`
+  });
+}
+
+// E2E snapshots and resizes a volume through the node it is attached to.
+function requireAttachedVmId(volume: VolumeDetails, volumeId: number): number {
+  // E2E can send vm_id as null for a detached volume.
+  const vmId = volume.vm_detail?.vm_id;
+  if (typeof vmId === 'number') {
+    return vmId;
+  }
+
+  throw new CliError(`Volume ${volumeId} is not attached to a node.`, {
+    code: 'VOLUME_NOT_ATTACHED',
+    exitCode: EXIT_CODES.usage,
+    suggestion: `Attach it first with ${formatMyAccountCommand(`node action volume attach <node-id> --volume-id ${volumeId}`)}.`
+  });
 }
 
 function assertVolumeId(volumeId: string): number {

@@ -17,8 +17,7 @@ function createConfig(): ConfigFile {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        default_location: 'Delhi',
-        default_project_id: '46429'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   };
@@ -132,6 +131,10 @@ function createServiceFixture(options?: {
   );
   const listNodeCatalogPlans = vi.fn(() => Promise.resolve([]));
   const nodeClient: NodeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -141,7 +144,9 @@ function createServiceFixture(options?: {
     listNodes: vi.fn(),
     powerOffNode,
     powerOnNode,
+    rebootNode: vi.fn(),
     saveNodeImage,
+    setDeletionProtection: vi.fn(),
     upgradeNode
   };
   const listSshKeys = vi.fn(() =>
@@ -217,6 +222,11 @@ function createServiceFixture(options?: {
     })
   );
   const volumeClient: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
+    resizeVolume: vi.fn(),
     attachVolumeToNode,
     createVolume: vi.fn(),
     deleteVolume: vi.fn(),
@@ -497,6 +507,7 @@ describe('NodeService', () => {
     expect(upgradeNode.mock.calls[0]?.[1]).not.toHaveProperty('committed_id');
     expect(result).toEqual({
       action: 'upgrade',
+      image_kept: false,
       details: {
         location: 'Delhi',
         new_node_image_id: 8802,
@@ -528,6 +539,7 @@ describe('NodeService', () => {
     expect(upgradeNode).not.toHaveBeenCalled();
     expect(result).toEqual({
       action: 'upgrade',
+      image_kept: false,
       cancelled: true,
       node_id: 101,
       requested: {
@@ -1256,6 +1268,7 @@ describe('NodeService', () => {
           config: {
             disk_gb: 50,
             family: 'CPU Intensive 3rd Generation',
+            gpu: null,
             ram: '4.00',
             series: 'C3',
             vcpu: 2
@@ -1284,6 +1297,7 @@ describe('NodeService', () => {
           config: {
             disk_gb: 100,
             family: 'CPU Intensive 3rd Generation',
+            gpu: null,
             ram: '8.00',
             series: 'C3',
             vcpu: 4

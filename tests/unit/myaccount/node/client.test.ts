@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/http/index.js';
 import { NodeApiClient } from '../../../../src/myaccount/node/client.js';
 import type { NodeCreateRequest } from '../../../../src/myaccount/node/index.js';
+import { createStubTransport } from '../../../helpers/stub-transport.js';
 
 class StubTransport implements ApiTransport {
   readonly deleteMock = vi.fn();
@@ -300,17 +301,17 @@ describe('NodeApiClient', () => {
 
     transport.getMock.mockResolvedValue(
       envelope({
-        category_list: []
+        category_list: {}
       })
     );
 
     const result = await client.listNodeCatalogOs();
 
     expect(transport.getMock).toHaveBeenCalledWith(
-      '/images/os-category/',
+      '/images/category-list/',
       undefined
     );
-    expect(result.category_list).toEqual([]);
+    expect(result.category_list).toEqual({});
   });
 
   it('requests plan and image pairs with the required query filters', async () => {
@@ -500,3 +501,83 @@ function envelope<TData>(
     message: overrides.message ?? 'Success'
   };
 }
+
+describe('NodeApiClient additions', () => {
+  it.each([
+    [
+      'rebootNode',
+      (client: NodeApiClient) => client.rebootNode('101'),
+      {
+        method: 'REQUEST',
+        options: {
+          body: { type: 'reboot' },
+          method: 'PUT',
+          path: '/nodes/101/actions/'
+        }
+      }
+    ],
+    [
+      'setDeletionProtection on',
+      (client: NodeApiClient) => client.setDeletionProtection('101', true),
+      {
+        method: 'REQUEST',
+        options: {
+          body: { type: 'enable_accidental_protection' },
+          method: 'PUT',
+          path: '/nodes/101/actions/'
+        }
+      }
+    ],
+    [
+      'setDeletionProtection off',
+      (client: NodeApiClient) => client.setDeletionProtection('101', false),
+      {
+        method: 'REQUEST',
+        options: {
+          body: { type: 'disable_accidental_protection' },
+          method: 'PUT',
+          path: '/nodes/101/actions/'
+        }
+      }
+    ],
+    [
+      'listSnapshots',
+      (client: NodeApiClient) => client.listSnapshots('101'),
+      { method: 'GET', options: undefined, path: '/nodes/101/snapshots/' }
+    ],
+    [
+      'createSnapshot',
+      (client: NodeApiClient) => client.createSnapshot('101', 'before'),
+      {
+        method: 'POST',
+        options: { body: { name: 'before' } },
+        path: '/nodes/101/snapshots/'
+      }
+    ],
+    [
+      'deleteSnapshot',
+      (client: NodeApiClient) => client.deleteSnapshot('101', 'uuid-1'),
+      {
+        method: 'DELETE',
+        options: undefined,
+        path: '/nodes/101/snapshot/uuid-1'
+      }
+    ],
+    [
+      'saveSnapshotAsImage',
+      (client: NodeApiClient) =>
+        client.saveSnapshotAsImage('101', 'uuid-1', 'restored'),
+      {
+        method: 'POST',
+        options: { body: { disk_id: 0, name: 'restored' } },
+        path: '/nodes/101/snapshot/uuid-1'
+      }
+    ]
+  ])('%s calls the right path', async (_name, call, expected) => {
+    const { calls, transport } = createStubTransport({});
+
+    await call(new NodeApiClient(transport));
+
+    expect(calls).toEqual([expected]);
+  });
+});

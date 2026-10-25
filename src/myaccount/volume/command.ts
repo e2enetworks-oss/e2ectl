@@ -3,13 +3,15 @@ import { Command } from 'commander';
 import { addContextOptions } from '../../app/context-options.js';
 import { formatMyAccountCommand } from '../api.js';
 import type { CliRuntime } from '../../app/index.js';
-import { renderVolumeResult } from './formatter.js';
+import { renderVolumeResult, renderVolumeSnapshotResult } from './formatter.js';
 import {
   VolumeService,
   type VolumeContextOptions,
   type VolumeCreateOptions,
   type VolumeDeleteOptions,
-  type VolumePlansOptions
+  type VolumePlansOptions,
+  type VolumeResizeOptions,
+  type VolumeSnapshotDeleteOptions
 } from './service.js';
 
 interface GlobalOptions {
@@ -21,7 +23,10 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
     confirm: (message) => runtime.confirm(message),
     createVolumeClient: (credentials) =>
       runtime.createVolumeClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('volume').description(
@@ -29,6 +34,7 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
   );
 
   command.helpCommand('help [command]', 'Show help for a volume command');
+  command.addCommand(buildVolumeSnapshotCommand(service, runtime));
 
   addContextOptions(
     command
@@ -101,6 +107,34 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
   });
 
   addContextOptions(
+    command
+      .command('resize <volumeId>')
+      .description(
+        'Grow an attached volume to a larger size from volume plans. E2E resizes it through the node it is attached to; the volume keeps its name and data.'
+      )
+      .requiredOption('--size <size>', 'New size in GB, from volume plans.')
+      .option('--force', 'Skip the confirmation prompt.')
+      .addHelpText(
+        'after',
+        `\nExample:\n  ${formatMyAccountCommand('volume resize 5 --size 250 --force')}\nSizes come from ${formatMyAccountCommand('volume plans')}.\n`
+      )
+  ).action(
+    async (
+      volumeId: string,
+      options: VolumeResizeOptions,
+      commandInstance: Command
+    ) => {
+      const result = await service.resizeVolume(volumeId, options);
+      runtime.stdout.write(
+        renderVolumeResult(
+          result,
+          commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+        )
+      );
+    }
+  );
+
+  addContextOptions(
     command.command('get <volumeId>').description('Get details for a volume.')
   ).action(
     async (
@@ -135,6 +169,108 @@ export function buildVolumeCommand(runtime: CliRuntime): Command {
           result,
           commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
         )
+      );
+    }
+  );
+
+  command.action(() => {
+    command.outputHelp();
+  });
+
+  return command;
+}
+
+function buildVolumeSnapshotCommand(
+  service: VolumeService,
+  runtime: CliRuntime
+): Command {
+  const command = new Command('snapshot').description(
+    'Take, list and delete volume snapshots, and save one as a new volume (the safe restore: the volume is not changed). The volume must be attached to a node.'
+  );
+  const write = (
+    result: Awaited<ReturnType<VolumeService['listSnapshots']>>,
+    commandInstance: Command
+  ): void => {
+    runtime.stdout.write(
+      renderVolumeSnapshotResult(
+        result,
+        commandInstance.optsWithGlobals<GlobalOptions>().json ?? false
+      )
+    );
+  };
+
+  command.helpCommand(
+    'help [command]',
+    'Show help for a volume snapshot command'
+  );
+
+  addContextOptions(
+    command
+      .command('list <volumeId>')
+      .description('List the snapshots of a volume.')
+  ).action(
+    async (
+      volumeId: string,
+      options: VolumeContextOptions,
+      instance: Command
+    ) => {
+      write(await service.listSnapshots(volumeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('create <volumeId>')
+      .description(
+        'Take a snapshot of an attached volume. It is ready when snapshot list shows it.'
+      )
+      .requiredOption('--name <name>', 'Snapshot name.')
+  ).action(
+    async (
+      volumeId: string,
+      options: VolumeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(await service.createSnapshot(volumeId, options), instance);
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('delete <volumeId> <snapshotId>')
+      .description('Delete a volume snapshot.')
+      .option('--force', 'Skip the interactive confirmation prompt.')
+  ).action(
+    async (
+      volumeId: string,
+      snapshotId: string,
+      options: VolumeSnapshotDeleteOptions,
+      instance: Command
+    ) => {
+      write(
+        await service.deleteSnapshot(volumeId, snapshotId, options),
+        instance
+      );
+    }
+  );
+
+  addContextOptions(
+    command
+      .command('save-volume <volumeId> <snapshotId>')
+      .description(
+        'Save a snapshot as a new volume. The volume is not changed; the new volume is billed like any volume.'
+      )
+      .requiredOption('--name <name>', 'Name for the new volume.')
+  ).action(
+    async (
+      volumeId: string,
+      snapshotId: string,
+      options: VolumeContextOptions & { name: string },
+      instance: Command
+    ) => {
+      write(
+        await service.saveSnapshotAsVolume(volumeId, snapshotId, options),
+        instance
       );
     }
   );

@@ -6,6 +6,7 @@ import {
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import type { ImageClient } from './client.js';
 import type { ImageSummary } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 export interface ImageContextOptions {
   alias?: string;
@@ -156,23 +157,6 @@ function summarizeImage(image: ImageSummary): ImageItem {
     scaler_group_count: image.scaler_group_count ?? 0,
     template_id: image.template_id ?? null
   };
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function normalizeImageId(imageId: string): string {

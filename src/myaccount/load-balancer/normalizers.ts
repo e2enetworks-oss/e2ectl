@@ -2,7 +2,6 @@ import { isIPv4 } from 'node:net';
 
 import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
-import { normalizeRequiredNumericId } from '../node/index.js';
 import type { ReservedIpSummary } from '../reserved-ip/index.js';
 import {
   LOAD_BALANCER_ALB_BACKEND_PROTOCOLS,
@@ -26,6 +25,7 @@ import type {
   LoadBalancerServer,
   LoadBalancerUpdateOptions
 } from './types/index.js';
+import { normalizeRequiredNumericId } from '../../core/normalize.js';
 
 export function assertLbType(lbType: string | undefined): LoadBalancerVpc {
   if (lbType === undefined) return 'external';

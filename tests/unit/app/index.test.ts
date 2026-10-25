@@ -39,6 +39,23 @@ describe('runCli', () => {
     };
   }
 
+  it.each([['--no-input'], ['--json']])(
+    'turns prompts off with %s, even in a terminal',
+    async (flag) => {
+      const { runtime, stderr } = createRuntimeFixture({ isInteractive: true });
+
+      const exitCode = await runCli(
+        ['node', CLI_COMMAND_NAME, flag, 'configure'],
+        runtime,
+        stderr
+      );
+
+      expect(runtime.isInteractive).toBe(false);
+      expect(exitCode).toBe(2);
+      expect(stderr.buffer).toContain('Choose at least one platform.');
+    }
+  );
+
   it('formats missing required options as CLI usage errors', async () => {
     const { runtime, stderr, stdout } = createRuntimeFixture();
 
@@ -131,13 +148,31 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(2);
     expect(stdout.buffer).toBe('');
-    expect(stderr.buffer).toBe(expected);
+    if (!args.includes('--json')) {
+      expect(stderr.buffer).toBe(expected);
+      return;
+    }
+
+    // With --json the same facts come as a JSON error.
+    const { error } = JSON.parse(stderr.buffer) as {
+      error: {
+        code: string;
+        exit_code: number;
+        message: string;
+        next_step: string;
+      };
+    };
+    expect(`Error: ${error.message}\n\nNext step: ${error.next_step}\n`).toBe(
+      expected
+    );
+    expect(error).toMatchObject({ code: 'UNKNOWN_COMMAND', exit_code: 2 });
   });
 
   it.each([
     [['help', 'myaccount']],
     [['myaccount', 'help', 'node']],
-    [['myaccount', 'node', 'help', 'list']]
+    [['myaccount', 'node', 'help', 'list']],
+    [['help', 'myaccount', 'node', 'snapshot']]
   ])('exits 0 after showing help through %j', async (args) => {
     const { runtime, stderr } = createRuntimeFixture();
     const writeSpy = vi
@@ -154,6 +189,12 @@ describe('runCli', () => {
       expect(exitCode).toBe(0);
       expect(stderr.buffer).toBe('');
       expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('Usage:'));
+      // help follows every word, down to the last command named.
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Usage: e2ectl ${args.filter((arg) => arg !== 'help').join(' ')}`
+        )
+      );
     } finally {
       writeSpy.mockRestore();
     }

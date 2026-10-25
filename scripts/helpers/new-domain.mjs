@@ -9,7 +9,31 @@ const NAME_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const MYACCOUNT_NAME = 'MyAccount';
 
 // Shared folders under src that must never become a platform.
-const RESERVED_PLATFORMS = new Set(['app', 'config', 'core', 'help', 'http']);
+
+// The platforms the generator knows: how a product finds its credentials,
+// which context flags its commands take, and which address override the
+// runtime hands its transport. MyAccount products need a project and
+// location; TIR products need a TIR account, project and location.
+const PLATFORM_CONTEXT = {
+  myaccount: {
+    clientOptions: 'apiClientOptions',
+    contextFields: ['location', 'projectId'],
+    credentialsResolver: 'resolveStoredCredentials',
+    credentialsType: 'ResolvedCredentials',
+    optionsHelper: 'addContextOptions',
+    resolverRequirement: '',
+    testProfile: "myaccount: { location: 'Delhi', project_id: '1' }"
+  },
+  tir: {
+    clientOptions: 'tirApiClientOptions',
+    contextFields: ['accountId', 'location', 'projectId'],
+    credentialsResolver: 'resolveStoredTirCredentials',
+    credentialsType: 'ResolvedTirCredentials',
+    optionsHelper: 'addTirContextOptions',
+    resolverRequirement: ",\n      'project'",
+    testProfile: "tir: { account_id: '1', location: 'Delhi', project_id: '2' }"
+  }
+};
 
 export function parseDomainName(input) {
   const parts = (input ?? '').trim().split('/');
@@ -29,9 +53,9 @@ export function parseDomainName(input) {
     throw new Error('"help" is the help command, not a product name.');
   }
 
-  if (RESERVED_PLATFORMS.has(platform)) {
+  if (!Object.hasOwn(PLATFORM_CONTEXT, platform)) {
     throw new Error(
-      `"${platform}" is shared code under src, not a platform. Use a platform such as myaccount or tir.`
+      `"${platform}" is not a platform the generator knows. Use myaccount or tir.`
     );
   }
 
@@ -46,18 +70,7 @@ export function parseDomainName(input) {
 
   return {
     baseName,
-    // How people write the platform name in messages, for example TIR.
-    displayName: isMyAccount ? MYACCOUNT_NAME : platform.toUpperCase(),
-    isMyAccount,
-    // MyAccount products need a project and location; products on other
-    // platforms only need a token and may pick their own context later.
-    credentialsType: isMyAccount
-      ? 'ResolvedCredentials'
-      : 'ResolvedAccountCredentials',
-    credentialsResolver: isMyAccount
-      ? 'resolveStoredCredentials'
-      : 'resolveStoredAccountCredentials',
-    optionsHelper: isMyAccount ? 'addContextOptions' : 'addAliasOption',
+    ...PLATFORM_CONTEXT[platform],
     platform,
     platformName,
     product
@@ -141,42 +154,22 @@ export function registerInPlatformIndex(source, names) {
   );
 }
 
-export function registerPlatformInProgram(source, names) {
-  const withImport = insertAfterLastImport(
-    source,
-    `import { build${names.platformName}Command } from '../${names.platform}/index.js';`
-  );
-
-  return insertAfterLastLine(
-    withImport,
-    '  program.addCommand(',
-    `  program.addCommand(build${names.platformName}Command(runtime));`
-  );
-}
-
-export function registerInRuntime(source, names, { addTransportImport }) {
-  let next = insertAfterLastImport(
+export function registerInRuntime(source, names) {
+  const next = insertAfterLastImport(
     source,
     `import {\n  ${names.baseName}ApiClient,\n  type ${names.baseName}Client\n} from '../${names.platform}/${names.product}/index.js';`
   );
 
-  if (addTransportImport) {
-    next = insertAfterLastImport(
-      next,
-      `import { create${names.platformName}Transport } from '../${names.platform}/api.js';`
-    );
-  }
-
-  next = insertBeforeLine(
+  const withType = insertBeforeLine(
     next,
     '  credentialValidator: CredentialValidator;',
     `  create${names.baseName}Client(credentials: ${names.credentialsType}): ${names.baseName}Client;`
   );
 
   return insertBeforeLine(
-    next,
+    withType,
     '    credentialValidator: new ApiCredentialValidator(',
-    `    create${names.baseName}Client: (credentials) =>\n      new ${names.baseName}ApiClient(\n        create${names.platformName}Transport(credentials, apiClientOptions)\n      ),`
+    `    create${names.baseName}Client: (credentials) =>\n      new ${names.baseName}ApiClient(\n        create${names.platformName}Transport(credentials, ${names.clientOptions})\n      ),`
   );
 }
 
@@ -190,82 +183,12 @@ export function registerInTestRuntime(source, names) {
 
 // --- New files ---------------------------------------------------------------
 
-// A new platform's index registers its first product straight away.
-export function renderPlatformFiles(names) {
-  const { displayName, platform, platformName } = names;
-  const addressConstant = `${platform.toUpperCase().replaceAll('-', '_')}_API_BASE_URL`;
-
-  return {
-    [`src/${platform}/api.ts`]: `import { formatCliCommand } from '../app/metadata.js';
-import { CliError, EXIT_CODES } from '../core/errors.js';
-import {
-  HttpTransport,
-  type ApiClientCredentials,
-  type ApiClientOptions,
-  type ApiTransport
-} from '../http/index.js';
-
-// Set this to the ${displayName} API address before adding real commands.
-// Until then every ${platform} command stops with a clear error instead of
-// sending requests somewhere else. options.baseUrl is not used here: the
-// runtime fills it from the MyAccount address override.
-const ${addressConstant}: string | undefined = undefined;
-
-export function create${platformName}Transport(
-  credentials: ApiClientCredentials,
-  options: ApiClientOptions = {}
-): ApiTransport {
-  const baseUrl = ${addressConstant};
-  if (baseUrl === undefined) {
-    throw new CliError('The ${displayName} API address is not set yet.', {
-      code: 'PLATFORM_ADDRESS_MISSING',
-      exitCode: EXIT_CODES.config,
-      suggestion: 'Set ${addressConstant} in src/${platform}/api.ts.'
-    });
-  }
-
-  return new HttpTransport(credentials, {
-    ...options,
-    apiName: '${displayName}',
-    baseUrl
-  });
-}
-
-// Builds a ${platform} command for hints and errors.
-export function format${platformName}Command(argumentsText: string): string {
-  return formatCliCommand(\`${platform} \${argumentsText}\`);
-}
-`,
-    [`src/${platform}/index.ts`]: `import { Command } from 'commander';
-
-import type { CliRuntime } from '../app/runtime.js';
-import { build${names.baseName}Command } from './${names.product}/index.js';
-
-export function build${platformName}Command(runtime: CliRuntime): Command {
-  const command = new Command('${platform}').description(
-    'Manage E2E ${displayName} resources.'
-  );
-
-  command.helpCommand('help [command]', 'Show help for a ${platform} command');
-
-  command.addCommand(build${names.baseName}Command(runtime));
-
-  command.action(() => {
-    command.outputHelp();
-  });
-
-  return command;
-}
-`
-  };
-}
-
 export function renderProductFiles(names) {
-  const { baseName, isMyAccount, platform, product } = names;
+  const { baseName, contextFields, platform, product } = names;
   const directory = `src/${platform}/${product}`;
   const pathConstant = `${product.toUpperCase().replaceAll('-', '_')}_PATH`;
   const contextOptions = `export interface ${baseName}ContextOptions {
-  alias?: string;${isMyAccount ? '\n  location?: string;\n  projectId?: string;' : ''}
+  alias?: string;${contextFields.map((field) => `\n  ${field}?: string;`).join('')}
 }`;
 
   return {
@@ -390,11 +313,16 @@ export type {
 }
 
 function renderService(names) {
-  const { baseName, credentialsResolver: resolver, credentialsType } = names;
+  const {
+    baseName,
+    credentialsResolver: resolver,
+    credentialsType,
+    resolverRequirement
+  } = names;
 
   return `import {
   ${resolver},
-  type ConfigFile,
+  type CredentialResolutionStore,
   type ${credentialsType}
 } from '../../config/index.js';
 import type { ${baseName}Client } from './client.js';
@@ -403,14 +331,9 @@ import type {
   ${baseName}ListCommandResult
 } from './types.js';
 
-interface ${baseName}Store {
-  readonly configPath: string;
-  read(): Promise<ConfigFile>;
-}
-
 export interface ${baseName}ServiceDependencies {
   create${baseName}Client(credentials: ${credentialsType}): ${baseName}Client;
-  store: ${baseName}Store;
+  store: CredentialResolutionStore;
 }
 
 export class ${baseName}Service {
@@ -421,7 +344,7 @@ export class ${baseName}Service {
   ): Promise<${baseName}ListCommandResult> {
     const credentials = await ${resolver}(
       this.dependencies.store,
-      options
+      options${resolverRequirement}
     );
     const client = this.dependencies.create${baseName}Client(credentials);
     const items = await client.listItems();
@@ -454,8 +377,7 @@ async function run${baseName}List(
   await store.upsertProfile('default', {
     api_key: 'key',
     auth_token: 'token',
-    default_location: 'Delhi',
-    default_project_id: '1'
+    ${names.testProfile}
   });
   const stdout = new MemoryWriter();
   const program = createProgram(

@@ -4,17 +4,23 @@ import type {
   ContextField,
   ProfileConfig,
   ResolvedAccountCredentials,
-  ResolvedCredentials
+  ResolvedCredentials,
+  ResolvedTirCredentials,
+  TirContextField
 } from './types.js';
 import {
   AUTH_ENV_VAR_BY_FIELD,
   CONTEXT_ENV_VAR_BY_FIELD,
   REQUIRED_AUTH_FIELDS,
   REQUIRED_CONTEXT_FIELDS,
-  VALID_LOCATIONS
+  TIR_CONTEXT_ENV_VAR_BY_FIELD
 } from './types.js';
+import { normalizeRequiredNumericId } from '../core/normalize.js';
+import { findLocation, normalizeLocation } from './checks.js';
+import { findProfile } from './store.js';
+import { pickValue, type PickedValue } from './value-order.js';
+import { formatCliCommand } from '../app/metadata.js';
 import { CliError, EXIT_CODES } from '../core/errors.js';
-import { isNonEmptyString } from '../core/guards.js';
 
 export interface ResolveCredentialsOptions {
   alias?: string;
@@ -25,7 +31,14 @@ export interface ResolveCredentialsOptions {
   projectId?: string;
 }
 
-type PartialAuth = Partial<Record<AuthField, string>>;
+export interface ResolveTirCredentialsOptions extends ResolveCredentialsOptions {
+  accountId?: string;
+}
+
+// What a TIR command needs before it can call the API: only a key and token
+// (account list), also an account (project list), or the full context.
+export type TirRequirement = 'account' | 'auth' | 'project';
+
 type PartialContext = Partial<Record<ContextField, string>>;
 
 export interface CredentialResolutionStore {
@@ -33,118 +46,97 @@ export interface CredentialResolutionStore {
   read(): Promise<ConfigFile>;
 }
 
-export function readAuthFromEnv(
-  env: NodeJS.ProcessEnv = process.env
-): PartialAuth {
-  const credentials: PartialAuth = {};
-
-  for (const field of REQUIRED_AUTH_FIELDS) {
-    const value = env[AUTH_ENV_VAR_BY_FIELD[field]];
-    if (isNonEmptyString(value)) {
-      credentials[field] = value.trim();
-    }
-  }
-
-  return credentials;
+// The profile a command works with. `chosenByFlag` is true when --alias named
+// it: the alias is a flag, so the profile's key and token then beat the key
+// and token environment variables.
+interface SelectedProfile {
+  alias: string | undefined;
+  chosenByFlag: boolean;
+  profile: ProfileConfig | undefined;
+  // A saved default alias whose profile no longer exists.
+  staleDefault: string | undefined;
 }
 
-export function readContextFromEnv(
-  env: NodeJS.ProcessEnv = process.env
-): PartialContext {
-  const context: PartialContext = {};
-
-  for (const field of REQUIRED_CONTEXT_FIELDS) {
-    const value = env[CONTEXT_ENV_VAR_BY_FIELD[field]];
-    if (isNonEmptyString(value)) {
-      context[field] = value.trim();
-    }
-  }
-
-  return context;
+interface ResolvedAuth {
+  missing: AuthField[];
+  values: Partial<Record<AuthField, string>>;
 }
 
 export function resolveCredentials(
   options: ResolveCredentialsOptions
 ): ResolvedCredentials {
-  return resolveCredentialSet(options, 'project') as ResolvedCredentials;
+  const env = options.env ?? process.env;
+  const selection = selectProfile(options);
+  const auth = resolveAuth(selection, env);
+  const context = resolveMyAccountContext(options, selection, env);
+  const missingContext = getMissingFields(REQUIRED_CONTEXT_FIELDS, context);
+
+  assertDefaultProfileUsable(options, selection, auth.missing, missingContext);
+  assertAuthResolved(options, selection, auth, 'MyAccount');
+  if (missingContext.length > 0) {
+    throwMissingContextError(options, selection.alias, missingContext);
+  }
+
+  const projectId = context.project_id ?? '';
+  const location = context.location ?? '';
+  validateResolvedContext(projectId, location);
+
+  return withAlias<ResolvedCredentials>(
+    {
+      api_key: auth.values.api_key ?? '',
+      auth_token: auth.values.auth_token ?? '',
+      project_id: projectId,
+      location
+    },
+    selection.alias
+  );
 }
 
 export function resolveAccountCredentials(
   options: ResolveCredentialsOptions
 ): ResolvedAccountCredentials {
-  return resolveCredentialSet(options, 'account');
+  const env = options.env ?? process.env;
+  const selection = selectProfile(options);
+  const auth = resolveAuth(selection, env);
+  const context = resolveMyAccountContext(options, selection, env);
+
+  assertDefaultProfileUsable(options, selection, auth.missing, []);
+  assertAuthResolved(options, selection, auth, 'MyAccount');
+  if (context.project_id !== undefined && context.location !== undefined) {
+    validateResolvedContext(context.project_id, context.location);
+  }
+
+  return withAlias<ResolvedAccountCredentials>(
+    {
+      api_key: auth.values.api_key ?? '',
+      auth_token: auth.values.auth_token ?? '',
+      ...context
+    },
+    selection.alias
+  );
 }
 
-type ResolutionScope = 'account' | 'project';
+export function resolveTirCredentials(
+  options: ResolveTirCredentialsOptions,
+  requirement: TirRequirement
+): ResolvedTirCredentials {
+  const env = options.env ?? process.env;
+  const selection = selectProfile(options);
+  const auth = resolveAuth(selection, env);
 
-function resolveCredentialSet(
-  options: ResolveCredentialsOptions,
-  scope: ResolutionScope
-): ResolvedAccountCredentials | ResolvedCredentials {
-  const envAuth = readAuthFromEnv(options.env);
-  const envContext = readContextFromEnv(options.env);
-  const flagContext = readContextFromFlags(options);
-  if (options.alias !== undefined) {
-    const profile = resolveProfile(
-      options.config,
-      options.alias,
-      options.configPath,
-      options.alias
-    );
+  assertDefaultProfileUsable(options, selection, auth.missing, []);
+  assertAuthResolved(options, selection, auth, 'TIR');
 
-    return buildResolvedCredentials(
-      options,
-      options.alias,
-      profile,
-      envAuth,
-      envContext,
-      flagContext,
-      scope
-    );
-  }
+  const context = resolveTirContext(options, selection, env);
+  assertTirContext(context, requirement);
 
-  const defaultAlias = options.config.default;
-  if (defaultAlias !== undefined) {
-    const defaultProfile = options.config.profiles[defaultAlias];
-    if (defaultProfile !== undefined) {
-      return buildResolvedCredentials(
-        options,
-        defaultAlias,
-        defaultProfile,
-        envAuth,
-        envContext,
-        flagContext,
-        scope
-      );
-    }
-
-    const missingAuthFields = getMissingFields(REQUIRED_AUTH_FIELDS, envAuth);
-    const missingContextFields =
-      scope === 'project'
-        ? getMissingFields(REQUIRED_CONTEXT_FIELDS, {
-            ...envContext,
-            ...flagContext
-          })
-        : [];
-
-    if (missingAuthFields.length > 0 || missingContextFields.length > 0) {
-      throwInvalidDefaultProfileError(
-        options,
-        defaultAlias,
-        missingAuthFields,
-        missingContextFields
-      );
-    }
-  }
-
-  return buildResolvedCredentials(
-    options,
-    undefined,
-    undefined,
-    envAuth,
-    envContext,
-    flagContext,
-    scope
+  return withAlias<ResolvedTirCredentials>(
+    {
+      api_key: auth.values.api_key ?? '',
+      auth_token: auth.values.auth_token ?? '',
+      ...context
+    },
+    selection.alias
   );
 }
 
@@ -152,11 +144,9 @@ export async function resolveStoredCredentials(
   store: CredentialResolutionStore,
   options: Omit<ResolveCredentialsOptions, 'config' | 'configPath'>
 ): Promise<ResolvedCredentials> {
-  const config = await store.read();
-
   return resolveCredentials({
     ...options,
-    config,
+    config: await store.read(),
     configPath: store.configPath
   });
 }
@@ -165,180 +155,252 @@ export async function resolveStoredAccountCredentials(
   store: CredentialResolutionStore,
   options: Omit<ResolveCredentialsOptions, 'config' | 'configPath'>
 ): Promise<ResolvedAccountCredentials> {
-  const config = await store.read();
-
   return resolveAccountCredentials({
     ...options,
-    config,
+    config: await store.read(),
     configPath: store.configPath
   });
 }
 
-function buildResolvedCredentials(
-  options: ResolveCredentialsOptions,
-  profileAlias: string | undefined,
-  profile: ProfileConfig | undefined,
-  envAuth: PartialAuth,
-  envContext: PartialContext,
-  flagContext: PartialContext,
-  scope: ResolutionScope
-): ResolvedAccountCredentials | ResolvedCredentials {
-  const mergedAuth: PartialAuth = {
-    ...(profile === undefined
-      ? {}
-      : {
-          api_key: profile.api_key,
-          auth_token: profile.auth_token
-        }),
-    ...envAuth
-  };
-  const mergedContext: PartialContext = {
-    ...readContextFromProfile(profile),
-    ...envContext,
-    ...flagContext
-  };
+export async function resolveStoredTirCredentials(
+  store: CredentialResolutionStore,
+  options: Omit<ResolveTirCredentialsOptions, 'config' | 'configPath'>,
+  requirement: TirRequirement
+): Promise<ResolvedTirCredentials> {
+  return resolveTirCredentials(
+    {
+      ...options,
+      config: await store.read(),
+      configPath: store.configPath
+    },
+    requirement
+  );
+}
 
-  const missingAuthFields = getMissingFields(REQUIRED_AUTH_FIELDS, mergedAuth);
-  if (missingAuthFields.length > 0) {
-    throwMissingAuthError(options, profileAlias, missingAuthFields);
-  }
-
-  if (scope === 'project') {
-    const missingContextFields = getMissingFields(
-      REQUIRED_CONTEXT_FIELDS,
-      mergedContext
-    );
-    if (missingContextFields.length > 0) {
-      throwMissingContextError(options, profileAlias, missingContextFields);
-    }
-
-    validateResolvedContext(
-      mergedContext.project_id ?? '',
-      mergedContext.location ?? ''
-    );
-
-    const resolvedCredentials: ResolvedCredentials = {
-      api_key: mergedAuth.api_key ?? '',
-      auth_token: mergedAuth.auth_token ?? '',
-      project_id: mergedContext.project_id ?? '',
-      location: mergedContext.location ?? '',
-      source: inferCredentialSource(profile, envAuth)
+function selectProfile(options: ResolveCredentialsOptions): SelectedProfile {
+  if (options.alias !== undefined) {
+    return {
+      alias: options.alias,
+      chosenByFlag: true,
+      profile: requireProfile(options, options.alias),
+      staleDefault: undefined
     };
-
-    return profileAlias === undefined
-      ? resolvedCredentials
-      : {
-          ...resolvedCredentials,
-          alias: profileAlias
-        };
   }
 
-  const optionalContext = buildOptionalResolvedContext(mergedContext);
-  const resolvedCredentials: ResolvedAccountCredentials = {
-    api_key: mergedAuth.api_key ?? '',
-    auth_token: mergedAuth.auth_token ?? '',
-    source: inferCredentialSource(profile, envAuth),
-    ...optionalContext
-  };
+  const defaultAlias = options.config.default;
+  const defaultProfile =
+    defaultAlias === undefined
+      ? undefined
+      : findProfile(options.config, defaultAlias);
+  if (defaultProfile === undefined) {
+    return {
+      alias: undefined,
+      chosenByFlag: false,
+      profile: undefined,
+      staleDefault: defaultAlias
+    };
+  }
 
-  return profileAlias === undefined
-    ? resolvedCredentials
+  return {
+    alias: defaultAlias,
+    chosenByFlag: false,
+    profile: defaultProfile,
+    staleDefault: undefined
+  };
+}
+
+function resolveAuth(
+  selection: SelectedProfile,
+  env: NodeJS.ProcessEnv
+): ResolvedAuth {
+  const picked = pickKeyAndToken(
+    selection.profile,
+    selection.chosenByFlag,
+    env
+  );
+  const values: Partial<Record<AuthField, string>> = {};
+  for (const field of REQUIRED_AUTH_FIELDS) {
+    const value = picked[field]?.value;
+    if (value !== undefined) {
+      values[field] = value;
+    }
+  }
+
+  return { missing: getMissingFields(REQUIRED_AUTH_FIELDS, values), values };
+}
+
+// The key and token in the shared value order. A profile named with --alias
+// counts as a flag, so it beats E2E_API_KEY and E2E_AUTH_TOKEN; the default
+// profile comes after them. e2ectl configure uses this too.
+export function pickKeyAndToken(
+  profile: ProfileConfig | undefined,
+  chosenByFlag: boolean,
+  env: NodeJS.ProcessEnv
+): Record<AuthField, PickedValue | undefined> {
+  const pick = (field: AuthField): PickedValue | undefined =>
+    pickValue({
+      env: env[AUTH_ENV_VAR_BY_FIELD[field]],
+      flag: chosenByFlag ? profile?.[field] : undefined,
+      profile: chosenByFlag ? undefined : profile?.[field]
+    });
+
+  return { api_key: pick('api_key'), auth_token: pick('auth_token') };
+}
+
+function resolveMyAccountContext(
+  options: ResolveCredentialsOptions,
+  selection: SelectedProfile,
+  env: NodeJS.ProcessEnv
+): PartialContext {
+  const projectId = pickValue({
+    flag: options.projectId,
+    env: env[CONTEXT_ENV_VAR_BY_FIELD.project_id],
+    profile: selection.profile?.myaccount?.project_id
+  });
+  const location = pickValue({
+    flag: options.location,
+    env: env[CONTEXT_ENV_VAR_BY_FIELD.location],
+    profile: selection.profile?.myaccount?.location
+  });
+
+  return withCanonicalLocation({
+    ...(projectId === undefined ? {} : { project_id: projectId.value }),
+    ...(location === undefined ? {} : { location: location.value })
+  });
+}
+
+// "chennai" works like "Chennai"; anything else is checked later.
+function withCanonicalLocation<T extends { location?: string }>(context: T): T {
+  return context.location === undefined
+    ? context
     : {
-        ...resolvedCredentials,
-        alias: profileAlias
+        ...context,
+        location: findLocation(context.location) ?? context.location
       };
+}
+
+function resolveTirContext(
+  options: ResolveTirCredentialsOptions,
+  selection: SelectedProfile,
+  env: NodeJS.ProcessEnv
+): Partial<Record<TirContextField, string>> {
+  const flags: Record<TirContextField, string | undefined> = {
+    account_id: options.accountId,
+    location: options.location,
+    project_id: options.projectId
+  };
+  const context: Partial<Record<TirContextField, string>> = {};
+
+  for (const field of Object.keys(flags) as TirContextField[]) {
+    const picked = pickValue({
+      flag: flags[field],
+      env: env[TIR_CONTEXT_ENV_VAR_BY_FIELD[field]],
+      profile: selection.profile?.tir?.[field]
+    });
+    if (picked !== undefined) {
+      context[field] = picked.value;
+    }
+  }
+
+  return withCanonicalLocation(context);
+}
+
+function assertTirContext(
+  context: Partial<Record<TirContextField, string>>,
+  requirement: TirRequirement
+): void {
+  if (requirement === 'auth') {
+    return;
+  }
+
+  if (context.account_id === undefined) {
+    throw new CliError('No TIR account chosen.', {
+      code: 'MISSING_TIR_ACCOUNT',
+      exitCode: EXIT_CODES.config,
+      suggestion: `Run \`${formatCliCommand('tir account list')}\`, then pass --account-id <id>, set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.account_id}, or run \`${formatCliCommand('tir configure')}\`.`
+    });
+  }
+  normalizeRequiredNumericId(
+    context.account_id,
+    'TIR account ID',
+    '--account-id'
+  );
+
+  if (requirement === 'account') {
+    return;
+  }
+
+  if (context.project_id === undefined || context.location === undefined) {
+    throw new CliError('No TIR project and location chosen.', {
+      code: 'MISSING_TIR_PROJECT',
+      exitCode: EXIT_CODES.config,
+      suggestion: `Run \`${formatCliCommand('tir project list')}\`, then \`${formatCliCommand('tir configure --account-id <id> --project-id <id> --location <Delhi|Chennai>')}\`, or set ${TIR_CONTEXT_ENV_VAR_BY_FIELD.project_id} and ${TIR_CONTEXT_ENV_VAR_BY_FIELD.location}.`
+    });
+  }
+  normalizeRequiredNumericId(
+    context.project_id,
+    'TIR project ID',
+    '--project-id'
+  );
+  normalizeLocation(context.location);
 }
 
 function getMissingFields<TField extends string>(
   requiredFields: readonly TField[],
   values: Partial<Record<TField, string>>
 ): TField[] {
-  return requiredFields.filter((field) => {
-    const value = values[field];
-    return !isNonEmptyString(value);
-  });
+  return requiredFields.filter((field) => values[field] === undefined);
 }
 
-function readContextFromFlags(
-  options: Pick<ResolveCredentialsOptions, 'projectId' | 'location'>
-): PartialContext {
-  const context: PartialContext = {};
-
-  if (isNonEmptyString(options.projectId)) {
-    context.project_id = options.projectId.trim();
-  }
-
-  if (isNonEmptyString(options.location)) {
-    context.location = options.location.trim();
-  }
-
-  return context;
+function withAlias<TCredentials extends { alias?: string }>(
+  credentials: TCredentials,
+  alias: string | undefined
+): TCredentials {
+  return alias === undefined ? credentials : { ...credentials, alias };
 }
 
-function readContextFromProfile(
-  profile: ProfileConfig | undefined
-): PartialContext {
-  if (profile === undefined) {
-    return {};
-  }
-
-  const context: PartialContext = {};
-
-  if (isNonEmptyString(profile.default_project_id)) {
-    context.project_id = profile.default_project_id.trim();
-  }
-
-  if (isNonEmptyString(profile.default_location)) {
-    context.location = profile.default_location.trim();
-  }
-
-  return context;
-}
-
-function resolveProfile(
-  config: ConfigFile,
-  alias: string | undefined,
-  configPath: string | undefined,
-  explicitAlias: string | undefined
-): ProfileConfig | undefined {
-  if (alias === undefined) {
-    return undefined;
-  }
-
-  const profile = config.profiles[alias];
+function requireProfile(
+  options: ResolveCredentialsOptions,
+  alias: string
+): ProfileConfig {
+  const profile = findProfile(options.config, alias);
   if (profile !== undefined) {
     return profile;
   }
 
   const details = [`Unknown profile alias: ${alias}`];
-  if (configPath !== undefined) {
-    details.push(`Config path: ${configPath}`);
+  if (options.configPath !== undefined) {
+    details.push(`Config path: ${options.configPath}`);
   }
 
   throw new CliError(`Profile "${alias}" was not found.`, {
     code: 'PROFILE_NOT_FOUND',
     details,
     exitCode: EXIT_CODES.config,
-    suggestion:
-      explicitAlias === undefined
-        ? 'Create a default profile or set E2E_API_KEY and E2E_AUTH_TOKEN.'
-        : 'Choose an existing profile alias or set E2E_API_KEY and E2E_AUTH_TOKEN.'
+    suggestion: `Pick one from \`${formatCliCommand('config list')}\`, save it with \`${formatCliCommand(`configure --alias ${alias}`)}\`, or set E2E_API_KEY and E2E_AUTH_TOKEN.`
   });
 }
 
-function throwInvalidDefaultProfileError(
+// A saved default alias that points at a missing profile is only an error
+// when the environment and flags cannot fill in what the profile would have.
+function assertDefaultProfileUsable(
   options: ResolveCredentialsOptions,
-  alias: string,
+  selection: SelectedProfile,
   missingAuthFields: AuthField[],
   missingContextFields: ContextField[]
-): never {
-  const details = [`Unknown saved default alias: ${alias}`];
+): void {
+  if (
+    selection.staleDefault === undefined ||
+    (missingAuthFields.length === 0 && missingContextFields.length === 0)
+  ) {
+    return;
+  }
+
+  const details = [`Unknown saved default alias: ${selection.staleDefault}`];
 
   if (missingAuthFields.length > 0) {
     details.push(
-      `Missing required auth values without a valid default profile: ${missingAuthFields.join(', ')}`
-    );
-    details.push(
+      `Missing required auth values without a valid default profile: ${missingAuthFields.join(', ')}`,
       `Expected environment variables: ${missingAuthFields
         .map((field) => AUTH_ENV_VAR_BY_FIELD[field])
         .join(', ')}`
@@ -347,60 +409,57 @@ function throwInvalidDefaultProfileError(
 
   if (missingContextFields.length > 0) {
     details.push(
-      `Missing required context values without a valid default profile: ${missingContextFields.join(', ')}`
-    );
-    details.push(
+      `Missing required context values without a valid default profile: ${missingContextFields.join(', ')}`,
       `Expected environment variables: ${missingContextFields
         .map((field) => CONTEXT_ENV_VAR_BY_FIELD[field])
         .join(', ')}`
     );
   }
 
-  if (options.projectId !== undefined || options.location !== undefined) {
-    details.push(
-      `Command flags: --project-id ${options.projectId ?? '<unset>'}, --location ${options.location ?? '<unset>'}`
-    );
-  }
-
+  details.push(...describeContextFlags(options));
   if (options.configPath !== undefined) {
     details.push(`Config path: ${options.configPath}`);
   }
 
-  throw new CliError(`Default profile "${alias}" is invalid.`, {
-    code: 'INVALID_DEFAULT_PROFILE',
-    details,
-    exitCode: EXIT_CODES.config,
-    suggestion:
-      'Fix the saved default profile or provide E2E_API_KEY, E2E_AUTH_TOKEN, and either E2E_PROJECT_ID/E2E_LOCATION or --project-id/--location.'
-  });
+  throw new CliError(
+    `Default profile "${selection.staleDefault}" is invalid.`,
+    {
+      code: 'INVALID_DEFAULT_PROFILE',
+      details,
+      exitCode: EXIT_CODES.config,
+      suggestion: `Save it again with \`${formatCliCommand('configure')}\`, or pick another profile with --alias.`
+    }
+  );
 }
 
-function throwMissingAuthError(
+function assertAuthResolved(
   options: ResolveCredentialsOptions,
-  profileAlias: string | undefined,
-  missingFields: AuthField[]
-): never {
-  const missingEnvVars = missingFields.map(
-    (field) => AUTH_ENV_VAR_BY_FIELD[field]
-  );
-  const details = [
-    `Missing required auth values: ${missingFields.join(', ')}`,
-    profileAlias === undefined
-      ? 'No profile alias was provided and no default profile exists.'
-      : `Resolved profile alias: ${profileAlias}`,
-    `Expected environment variables: ${missingEnvVars.join(', ')}`
-  ];
+  selection: SelectedProfile,
+  auth: ResolvedAuth,
+  platform: 'MyAccount' | 'TIR'
+): void {
+  if (auth.missing.length === 0) {
+    return;
+  }
 
+  const details = [
+    `Missing required auth values: ${auth.missing.join(', ')}`,
+    selection.alias === undefined
+      ? 'No profile alias was provided and no default profile exists.'
+      : `Resolved profile alias: ${selection.alias}`,
+    `Expected environment variables: ${auth.missing
+      .map((field) => AUTH_ENV_VAR_BY_FIELD[field])
+      .join(', ')}`
+  ];
   if (options.configPath !== undefined) {
     details.push(`Config path: ${options.configPath}`);
   }
 
-  throw new CliError('Unable to resolve MyAccount authentication.', {
+  throw new CliError(`Unable to resolve ${platform} authentication.`, {
     code: 'MISSING_AUTH_CREDENTIALS',
     details,
     exitCode: EXIT_CODES.auth,
-    suggestion:
-      'Set E2E_API_KEY and E2E_AUTH_TOKEN or add a saved profile before running API-backed commands.'
+    suggestion: `Run \`${formatCliCommand('configure')}\`, or set E2E_API_KEY and E2E_AUTH_TOKEN.`
   });
 }
 
@@ -409,92 +468,39 @@ function throwMissingContextError(
   profileAlias: string | undefined,
   missingFields: ContextField[]
 ): never {
-  const missingEnvVars = missingFields.map(
-    (field) => CONTEXT_ENV_VAR_BY_FIELD[field]
-  );
   const details = [
     `Missing required context values: ${missingFields.join(', ')}`,
     profileAlias === undefined
       ? 'No profile alias was provided and no default profile exists.'
       : `Resolved profile alias: ${profileAlias}`,
-    `Expected environment variables: ${missingEnvVars.join(', ')}`
+    `Expected environment variables: ${missingFields
+      .map((field) => CONTEXT_ENV_VAR_BY_FIELD[field])
+      .join(', ')}`,
+    ...describeContextFlags(options)
   ];
-
-  if (options.projectId !== undefined || options.location !== undefined) {
-    details.push(
-      `Command flags: --project-id ${options.projectId ?? '<unset>'}, --location ${options.location ?? '<unset>'}`
-    );
-  }
-
   if (options.configPath !== undefined) {
     details.push(`Config path: ${options.configPath}`);
   }
 
-  throw new CliError('Unable to resolve MyAccount project context.', {
+  throw new CliError('No MyAccount project and location chosen.', {
     code: 'MISSING_REQUEST_CONTEXT',
     details,
     exitCode: EXIT_CODES.config,
-    suggestion:
-      'Pass --project-id and --location, set E2E_PROJECT_ID and E2E_LOCATION, or save default project/location values on the selected profile.'
+    suggestion: `Run \`${formatCliCommand('myaccount configure')}\`, pass --project-id and --location, or set E2E_PROJECT_ID and E2E_LOCATION.`
   });
 }
 
+function describeContextFlags(options: ResolveCredentialsOptions): string[] {
+  if (options.projectId === undefined && options.location === undefined) {
+    return [];
+  }
+
+  return [
+    `Command flags: --project-id ${options.projectId ?? '<unset>'}, --location ${options.location ?? '<unset>'}`
+  ];
+}
+
 function validateResolvedContext(projectId: string, location: string): void {
-  if (!/^\d+$/.test(projectId.trim())) {
-    throw new CliError('Project ID must be numeric.', {
-      code: 'INVALID_PROJECT_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Pass a numeric project id with --project-id or save a numeric default project id on the profile.'
-    });
-  }
-
-  if (
-    !VALID_LOCATIONS.includes(
-      location.trim() as (typeof VALID_LOCATIONS)[number]
-    )
-  ) {
-    throw new CliError(`Unsupported location "${location}".`, {
-      code: 'INVALID_LOCATION',
-      details: [`Expected one of: ${VALID_LOCATIONS.join(', ')}`],
-      exitCode: EXIT_CODES.usage,
-      suggestion:
-        'Pass a supported location with --location or save a supported default location on the profile.'
-    });
-  }
-}
-
-function buildOptionalResolvedContext(
-  context: PartialContext
-): Partial<Pick<ResolvedAccountCredentials, 'location' | 'project_id'>> {
-  const projectId = context.project_id?.trim();
-  const location = context.location?.trim();
-
-  if (isNonEmptyString(projectId) && isNonEmptyString(location)) {
-    validateResolvedContext(projectId, location);
-  }
-
-  return {
-    ...(isNonEmptyString(projectId) ? { project_id: projectId } : {}),
-    ...(isNonEmptyString(location) ? { location } : {})
-  };
-}
-
-function inferCredentialSource(
-  profile: ProfileConfig | undefined,
-  envAuth: PartialAuth
-): ResolvedCredentials['source'] {
-  const hasEnvOverride = REQUIRED_AUTH_FIELDS.some(
-    (field) => envAuth[field] !== undefined
-  );
-
-  if (profile !== undefined && hasEnvOverride) {
-    return 'mixed';
-  }
-
-  if (profile !== undefined) {
-    return 'profile';
-  }
-
-  return 'env';
+  normalizeRequiredNumericId(projectId, 'Project ID', '--project-id');
+  normalizeLocation(location);
 }

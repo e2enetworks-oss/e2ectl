@@ -5,9 +5,51 @@ This guide turns the same command model from the interactive docs into safer scr
 ## Start With The Same Mental Model
 
 - discover exact ids first with list or catalog commands
+- set up once with `e2ectl configure` (flags only, no prompts), or skip saved profiles and use
+  environment variables
 - store defaults once with `config import --no-input`
 - use `--json` when a later step needs machine-readable output
 - avoid inline secrets on the command line where they can leak into shell history
+
+## Recipe: Set Up In One Command
+
+The key and token come from the environment; the values come from flags. Giving a platform's flags
+sets that platform up:
+
+```bash
+E2E_API_KEY=<key> E2E_AUTH_TOKEN=<token> e2ectl configure \
+  --tir-account-id <account-id> --tir-project-id <project-id> --tir-location Delhi \
+  --myaccount-project-id <project-id> --myaccount-location Chennai
+```
+
+## Recipe: No Saved Profile At All
+
+Every command also works from environment variables alone:
+
+```bash
+export E2E_API_KEY=<key> E2E_AUTH_TOKEN=<token>
+export E2E_PROJECT_ID=<project-id> E2E_LOCATION=Chennai      # MyAccount
+export E2E_TIR_ACCOUNT_ID=<account-id> E2E_TIR_PROJECT_ID=<project-id> E2E_TIR_LOCATION=Delhi  # TIR
+e2ectl --json myaccount node list
+e2ectl --json tir image list
+```
+
+## Errors, Exit Codes And Prompts
+
+- With `--json`, results go to stdout and errors go to stderr as JSON:
+  `{"error":{"code":"...","message":"...","details":[...],"next_step":"...","exit_code":2}}`.
+- `--json` and `--no-input` never ask a question, even inside a terminal. A command that would ask
+  fails instead and names the flag to add, for example `--force` for a delete.
+- Exit codes:
+
+| Code | Meaning                                                  | Retry?     |
+| ---- | -------------------------------------------------------- | ---------- |
+| 0    | Success                                                  | -          |
+| 1    | E2E refused the request (for example a bad id), or other | No         |
+| 2    | Usage: a missing or wrong flag or argument               | No, fix it |
+| 3    | The key or token was refused                             | No         |
+| 4    | Config: no profile, or no project chosen                 | No, set up |
+| 5    | Network: timeout, rate limit or server error             | Yes        |
 
 ## Recipe: Import A Profile Without Prompts
 

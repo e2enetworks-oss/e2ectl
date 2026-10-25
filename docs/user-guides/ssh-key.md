@@ -26,6 +26,13 @@ e2ectl myaccount ssh-key create \
   --public-key-file ~/.ssh/id_ed25519.pub
 ```
 
+### Creating The Same Key Again
+
+If the same public key is already saved (same type and key body; the comment at the end does not
+count), `ssh-key create` returns the saved key instead of failing. The output says so, including
+when the saved key has a different label, and `--json` has `"created": false`. A new key has
+`"created": true`. This makes `ssh-key create` safe to run again in scripts.
+
 ### Create A Key From Stdin
 
 ```bash

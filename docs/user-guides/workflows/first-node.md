@@ -10,13 +10,14 @@ It keeps the first success milestone simple: import one profile, discover one va
 - Pick a project and location you are comfortable using for a first node.
 - Keep the credential file private and disposable in local screenshots or notes.
 
-## 1. Import The Downloaded Credentials
+## 1. Set Up e2ectl
 
 ```bash
-e2ectl config import --file ~/Downloads/myaccount-config.json
+e2ectl configure
 ```
 
-If you are working non-interactively, use the explicit pattern from [Quickstart](../quickstart.md).
+Choose MyAccount when it asks for platforms. If you are working non-interactively, use the flag
+pattern from [Quickstart](../quickstart.md).
 
 ## 2. Confirm The Saved Profile
 

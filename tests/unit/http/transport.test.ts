@@ -13,8 +13,7 @@ describe('HttpTransport', () => {
     api_key: 'api-key',
     auth_token: 'auth-token',
     project_id: '123',
-    location: 'Delhi',
-    source: 'profile' as const
+    location: 'Delhi'
   };
 
   it('injects bearer auth and required query params', async () => {
@@ -91,8 +90,7 @@ describe('HttpTransport', () => {
     const transport = new HttpTransport(
       {
         api_key: 'api-key',
-        auth_token: 'auth-token',
-        source: 'profile'
+        auth_token: 'auth-token'
       },
       {
         apiName: 'MyAccount',
@@ -115,8 +113,7 @@ describe('HttpTransport', () => {
     const transport = new HttpTransport(
       {
         api_key: 'api-key',
-        auth_token: 'auth-token',
-        source: 'profile'
+        auth_token: 'auth-token'
       },
       {
         apiName: 'MyAccount',
@@ -129,6 +126,67 @@ describe('HttpTransport', () => {
     await expect(
       transport.get<ApiEnvelope<{ ok: boolean }>>('/nodes/')
     ).rejects.toThrow(/project context is required/i);
+  });
+
+  it('sends the account under its own query name when the platform asks for it', async () => {
+    let seenInput = '';
+    const transport = new HttpTransport(
+      { ...credentials, account_id: '77' },
+      {
+        apiName: 'TIR',
+        baseUrl: 'https://example.test/gpu',
+        projectContext: { ...projectContext, accountParameter: 'active_iam' },
+        fetchFn: (input: string) => {
+          seenInput = input;
+          return Promise.resolve(createFetchResponse(envelope({ ok: true })));
+        }
+      }
+    );
+
+    await transport.get<ApiEnvelope<{ ok: boolean }>>('/plans/');
+
+    expect(seenInput).toBe(
+      'https://example.test/gpu/plans/?apikey=api-key&active_iam=77&project_id=123&location=Delhi'
+    );
+  });
+
+  it('fails early when the platform needs an account and the credentials have none', async () => {
+    const transport = new HttpTransport(credentials, {
+      apiName: 'TIR',
+      baseUrl: 'https://example.test/gpu',
+      projectContext: { ...projectContext, accountParameter: 'active_iam' },
+      fetchFn: vi.fn()
+    });
+
+    await expect(
+      transport.get<ApiEnvelope<{ ok: boolean }>>('/plans/')
+    ).rejects.toThrow(/project context is required/i);
+  });
+
+  it('gives the platform next step for a 403 and the key check for a 401', async () => {
+    const failWith = (status: number): HttpTransport =>
+      new HttpTransport(credentials, {
+        apiName: 'TIR',
+        baseUrl: 'https://example.test/gpu',
+        forbiddenSuggestion: 'Check the TIR account and project.',
+        fetchFn: () =>
+          Promise.resolve(
+            createFetchResponse(undefined, {
+              ok: false,
+              status,
+              statusText: 'Refused',
+              json: () => Promise.resolve({ message: 'Forbidden' })
+            })
+          )
+      });
+
+    await expect(failWith(403).get('/plans/')).rejects.toMatchObject({
+      suggestion: 'Check the TIR account and project.'
+    });
+    await expect(failWith(401).get('/plans/')).rejects.toMatchObject({
+      suggestion:
+        'Verify the saved token and API key, then run the command again.'
+    });
   });
 
   it('serializes JSON bodies for POST requests', async () => {
@@ -513,6 +571,84 @@ describe('HttpTransport', () => {
       ]),
       message: expect.stringContaining('Unexpected API error')
     });
+  });
+
+  it.each([
+    [
+      412,
+      'Precondition Failed',
+      { message: 'Precondition Failed', errors: 'Node not found.' },
+      1,
+      'Node not found.'
+    ],
+    [
+      400,
+      'Bad Request',
+      { message: 'Bad Request', errors: {} },
+      1,
+      'Bad Request'
+    ],
+    [
+      404,
+      'Not Found',
+      { message: 'No client found for API Key api-key' },
+      3,
+      'No client found for API Key ****-key'
+    ],
+    [429, 'Too Many Requests', { message: 'Slow down' }, 5, 'Slow down'],
+    [502, 'Bad Gateway', { message: 'Upstream down' }, 5, 'Upstream down']
+  ])(
+    'turns a %s reply into exit %s with a useful message',
+    async (status, statusText, payload, exitCode, message) => {
+      const transport = new HttpTransport(credentials, {
+        apiName: 'MyAccount',
+        baseUrl: MYACCOUNT_BASE_URL,
+        projectContext,
+        fetchFn: () =>
+          Promise.resolve(
+            createFetchResponse(payload, { ok: false, status, statusText })
+          )
+      });
+
+      const error = await transport
+        .request({ method: 'DELETE', path: '/nodes/1/' })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toMatchObject({
+        exitCode,
+        message: `MyAccount API request failed: ${message}`
+      });
+      expect(JSON.stringify(error)).not.toContain('api-key"');
+    }
+  );
+
+  it('hides secret keys in a response preview and keeps the HTTP status', async () => {
+    const transport = new HttpTransport(credentials, {
+      apiName: 'MyAccount',
+      baseUrl: MYACCOUNT_BASE_URL,
+      projectContext,
+      fetchFn: () =>
+        Promise.resolve(
+          createFetchResponse(undefined, {
+            ok: false,
+            status: 500,
+            statusText: 'Server Error',
+            json: () => Promise.reject(new SyntaxError('Unexpected end')),
+            text: () =>
+              Promise.resolve('[{"access_key":"AK1","secret_key":"TOPSECRET"')
+          })
+        )
+    });
+
+    const error = await transport
+      .get('/storage/core/list/users/')
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ httpStatus: 500 });
+    expect(JSON.stringify(error)).not.toContain('TOPSECRET');
+    expect((error as { details: string[] }).details.join('\n')).toContain(
+      '"secret_key":"[REDACTED]"'
+    );
   });
 
   it('wraps network failures in an actionable CLI error', async () => {

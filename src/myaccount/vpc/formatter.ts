@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -17,7 +17,7 @@ export function renderVpcResult(
 }
 
 export function formatVpcListTable(items: VpcListItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'VPC ID',
       'Name',
@@ -45,7 +45,7 @@ export function formatVpcListTable(items: VpcListItem[]): string {
 }
 
 export function formatVpcHourlyPlansTable(items: VpcHourlyPlanItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan', 'Location', 'Price/Hour', 'Price/Month']
   });
 
@@ -64,7 +64,7 @@ export function formatVpcHourlyPlansTable(items: VpcHourlyPlanItem[]): string {
 export function formatVpcCommittedPlansTable(
   items: VpcCommittedPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan ID', 'Name', 'Term (Days)', 'Total Price']
   });
 

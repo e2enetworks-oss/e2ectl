@@ -1,6 +1,7 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
+import { formatSnapshotResult } from '../snapshot/index.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import {
   CUSTOM_STORAGE_DEFAULT_DISK_GB,
@@ -9,7 +10,7 @@ import {
 } from './custom-storage.js';
 import type {
   NodeCatalogBillingType,
-  NodeCatalogOsData,
+  NodeCatalogGpuSummary,
   NodeCatalogOsEntry,
   NodeCatalogPlanItem,
   NodeCatalogPlansQuery,
@@ -21,9 +22,29 @@ import type {
   NodeCreateBillingSummary,
   NodeActionStatusSummary,
   NodeCommandResult,
+  NodePowerOffCommandResult,
+  NodePowerOnCommandResult,
+  NodeProtectionCommandResult,
+  NodeRebootCommandResult,
   NodeResolvedSshKeySummary,
+  NodeSnapshotCommandResult,
   NodeCatalogPlansSummary
 } from './service.js';
+
+export function renderNodeSnapshotResult(
+  result: NodeSnapshotCommandResult,
+  json: boolean
+): string {
+  if (json) {
+    return renderJson(result);
+  }
+
+  if (result.action !== 'snapshot-save-image') {
+    return formatSnapshotResult('node', result.node_id, result);
+  }
+
+  return `Saving snapshot ${result.snapshot_id} of node ${result.node_id} as image "${result.image_name}". The node is not changed.\nWhen it shows in ${formatMyAccountCommand('image list')}, create a node from it with ${formatMyAccountCommand('node create --image <catalog-image> --saved-image-template-id <template-id>')}.\n`;
+}
 
 export function renderNodeResult(
   result: NodeCommandResult,
@@ -33,7 +54,7 @@ export function renderNodeResult(
 }
 
 export function formatNodesTable(nodes: NodeSummary[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Plan', 'Public IP', 'Private IP']
   });
 
@@ -51,49 +72,13 @@ export function formatNodesTable(nodes: NodeSummary[]): string {
   return table.toString();
 }
 
-export function summarizeNodeCatalogOs(
-  data: NodeCatalogOsData
-): NodeCatalogOsEntry[] {
-  return data.category_list
-    .flatMap((group) =>
-      group.version.flatMap((version) =>
-        group.category.map((displayCategory) => ({
-          category: version.sub_category,
-          display_category: displayCategory,
-          number_of_domains: version.number_of_domains ?? null,
-          os: version.os,
-          os_version: version.version,
-          software_version: version.software_version ?? ''
-        }))
-      )
-    )
-    .sort((left, right) => {
-      const leftKey = [
-        left.display_category,
-        left.category,
-        left.os,
-        left.os_version,
-        left.software_version
-      ].join('\u0000');
-      const rightKey = [
-        right.display_category,
-        right.category,
-        right.os,
-        right.os_version,
-        right.software_version
-      ].join('\u0000');
-
-      return leftKey.localeCompare(rightKey);
-    });
-}
-
 export function formatNodeCatalogOsTable(
   entries: NodeCatalogOsEntry[]
 ): string {
   const showSoftwareVersion = entries.some((entry) =>
     hasVisibleValue(entry.software_version)
   );
-  const table = new Table({
+  const table = buildTable({
     head: showSoftwareVersion
       ? ['Display Category', 'Category', 'OS', 'OS Version', 'Software Version']
       : ['Display Category', 'Category', 'OS', 'OS Version']
@@ -119,7 +104,7 @@ export function formatNodeCatalogOsTable(
 export function formatNodeCatalogPlansTable(
   items: NodeCatalogPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       '#',
       'SKU',
@@ -127,6 +112,7 @@ export function formatNodeCatalogPlansTable(
       'Image',
       'vCPU',
       'RAM',
+      'GPU',
       'Disk',
       'Hourly',
       'Available'
@@ -141,6 +127,7 @@ export function formatNodeCatalogPlansTable(
       item.image,
       formatCell(item.config.vcpu),
       formatMemory(item.config.ram),
+      formatGpu(item.config.gpu),
       formatDisk(item.config.disk_gb, item.config.series),
       formatHourlyPrice(item.hourly.price_per_hour, item.currency),
       item.available_inventory ? 'yes' : 'no'
@@ -153,7 +140,7 @@ export function formatNodeCatalogPlansTable(
 export function formatNodeCatalogCommittedOptionsTable(
   items: NodeCatalogPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'Config #',
       'SKU',
@@ -192,7 +179,11 @@ export function formatNodeDetails(node: NodeDetails): string {
     ['Created At', node.created_at ?? ''],
     ['Disk', node.disk ?? ''],
     ['Memory', node.memory ?? ''],
-    ['vCPUs', node.vcpus ?? '']
+    ['vCPUs', node.vcpus ?? ''],
+    [
+      'Deletion Protection',
+      node.is_accidental_protection === true ? 'on' : 'off'
+    ]
   ];
 
   return rows.map(([label, value]) => `${label}: ${value}`).join('\n');
@@ -209,6 +200,14 @@ export function formatNodeCreateResult(result: NodeCreateResult): string {
   }
 
   return lines.join('\n');
+}
+
+function formatGpu(gpu: NodeCatalogGpuSummary | null): string {
+  if (gpu === null) {
+    return '';
+  }
+
+  return gpu.count === null ? gpu.type : `${gpu.count}x ${gpu.type}`;
 }
 
 function formatCell(value: number | string | null | undefined): string {
@@ -314,6 +313,10 @@ type NodeAttachmentCommandResult = Extract<
 >;
 
 function renderNodeHuman(result: NodeCommandResult): string {
+  if (isSimpleNodeAction(result)) {
+    return formatNodeSimpleActionResult(result);
+  }
+
   switch (result.action) {
     case 'catalog-os':
       return formatNodeCatalogOsResult(result);
@@ -323,6 +326,15 @@ function renderNodeHuman(result: NodeCommandResult): string {
       return (
         formatNodeCreateBilling(result.billing)
           .concat('', [formatNodeCreateResult(result.result)])
+          .concat(
+            result.node === undefined
+              ? []
+              : [
+                  '',
+                  `Node ${result.node.id} is running.`,
+                  formatNodeDetails(result.node)
+                ]
+          )
           .join('\n') + '\n'
       );
     case 'delete':
@@ -333,18 +345,6 @@ function renderNodeHuman(result: NodeCommandResult): string {
       return result.nodes.length === 0
         ? 'No nodes found.\n'
         : `${formatNodesTable(sortNodeSummariesById(result.nodes))}\n`;
-    case 'power-off':
-      return (
-        [`Requested power off for node ${result.node_id}.`]
-          .concat(formatNodeActionSummary(result.result))
-          .join('\n') + '\n'
-      );
-    case 'power-on':
-      return (
-        [`Requested power on for node ${result.node_id}.`]
-          .concat(formatNodeActionSummary(result.result))
-          .join('\n') + '\n'
-      );
     case 'public-ip-detach':
       return formatNodePublicIpDetachResult(result);
     case 'save-image':
@@ -360,6 +360,35 @@ function renderNodeHuman(result: NodeCommandResult): string {
     default:
       return renderNodeAttachmentHuman(result);
   }
+}
+
+// Actions whose result is only the node and the action status.
+type NodeSimpleActionResult =
+  | NodePowerOffCommandResult
+  | NodePowerOnCommandResult
+  | NodeProtectionCommandResult
+  | NodeRebootCommandResult;
+
+const SIMPLE_ACTION_LABELS: Record<NodeSimpleActionResult['action'], string> = {
+  'power-off': 'Requested power off',
+  'power-on': 'Requested power on',
+  protect: 'Turned on deletion protection',
+  reboot: 'Requested reboot',
+  unprotect: 'Turned off deletion protection'
+};
+
+function isSimpleNodeAction(
+  result: NodeCommandResult
+): result is NodeSimpleActionResult {
+  return result.action in SIMPLE_ACTION_LABELS;
+}
+
+function formatNodeSimpleActionResult(result: NodeSimpleActionResult): string {
+  return (
+    [`${SIMPLE_ACTION_LABELS[result.action]} for node ${result.node_id}.`]
+      .concat(formatNodeActionSummary(result.result))
+      .join('\n') + '\n'
+  );
 }
 
 function renderNodeAttachmentHuman(
@@ -417,7 +446,7 @@ function renderNodeAttachmentHuman(
 function formatNodeCatalogOsResult(
   result: Extract<NodeCommandResult, { action: 'catalog-os' }>
 ): string {
-  const entries = summarizeNodeCatalogOs(result.catalog);
+  const entries = result.entries;
   if (entries.length === 0) {
     return 'No OS catalog rows found.\n';
   }
@@ -485,11 +514,19 @@ function formatNodeVpcResult(
 }
 
 function renderNodeJson(result: NodeCommandResult): string {
+  if (isSimpleNodeAction(result)) {
+    return renderJson({
+      action: result.action,
+      node_id: result.node_id,
+      result: normalizeNodeActionJson(result.result)
+    });
+  }
+
   switch (result.action) {
     case 'catalog-os':
       return renderJson({
         action: 'catalog-os',
-        entries: summarizeNodeCatalogOs(result.catalog)
+        entries: result.entries
       });
     case 'catalog-plans':
       return renderNodeCatalogPlansJson(result);
@@ -505,21 +542,9 @@ function renderNodeJson(result: NodeCommandResult): string {
     case 'list':
       return renderJson({
         action: 'list',
-        nodes: sortNodeSummariesById(result.nodes),
+        items: sortNodeSummariesById(result.nodes),
         total_count: result.total_count ?? null,
         total_page_number: result.total_page_number ?? null
-      });
-    case 'power-off':
-      return renderJson({
-        action: 'power-off',
-        node_id: result.node_id,
-        result: normalizeNodeActionJson(result.result)
-      });
-    case 'power-on':
-      return renderJson({
-        action: 'power-on',
-        node_id: result.node_id,
-        result: normalizeNodeActionJson(result.result)
       });
     case 'public-ip-detach':
       return renderNodePublicIpDetachJson(result);
@@ -640,6 +665,7 @@ function renderNodeCatalogPlansJson(
       config: {
         disk_gb: item.config.disk_gb,
         family: item.config.family,
+        gpu: item.config.gpu,
         ram: item.config.ram,
         series: item.config.series,
         vcpu: item.config.vcpu
@@ -678,6 +704,7 @@ function renderNodeCreateJson(
           })
     },
     created: result.result.total_number_of_node_created,
+    ...(result.node === undefined ? {} : { node: result.node }),
     nodes: result.result.node_create_response,
     requested: result.result.total_number_of_node_requested
   });
@@ -732,6 +759,7 @@ function renderNodeUpgradeJson(
       ? {
           action: 'upgrade',
           cancelled: true,
+          image_kept: result.image_kept,
           node_id: result.node_id,
           requested: {
             image: result.requested.image,
@@ -746,6 +774,7 @@ function renderNodeUpgradeJson(
             old_node_image_id: result.details.old_node_image_id,
             vm_id: result.details.vm_id
           },
+          image_kept: result.image_kept,
           message: result.message,
           node_id: result.node_id,
           requested: {
@@ -789,7 +818,7 @@ function formatNodeUpgradeResult(
         'Node upgrade cancelled.',
         `Node ID: ${result.node_id}`,
         `Target Plan: ${result.requested.plan}`,
-        `Target Image: ${result.requested.image}`
+        `Target Image: ${formatTargetImage(result)}`
       ].join('\n') + '\n'
     );
   }
@@ -797,7 +826,7 @@ function formatNodeUpgradeResult(
   const lines = [
     `Requested node upgrade for node ${result.node_id}.`,
     `Target Plan: ${result.requested.plan}`,
-    `Target Image: ${result.requested.image}`,
+    `Target Image: ${formatTargetImage(result)}`,
     `Message: ${result.message}`
   ];
 
@@ -818,6 +847,14 @@ function formatNodeUpgradeResult(
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+function formatTargetImage(
+  result: Extract<NodeCommandResult, { action: 'upgrade' }>
+): string {
+  return result.image_kept
+    ? `${result.requested.image} (kept from the node)`
+    : result.requested.image;
 }
 
 function formatOptionalApiMessage(message: string | undefined): string[] {
@@ -888,6 +925,18 @@ function formatNodeCatalogFilterSummary(query: NodeCatalogPlansQuery): string {
     filters.push(`Family=${query.family}`);
   }
 
+  if (query.gpu_type !== undefined) {
+    filters.push(`GPU=${query.gpu_type}`);
+  }
+
+  if (query.min_vcpu !== undefined) {
+    filters.push(`vCPU>=${query.min_vcpu}`);
+  }
+
+  if (query.min_ram_gb !== undefined) {
+    filters.push(`RAM>=${query.min_ram_gb} GB`);
+  }
+
   return `Filters: ${filters.join(', ')}`;
 }
 
@@ -915,6 +964,8 @@ function formatNodeCatalogEmptyMessage(
       return `No committed plan options found for family ${result.query.family}.`;
     case 'no_family_match':
       return `No configs were found for family ${result.query.family}.`;
+    case 'no_filter_match':
+      return 'No configs match the --gpu-type, --min-vcpu and --min-ram filters. Loosen or drop a filter.';
     case 'no_plans':
       return 'No plans found for the selected OS row.';
     default:

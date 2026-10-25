@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -20,7 +20,7 @@ export function renderSecurityGroupResult(
 export function formatSecurityGroupListTable(
   items: SecurityGroupItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Default', 'Rules', 'Description']
   });
 
@@ -40,7 +40,7 @@ export function formatSecurityGroupListTable(
 export function formatSecurityGroupRuleTable(
   rules: SecurityGroupRuleItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: [
       'ID',
       'Type',

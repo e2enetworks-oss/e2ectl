@@ -67,8 +67,7 @@ describe('config import process flow', () => {
           prod: {
             api_key: 'api-key-1234',
             auth_token: 'auth-token-5678',
-            default_project_id: '46429',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '46429' }
           }
         }
       });
@@ -114,8 +113,7 @@ describe('config import process flow', () => {
           prod: {
             api_key: 'api-existing',
             auth_token: 'auth-existing',
-            default_project_id: '46429',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '46429' }
           }
         }
       });
@@ -150,8 +148,7 @@ describe('config import process flow', () => {
           prod: {
             api_key: 'api-imported',
             auth_token: 'auth-imported',
-            default_project_id: '46429',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '46429' }
           }
         }
       });

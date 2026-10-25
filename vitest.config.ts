@@ -5,6 +5,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/unit/**/*.test.ts'],
+    setupFiles: ['tests/helpers/clear-e2e-env.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

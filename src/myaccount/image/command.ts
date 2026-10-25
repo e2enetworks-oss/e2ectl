@@ -21,7 +21,10 @@ export function buildImageCommand(runtime: CliRuntime): Command {
   const service = new ImageService({
     confirm: (message) => runtime.confirm(message),
     createImageClient: (credentials) => runtime.createImageClient(credentials),
-    isInteractive: runtime.isInteractive,
+    // Read when a command runs: --json and --no-input turn prompts off.
+    get isInteractive() {
+      return runtime.isInteractive;
+    },
     store: runtime.store
   });
   const command = new Command('image').description('Manage saved images.');

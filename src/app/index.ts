@@ -8,6 +8,7 @@ import {
   CliError,
   EXIT_CODES,
   formatError,
+  formatErrorJson,
   isCliError
 } from '../core/errors.js';
 import { createProgram } from './program.js';
@@ -18,6 +19,15 @@ import {
 } from './runtime.js';
 
 async function main(): Promise<void> {
+  // A reader that stops early (| head, | grep -q) closes the pipe; that is
+  // a normal end, not a crash.
+  process.stdout.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EPIPE') {
+      throw error;
+    }
+
+    process.exit(0);
+  });
   process.exitCode = await runCli(process.argv);
 }
 
@@ -32,10 +42,11 @@ export async function runCli(
 ): Promise<number> {
   const program = createProgram(runtime);
   prepareProgramForCli(program);
+  const args = withHelpAtAnyDepth(argv.slice(2));
 
   try {
-    rejectUnknownCommand(program, argv.slice(2));
-    await program.parseAsync(argv);
+    rejectUnknownCommand(program, args);
+    await program.parseAsync([...argv.slice(0, 2), ...args]);
     return EXIT_CODES.success;
   } catch (error: unknown) {
     if (isCommanderSuccessExit(error)) {
@@ -43,7 +54,11 @@ export async function runCli(
     }
 
     const normalizedError = normalizeCliExecutionError(error);
-    stderr.write(formatError(normalizedError));
+    stderr.write(
+      argv.slice(2).includes('--json')
+        ? formatErrorJson(normalizedError)
+        : formatError(normalizedError)
+    );
 
     return isCliError(normalizedError)
       ? normalizedError.exitCode
@@ -80,6 +95,15 @@ function prepareProgramForCli(program: Command): void {
   for (const command of program.commands) {
     prepareProgramForCli(command);
   }
+}
+
+// "help myaccount node snapshot" shows the same page as
+// "myaccount node snapshot --help"; Commander's own help command only
+// follows one word.
+function withHelpAtAnyDepth(args: string[]): string[] {
+  return args[0] === 'help' && args.length > 2
+    ? [...args.slice(1), '--help']
+    : args;
 }
 
 // Checks the command words typed (before any option) against the command

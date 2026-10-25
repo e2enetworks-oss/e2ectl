@@ -7,8 +7,7 @@ export async function seedDefaultProfile(tempHome: TempHome): Promise<void> {
       prod: {
         api_key: 'prod-api-key',
         auth_token: 'prod-auth-token',
-        default_project_id: '46429',
-        default_location: 'Delhi'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   });

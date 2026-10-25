@@ -168,6 +168,7 @@ describe('node catalog helpers', () => {
         config: {
           disk_gb: null,
           family: 'GPU',
+          gpu: null,
           ram: 'not-a-number',
           series: 'C3',
           vcpu: null
@@ -249,7 +250,7 @@ describe('node catalog helpers', () => {
         })
       ],
       'all',
-      'GPU'
+      { family: 'GPU' }
     );
 
     expect(items).toHaveLength(1);
@@ -304,7 +305,9 @@ describe('node catalog helpers', () => {
   });
 
   it('reports no-family-match when the requested family does not exist', () => {
-    const summary = summarizeNodeCatalogPlans([samplePlan()], [], 'all', 'GPU');
+    const summary = summarizeNodeCatalogPlans([samplePlan()], [], 'all', {
+      family: 'GPU'
+    });
 
     expect(summary).toEqual({
       available_families: ['General Purpose'],
@@ -320,12 +323,9 @@ describe('node catalog helpers', () => {
     });
 
     expect(
-      summarizeNodeCatalogPlans(
-        [samplePlan()],
-        [],
-        'committed',
-        'General Purpose'
-      )
+      summarizeNodeCatalogPlans([samplePlan()], [], 'committed', {
+        family: 'General Purpose'
+      })
     ).toMatchObject({
       empty_reason: 'no_committed_for_family'
     });

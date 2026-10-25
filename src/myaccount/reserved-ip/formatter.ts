@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
@@ -19,7 +19,7 @@ export function renderReservedIpResult(
 }
 
 export function formatReservedIpListTable(items: ReservedIpItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['IP Address', 'Status', 'Attached VM', 'Type', 'Project']
   });
 
@@ -39,7 +39,7 @@ export function formatReservedIpListTable(items: ReservedIpItem[]): string {
 function formatReservedIpAttachmentTable(
   items: ReservedIpAttachmentNodeItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Node ID', 'VM ID', 'Name', 'Private IP', 'Public IP', 'Status']
   });
 

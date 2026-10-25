@@ -48,6 +48,37 @@ e2ectl myaccount node action volume attach <node-id> --volume-id <volume-id>
 e2ectl myaccount node action volume detach <node-id> --volume-id <volume-id>
 ```
 
+### Grow A Volume
+
+```bash
+e2ectl myaccount volume resize <volume-id> --size 200
+e2ectl myaccount volume get <volume-id>
+```
+
+It asks before growing the volume, because a volume cannot be shrunk again; add `--force` in
+scripts. The volume must be attached to a node, and the new size must be bigger and one of the
+sizes in `volume plans`. E2E grows it through the node it is attached to; the volume keeps its name and
+data. E2E refuses while the volume has snapshots: delete them first. Grow the filesystem inside
+the node afterwards to use the new space.
+
+### Snapshot A Volume
+
+```bash
+e2ectl myaccount volume snapshot create <volume-id> --name nightly
+e2ectl myaccount volume snapshot list <volume-id>
+e2ectl myaccount volume snapshot delete <volume-id> <snapshot-id>
+```
+
+The volume must be attached to a node; E2E takes the snapshot through that node. The
+snapshot list has the same columns as node snapshots. Volume snapshot ids are numbers.
+
+To restore, save a snapshot as a new volume. The volume it came from is never overwritten, and
+the new volume is billed like any other:
+
+```bash
+e2ectl myaccount volume snapshot save-volume <volume-id> <snapshot-id> --name restored
+```
+
 ### Delete A Volume
 
 ```bash

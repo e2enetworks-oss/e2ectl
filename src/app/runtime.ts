@@ -1,12 +1,15 @@
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 
+import { CliError, EXIT_CODES } from '../core/errors.js';
 import type { ApiClientOptions } from '../http/index.js';
 import {
   ApiCredentialValidator,
   ConfigStore,
   type CredentialValidator,
   type ResolvedAccountCredentials,
-  type ResolvedCredentials
+  type ResolvedCredentials,
+  type ResolvedTirCredentials
 } from '../config/index.js';
 import { createMyAccountTransport } from '../myaccount/api.js';
 import { ImageApiClient, type ImageClient } from '../myaccount/image/index.js';
@@ -42,6 +45,18 @@ import {
   type VolumeClient
 } from '../myaccount/volume/index.js';
 import { VpcApiClient, type VpcClient } from '../myaccount/vpc/index.js';
+import {
+  TirAccountApiClient,
+  type TirAccountClient
+} from '../tir/account/index.js';
+import { createTirTransport } from '../tir/api.js';
+import {
+  TirProjectApiClient,
+  type TirProjectClient
+} from '../tir/project/index.js';
+import { TirImageApiClient, type TirImageClient } from '../tir/image/index.js';
+import { TirPlanApiClient, type TirPlanClient } from '../tir/plan/index.js';
+import { EosApiClient, type EosClient } from '../myaccount/eos/index.js';
 
 export interface OutputWriter {
   write(chunk: string): void;
@@ -67,19 +82,28 @@ export interface CliRuntime {
   ): SupportTicketClient;
   createVolumeClient(credentials: ResolvedCredentials): VolumeClient;
   createVpcClient(credentials: ResolvedCredentials): VpcClient;
+  createTirAccountClient(credentials: ResolvedTirCredentials): TirAccountClient;
+  createTirProjectClient(credentials: ResolvedTirCredentials): TirProjectClient;
+  createTirImageClient(credentials: ResolvedTirCredentials): TirImageClient;
+  createTirPlanClient(credentials: ResolvedTirCredentials): TirPlanClient;
+  createEosClient(credentials: ResolvedCredentials): EosClient;
   credentialValidator: CredentialValidator;
   isInteractive: boolean;
   prompt(message: string): Promise<string>;
+  // Like prompt, but what is typed is not shown (for keys and tokens).
+  promptSecret(message: string): Promise<string>;
   stderr: OutputWriter;
   stdout: OutputWriter;
   store: ConfigStore;
 }
 
-// Internal test hook for pointing the compiled CLI at a fake API server.
+// Internal test hooks for pointing the compiled CLI at a fake API server.
 export const MYACCOUNT_BASE_URL_ENV_VAR = 'E2ECTL_MYACCOUNT_BASE_URL';
+export const TIR_BASE_URL_ENV_VAR = 'E2ECTL_TIR_BASE_URL';
 
 export function createRuntime(): CliRuntime {
-  const apiClientOptions = readApiClientOptions();
+  const apiClientOptions = readApiClientOptions(MYACCOUNT_BASE_URL_ENV_VAR);
+  const tirApiClientOptions = readApiClientOptions(TIR_BASE_URL_ENV_VAR);
 
   return {
     confirm: promptForConfirmation,
@@ -127,11 +151,30 @@ export function createRuntime(): CliRuntime {
       ),
     createVpcClient: (credentials) =>
       new VpcApiClient(createMyAccountTransport(credentials, apiClientOptions)),
+    createTirAccountClient: (credentials) =>
+      new TirAccountApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirProjectClient: (credentials) =>
+      new TirProjectApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirImageClient: (credentials) =>
+      new TirImageApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createTirPlanClient: (credentials) =>
+      new TirPlanApiClient(
+        createTirTransport(credentials, tirApiClientOptions)
+      ),
+    createEosClient: (credentials) =>
+      new EosApiClient(createMyAccountTransport(credentials, apiClientOptions)),
     credentialValidator: new ApiCredentialValidator((credentials) =>
       createMyAccountTransport(credentials, apiClientOptions)
     ),
     isInteractive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     prompt: promptForInput,
+    promptSecret: promptForSecret,
     stderr: process.stderr,
     stdout: process.stdout,
     store: new ConfigStore()
@@ -139,9 +182,10 @@ export function createRuntime(): CliRuntime {
 }
 
 function readApiClientOptions(
+  envVarName: string,
   env: NodeJS.ProcessEnv = process.env
 ): ApiClientOptions {
-  const baseUrl = env[MYACCOUNT_BASE_URL_ENV_VAR]?.trim();
+  const baseUrl = env[envVarName]?.trim();
 
   return baseUrl === undefined || baseUrl.length === 0 ? {} : { baseUrl };
 }
@@ -152,15 +196,59 @@ async function promptForConfirmation(message: string): Promise<boolean> {
   return /^(y|yes)$/i.test(answer.trim());
 }
 
+// Questions go to stderr, so stdout holds only the command's output.
 async function promptForInput(message: string): Promise<string> {
   const readline = createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stderr
   });
 
   try {
     return await readline.question(message);
+  } catch (error: unknown) {
+    throw toCancelledError(error);
   } finally {
     readline.close();
+  }
+}
+
+// Ctrl+C or Ctrl+D at a question ends the command plainly.
+function toCancelledError(error: unknown): unknown {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return new CliError('Cancelled.', {
+      code: 'CANCELLED',
+      exitCode: EXIT_CODES.general
+    });
+  }
+
+  return error;
+}
+
+// Shows the question, then hides the answer while it is typed.
+async function promptForSecret(message: string): Promise<string> {
+  let muted = false;
+  const output = new Writable({
+    write(chunk: Buffer | string, _encoding, callback) {
+      if (!muted) {
+        process.stderr.write(chunk);
+      }
+      callback();
+    }
+  });
+  const readline = createInterface({
+    input: process.stdin,
+    output,
+    terminal: true
+  });
+
+  try {
+    const answer = readline.question(message);
+    muted = true;
+    return await answer;
+  } catch (error: unknown) {
+    throw toCancelledError(error);
+  } finally {
+    readline.close();
+    process.stderr.write('\n');
   }
 }

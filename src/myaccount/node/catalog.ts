@@ -1,15 +1,22 @@
+import { isNonEmptyString, isRecord } from '../../core/guards.js';
 import type {
   NodeCatalogBillingType,
   NodeCatalogCommittedOptionSummary,
   NodeCatalogCommittedSku,
+  NodeCatalogGpuSummary,
+  NodeCatalogOsData,
+  NodeCatalogOsEntry,
+  NodeCatalogOsVersion,
   NodeCatalogPlan,
+  NodeCatalogPlanFilters,
   NodeCatalogPlanItem,
   NodeCatalogQuery
 } from './types.js';
+import { normalizeBillingType } from './normalizers.js';
 import {
-  normalizeBillingType,
+  normalizeRequiredNumericId,
   normalizeRequiredString
-} from './normalizers.js';
+} from '../../core/normalize.js';
 
 interface NodeCatalogPlansOptionsInput {
   category: string;
@@ -18,8 +25,19 @@ interface NodeCatalogPlansOptionsInput {
   osVersion: string;
 }
 
+interface NodeCatalogFilterOptionsInput {
+  family?: string;
+  gpuType?: string;
+  minRam?: string;
+  minVcpu?: string;
+}
+
 type NodeCatalogPlansEmptyReason =
-  'no_committed' | 'no_committed_for_family' | 'no_family_match' | 'no_plans';
+  | 'no_committed'
+  | 'no_committed_for_family'
+  | 'no_family_match'
+  | 'no_filter_match'
+  | 'no_plans';
 
 interface NodeCatalogPlansSummary {
   available_families: string[];
@@ -61,12 +79,69 @@ export function normalizeNodeCatalogBillingType(
   );
 }
 
+// Flattens the grouped catalog into one row per display category and OS
+// version. GPU rows repeat under every card that offers them; they are kept
+// once. Groups without OS rows (the GPU wizard) are skipped.
+export function summarizeNodeCatalogOs(
+  data: NodeCatalogOsData
+): NodeCatalogOsEntry[] {
+  const entries = new Map<string, NodeCatalogOsEntry>();
+
+  for (const [displayCategory, group] of Object.entries(data.category_list)) {
+    for (const row of collectOsRows(group)) {
+      const entry: NodeCatalogOsEntry = {
+        category: row.sub_category,
+        display_category: displayCategory,
+        number_of_domains: row.number_of_domains ?? null,
+        os: row.os,
+        os_version: row.version,
+        software_version: row.software_version ?? ''
+      };
+      entries.set(osEntryKey(entry), entry);
+    }
+  }
+
+  return [...entries.values()].sort((left, right) =>
+    osEntryKey(left).localeCompare(osEntryKey(right))
+  );
+}
+
+function collectOsRows(group: unknown): NodeCatalogOsVersion[] {
+  if (!isRecord(group)) {
+    return [];
+  }
+
+  return Object.values(group)
+    .filter((rows): rows is unknown[] => Array.isArray(rows))
+    .flat()
+    .filter(isCatalogOsRow);
+}
+
+function isCatalogOsRow(row: unknown): row is NodeCatalogOsVersion {
+  return (
+    isRecord(row) &&
+    isNonEmptyString(row.os) &&
+    isNonEmptyString(row.version) &&
+    isNonEmptyString(row.sub_category)
+  );
+}
+
+function osEntryKey(entry: NodeCatalogOsEntry): string {
+  return [
+    entry.display_category,
+    entry.category,
+    entry.os,
+    entry.os_version,
+    entry.software_version
+  ].join('\u0000');
+}
+
 export function normalizeNodeCatalogPlanItems(
   plans: NodeCatalogPlan[],
   billingType: NodeCatalogBillingType,
-  family?: string
+  filters: NodeCatalogPlanFilters = {}
 ): NodeCatalogPlanItem[] {
-  const familyFilteredPlans = filterNodeCatalogPlansByFamily(plans, family);
+  const familyFilteredPlans = filterNodeCatalogPlans(plans, filters);
   const filteredPlans =
     billingType === 'committed'
       ? filterNodeCatalogPlansForCommittedBilling(familyFilteredPlans)
@@ -87,41 +162,128 @@ export function normalizeOptionalNodeCatalogFamily(
   return normalizeRequiredString(value, 'Family', '--family');
 }
 
+export function normalizeNodeCatalogPlanFilters(
+  options: NodeCatalogFilterOptionsInput
+): NodeCatalogPlanFilters {
+  const family = normalizeOptionalNodeCatalogFamily(options.family);
+  const gpuType =
+    options.gpuType === undefined
+      ? undefined
+      : normalizeRequiredString(options.gpuType, 'GPU type', '--gpu-type');
+  const minVcpu =
+    options.minVcpu === undefined
+      ? undefined
+      : normalizeRequiredNumericId(
+          options.minVcpu,
+          'Minimum vCPU',
+          '--min-vcpu'
+        );
+  const minRamGb =
+    options.minRam === undefined
+      ? undefined
+      : normalizeRequiredNumericId(
+          options.minRam,
+          'Minimum RAM in GB',
+          '--min-ram'
+        );
+
+  return {
+    ...(family === undefined ? {} : { family }),
+    ...(gpuType === undefined ? {} : { gpu_type: gpuType }),
+    ...(minVcpu === undefined ? {} : { min_vcpu: minVcpu }),
+    ...(minRamGb === undefined ? {} : { min_ram_gb: minRamGb })
+  };
+}
+
 export function summarizeNodeCatalogPlans(
   plans: NodeCatalogPlan[],
   items: NodeCatalogPlanItem[],
   billingType: NodeCatalogBillingType,
-  family?: string
+  filters: NodeCatalogPlanFilters = {}
 ): NodeCatalogPlansSummary {
-  const familyFilteredPlans = filterNodeCatalogPlansByFamily(plans, family);
-
-  let emptyReason: NodeCatalogPlansEmptyReason | null = null;
-  if (items.length === 0) {
-    if (family !== undefined && familyFilteredPlans.length === 0) {
-      emptyReason = 'no_family_match';
-    } else if (billingType === 'committed') {
-      emptyReason =
-        family === undefined ? 'no_committed' : 'no_committed_for_family';
-    } else {
-      emptyReason = 'no_plans';
-    }
-  }
-
   return {
     available_families: collectNodeCatalogFamilies(plans),
-    empty_reason: emptyReason
+    empty_reason:
+      items.length === 0
+        ? explainEmptyCatalog(plans, billingType, filters)
+        : null
   };
 }
 
-function filterNodeCatalogPlansByFamily(
+function explainEmptyCatalog(
   plans: NodeCatalogPlan[],
-  family?: string
+  billingType: NodeCatalogBillingType,
+  filters: NodeCatalogPlanFilters
+): NodeCatalogPlansEmptyReason {
+  const { family } = filters;
+  const familyPlans = filterNodeCatalogPlans(
+    plans,
+    family === undefined ? {} : { family }
+  );
+
+  if (family !== undefined && familyPlans.length === 0) {
+    return 'no_family_match';
+  }
+
+  if (filterNodeCatalogPlans(familyPlans, filters).length === 0) {
+    return plans.length === 0 ? 'no_plans' : 'no_filter_match';
+  }
+
+  if (billingType === 'committed') {
+    return family === undefined ? 'no_committed' : 'no_committed_for_family';
+  }
+
+  return 'no_plans';
+}
+
+function filterNodeCatalogPlans(
+  plans: NodeCatalogPlan[],
+  filters: NodeCatalogPlanFilters
 ): NodeCatalogPlan[] {
-  return family === undefined
-    ? plans
-    : plans.filter(
-        (plan) => normalizeOptionalText(plan.specs?.family) === family
-      );
+  return plans.filter(
+    (plan) =>
+      (filters.family === undefined ||
+        normalizeOptionalText(plan.specs?.family) === filters.family) &&
+      (filters.min_vcpu === undefined ||
+        (plan.specs?.cpu ?? 0) >= filters.min_vcpu) &&
+      (filters.min_ram_gb === undefined ||
+        (parseRamAsNumber(plan.specs?.ram) ?? 0) >= filters.min_ram_gb) &&
+      (filters.gpu_type === undefined ||
+        matchesGpuType(summarizeGpu(plan), filters.gpu_type))
+  );
+}
+
+// Accepts the card type as the catalog writes it (Nvidia-A100) or without
+// the maker (A100), in any case.
+function matchesGpuType(
+  gpu: NodeCatalogGpuSummary | null,
+  wanted: string
+): boolean {
+  if (gpu === null) {
+    return false;
+  }
+
+  const cardType = gpu.type.toLowerCase();
+  const wantedType = wanted.toLowerCase();
+  return cardType === wantedType || cardType.endsWith(`-${wantedType}`);
+}
+
+function summarizeGpu(plan: NodeCatalogPlan): NodeCatalogGpuSummary | null {
+  const card = plan.gpu_card_details;
+  if (card === undefined || !('CARD_TYPE' in card)) {
+    return null;
+  }
+
+  const type = normalizeOptionalText(card.CARD_TYPE);
+  if (type === null) {
+    return null;
+  }
+
+  return {
+    count: normalizeOptionalInteger(card.UNIT_COUNT),
+    memory_gb: parseRamAsNumber(card.MEMORY),
+    type
+  };
 }
 
 function filterNodeCatalogPlansForCommittedBilling(
@@ -169,6 +331,7 @@ function toNodeCatalogPlanItem(
     config: {
       disk_gb: normalizeOptionalInteger(plan.specs?.disk_space),
       family: normalizeOptionalText(plan.specs?.family),
+      gpu: summarizeGpu(plan),
       ram: normalizeOptionalText(plan.specs?.ram),
       series: normalizeOptionalText(plan.specs?.series),
       vcpu: normalizeOptionalInteger(plan.specs?.cpu)

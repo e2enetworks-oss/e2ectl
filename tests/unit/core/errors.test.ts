@@ -2,7 +2,8 @@ import {
   AppError,
   CliError,
   EXIT_CODES,
-  formatError
+  formatError,
+  formatErrorJson
 } from '../../../src/core/errors.js';
 
 describe('formatError', () => {
@@ -56,5 +57,38 @@ describe('formatError', () => {
     const message = formatError('not an error object');
 
     expect(message).toBe('Unexpected error: an unknown failure occurred.\n');
+  });
+});
+
+describe('formatErrorJson', () => {
+  it('gives agents the code, message, details, next step and exit code', () => {
+    const error = new CliError('Volume 5 is not attached to a node.', {
+      code: 'VOLUME_NOT_ATTACHED',
+      details: ['Volume: 5'],
+      exitCode: EXIT_CODES.usage,
+      suggestion: 'Attach it first.'
+    });
+
+    expect(JSON.parse(formatErrorJson(error))).toEqual({
+      error: {
+        code: 'VOLUME_NOT_ATTACHED',
+        details: ['Volume: 5'],
+        exit_code: 2,
+        message: 'Volume 5 is not attached to a node.',
+        next_step: 'Attach it first.'
+      }
+    });
+  });
+
+  it('wraps an unexpected error the same way', () => {
+    expect(JSON.parse(formatErrorJson(new Error('boom')))).toEqual({
+      error: {
+        code: 'UNEXPECTED_ERROR',
+        details: [],
+        exit_code: 1,
+        message: 'boom',
+        next_step: null
+      }
+    });
   });
 });

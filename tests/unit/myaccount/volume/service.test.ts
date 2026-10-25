@@ -13,8 +13,7 @@ function createConfig(): ConfigFile {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        default_location: 'Delhi',
-        default_project_id: '46429'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   };
@@ -43,6 +42,11 @@ function createServiceFixture(options?: {
   let credentials: ResolvedCredentials | undefined;
 
   const client: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
+    resizeVolume: vi.fn(),
     attachVolumeToNode: vi.fn(),
     createVolume,
     deleteVolume,

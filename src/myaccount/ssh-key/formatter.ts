@@ -1,4 +1,4 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { stableStringify, type JsonValue } from '../../core/json.js';
 import type { SshKeyCommandResult, SshKeyItem } from './service.js';
@@ -11,7 +11,7 @@ export function renderSshKeyResult(
 }
 
 export function formatSshKeyTable(items: SshKeyItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Label', 'Type', 'Attached Nodes', 'Created']
   });
 
@@ -32,7 +32,9 @@ function renderSshKeyHuman(result: SshKeyCommandResult): string {
   switch (result.action) {
     case 'create':
       return (
-        `Added SSH key: ${result.item.label}\n` +
+        (result.created
+          ? `Added SSH key: ${result.item.label}\n`
+          : `This key is already saved as "${result.item.label}"; returning it instead of adding a copy.\n`) +
         `ID: ${result.item.id}\n` +
         `Type: ${result.item.type}\n`
       );
@@ -58,6 +60,7 @@ function normalizeJsonResult(result: SshKeyCommandResult): JsonValue {
     case 'create':
       return {
         action: 'create',
+        created: result.created,
         item: normalizeJsonItem(result.item)
       };
     case 'delete':

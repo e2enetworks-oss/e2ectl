@@ -11,32 +11,44 @@ npm install -g @e2enetworks-oss/e2ectl
 e2ectl --help
 ```
 
-## 2. Download Your Credential File
+## 2. Create An API Key And Token
 
-Open [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam), create an API token, and download the generated config JSON file.
+Open [E2E MyAccount > API & IAM](https://myaccount.e2enetworks.com/services/apiiam) and create an
+API key and token. Keep them private. Do not paste them into tickets, chat threads, or screenshots.
 
-Keep the file private. Do not paste its contents into tickets, chat threads, or screenshots.
-
-## 3. Import A Saved Profile
-
-Interactive terminals can let `e2ectl` help you choose a default alias and optional default project/location context:
+## 3. Set Up e2ectl
 
 ```bash
-e2ectl config import --file ~/Downloads/myaccount-config.json
+e2ectl configure
 ```
 
-For a fully non-interactive path, pass the shared defaults explicitly:
+It asks for the key and token (they are not shown as you type), checks them, and saves them in a
+profile. Then it asks which platforms you use: TIR (recommended, picked by default) and MyAccount.
+For each one it asks for the project and location (and the account, for TIR), checks them, and
+saves them. Run it again at any time: each question offers the saved value (or the value of its
+environment variable) as the default answer, and the prompt says which one Enter keeps.
+
+To change one platform later:
 
 ```bash
-e2ectl config import \
-  --file ~/Downloads/myaccount-config.json \
-  --default <profile-alias> \
-  --default-project-id <project-id> \
-  --default-location <location> \
-  --no-input
+e2ectl tir configure
+e2ectl myaccount configure
 ```
 
-If import fails, start with [Authentication and import problems](./troubleshooting.md#authentication-and-import-problems).
+In scripts and agents there is no terminal to ask in. Put the key and token in `E2E_API_KEY` and
+`E2E_AUTH_TOKEN` (they are never taken as flags) and the values in flags. Giving a platform's flags
+sets that platform up, so one command can set up both:
+
+```bash
+e2ectl configure --tir-account-id <account-id> --tir-project-id <project-id> --tir-location Chennai
+e2ectl configure --myaccount-project-id <project-id> --myaccount-location Delhi
+```
+
+`--platform tir` or `--platform myaccount` sets a platform up from its environment variables or
+saved values instead. Missing values fail with one message that names every flag to add. If you already have a downloaded
+credential file, `e2ectl config import --file <path>` saves it as a profile instead.
+
+If setup fails, start with [Authentication and import problems](./troubleshooting.md#authentication-and-import-problems).
 
 ## 4. Confirm What Was Saved
 

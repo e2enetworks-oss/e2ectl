@@ -1,15 +1,33 @@
-import Table from 'cli-table3';
+import { buildTable } from '../../core/table.js';
 
 import { formatMyAccountCommand } from '../api.js';
 import { stableStringify, type JsonValue } from '../../core/json.js';
+import { formatSnapshotResult } from '../snapshot/index.js';
 import type {
   VolumeCommandResult,
   VolumeCommittedPlanItem,
   VolumeDetailItem,
   VolumeListItem,
   VolumePlanItem,
-  VolumePlansCommandResult
+  VolumePlansCommandResult,
+  VolumeResizeCommandResult,
+  VolumeSnapshotCommandResult
 } from './service.js';
+
+export function renderVolumeSnapshotResult(
+  result: VolumeSnapshotCommandResult,
+  json: boolean
+): string {
+  if (json) {
+    return `${stableStringify(result as unknown as JsonValue)}\n`;
+  }
+
+  if (result.action !== 'snapshot-save-volume') {
+    return formatSnapshotResult('volume', result.volume_id, result);
+  }
+
+  return `Saving snapshot ${result.snapshot_id} of volume ${result.volume_id} as a new volume "${result.volume_name}". The volume itself is not changed.\nFind the new volume with ${formatMyAccountCommand('volume list')}.\n`;
+}
 
 export function renderVolumeResult(
   result: VolumeCommandResult,
@@ -19,7 +37,7 @@ export function renderVolumeResult(
 }
 
 export function formatVolumeListTable(items: VolumeListItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['ID', 'Name', 'Status', 'Size', 'Attached To']
   });
 
@@ -37,7 +55,7 @@ export function formatVolumeListTable(items: VolumeListItem[]): string {
 }
 
 export function formatVolumePlansTable(items: VolumePlanItem[]): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Size (GB)', 'IOPS', 'Price/Hour', 'Available']
   });
 
@@ -56,7 +74,7 @@ export function formatVolumePlansTable(items: VolumePlanItem[]): string {
 export function formatVolumeCommittedPlansTable(
   items: VolumeCommittedPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan ID', 'Name', 'Term (Days)', 'Total Price', 'Savings %']
   });
 
@@ -76,7 +94,7 @@ export function formatVolumeCommittedPlansTable(
 function formatVolumeCommittedPlanReferenceTable(
   items: VolumeCommittedPlanItem[]
 ): string {
-  const table = new Table({
+  const table = buildTable({
     head: ['Plan ID', 'Name', 'Term (Days)']
   });
 
@@ -85,6 +103,19 @@ function formatVolumeCommittedPlanReferenceTable(
   });
 
   return table.toString();
+}
+
+function formatVolumeResize(result: VolumeResizeCommandResult): string {
+  if (result.cancelled) {
+    return 'Resize cancelled.\n';
+  }
+
+  const from =
+    result.previous_size_gb === null
+      ? ''
+      : ` from ${result.previous_size_gb} GB`;
+
+  return `Resizing volume ${result.volume_id}${from} to ${result.size_gb} GB. ${result.message ?? ''}\nCheck the new size with ${formatMyAccountCommand(`volume get ${result.volume_id}`)}.\n`;
 }
 
 function renderVolumeHuman(result: VolumeCommandResult): string {
@@ -113,6 +144,8 @@ function renderVolumeHuman(result: VolumeCommandResult): string {
         `Next: run ${formatMyAccountCommand('volume list')} to inspect the current state.\n`
       );
     }
+    case 'resize':
+      return formatVolumeResize(result);
     case 'delete':
       return result.cancelled
         ? 'Deletion cancelled.\n'
@@ -181,6 +214,8 @@ function normalizeVolumeJson(result: VolumeCommandResult): JsonValue {
           name: result.volume.name
         }
       };
+    case 'resize':
+      return { ...result };
     case 'delete':
       return result.cancelled
         ? {

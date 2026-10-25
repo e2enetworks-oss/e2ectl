@@ -11,8 +11,7 @@ describe('resolveCredentials', () => {
       prod: {
         api_key: 'api-prod',
         auth_token: 'auth-prod',
-        default_project_id: '123',
-        default_location: 'Delhi'
+        myaccount: { location: 'Delhi', project_id: '123' }
       }
     },
     default: 'prod'
@@ -30,8 +29,7 @@ describe('resolveCredentials', () => {
       auth_token: 'auth-prod',
       project_id: '123',
       location: 'Delhi',
-      alias: 'prod',
-      source: 'profile'
+      alias: 'prod'
     });
   });
 
@@ -48,7 +46,6 @@ describe('resolveCredentials', () => {
     expect(result.project_id).toBe('456');
     expect(result.location).toBe('Chennai');
     expect(result.api_key).toBe('api-prod');
-    expect(result.source).toBe('profile');
   });
 
   it('uses environment auth and context without a saved profile', () => {
@@ -66,8 +63,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '789',
-      location: 'Chennai',
-      source: 'env'
+      location: 'Chennai'
     });
     expect(result.alias).toBeUndefined();
   });
@@ -87,8 +83,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       location: 'Delhi',
-      project_id: '790',
-      source: 'env'
+      project_id: '790'
     });
   });
 
@@ -142,7 +137,7 @@ describe('resolveCredentials', () => {
         configPath: '/tmp/config.json',
         env: {}
       })
-    ).toThrowError(/Unable to resolve MyAccount project context/);
+    ).toThrowError(/No MyAccount project and location chosen/);
   });
 
   it('omits config-path details when context resolution fails without a config file path', () => {
@@ -204,9 +199,18 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '456',
-      location: 'Chennai',
-      source: 'mixed'
+      location: 'Chennai'
     });
+  });
+
+  it('reports mixed auth when the key and token come from different places', () => {
+    const result = resolveCredentials({
+      config,
+      env: { E2E_API_KEY: 'api-env' }
+    });
+
+    expect(result.api_key).toBe('api-env');
+    expect(result.auth_token).toBe('auth-prod');
   });
 
   it('ignores a stale default alias when env auth and env context are complete', () => {
@@ -228,8 +232,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '46429',
-      location: 'Delhi',
-      source: 'env'
+      location: 'Delhi'
     });
   });
 
@@ -252,8 +255,7 @@ describe('resolveCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       project_id: '789',
-      location: 'Chennai',
-      source: 'env'
+      location: 'Chennai'
     });
   });
 
@@ -281,7 +283,7 @@ describe('resolveCredentials', () => {
       'Expected environment variables: E2E_PROJECT_ID, E2E_LOCATION',
       'Config path: /tmp/config.json'
     ]);
-    expect(error.suggestion).toContain('Fix the saved default profile');
+    expect(error.suggestion).toContain('configure');
   });
 
   it('includes flag details when a stale default alias still leaves auth unresolved', () => {
@@ -342,7 +344,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123'
+              myaccount: { project_id: '123' }
             }
           }
         },
@@ -370,8 +372,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: 'abc',
-              default_location: 'Delhi'
+              myaccount: { location: 'Delhi', project_id: 'abc' }
             }
           },
           default: 'prod'
@@ -386,8 +387,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123',
-              default_location: 'Atlantis'
+              myaccount: { location: 'Atlantis', project_id: '123' }
             }
           },
           default: 'prod'
@@ -396,7 +396,7 @@ describe('resolveCredentials', () => {
       })
     );
 
-    expect(projectError.code).toBe('INVALID_PROJECT_ID');
+    expect(projectError.code).toBe('INVALID_NUMERIC_ID');
     expect(locationError.code).toBe('INVALID_LOCATION');
   });
 });
@@ -419,8 +419,7 @@ describe('resolveAccountCredentials', () => {
     expect(result).toEqual({
       alias: 'prod',
       api_key: 'api-prod',
-      auth_token: 'auth-prod',
-      source: 'profile'
+      auth_token: 'auth-prod'
     });
   });
 
@@ -441,8 +440,7 @@ describe('resolveAccountCredentials', () => {
       api_key: 'api-env',
       auth_token: 'auth-env',
       location: 'Chennai',
-      project_id: '123',
-      source: 'env'
+      project_id: '123'
     });
   });
 
@@ -453,8 +451,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '123' }
           }
         },
         default: 'prod'
@@ -467,8 +464,7 @@ describe('resolveAccountCredentials', () => {
       api_key: 'api-prod',
       auth_token: 'auth-prod',
       project_id: '123',
-      location: 'Delhi',
-      source: 'profile'
+      location: 'Delhi'
     });
   });
 
@@ -487,8 +483,7 @@ describe('resolveAccountCredentials', () => {
 
     expect(result).toEqual({
       api_key: 'api-env',
-      auth_token: 'auth-env',
-      source: 'env'
+      auth_token: 'auth-env'
     });
   });
 
@@ -499,8 +494,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: '   '
+            myaccount: { location: '   ', project_id: '123' }
           }
         },
         default: 'prod'
@@ -513,8 +507,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '123' }
           }
         },
         default: 'prod'
@@ -526,16 +519,14 @@ describe('resolveAccountCredentials', () => {
       alias: 'prod',
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      project_id: '123',
-      source: 'profile'
+      project_id: '123'
     });
     expect(resultWithFullContext).toEqual({
       alias: 'prod',
       api_key: 'api-prod',
       auth_token: 'auth-prod',
       project_id: '123',
-      location: 'Delhi',
-      source: 'profile'
+      location: 'Delhi'
     });
   });
 
@@ -547,8 +538,7 @@ describe('resolveAccountCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: 'bad-id',
-              default_location: 'Delhi'
+              myaccount: { location: 'Delhi', project_id: 'bad-id' }
             }
           },
           default: 'prod'
@@ -563,8 +553,7 @@ describe('resolveAccountCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123',
-              default_location: 'Atlantis'
+              myaccount: { location: 'Atlantis', project_id: '123' }
             }
           },
           default: 'prod'
@@ -573,7 +562,7 @@ describe('resolveAccountCredentials', () => {
       })
     );
 
-    expect(invalidProject.code).toBe('INVALID_PROJECT_ID');
+    expect(invalidProject.code).toBe('INVALID_NUMERIC_ID');
     expect(invalidLocation.code).toBe('INVALID_LOCATION');
   });
 });

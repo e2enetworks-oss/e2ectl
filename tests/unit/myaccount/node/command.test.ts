@@ -74,11 +74,9 @@ function createNodeClientStub() {
   );
   const listNodeCatalogOs = vi.fn(() =>
     Promise.resolve({
-      category_list: [
-        {
-          OS: 'Ubuntu',
-          category: ['Linux Virtual Node'],
-          version: [
+      category_list: {
+        'Linux Virtual Node': {
+          Ubuntu: [
             {
               number_of_domains: null,
               os: 'Ubuntu',
@@ -88,7 +86,7 @@ function createNodeClientStub() {
             }
           ]
         }
-      ]
+      }
     })
   );
   const listNodeCatalogPlans = vi.fn(() =>
@@ -162,6 +160,24 @@ function createNodeClientStub() {
       status: 'In Progress'
     })
   );
+  const rebootNode = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'Reboot',
+      created_at: '2026-03-14T08:15:00Z',
+      id: 704,
+      resource_id: '101',
+      status: 'In Progress'
+    })
+  );
+  const setDeletionProtection = vi.fn(() =>
+    Promise.resolve({
+      action_type: 'enable_accidental_protection',
+      created_at: '2026-03-14T08:16:00Z',
+      id: 705,
+      resource_id: '101',
+      status: 'Done'
+    })
+  );
   const saveNodeImage = vi.fn(() =>
     Promise.resolve({
       action_type: 'Save Image',
@@ -183,6 +199,10 @@ function createNodeClientStub() {
   );
 
   const stub: NodeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -192,11 +212,17 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
+    rebootNode,
     saveNodeImage,
+    setDeletionProtection,
     upgradeNode
   };
 
   return {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsImage: vi.fn(),
     attachSshKeys,
     createNode,
     deleteNode,
@@ -206,7 +232,9 @@ function createNodeClientStub() {
     listNodes,
     powerOffNode,
     powerOnNode,
+    rebootNode,
     saveNodeImage,
+    setDeletionProtection,
     upgradeNode,
     stub
   };
@@ -320,6 +348,11 @@ function createVolumeClientStub() {
   const listVolumes = vi.fn();
 
   const stub: VolumeClient = {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
+    resizeVolume: vi.fn(),
     attachVolumeToNode,
     createVolume,
     deleteVolume: vi.fn(),
@@ -330,6 +363,11 @@ function createVolumeClientStub() {
   };
 
   return {
+    createSnapshot: vi.fn(),
+    deleteSnapshot: vi.fn(),
+    listSnapshots: vi.fn(),
+    saveSnapshotAsVolume: vi.fn(),
+    resizeVolume: vi.fn(),
     attachVolumeToNode,
     createVolume,
     detachVolumeFromNode,
@@ -448,8 +486,7 @@ describe('node commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
   }
 
@@ -477,7 +514,7 @@ describe('node commands', () => {
     expect(stdout.buffer).toBe(
       toJsonOutput({
         action: 'list',
-        nodes: [
+        items: [
           {
             id: 101,
             is_locked: false,
@@ -969,7 +1006,8 @@ describe('node commands', () => {
       '--project-id',
       '46429',
       '--location',
-      'Chennai'
+      'Chennai',
+      '--force'
     ]);
 
     expect(receivedCredentials()).toMatchObject({
@@ -978,9 +1016,8 @@ describe('node commands', () => {
       project_id: '46429'
     });
     expect(nodeStub.getNode).toHaveBeenCalledWith('101');
-    expect(confirm).toHaveBeenCalledWith(
-      'Detach public IP 1.1.1.1 from node 101? The node may no longer be publicly reachable.'
-    );
+    // --json never asks; --force is what lets it go ahead.
+    expect(confirm).not.toHaveBeenCalled();
     expect(reservedIpStub.detachNodePublicIp).toHaveBeenCalledWith({
       public_ip: '1.1.1.1',
       type: 'detach',
@@ -1178,6 +1215,7 @@ describe('node commands', () => {
             config: {
               disk_gb: 100,
               family: null,
+              gpu: null,
               ram: '8.00',
               series: 'C3',
               vcpu: 4
@@ -1383,12 +1421,11 @@ describe('node commands', () => {
       '--image',
       'Ubuntu-24.04-Distro',
       '--alias',
-      'prod'
+      'prod',
+      '--force'
     ]);
 
-    expect(confirm).toHaveBeenCalledWith(
-      'Upgrade node 101 to plan C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi with image Ubuntu-24.04-Distro? This is disruptive.'
-    );
+    expect(confirm).not.toHaveBeenCalled();
     expect(nodeStub.upgradeNode).toHaveBeenCalledWith('101', {
       image: 'Ubuntu-24.04-Distro',
       plan: 'C3-4vCPU-8RAM-100DISK-C3.8GB-Ubuntu-24.04-Delhi'
@@ -1402,6 +1439,7 @@ describe('node commands', () => {
           old_node_image_id: 8801,
           vm_id: 100157
         },
+        image_kept: false,
         message: 'Node upgrade initiated',
         node_id: 101,
         requested: {
@@ -1928,7 +1966,6 @@ describe('node commands', () => {
     await program.parseAsync([
       'node',
       CLI_COMMAND_NAME,
-      '--json',
       'myaccount',
       'node',
       'delete',
@@ -1941,14 +1978,7 @@ describe('node commands', () => {
       'Delete node 101? This cannot be undone.'
     );
     expect(nodeStub.deleteNode).not.toHaveBeenCalled();
-    expect(stdout.buffer).toBe(
-      toJsonOutput({
-        action: 'delete',
-        cancelled: true,
-        node_id: 101,
-        reserve_public_ip_requested: false
-      })
-    );
+    expect(stdout.buffer.toLowerCase()).toContain('cancelled');
   });
 
   it('requires force outside an interactive terminal', async () => {

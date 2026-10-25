@@ -1,6 +1,5 @@
-// The TIR account, project and location a profile works in. Saved now so
-// old and new config files share one shape; TIR commands start using it in
-// a later release.
+// The TIR account, project and location a profile works in, saved by
+// `tir configure` and used by every later `tir` command.
 export const TIR_CONTEXT_FIELDS = [
   'account_id',
   'location',
@@ -11,13 +10,14 @@ export type TirContextField = (typeof TIR_CONTEXT_FIELDS)[number];
 
 export type TirContext = Partial<Record<TirContextField, string>>;
 
+// The MyAccount project and location a profile works in, saved by
+// `myaccount configure` and used by every later `myaccount` command.
+export type MyAccountContext = Partial<Record<ContextField, string>>;
+
 export interface ProfileConfig {
   api_key: string;
   auth_token: string;
-  // MyAccount context. The names predate TIR and stay as they are so
-  // existing config files keep working unchanged.
-  default_project_id?: string;
-  default_location?: string;
+  myaccount?: MyAccountContext;
   tir?: TirContext;
 }
 
@@ -34,7 +34,6 @@ export interface ResolvedCredentials {
   alias?: string;
   location: string;
   project_id: string;
-  source: 'env' | 'profile' | 'mixed';
 }
 
 export interface ResolvedAccountCredentials {
@@ -43,7 +42,16 @@ export interface ResolvedAccountCredentials {
   alias?: string;
   location?: string;
   project_id?: string;
-  source: 'env' | 'profile' | 'mixed';
+}
+
+// TIR context only: the account, project and location chosen for TIR.
+export interface ResolvedTirCredentials {
+  api_key: string;
+  auth_token: string;
+  account_id?: string;
+  alias?: string;
+  location?: string;
+  project_id?: string;
 }
 
 export interface ProfileSummary {
@@ -51,8 +59,8 @@ export interface ProfileSummary {
   isDefault: boolean;
   api_key: string;
   auth_token: string;
-  default_project_id: string;
-  default_location: string;
+  myaccount: MyAccountContext | null;
+  tir: TirContext | null;
 }
 
 export const REQUIRED_AUTH_FIELDS = ['api_key', 'auth_token'] as const;
@@ -70,4 +78,10 @@ export const AUTH_ENV_VAR_BY_FIELD: Record<AuthField, string> = {
 export const CONTEXT_ENV_VAR_BY_FIELD: Record<ContextField, string> = {
   project_id: 'E2E_PROJECT_ID',
   location: 'E2E_LOCATION'
+};
+
+export const TIR_CONTEXT_ENV_VAR_BY_FIELD: Record<TirContextField, string> = {
+  account_id: 'E2E_TIR_ACCOUNT_ID',
+  location: 'E2E_TIR_LOCATION',
+  project_id: 'E2E_TIR_PROJECT_ID'
 };

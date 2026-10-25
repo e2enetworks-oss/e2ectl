@@ -49,8 +49,9 @@ export interface ApiRequestOptions<TResponse = ApiEnvelope<unknown>> {
 }
 
 export interface ApiClientCredentials extends ApiAuthCredentials {
+  // TIR only: the account (IAM membership) a request acts in.
+  account_id?: string;
   alias?: string;
   location?: string;
   project_id?: string;
-  source: 'env' | 'mixed' | 'profile';
 }

@@ -12,8 +12,7 @@ function createConfig(): ConfigFile {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        default_location: 'Delhi',
-        default_project_id: '46429'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   };

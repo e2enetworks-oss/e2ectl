@@ -9,18 +9,52 @@ export {
   resolveAccountCredentials,
   resolveCredentials,
   resolveStoredAccountCredentials,
-  resolveStoredCredentials
+  resolveStoredCredentials,
+  resolveStoredTirCredentials,
+  pickKeyAndToken,
+  resolveTirCredentials
 } from './resolver.js';
-export { ConfigStore, createEmptyConfig, normalizeConfig } from './store.js';
+export {
+  pickValue,
+  type PickedValue,
+  type ValueSources
+} from './value-order.js';
+export {
+  ConfigStore,
+  createEmptyConfig,
+  findProfile,
+  normalizeConfig
+} from './store.js';
 export type {
   AuthField,
   ConfigFile,
   ContextField,
+  MyAccountContext,
   ProfileConfig,
   ResolvedAccountCredentials,
   ProfileSummary,
   ResolvedCredentials,
+  ResolvedTirCredentials,
   TirContext,
   TirContextField
 } from './types.js';
 export type { CredentialResolutionStore } from './resolver.js';
+export {
+  CONTEXT_ENV_VAR_BY_FIELD,
+  TIR_CONTEXT_ENV_VAR_BY_FIELD
+} from './types.js';
+export {
+  configurePlatform,
+  describePlatformSetup,
+  platformName,
+  renderPlatformSetupResult,
+  type CreateSetupSteps,
+  type PlatformConfigureOutcome,
+  type PlatformConfigureRequest,
+  type PlatformSetupResult,
+  type PlatformSetupSteps,
+  type PlatformSetupTerminal,
+  type SetupPlatform,
+  type SetupValues
+} from './platform-setup.js';
+export { findLocation, normalizeLocation, type Location } from './checks.js';

@@ -12,8 +12,7 @@ function createConfig(): ConfigFile {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        default_location: 'Delhi',
-        default_project_id: '46429'
+        myaccount: { location: 'Delhi', project_id: '46429' }
       }
     }
   };
@@ -34,7 +33,7 @@ function createServiceFixture(options?: {
 } {
   const createSshKey = vi.fn();
   const deleteSshKey = vi.fn();
-  const listSshKeys = vi.fn();
+  const listSshKeys = vi.fn(() => Promise.resolve([]));
   const readPublicKeyFile = vi.fn();
   const readPublicKeyFromStdin = vi.fn();
   const confirm = vi.fn(() => Promise.resolve(options?.confirmResult ?? true));
@@ -105,6 +104,7 @@ describe('SshKeyService', () => {
     });
     expect(result).toEqual({
       action: 'create',
+      created: true,
       item: {
         attached_nodes: 0,
         created_at: '19-Feb-2025',
@@ -281,6 +281,7 @@ describe('SshKeyService', () => {
 
     expect(result).toEqual({
       action: 'create',
+      created: true,
       item: {
         attached_nodes: 0,
         created_at: '19-Feb-2025',
@@ -443,6 +444,32 @@ describe('SshKeyService', () => {
       cancelled: false,
       id: 15398,
       message: 'SSH Key has been deleted successfully.'
+    });
+  });
+
+  it('returns the saved key when the same key is created again, even under another label', async () => {
+    const fixture = createServiceFixture();
+    fixture.listSshKeys.mockResolvedValueOnce([
+      {
+        label: 'laptop',
+        pk: 42,
+        ssh_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA old-comment',
+        timestamp: '19-Feb-2025'
+      }
+    ]);
+    fixture.readPublicKeyFile.mockResolvedValueOnce(
+      'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA new-comment\n'
+    );
+
+    const result = await fixture.service.createSshKey({
+      label: 'other-label',
+      publicKeyFile: '/tmp/key.pub'
+    });
+
+    expect(fixture.createSshKey).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      created: false,
+      item: { id: 42, label: 'laptop' }
     });
   });
 });

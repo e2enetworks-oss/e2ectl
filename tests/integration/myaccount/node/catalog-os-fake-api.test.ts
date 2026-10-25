@@ -8,15 +8,34 @@ import { createTempHome } from '../../../helpers/temp-home.js';
 describe('node catalog os against a fake MyAccount API', () => {
   it('renders deterministic json from the compiled CLI', async () => {
     const server = await startTestHttpServer({
-      'GET /myaccount/api/v1/images/os-category/': () => ({
+      'GET /myaccount/api/v1/images/category-list/': () => ({
         body: {
           code: 200,
           data: {
-            category_list: [
-              {
-                OS: 'Ubuntu',
-                category: ['Linux Virtual Node'],
-                version: [
+            category_list: {
+              GPU: {
+                'Nvidia-A100': [
+                  {
+                    number_of_domains: null,
+                    os: 'Ubuntu',
+                    software_version: '',
+                    sub_category: 'Gpu',
+                    version: '22.04'
+                  }
+                ],
+                'Nvidia-T4': [
+                  {
+                    number_of_domains: null,
+                    os: 'Ubuntu',
+                    software_version: '',
+                    sub_category: 'Gpu',
+                    version: '22.04'
+                  }
+                ]
+              },
+              'GPU Cloud Wizard': { containers: [{ name: 'nemo' }] },
+              'Linux Virtual Node': {
+                Ubuntu: [
                   {
                     number_of_domains: null,
                     os: 'Ubuntu',
@@ -26,7 +45,7 @@ describe('node catalog os against a fake MyAccount API', () => {
                   }
                 ]
               }
-            ]
+            }
           },
           errors: {},
           message: 'OK'
@@ -55,6 +74,14 @@ describe('node catalog os against a fake MyAccount API', () => {
           action: 'catalog-os',
           entries: [
             {
+              category: 'Gpu',
+              display_category: 'GPU',
+              number_of_domains: null,
+              os: 'Ubuntu',
+              os_version: '22.04',
+              software_version: ''
+            },
+            {
               category: 'Ubuntu',
               display_category: 'Linux Virtual Node',
               number_of_domains: null,
@@ -69,7 +96,7 @@ describe('node catalog os against a fake MyAccount API', () => {
       expect(server.requests).toHaveLength(1);
       expect(server.requests[0]).toMatchObject({
         method: 'GET',
-        pathname: '/myaccount/api/v1/images/os-category/',
+        pathname: '/myaccount/api/v1/images/category-list/',
         query: {
           apikey: 'prod-api-key',
           location: 'Delhi',

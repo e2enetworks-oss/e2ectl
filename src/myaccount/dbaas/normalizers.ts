@@ -17,6 +17,10 @@ import type {
   NormalizedDbaasCreateInput,
   SupportedDatabaseType
 } from './types/index.js';
+import {
+  normalizeRequiredNumericId,
+  normalizeRequiredString
+} from '../../core/normalize.js';
 
 export function normalizeCreateBillingType(
   value: string | undefined
@@ -199,58 +203,6 @@ export function normalizePassword(value: string, flag: string): string {
   return normalized;
 }
 
-export function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'INVALID_DBAAS_INPUT',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
-}
-
-export function normalizeRequiredNumericId(
-  value: string,
-  label: string,
-  flagDescription: string
-): number {
-  const normalized = value.trim();
-  if (normalized.length === 0) {
-    throw new CliError(`${label} cannot be empty.`, {
-      code: 'INVALID_DBAAS_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Pass the numeric ${label.toLowerCase()} as ${flagDescription}.`
-    });
-  }
-
-  if (!/^\d+$/.test(normalized)) {
-    throw new CliError(`${label} must be numeric.`, {
-      code: 'INVALID_DBAAS_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Pass the numeric ${label.toLowerCase()} as ${flagDescription}.`
-    });
-  }
-
-  const parsed = Number(normalized);
-  if (parsed > Number.MAX_SAFE_INTEGER) {
-    throw new CliError(`${label} is too large to represent safely.`, {
-      code: 'INVALID_DBAAS_ID',
-      exitCode: EXIT_CODES.usage,
-      suggestion: `Pass the numeric ${label.toLowerCase()} as ${flagDescription}.`
-    });
-  }
-
-  return parsed;
-}
-
 export function normalizeIpAddress(value: string): string {
   const normalized = normalizeRequiredString(
     value,
@@ -269,7 +221,7 @@ export function normalizeIpAddress(value: string): string {
 }
 
 export function normalizeDbaasIdArg(dbaasId: string): number {
-  return normalizeRequiredNumericId(dbaasId, 'DBaaS ID', 'the first argument');
+  return normalizeRequiredNumericId(dbaasId, 'DBaaS ID', '<dbaasId>');
 }
 
 export function normalizeDbaasCreateInput(

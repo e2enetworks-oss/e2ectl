@@ -12,12 +12,12 @@ export type {
   NodeCatalogHourlySummary,
   NodeCatalogOsData,
   NodeCatalogOsEntry,
-  NodeCatalogOsGroup,
   NodeCatalogOsVersion,
   NodeCatalogPlan,
   NodeCatalogPlanItem,
   NodeCatalogPlanOsInfo,
   NodeCatalogPlansQuery,
+  NodeCatalogPlanFilters,
   NodeCatalogPlanSpecs,
   NodeCatalogQuery,
   NodeCommittedCreateStatus,
@@ -32,4 +32,3 @@ export type {
   NodeUpgradeRequest,
   NodeUpgradeResult
 } from './types.js';
-export { normalizeRequiredNumericId } from './normalizers.js';

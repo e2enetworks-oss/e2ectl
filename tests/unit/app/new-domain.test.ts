@@ -8,8 +8,6 @@ import {
   registerInPlatformIndex,
   registerInRuntime,
   registerInTestRuntime,
-  registerPlatformInProgram,
-  renderPlatformFiles,
   renderProductFiles
 } from '../../../scripts/helpers/new-domain.mjs';
 
@@ -34,12 +32,10 @@ export function createRuntime(): CliRuntime {
 
 describe('parseDomainName', () => {
   it('keeps short names for MyAccount products', () => {
-    expect(parseDomainName('myaccount/ssh-key')).toEqual({
+    expect(parseDomainName('myaccount/ssh-key')).toMatchObject({
       baseName: 'SshKey',
       credentialsResolver: 'resolveStoredCredentials',
       credentialsType: 'ResolvedCredentials',
-      displayName: 'MyAccount',
-      isMyAccount: true,
       optionsHelper: 'addContextOptions',
       platform: 'myaccount',
       platformName: 'MyAccount',
@@ -71,11 +67,11 @@ describe('reserved names', () => {
     expect(() => parseDomainName('tir/help')).toThrow('is the help command');
   });
 
-  it.each(['app/foo', 'config/foo', 'core/foo', 'help/foo', 'http/foo'])(
-    'refuses %s because that folder is shared code',
+  it.each(['app/foo', 'config/foo', 'core/foo', 'newplatform/foo'])(
+    'refuses %s: only myaccount and tir products can be made',
     (input) => {
       expect(() => parseDomainName(input)).toThrow(
-        'is shared code under src, not a platform'
+        'is not a platform the generator knows. Use myaccount or tir.'
       );
     }
   );
@@ -102,34 +98,27 @@ describe('text insertion', () => {
 });
 
 describe('registering a product', () => {
-  it('adds a TIR factory, its import and its transport to the runtime', () => {
+  it('adds a TIR factory and its import to the runtime', () => {
     const result = registerInRuntime(
       RUNTIME_SOURCE,
-      parseDomainName('tir/foo'),
-      {
-        addTransportImport: true
-      }
+      parseDomainName('tir/foo')
     );
 
     expect(result).toContain(
       "  TirFooApiClient,\n  type TirFooClient\n} from '../tir/foo/index.js';"
     );
     expect(result).toContain(
-      "import { createTirTransport } from '../tir/api.js';"
+      '  createTirFooClient(credentials: ResolvedTirCredentials): TirFooClient;\n  credentialValidator: CredentialValidator;'
     );
     expect(result).toContain(
-      '  createTirFooClient(credentials: ResolvedAccountCredentials): TirFooClient;\n  credentialValidator: CredentialValidator;'
-    );
-    expect(result).toContain(
-      '    createTirFooClient: (credentials) =>\n      new TirFooApiClient(\n        createTirTransport(credentials, apiClientOptions)\n      ),\n    credentialValidator: new ApiCredentialValidator('
+      '    createTirFooClient: (credentials) =>\n      new TirFooApiClient(\n        createTirTransport(credentials, tirApiClientOptions)\n      ),\n    credentialValidator: new ApiCredentialValidator('
     );
   });
 
   it('gives MyAccount products project credentials and no new transport import', () => {
     const result = registerInRuntime(
       RUNTIME_SOURCE,
-      parseDomainName('myaccount/eos'),
-      { addTransportImport: false }
+      parseDomainName('myaccount/eos')
     );
 
     expect(result).toContain(
@@ -173,25 +162,6 @@ export function buildMyAccountCommand(runtime) {
       '  command.addCommand(buildVpcCommand(runtime));\n  command.addCommand(buildEosCommand(runtime));'
     );
   });
-
-  it('adds a new platform to the program', () => {
-    const source = `import { buildConfigCommand } from '../config/index.js';
-
-  program.addCommand(buildConfigCommand(runtime));
-  program.addCommand(buildMyAccountCommand(runtime));
-`;
-    const result = registerPlatformInProgram(
-      source,
-      parseDomainName('tir/foo')
-    );
-
-    expect(result).toContain(
-      "import { buildTirCommand } from '../tir/index.js';"
-    );
-    expect(result).toContain(
-      '  program.addCommand(buildMyAccountCommand(runtime));\n  program.addCommand(buildTirCommand(runtime));'
-    );
-  });
 });
 
 describe('renderProductFiles', () => {
@@ -209,21 +179,17 @@ describe('renderProductFiles', () => {
     ]);
   });
 
-  it('never lets a new platform borrow the MyAccount address', () => {
-    const api =
-      renderPlatformFiles(parseDomainName('tir/foo'))['src/tir/api.ts'] ?? '';
-
-    expect(api).toContain('const baseUrl = TIR_API_BASE_URL;');
-    expect(api).not.toContain('options.baseUrl ??');
-  });
-
-  it('keeps TIR products free of MyAccount project settings', () => {
+  it('gives TIR products the TIR context and never the MyAccount one', () => {
     const files = renderProductFiles(parseDomainName('tir/foo'));
 
     expect(files['src/tir/foo/service.ts']).toContain(
-      'resolveStoredAccountCredentials'
+      "resolveStoredTirCredentials(\n      this.dependencies.store,\n      options,\n      'project'\n    );"
     );
-    expect(files['src/tir/foo/command.ts']).toContain('addAliasOption');
+    expect(files['src/tir/foo/command.ts']).toContain('addTirContextOptions');
+    expect(files['src/tir/foo/types.ts']).toContain('accountId?: string;');
+    expect(files['tests/unit/tir/foo/command.test.ts']).toContain(
+      "tir: { account_id: '1', location: 'Delhi', project_id: '2' }"
+    );
   });
 });
 
@@ -239,17 +205,15 @@ describe('the files the generator edits', () => {
     const tirFoo = parseDomainName('tir/foo');
     const myAccountBar = parseDomainName('myaccount/bar');
 
-    expect(
-      registerInRuntime(read('src/app/runtime.ts'), tirFoo, {
-        addTransportImport: true
-      })
-    ).toContain('createTirFooClient: (credentials) =>');
+    expect(registerInRuntime(read('src/app/runtime.ts'), tirFoo)).toContain(
+      'createTirFooClient: (credentials) =>'
+    );
     expect(
       registerInTestRuntime(read('tests/helpers/runtime.ts'), tirFoo)
     ).toContain("createTirFooClient: unexpectedClient('TirFoo'),");
-    expect(
-      registerPlatformInProgram(read('src/app/program.ts'), tirFoo)
-    ).toContain('program.addCommand(buildTirCommand(runtime));');
+    expect(registerInPlatformIndex(read('src/tir/index.ts'), tirFoo)).toContain(
+      'command.addCommand(buildTirFooCommand(runtime));'
+    );
     expect(
       registerInPlatformIndex(read('src/myaccount/index.ts'), myAccountBar)
     ).toContain('command.addCommand(buildBarCommand(runtime));');

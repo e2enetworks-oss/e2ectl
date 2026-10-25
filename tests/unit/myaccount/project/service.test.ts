@@ -15,12 +15,14 @@ function createConfig(overrides?: {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        ...(overrides?.defaultLocation === undefined
-          ? {}
-          : { default_location: overrides.defaultLocation }),
-        ...(overrides?.defaultProjectId === undefined
-          ? {}
-          : { default_project_id: overrides.defaultProjectId })
+        myaccount: {
+          ...(overrides?.defaultLocation === undefined
+            ? {}
+            : { location: overrides.defaultLocation }),
+          ...(overrides?.defaultProjectId === undefined
+            ? {}
+            : { project_id: overrides.defaultProjectId })
+        }
       }
     }
   };
@@ -99,8 +101,7 @@ describe('ProjectService', () => {
       api_key: 'api-key',
       auth_token: 'auth-token',
       location: 'Delhi',
-      project_id: '46429',
-      source: 'profile'
+      project_id: '46429'
     });
     expect(result).toEqual({
       action: 'list',
@@ -240,8 +241,7 @@ describe('ProjectService', () => {
     expect(receivedCredentials()).toEqual({
       alias: 'prod',
       api_key: 'api-key',
-      auth_token: 'auth-token',
-      source: 'profile'
+      auth_token: 'auth-token'
     });
     expect(result.items[0]?.is_cli_default_project).toBe(false);
   });

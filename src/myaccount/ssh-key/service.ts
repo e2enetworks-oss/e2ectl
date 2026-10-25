@@ -7,6 +7,7 @@ import { formatMyAccountCommand } from '../api.js';
 import { CliError, EXIT_CODES } from '../../core/errors.js';
 import type { SshKeyClient, SshKeyCreateRequest } from './client.js';
 import type { SshKeyCreateResult, SshKeySummary } from './types.js';
+import { normalizeRequiredString } from '../../core/normalize.js';
 
 const SSH_KEY_TYPE_LABELS: Record<string, string> = {
   'ecdsa-sha2-nistp256': 'ECDSA',
@@ -52,6 +53,8 @@ export interface SshKeyListCommandResult {
 
 export interface SshKeyCreateCommandResult {
   action: 'create';
+  // False when the same key was already saved and is returned instead.
+  created: boolean;
   item: SshKeyItem;
 }
 
@@ -101,12 +104,26 @@ export class SshKeyService {
     const input = normalizeSshKeyCreateInput(options);
     const publicKey = await this.loadPublicKey(input.publicKeyFile);
     const client = await this.createClient(options);
+    const material = keyMaterial(publicKey);
+    const existing = (await client.listSshKeys()).find(
+      (key) => keyMaterial(key.ssh_key) === material
+    );
+
+    if (existing !== undefined) {
+      return {
+        action: 'create',
+        created: false,
+        item: summarizeListedSshKey(existing)
+      };
+    }
+
     const createdKey = await client.createSshKey(
       buildSshKeyCreateRequest(input.label, publicKey)
     );
 
     return {
       action: 'create',
+      created: true,
       item: summarizeCreatedSshKey(createdKey)
     };
   }
@@ -196,6 +213,12 @@ export class SshKeyService {
       throw wrapPublicKeyReadError(publicKeyFile, error);
     }
   }
+}
+
+// The key type and key body; the comment after them does not make a key
+// different.
+function keyMaterial(publicKey: string): string {
+  return publicKey.trim().split(/\s+/).slice(0, 2).join(' ');
 }
 
 function inferSshKeyType(publicKey: string): string {
@@ -300,23 +323,6 @@ function summarizeListedSshKey(item: SshKeySummary): SshKeyItem {
     public_key: item.ssh_key,
     type: item.ssh_key_type ?? inferSshKeyType(item.ssh_key)
   };
-}
-
-function normalizeRequiredString(
-  value: string,
-  label: string,
-  flag: string
-): string {
-  const normalized = value.trim();
-  if (normalized.length > 0) {
-    return normalized;
-  }
-
-  throw new CliError(`${label} cannot be empty.`, {
-    code: 'EMPTY_REQUIRED_VALUE',
-    exitCode: EXIT_CODES.usage,
-    suggestion: `Pass a non-empty value with ${flag}.`
-  });
 }
 
 function assertCanDelete(isInteractive: boolean, resourceName: string): void {

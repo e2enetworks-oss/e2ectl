@@ -28,6 +28,7 @@ describe('ssh-key formatter', () => {
     const output = renderSshKeyResult(
       {
         action: 'create',
+        created: true,
         item: {
           attached_nodes: 0,
           created_at: '19-Feb-2025',

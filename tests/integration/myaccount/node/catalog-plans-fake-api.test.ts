@@ -134,6 +134,7 @@ describe('node catalog plans against a fake MyAccount API', () => {
               config: {
                 disk_gb: 50,
                 family: null,
+                gpu: null,
                 ram: '4.00',
                 series: 'C3',
                 vcpu: 2
@@ -162,6 +163,7 @@ describe('node catalog plans against a fake MyAccount API', () => {
               config: {
                 disk_gb: 100,
                 family: null,
+                gpu: null,
                 ram: '8.00',
                 series: 'C3',
                 vcpu: 4

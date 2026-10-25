@@ -16,8 +16,7 @@ async function createRuntimeWithSslClient(
   await store.upsertProfile('default', {
     api_key: 'key',
     auth_token: 'token',
-    default_location: 'Delhi',
-    default_project_id: '1'
+    myaccount: { location: 'Delhi', project_id: '1' }
   });
 
   const stdout = new MemoryWriter();

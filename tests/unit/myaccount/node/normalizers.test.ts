@@ -1,10 +1,12 @@
 import { CliError, EXIT_CODES } from '../../../../src/core/errors.js';
 import {
-  normalizeBillingType,
   normalizeOptionalNumericId,
-  normalizeOptionalString,
   normalizeRequiredNumericId,
   normalizeRequiredString
+} from '../../../../src/core/normalize.js';
+import {
+  normalizeBillingType,
+  normalizeOptionalString
 } from '../../../../src/myaccount/node/normalizers.js';
 
 // ---------------------------------------------------------------------------

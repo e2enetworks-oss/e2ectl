@@ -153,8 +153,7 @@ describe('support-ticket commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      default_location: 'Delhi',
-      default_project_id: '12345'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
   }
 
