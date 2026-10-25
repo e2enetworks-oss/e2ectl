@@ -10,8 +10,7 @@ async function seedConfiguredProfile(tempHome: TempHome): Promise<void> {
       work: {
         api_key: 'work-key',
         auth_token: 'work-token',
-        default_location: 'Chennai',
-        default_project_id: '555',
+        myaccount: { location: 'Chennai', project_id: '555' },
         tir: { account_id: '1234', location: 'Delhi', project_id: '91011' }
       }
     }

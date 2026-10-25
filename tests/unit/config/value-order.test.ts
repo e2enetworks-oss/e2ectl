@@ -55,7 +55,7 @@ describe('MyAccount value order', () => {
     'project: flag=$flag env=$env profile=$profile picks $winner',
     ({ flag, env, winner }) => {
       const result = resolveCredentials({
-        config: profileConfig({ default_project_id: '301' }),
+        config: profileConfig({ project_id: '301' }),
         env: {
           ...(env ? { E2E_PROJECT_ID: '201' } : {})
         },
@@ -74,7 +74,7 @@ describe('MyAccount value order', () => {
     'location: flag=$flag env=$env profile=$profile gives $expected',
     ({ flag, env, profile, expected }) => {
       const result = resolveCredentials({
-        config: profileConfig({ default_location: profile }),
+        config: profileConfig({ location: profile }),
         env: env === undefined ? {} : { E2E_LOCATION: env },
         ...(flag === undefined ? {} : { location: flag })
       });
@@ -297,7 +297,7 @@ describe('TIR value order', () => {
 });
 
 function profileConfig(
-  myAccount: { default_location?: string; default_project_id?: string } = {},
+  myAccount: { location?: string; project_id?: string } = {},
   tir?: Record<string, string>
 ): ConfigFile {
   return {
@@ -306,9 +306,7 @@ function profileConfig(
       home: {
         api_key: 'key-home',
         auth_token: 'token-home',
-        default_project_id: '300',
-        default_location: 'Delhi',
-        ...myAccount,
+        myaccount: { location: 'Delhi', project_id: '300', ...myAccount },
         ...(tir === undefined ? {} : { tir })
       }
     }
@@ -322,14 +320,12 @@ function twoProfileConfig(): ConfigFile {
       home: {
         api_key: 'key-home',
         auth_token: 'token-home',
-        default_project_id: '300',
-        default_location: 'Delhi'
+        myaccount: { location: 'Delhi', project_id: '300' }
       },
       work: {
         api_key: 'key-work',
         auth_token: 'token-work',
-        default_project_id: '400',
-        default_location: 'Delhi'
+        myaccount: { location: 'Delhi', project_id: '400' }
       }
     }
   };

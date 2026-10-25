@@ -130,8 +130,7 @@ describe('ConfigService', () => {
           prod: {
             api_key: 'api-old-prod',
             auth_token: 'auth-old-prod',
-            default_location: 'Mumbai',
-            default_project_id: '99'
+            myaccount: { location: 'Mumbai', project_id: '99' }
           }
         }),
         {
@@ -167,8 +166,8 @@ describe('ConfigService', () => {
     );
     expect(result.importedAliases).toEqual(['prod', 'staging']);
     expect(result.importedDefaults).toEqual({
-      default_location: 'Delhi',
-      default_project_id: '123'
+      location: 'Delhi',
+      project_id: '123'
     });
     expect(getConfig()).toEqual({
       default: 'staging',
@@ -176,14 +175,12 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-new-prod',
           auth_token: 'auth-new-prod',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         },
         staging: {
           api_key: 'api-staging',
           auth_token: 'auth-staging',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         }
       }
     });
@@ -362,8 +359,7 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-old',
           auth_token: 'auth-old',
-          default_location: 'Delhi',
-          default_project_id: '123'
+          myaccount: { location: 'Delhi', project_id: '123' }
         }
       }),
       { isInteractive: false }
@@ -377,8 +373,7 @@ describe('ConfigService', () => {
     expect(getConfig().profiles.prod).toEqual({
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_location: 'Delhi',
-      default_project_id: '123'
+      myaccount: { location: 'Delhi', project_id: '123' }
     });
   });
 
@@ -432,7 +427,7 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-prod',
           auth_token: 'auth-prod',
-          default_project_id: '555'
+          myaccount: { project_id: '555' }
         }
       }
     });
@@ -449,7 +444,7 @@ describe('ConfigService', () => {
         prod: {
           api_key: 'api-prod',
           auth_token: 'auth-prod',
-          default_location: 'Chennai'
+          myaccount: { location: 'Chennai' }
         }
       }
     });

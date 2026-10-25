@@ -40,6 +40,11 @@ e2ectl config import \
 e2ectl config list
 ```
 
+Each profile shows its key and token (masked) and what `myaccount configure` and `tir configure`
+saved: the MyAccount Context and TIR Context columns, or `myaccount` and `tir` in `--json`. In the
+config file they are the `myaccount` (`project_id`, `location`) and `tir` (`account_id`,
+`project_id`, `location`) blocks of each profile.
+
 ### Choose The Default Saved Profile
 
 ```bash
@@ -60,8 +65,8 @@ then the saved profile. The first one that is set wins.
 | Value                          | Flag                                                           | Environment variable                                           | Saved profile                                  |
 | ------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------- |
 | API key and token              | `--alias` (the profile it names)                               | `E2E_API_KEY`, `E2E_AUTH_TOKEN`                                | the default profile                            |
-| MyAccount project              | `--project-id`                                                 | `E2E_PROJECT_ID`                                               | `default_project_id` on the profile            |
-| MyAccount location             | `--location`                                                   | `E2E_LOCATION`                                                 | `default_location` on the profile              |
+| MyAccount project              | `--project-id`                                                 | `E2E_PROJECT_ID`                                               | `myaccount.project_id` on the profile          |
+| MyAccount location             | `--location`                                                   | `E2E_LOCATION`                                                 | `myaccount.location` on the profile            |
 | TIR account, project, location | `--account-id`, `--project-id`, `--location` on `tir` commands | `E2E_TIR_ACCOUNT_ID`, `E2E_TIR_PROJECT_ID`, `E2E_TIR_LOCATION` | saved by `tir configure` (see [TIR](./tir.md)) |
 
 Two things follow from this:

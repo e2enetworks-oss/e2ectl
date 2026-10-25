@@ -28,12 +28,14 @@ export function createMyAccountSetupSteps(
       })),
     platform: 'myaccount',
     readSaved: (profile) => ({
-      location: profile.default_location,
-      project: profile.default_project_id
+      location: profile.myaccount?.location,
+      project: profile.myaccount?.project_id
     }),
     toProfilePatch: (context) => ({
-      default_location: context.location,
-      default_project_id: String(context.projectId)
+      myaccount: {
+        location: context.location,
+        project_id: String(context.projectId)
+      }
     })
   };
 }

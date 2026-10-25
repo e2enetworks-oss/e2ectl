@@ -2,7 +2,7 @@ import { CliError, EXIT_CODES } from '../core/errors.js';
 import { formatCliCommand } from '../app/metadata.js';
 import type { ApiAuthCredentials } from '../http/index.js';
 import { readImportedProfiles } from './import-file.js';
-import type { ConfigFile, ProfileConfig } from './types.js';
+import type { ConfigFile, MyAccountContext, ProfileConfig } from './types.js';
 import { VALID_LOCATIONS } from './types.js';
 import { normalizeRequiredString } from '../core/normalize.js';
 
@@ -44,9 +44,7 @@ export interface ConfigImportedCommandResult {
   config: ConfigFile;
   filePath: string;
   importedAliases: string[];
-  importedDefaults: Partial<
-    Pick<ProfileConfig, 'default_project_id' | 'default_location'>
-  >;
+  importedDefaults: MyAccountContext;
   previousDefault: string | undefined;
 }
 
@@ -362,9 +360,7 @@ export class ConfigService {
   private async resolveImportedDefaults(
     options: ImportProfilesInput,
     canPrompt: boolean
-  ): Promise<
-    Partial<Pick<ProfileConfig, 'default_project_id' | 'default_location'>>
-  > {
+  ): Promise<MyAccountContext> {
     const defaultProjectId =
       normalizeOptionalString(options.defaultProjectId) ??
       (canPrompt
@@ -389,72 +385,36 @@ export class ConfigService {
     return {
       ...(defaultProjectId === undefined
         ? {}
-        : {
-            default_project_id: defaultProjectId
-          }),
-      ...(defaultLocation === undefined
-        ? {}
-        : {
-            default_location: defaultLocation
-          })
+        : { project_id: defaultProjectId }),
+      ...(defaultLocation === undefined ? {} : { location: defaultLocation })
     };
   }
 }
 
 function applyImportedDefaults(
   profiles: Record<string, ProfileConfig>,
-  defaults: Partial<
-    Pick<ProfileConfig, 'default_project_id' | 'default_location'>
-  >
+  defaults: MyAccountContext
 ): Record<string, ProfileConfig> {
-  if (
-    defaults.default_project_id === undefined &&
-    defaults.default_location === undefined
-  ) {
+  if (defaults.project_id === undefined && defaults.location === undefined) {
     return profiles;
   }
 
   return Object.fromEntries(
     Object.entries(profiles).map(([alias, profile]) => [
       alias,
-      {
-        ...profile,
-        ...(defaults.default_project_id === undefined
-          ? {}
-          : {
-              default_project_id: defaults.default_project_id
-            }),
-        ...(defaults.default_location === undefined
-          ? {}
-          : {
-              default_location: defaults.default_location
-            })
-      }
+      { ...profile, myaccount: { ...profile.myaccount, ...defaults } }
     ])
   );
 }
 
 function preserveExistingProfileContext(
   profile: ProfileConfig | undefined
-): Partial<
-  Pick<ProfileConfig, 'default_project_id' | 'default_location' | 'tir'>
-> {
-  if (profile === undefined) {
-    return {};
-  }
-
+): Pick<ProfileConfig, 'myaccount' | 'tir'> {
   return {
-    ...(profile.default_project_id === undefined
+    ...(profile?.myaccount === undefined
       ? {}
-      : {
-          default_project_id: profile.default_project_id
-        }),
-    ...(profile.default_location === undefined
-      ? {}
-      : {
-          default_location: profile.default_location
-        }),
-    ...(profile.tir === undefined ? {} : { tir: profile.tir })
+      : { myaccount: profile.myaccount }),
+    ...(profile?.tir === undefined ? {} : { tir: profile.tir })
   };
 }
 

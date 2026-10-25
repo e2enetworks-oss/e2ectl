@@ -35,14 +35,12 @@ describe('ConfigStore', () => {
     await store.upsertProfile('zeta', {
       api_key: ' api-zeta ',
       auth_token: ' auth-zeta ',
-      default_project_id: '2',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '2' }
     });
     await store.upsertProfile('alpha', {
       api_key: ' api-alpha ',
       auth_token: ' auth-alpha ',
-      default_project_id: '1',
-      default_location: 'Chennai'
+      myaccount: { location: 'Chennai', project_id: '1' }
     });
 
     const content = await readFile(configPath, 'utf8');
@@ -52,8 +50,7 @@ describe('ConfigStore', () => {
     expect(parsedConfig.profiles.alpha).toEqual({
       api_key: 'api-alpha',
       auth_token: 'auth-alpha',
-      default_project_id: '1',
-      default_location: 'Chennai'
+      myaccount: { location: 'Chennai', project_id: '1' }
     });
   });
 
@@ -145,8 +142,7 @@ describe('ConfigStore', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '46429',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '46429' }
           }
         }
       });
@@ -198,15 +194,13 @@ describe('ConfigStore', () => {
     });
 
     const nextConfig = await store.updateProfile('prod', {
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
 
     expect(nextConfig.profiles.prod).toEqual({
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_project_id: '46429',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '46429' }
     });
   });
 
@@ -218,14 +212,12 @@ describe('ConfigStore', () => {
     await store.upsertProfile('prod', {
       api_key: 'api-prod',
       auth_token: 'auth-prod',
-      default_project_id: '1',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '1' }
     });
     await store.upsertProfile('dev', {
       api_key: 'api-dev',
       auth_token: 'auth-dev',
-      default_project_id: '2',
-      default_location: 'Chennai'
+      myaccount: { location: 'Chennai', project_id: '2' }
     });
     await store.setDefault('prod');
 
@@ -257,8 +249,7 @@ describe('ConfigStore TIR context', () => {
         prod: {
           api_key: 'api-prod',
           auth_token: 'auth-prod',
-          default_location: 'Chennai',
-          default_project_id: '46429'
+          myaccount: { location: 'Chennai', project_id: '46429' }
         }
       }
     };
@@ -309,8 +300,7 @@ describe('ConfigStore TIR context', () => {
     });
 
     const nextConfig = await store.updateProfile('prod', {
-      default_location: 'Chennai',
-      default_project_id: '46429'
+      myaccount: { location: 'Chennai', project_id: '46429' }
     });
 
     expect(nextConfig.profiles.prod?.tir).toEqual({
@@ -391,8 +381,7 @@ describe('ConfigStore – atomic write guarantees', () => {
         staging: {
           api_key: 'api-staging',
           auth_token: 'auth-staging',
-          default_project_id: '99',
-          default_location: 'Mumbai'
+          myaccount: { location: 'Mumbai', project_id: '99' }
         },
         prod: { api_key: 'api-prod', auth_token: 'auth-prod' }
       },
@@ -409,8 +398,7 @@ describe('ConfigStore – atomic write guarantees', () => {
         staging: {
           api_key: 'api-staging',
           auth_token: 'auth-staging',
-          default_project_id: '99',
-          default_location: 'Mumbai'
+          myaccount: { location: 'Mumbai', project_id: '99' }
         }
       },
       default: 'prod'

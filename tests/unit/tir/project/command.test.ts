@@ -131,8 +131,7 @@ describe('tir configure', () => {
 
   it('checks the values against TIR and saves them in the default profile', async () => {
     const { output, store } = await runTir(['tir', 'configure', ...flags], {
-      default_location: 'Delhi',
-      default_project_id: '5'
+      myaccount: { location: 'Delhi', project_id: '5' }
     });
 
     expect(output).toBe(
@@ -144,7 +143,7 @@ describe('tir configure', () => {
       location: 'Chennai',
       project_id: '33'
     });
-    expect(saved?.default_project_id).toBe('5');
+    expect(saved?.myaccount?.project_id).toBe('5');
   });
 
   it('emits the shared --json shape', async () => {

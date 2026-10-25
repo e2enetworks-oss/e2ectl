@@ -24,8 +24,7 @@ export function summarizeProfiles(config: ConfigFile): ProfileSummary[] {
       isDefault: config.default === alias,
       api_key: maskSecret(profile.api_key),
       auth_token: maskSecret(profile.auth_token),
-      default_project_id: profile.default_project_id ?? '',
-      default_location: profile.default_location ?? '',
+      myaccount: profile.myaccount ?? null,
       tir: profile.tir ?? null
     }));
 }
@@ -37,8 +36,7 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       'Default',
       'API Key',
       'Auth Token',
-      'Default Project ID',
-      'Default Location',
+      'MyAccount Context',
       'TIR Context'
     ]
   });
@@ -49,24 +47,28 @@ export function formatProfilesTable(profiles: ProfileSummary[]): string {
       profile.isDefault ? 'yes' : '',
       profile.api_key,
       profile.auth_token,
-      profile.default_project_id,
-      profile.default_location,
-      formatTirContext(profile.tir)
+      formatContext(profile.myaccount),
+      formatContext(profile.tir)
     ]);
   }
 
   return table.toString();
 }
 
-function formatTirContext(tir: TirContext | null): string {
-  if (tir === null) {
+// "account 12, project 34, Delhi" for a saved MyAccount or TIR block.
+function formatContext(context: TirContext | null): string {
+  if (context === null) {
     return '';
   }
 
   return [
-    tir.account_id === undefined ? undefined : `account ${tir.account_id}`,
-    tir.project_id === undefined ? undefined : `project ${tir.project_id}`,
-    tir.location
+    context.account_id === undefined
+      ? undefined
+      : `account ${context.account_id}`,
+    context.project_id === undefined
+      ? undefined
+      : `project ${context.project_id}`,
+    context.location
   ]
     .filter((part) => part !== undefined)
     .join(', ');
@@ -97,10 +99,8 @@ function renderConfigJson(result: ConfigCommandResult): string {
         default: result.config.default ?? null,
         imported_aliases: result.importedAliases,
         imported_count: result.importedAliases.length,
-        saved_default_location:
-          result.importedDefaults.default_location ?? null,
-        saved_default_project_id:
-          result.importedDefaults.default_project_id ?? null,
+        saved_default_location: result.importedDefaults.location ?? null,
+        saved_default_project_id: result.importedDefaults.project_id ?? null,
         profiles: summarizeProfiles(result.config)
       });
     case 'list':
@@ -120,15 +120,15 @@ function renderImportedHuman(result: ConfigImportedCommandResult): string {
     formatImportDefaultMessage(result)
   ];
 
-  if (result.importedDefaults.default_project_id !== undefined) {
+  if (result.importedDefaults.project_id !== undefined) {
     lines.push(
-      `Saved default project ID "${result.importedDefaults.default_project_id}" for imported aliases.`
+      `Saved MyAccount project ID "${result.importedDefaults.project_id}" for imported aliases.`
     );
   }
 
-  if (result.importedDefaults.default_location !== undefined) {
+  if (result.importedDefaults.location !== undefined) {
     lines.push(
-      `Saved default location "${result.importedDefaults.default_location}" for imported aliases.`
+      `Saved MyAccount location "${result.importedDefaults.location}" for imported aliases.`
     );
   }
 

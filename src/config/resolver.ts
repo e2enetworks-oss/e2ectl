@@ -255,12 +255,12 @@ function resolveMyAccountContext(
   const projectId = pickValue({
     flag: options.projectId,
     env: env[CONTEXT_ENV_VAR_BY_FIELD.project_id],
-    profile: selection.profile?.default_project_id
+    profile: selection.profile?.myaccount?.project_id
   });
   const location = pickValue({
     flag: options.location,
     env: env[CONTEXT_ENV_VAR_BY_FIELD.location],
-    profile: selection.profile?.default_location
+    profile: selection.profile?.myaccount?.location
   });
 
   return withCanonicalLocation({

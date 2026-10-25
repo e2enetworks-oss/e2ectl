@@ -15,11 +15,10 @@ import { CliError, EXIT_CODES } from '../core/errors.js';
 import { isNonEmptyString, isRecord } from '../core/guards.js';
 import { stableStringify, type JsonValue } from '../core/json.js';
 import {
+  REQUIRED_CONTEXT_FIELDS,
   TIR_CONTEXT_FIELDS,
   type ConfigFile,
-  type ProfileConfig,
-  type TirContext,
-  type TirContextField
+  type ProfileConfig
 } from './types.js';
 
 const DEFAULT_DIRECTORY_NAME = '.e2e';
@@ -203,15 +202,15 @@ function normalizeProfile(profile: ProfileConfig): ProfileConfig {
     auth_token: profile.auth_token.trim()
   };
 
-  if (isNonEmptyString(profile.default_project_id)) {
-    normalizedProfile.default_project_id = profile.default_project_id.trim();
+  const myaccount = normalizeContext(
+    profile.myaccount,
+    REQUIRED_CONTEXT_FIELDS
+  );
+  if (myaccount !== undefined) {
+    normalizedProfile.myaccount = myaccount;
   }
 
-  if (isNonEmptyString(profile.default_location)) {
-    normalizedProfile.default_location = profile.default_location.trim();
-  }
-
-  const tir = normalizeTirContext(profile.tir);
+  const tir = normalizeContext(profile.tir, TIR_CONTEXT_FIELDS);
   if (tir !== undefined) {
     normalizedProfile.tir = tir;
   }
@@ -220,15 +219,16 @@ function normalizeProfile(profile: ProfileConfig): ProfileConfig {
 }
 
 // Trims values and drops empty ones; returns undefined when nothing is left.
-function normalizeTirContext(
-  context: TirContext | undefined
-): TirContext | undefined {
+function normalizeContext<TField extends string>(
+  context: Partial<Record<TField, string>> | undefined,
+  fields: readonly TField[]
+): Partial<Record<TField, string>> | undefined {
   if (context === undefined) {
     return undefined;
   }
 
-  const normalized: TirContext = {};
-  for (const field of TIR_CONTEXT_FIELDS) {
+  const normalized: Partial<Record<TField, string>> = {};
+  for (const field of fields) {
     const value = context[field];
     if (isNonEmptyString(value)) {
       normalized[field] = value.trim();
@@ -380,51 +380,52 @@ function validateProfileShape(
     auth_token: authToken
   };
 
-  if (value.default_project_id !== undefined) {
-    profile.default_project_id = readOptionalProfileField(
+  if (value.myaccount !== undefined) {
+    profile.myaccount = validateContextShape(
       alias,
-      'default_project_id',
-      value.default_project_id,
-      configPath
-    );
-  }
-
-  if (value.default_location !== undefined) {
-    profile.default_location = readOptionalProfileField(
-      alias,
-      'default_location',
-      value.default_location,
+      'myaccount',
+      value.myaccount,
+      REQUIRED_CONTEXT_FIELDS,
       configPath
     );
   }
 
   if (value.tir !== undefined) {
-    profile.tir = validateTirContextShape(alias, value.tir, configPath);
+    profile.tir = validateContextShape(
+      alias,
+      'tir',
+      value.tir,
+      TIR_CONTEXT_FIELDS,
+      configPath
+    );
   }
 
   return profile;
 }
 
-// Keeps only the known TIR fields; any other key under "tir" is dropped and
-// disappears from the file on the next save.
-function validateTirContextShape(
+// Keeps only the known fields of a platform block ("myaccount" or "tir");
+// any other key in it, or on the profile, is dropped and disappears from
+// the file on the next save.
+function validateContextShape<TField extends string>(
   alias: string,
+  block: 'myaccount' | 'tir',
   value: unknown,
+  fields: readonly TField[],
   configPath: string
-): TirContext {
+): Partial<Record<TField, string>> {
   if (!isRecord(value)) {
     throw invalidConfigShapeError(
       configPath,
-      `Profile "${alias}" field "tir" must be an object when present.`
+      `Profile "${alias}" field "${block}" must be an object when present.`
     );
   }
 
-  const context: TirContext = {};
-  for (const field of TIR_CONTEXT_FIELDS) {
+  const context: Partial<Record<TField, string>> = {};
+  for (const field of fields) {
     if (value[field] !== undefined) {
       context[field] = readOptionalProfileField(
         alias,
-        `tir.${field}`,
+        `${block}.${field}`,
         value[field],
         configPath
       );
@@ -452,7 +453,7 @@ function readRequiredProfileField(
 
 function readOptionalProfileField(
   alias: string,
-  field: 'default_project_id' | 'default_location' | `tir.${TirContextField}`,
+  field: string,
   value: unknown,
   configPath: string
 ): string {

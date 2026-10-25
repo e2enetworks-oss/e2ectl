@@ -114,8 +114,7 @@ describe('e2ectl configure against fake APIs', () => {
       );
       expect(saved.exitCode).toBe(0);
       expect((await tempHome.readConfig()).profiles.work).toMatchObject({
-        default_location: 'Chennai',
-        default_project_id: '46'
+        myaccount: { location: 'Chennai', project_id: '46' }
       });
 
       const nodes = await runBuiltCli(['myaccount', 'node', 'list'], { env });

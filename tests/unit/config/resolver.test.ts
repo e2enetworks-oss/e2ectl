@@ -11,8 +11,7 @@ describe('resolveCredentials', () => {
       prod: {
         api_key: 'api-prod',
         auth_token: 'auth-prod',
-        default_project_id: '123',
-        default_location: 'Delhi'
+        myaccount: { location: 'Delhi', project_id: '123' }
       }
     },
     default: 'prod'
@@ -345,7 +344,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123'
+              myaccount: { project_id: '123' }
             }
           }
         },
@@ -373,8 +372,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: 'abc',
-              default_location: 'Delhi'
+              myaccount: { location: 'Delhi', project_id: 'abc' }
             }
           },
           default: 'prod'
@@ -389,8 +387,7 @@ describe('resolveCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123',
-              default_location: 'Atlantis'
+              myaccount: { location: 'Atlantis', project_id: '123' }
             }
           },
           default: 'prod'
@@ -454,8 +451,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '123' }
           }
         },
         default: 'prod'
@@ -498,8 +494,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: '   '
+            myaccount: { location: '   ', project_id: '123' }
           }
         },
         default: 'prod'
@@ -512,8 +507,7 @@ describe('resolveAccountCredentials', () => {
           prod: {
             api_key: 'api-prod',
             auth_token: 'auth-prod',
-            default_project_id: '123',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '123' }
           }
         },
         default: 'prod'
@@ -544,8 +538,7 @@ describe('resolveAccountCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: 'bad-id',
-              default_location: 'Delhi'
+              myaccount: { location: 'Delhi', project_id: 'bad-id' }
             }
           },
           default: 'prod'
@@ -560,8 +553,7 @@ describe('resolveAccountCredentials', () => {
             prod: {
               api_key: 'api-prod',
               auth_token: 'auth-prod',
-              default_project_id: '123',
-              default_location: 'Atlantis'
+              myaccount: { location: 'Atlantis', project_id: '123' }
             }
           },
           default: 'prod'

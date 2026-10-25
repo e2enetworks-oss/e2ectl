@@ -13,14 +13,12 @@ describe('config list json process flow', () => {
           dev: {
             api_key: 'dev-api-key-1111',
             auth_token: 'dev-auth-token-2222',
-            default_project_id: '12345',
-            default_location: 'Chennai'
+            myaccount: { location: 'Chennai', project_id: '12345' }
           },
           prod: {
             api_key: 'prod-api-key-3333',
             auth_token: 'prod-auth-token-4444',
-            default_project_id: '46429',
-            default_location: 'Delhi'
+            myaccount: { location: 'Delhi', project_id: '46429' }
           }
         }
       });
@@ -42,18 +40,16 @@ describe('config list json process flow', () => {
               alias: 'dev',
               api_key: '****1111',
               auth_token: '****2222',
-              default_location: 'Chennai',
-              default_project_id: '12345',
               isDefault: false,
+              myaccount: { location: 'Chennai', project_id: '12345' },
               tir: null
             },
             {
               alias: 'prod',
               api_key: '****3333',
               auth_token: '****4444',
-              default_location: 'Delhi',
-              default_project_id: '46429',
               isDefault: true,
+              myaccount: { location: 'Delhi', project_id: '46429' },
               tir: null
             }
           ]

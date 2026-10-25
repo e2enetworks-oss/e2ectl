@@ -10,13 +10,14 @@ export type TirContextField = (typeof TIR_CONTEXT_FIELDS)[number];
 
 export type TirContext = Partial<Record<TirContextField, string>>;
 
+// The MyAccount project and location a profile works in, saved by
+// `myaccount configure` and used by every later `myaccount` command.
+export type MyAccountContext = Partial<Record<ContextField, string>>;
+
 export interface ProfileConfig {
   api_key: string;
   auth_token: string;
-  // MyAccount context. The names predate TIR and stay as they are so
-  // existing config files keep working unchanged.
-  default_project_id?: string;
-  default_location?: string;
+  myaccount?: MyAccountContext;
   tir?: TirContext;
 }
 
@@ -58,8 +59,7 @@ export interface ProfileSummary {
   isDefault: boolean;
   api_key: string;
   auth_token: string;
-  default_project_id: string;
-  default_location: string;
+  myaccount: MyAccountContext | null;
   tir: TirContext | null;
 }
 

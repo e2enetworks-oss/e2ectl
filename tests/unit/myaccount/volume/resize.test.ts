@@ -55,8 +55,7 @@ async function resize(
   await store.upsertProfile('work', {
     api_key: 'k',
     auth_token: 't',
-    default_location: 'Chennai',
-    default_project_id: '1'
+    myaccount: { location: 'Chennai', project_id: '1' }
   });
   const stdout = new MemoryWriter();
   await createProgram(

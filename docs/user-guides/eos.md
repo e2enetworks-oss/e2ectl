@@ -42,7 +42,7 @@ mc cp e2e/my-bucket/report.csv ./report-copy.csv
 
 ```bash
 e2ectl myaccount eos access list my-bucket
-e2ectl myaccount eos access revoke my-bucket <access-id>
+e2ectl myaccount eos access revoke my-bucket --access-key <access-key>
 ```
 
 ### Delete Keys And Buckets

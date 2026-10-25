@@ -184,8 +184,7 @@ describe('reserved-ip commands', () => {
     await runtime.store.upsertProfile('prod', {
       api_key: 'api-key',
       auth_token: 'auth-token',
-      default_project_id: '12345',
-      default_location: 'Delhi'
+      myaccount: { location: 'Delhi', project_id: '12345' }
     });
   }
 

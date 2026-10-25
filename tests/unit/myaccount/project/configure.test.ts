@@ -62,8 +62,7 @@ describe('myaccount configure', () => {
     );
     const saved = (await store.read()).profiles.work;
     expect(saved).toMatchObject({
-      default_location: 'Chennai',
-      default_project_id: '46'
+      myaccount: { location: 'Chennai', project_id: '46' }
     });
     expect(saved?.tir).toEqual({ account_id: '1' });
   });

@@ -55,8 +55,9 @@ e2ectl myaccount volume resize <volume-id> --size 200
 e2ectl myaccount volume get <volume-id>
 ```
 
-The volume must be attached to a node, and the new size must be bigger and one of the sizes in
-`volume plans`. E2E grows it through the node it is attached to; the volume keeps its name and
+It asks before growing the volume, because a volume cannot be shrunk again; add `--force` in
+scripts. The volume must be attached to a node, and the new size must be bigger and one of the
+sizes in `volume plans`. E2E grows it through the node it is attached to; the volume keeps its name and
 data. E2E refuses while the volume has snapshots: delete them first. Grow the filesystem inside
 the node afterwards to use the new space.
 

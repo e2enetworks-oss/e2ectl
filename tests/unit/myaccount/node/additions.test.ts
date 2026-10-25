@@ -125,8 +125,7 @@ function service(
             work: {
               api_key: 'k',
               auth_token: 't',
-              default_location: 'Chennai',
-              default_project_id: '1'
+              myaccount: { location: 'Chennai', project_id: '1' }
             }
           }
         })
@@ -469,8 +468,7 @@ describe('node upgrade keeps the image', () => {
               w: {
                 api_key: 'k',
                 auth_token: 't',
-                default_location: 'Delhi',
-                default_project_id: '1'
+                myaccount: { location: 'Delhi', project_id: '1' }
               }
             }
           })
@@ -585,8 +583,7 @@ describe('node commands for the additions', () => {
     await store.upsertProfile('work', {
       api_key: 'k',
       auth_token: 't',
-      default_location: 'Chennai',
-      default_project_id: '1'
+      myaccount: { location: 'Chennai', project_id: '1' }
     });
     const stdout = new MemoryWriter();
     await createProgram(

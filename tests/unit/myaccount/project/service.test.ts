@@ -15,12 +15,14 @@ function createConfig(overrides?: {
       prod: {
         api_key: 'api-key',
         auth_token: 'auth-token',
-        ...(overrides?.defaultLocation === undefined
-          ? {}
-          : { default_location: overrides.defaultLocation }),
-        ...(overrides?.defaultProjectId === undefined
-          ? {}
-          : { default_project_id: overrides.defaultProjectId })
+        myaccount: {
+          ...(overrides?.defaultLocation === undefined
+            ? {}
+            : { location: overrides.defaultLocation }),
+          ...(overrides?.defaultProjectId === undefined
+            ? {}
+            : { project_id: overrides.defaultProjectId })
+        }
       }
     }
   };

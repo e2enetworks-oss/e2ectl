@@ -22,7 +22,7 @@ const PLATFORM_CONTEXT = {
     credentialsType: 'ResolvedCredentials',
     optionsHelper: 'addContextOptions',
     resolverRequirement: '',
-    testProfile: "default_location: 'Delhi',\n    default_project_id: '1'"
+    testProfile: "myaccount: { location: 'Delhi', project_id: '1' }"
   },
   tir: {
     clientOptions: 'tirApiClientOptions',

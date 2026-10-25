@@ -132,8 +132,7 @@ describe('e2ectl configure in a terminal', () => {
     });
 
     expect(config.profiles.default).toMatchObject({
-      default_location: 'Delhi',
-      default_project_id: '46'
+      myaccount: { location: 'Delhi', project_id: '46' }
     });
     expect(config.profiles.default?.tir).toBeUndefined();
   });
@@ -148,7 +147,7 @@ describe('e2ectl configure in a terminal', () => {
       output.indexOf('MyAccount context saved')
     );
     expect(config.profiles.default).toMatchObject({
-      default_location: 'Delhi',
+      myaccount: { location: 'Delhi' },
       tir: { location: 'Chennai' }
     });
   });
@@ -172,7 +171,7 @@ describe('e2ectl configure in a terminal', () => {
     });
 
     expect(output).toContain('Not a choice: myacount.');
-    expect(config.profiles.default?.default_project_id).toBe('46');
+    expect(config.profiles.default?.myaccount?.project_id).toBe('46');
   });
 
   it('keeps the saved key and token when Enter is pressed', async () => {
@@ -189,7 +188,7 @@ describe('e2ectl configure in a terminal', () => {
       api_key: 'saved-key',
       auth_token: 'saved-token'
     });
-    expect(config.profiles.work?.default_project_id).toBe('46');
+    expect(config.profiles.work?.myaccount?.project_id).toBe('46');
   });
 
   it('says whether Enter keeps the saved key or uses the environment', async () => {
@@ -273,8 +272,7 @@ describe('e2ectl configure without a terminal', () => {
     expect(config.profiles.default).toMatchObject({
       api_key: 'env-key',
       auth_token: 'env-token',
-      default_location: 'Delhi',
-      default_project_id: '46',
+      myaccount: { location: 'Delhi', project_id: '46' },
       tir: { account_id: '11', location: 'Chennai', project_id: '33' }
     });
   });
@@ -288,7 +286,7 @@ describe('e2ectl configure without a terminal', () => {
       'Delhi'
     ]);
 
-    expect(config.profiles.default?.default_project_id).toBe('46');
+    expect(config.profiles.default?.myaccount?.project_id).toBe('46');
     expect(config.profiles.default?.tir).toBeUndefined();
   });
 
